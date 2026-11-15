@@ -3,7 +3,7 @@
 
 import { app } from './app';
 import { EditorDocument } from '../core/document';
-import { GroupLayer, Layer, LayerMask, RasterLayer, TextLayer, isRaster, walkLayers } from '../core/layers';
+import { GroupLayer, Layer, LayerMask, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup } from '../core/compositor';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
@@ -89,6 +89,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   let c: Layer;
   if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
   else if (l instanceof TextLayer) { c = new TextLayer(l.name, d.width, d.height, { ...l.props }); }
+  else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
   if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
@@ -216,7 +217,7 @@ export function mergeDown() {
   ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = l.blendMode;
   if (l.visible) ctx.drawImage(top, 0, 0);
   let target = below as RasterLayer;
-  if (target instanceof TextLayer) target = rasterizeLayer(target);
+  if (isParametric(target)) target = rasterizeLayer(target);
   target.canvas = base; target.mask = null; target.touch();
   p.remove(l);
   d.setActive(target, false);
@@ -251,7 +252,7 @@ export function flattenImage() {
 
 export function rasterize() {
   const d = doc(); const l = d?.active;
-  if (!d || !(l instanceof TextLayer)) { app.toast('Solo las capas de texto se pueden rasterizar', 'warn'); return; }
+  if (!d || !isParametric(l)) { app.toast('Solo las capas de texto o de forma se pueden rasterizar', 'warn'); return; }
   rasterizeLayer(l); d.commit('Rasterizar capa');
 }
 
@@ -272,7 +273,7 @@ export function deleteMask(apply: boolean) {
   if (apply) {
     if (l instanceof GroupLayer) { app.toast('No se puede aplicar la máscara de un grupo', 'warn'); return; }
     let r = l as RasterLayer;
-    if (r instanceof TextLayer) r = rasterizeLayer(r);
+    if (isParametric(r)) r = rasterizeLayer(r);
     const c = ctx2d(r.canvas); c.globalCompositeOperation = 'destination-in'; c.drawImage(l.mask.canvas, 0, 0); c.globalCompositeOperation = 'source-over';
     r.touch(); r.mask = null;
   } else l.mask = null;
@@ -415,6 +416,20 @@ export function cropToSelection() {
   app.viewport.fit(true);
 }
 
+/** Amplía el lienzo para que se vea todo lo que quedó fuera al mover capas. */
+export function revealAll() {
+  const d = doc(); if (!d) return;
+  let x0 = 0, y0 = 0, x1 = d.width, y1 = d.height;
+  for (const l of d.allLayers()) if (isRaster(l) && !isParametric(l)) {
+    const f = l.fullContent();
+    if (f.canvas === l.canvas) continue;
+    const b = contentBounds(f.canvas); if (!b) continue;
+    x0 = Math.min(x0, f.x + b.x); y0 = Math.min(y0, f.y + b.y); x1 = Math.max(x1, f.x + b.x + b.w); y1 = Math.max(y1, f.y + b.y + b.h);
+  }
+  if (x0 === 0 && y0 === 0 && x1 === d.width && y1 === d.height) { app.toast('No hay nada fuera del lienzo'); return; }
+  d.resizeCanvas(x1 - x0, y1 - y0, -x0, -y0); d.commit('Revelar todo'); app.viewport.fit(true);
+}
+
 export function trimTransparent() {
   const d = doc(); if (!d) return;
   const b = contentBounds(d.flatten());
@@ -444,7 +459,7 @@ export function transformImage(kind: 'rot90' | 'rot-90' | 'rot180' | 'flipH' | '
     return c;
   };
   for (const l of d.allLayers()) {
-    if (l instanceof TextLayer) rasterizeLayer(l);
+    if (isParametric(l)) rasterizeLayer(l);
   }
   for (const l of d.allLayers()) {
     if (isRaster(l)) { l.canvas = tf(l.canvas); l.touch(); }

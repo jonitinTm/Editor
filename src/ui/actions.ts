@@ -8,7 +8,7 @@ import { FILTERS } from '../filters/registry';
 import { quickTransform } from '../tools/transform';
 import * as io from '../io/files';
 import { promptDialog } from './dialog';
-import { TextLayer } from '../core/layers';
+import { isParametric } from '../core/layers';
 
 export interface Action {
   id: string;
@@ -63,6 +63,7 @@ export const ACTIONS: Action[] = [
   { id: 'imgFlipV', label: 'Voltear lienzo vertical', enabled: hasDoc, run: () => ops.transformImage('flipV') },
   { id: 'cropSel', label: 'Recortar a la selección', enabled: hasSel, run: ops.cropToSelection },
   { id: 'trim', label: 'Cortar transparencia', enabled: hasDoc, run: ops.trimTransparent },
+  { id: 'revealAll', label: 'Revelar todo', enabled: hasDoc, run: ops.revealAll },
 
   // Capa
   { id: 'newLayer', label: 'Nueva capa', keys: ['Shift+Ctrl+N'], enabled: hasDoc, run: ops.newLayer },
@@ -85,7 +86,7 @@ export const ACTIONS: Action[] = [
   { id: 'bringForward', label: 'Hacia delante', keys: ['Ctrl+]'], enabled: hasLayer, run: () => ops.arrangeLayer('up') },
   { id: 'sendBackward', label: 'Hacia atrás', keys: ['Ctrl+['], enabled: hasLayer, run: () => ops.arrangeLayer('down') },
   { id: 'sendBack', label: 'Enviar al fondo', keys: ['Shift+Ctrl+['], enabled: hasLayer, run: () => ops.arrangeLayer('bottom') },
-  { id: 'rasterize', label: 'Rasterizar capa de texto', enabled: () => app.doc?.active instanceof TextLayer, run: ops.rasterize },
+  { id: 'rasterize', label: 'Rasterizar capa (texto o forma)', enabled: () => isParametric(app.doc?.active), run: ops.rasterize },
   { id: 'mergeDown', label: 'Combinar hacia abajo', keys: ['Ctrl+E'], enabled: hasLayer, run: ops.mergeDown },
   { id: 'mergeVisible', label: 'Combinar visibles', keys: ['Shift+Ctrl+E'], enabled: hasDoc, run: ops.mergeVisible },
   { id: 'flatten', label: 'Acoplar imagen', enabled: hasDoc, run: ops.flattenImage },

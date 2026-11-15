@@ -4,7 +4,8 @@ import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
-import { GroupLayer, Layer, RasterLayer, TextLayer, isRaster, walkLayers } from '../core/layers';
+import { GroupLayer, Layer, RasterLayer, isRaster, isParametric, walkLayers } from '../core/layers';
+import { selectedLayers } from '../ui/ops';
 import { rasterizeLayer } from './paint';
 
 /** Desplaza el contenido de un lienzo (los bordes que quedan vacíos se rellenan con `fill`). */
@@ -50,10 +51,12 @@ export class MoveTool implements Tool {
     const doc = app.doc!;
     let a = doc.active;
     if (!a) { app.toast('No hay ninguna capa seleccionada', 'warn'); return false; }
-    if (a.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return false; }
+    let sel = selectedLayers();
+    if (!sel.includes(a)) sel = [a];
+    if (sel.some(l => l.isLocked())) { app.toast('La capa está bloqueada', 'warn'); return false; }
     this.offset = { x: 0, y: 0 };
-    if (doc.selection.active && !(a instanceof GroupLayer) && !doc.editMask) {
-      if (a instanceof TextLayer) a = rasterizeLayer(a);
+    if (doc.selection.active && sel.length === 1 && !(a instanceof GroupLayer) && !doc.editMask) {
+      if (isParametric(a)) a = rasterizeLayer(a);
       const layer = a as RasterLayer;
       const sel = doc.selection.mask!;
       const pixels = cloneCanvas(layer.canvas);
@@ -64,7 +67,7 @@ export class MoveTool implements Tool {
       doc.overrides.set(layer, { canvas: hole, extra: ctx => ctx.drawImage(pixels, this.offset.x, this.offset.y) });
       this.layers = [layer];
     } else {
-      this.layers = a instanceof GroupLayer ? [a, ...walkLayers(a)] : [a];
+      this.layers = [...new Set(sel.flatMap(l => l instanceof GroupLayer ? [l, ...walkLayers(l)] : [l]))];
       this.floating = null;
     }
     return true;
@@ -77,7 +80,8 @@ export class MoveTool implements Tool {
     } else {
       for (const l of this.layers) {
         const ov = doc.overrides.get(l) ?? {};
-        if (isRaster(l)) ov.offset = this.offset;
+        if (isParametric(l)) ov.offset = this.offset;
+        else if (isRaster(l)) { const f = l.fullContent(); ov.canvas = f.canvas; ov.offset = { x: f.x + this.offset.x, y: f.y + this.offset.y }; }
         if (l.mask) ov.mask = shiftCanvas(l.mask.canvas, this.offset.x, this.offset.y, '#fff');
         doc.overrides.set(l, ov);
       }
@@ -109,8 +113,8 @@ export class MoveTool implements Tool {
       for (const l of this.layers) {
         doc.overrides.delete(l);
         if (!dx && !dy) continue;
-        if (l instanceof TextLayer) { l.props.x += dx; l.props.y += dy; l.render(); }
-        else if (isRaster(l)) { l.canvas = shiftCanvas(l.canvas, dx, dy); l.touch(); }
+        if (isParametric(l)) l.translate(dx, dy);
+        else if (isRaster(l)) { const f = l.fullContent(); l.placeFull(f.canvas, f.x + dx, f.y + dy); }
         if (l.mask) { l.mask.canvas = shiftCanvas(l.mask.canvas, dx, dy, '#fff'); l.mask.touch(); }
       }
     }

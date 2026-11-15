@@ -19,7 +19,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'clear', '-', 'fill', '-', 'freeTransform',
     { label: 'Transformar', items: ['flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }] },
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'imageSize', 'canvasSize',
-    { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim'] },
+    { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
   { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'flatten'] },

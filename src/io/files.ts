@@ -2,7 +2,7 @@
 // navegador: nada se envía a ningún servidor.
 
 import { EditorDocument } from '../core/document';
-import { RasterLayer, TextLayer, GroupLayer, LayerMask, Layer, bumpLayerId, isRaster } from '../core/layers';
+import { RasterLayer, TextLayer, ShapeLayer, GroupLayer, LayerMask, Layer, bumpLayerId, isRaster, isParametric } from '../core/layers';
 import { canvasToBlob, ctx2d, makeCanvas } from '../core/canvas';
 
 export const PROJECT_EXT = '.edp';
@@ -46,7 +46,7 @@ export function isImageFile(f: File) { return f.type.startsWith('image/') || /\.
 
 interface ProjLayer {
   id: number; type: string; name: string; visible: boolean; opacity: number; blendMode: string; locked: boolean;
-  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; children?: ProjLayer[]; expanded?: boolean;
+  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; children?: ProjLayer[]; expanded?: boolean;
 }
 interface ProjFile {
   format: 'editor-proyecto'; version: 1; name: string; width: number; height: number;
@@ -64,7 +64,7 @@ async function layerToProj(l: Layer): Promise<ProjLayer> {
     mask: l.mask ? { image: await canvasToDataURL(l.mask.canvas), enabled: l.mask.enabled } : null,
   };
   if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; }
-  else if (isRaster(l)) { p.image = await canvasToDataURL(l.canvas); if (l instanceof TextLayer) p.text = { ...l.props }; }
+  else if (isRaster(l)) { p.image = await canvasToDataURL(l.canvas); if (l instanceof TextLayer) p.text = { ...l.props }; if (l instanceof ShapeLayer) p.shape = { ...l.props }; }
   return p;
 }
 
@@ -84,8 +84,8 @@ async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
     for (const c of p.children ?? []) g.add(await projToLayer(c, w, h));
     l = g;
   } else {
-    const r = p.type === 'text' ? new TextLayer(p.name, w, h, p.text) : new RasterLayer(p.name, w, h);
-    if (p.image) { const img = await loadImage(p.image); ctx2d(r.canvas).clearRect(0, 0, w, h); ctx2d(r.canvas).drawImage(img, 0, 0); }
+    const r = p.type === 'text' ? new TextLayer(p.name, w, h, p.text) : p.type === 'shape' ? new ShapeLayer(p.name, w, h, p.shape) : new RasterLayer(p.name, w, h);
+    if (p.image && !isParametric(r)) { const img = await loadImage(p.image); ctx2d(r.canvas).clearRect(0, 0, w, h); ctx2d(r.canvas).drawImage(img, 0, 0); }
     l = r;
   }
   l.id = p.id; bumpLayerId(p.id);

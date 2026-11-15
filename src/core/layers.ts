@@ -76,7 +76,7 @@ export abstract class Layer {
   parent: GroupLayer | null = null;
   /** Se incrementa cada vez que cambian los píxeles; lo usa el historial. */
   version = 0;
-  abstract readonly kind: 'raster' | 'text' | 'group';
+  abstract readonly kind: 'raster' | 'text' | 'shape' | 'group';
   constructor(name: string) { this.name = name; }
   touch() { this.version++; }
   /** ¿Está bloqueada esta capa o alguno de sus grupos padre? */
@@ -93,12 +93,36 @@ export abstract class Layer {
 }
 
 export class RasterLayer extends Layer {
-  readonly kind: 'raster' | 'text' = 'raster';
+  readonly kind: 'raster' | 'text' | 'shape' = 'raster';
   canvas: HTMLCanvasElement;
+  /**
+   * Contenido completo de la capa cuando parte queda fuera del lienzo (tras
+   * moverla). Solo es válido mientras los píxeles no se editen (misma versión).
+   */
+  full: { canvas: HTMLCanvasElement; x: number; y: number; version: number } | null = null;
   constructor(name: string, w: number, h: number) {
     super(name);
     this.canvas = makeCanvas(w, h);
   }
+  /** Contenido con lo que haya fuera del lienzo, y su posición. */
+  fullContent(): { canvas: HTMLCanvasElement; x: number; y: number } {
+    if (this.full && this.full.version === this.version) return this.full;
+    return { canvas: this.canvas, x: 0, y: 0 };
+  }
+  /** Coloca el contenido completo en (x, y) y recorta la parte visible. */
+  placeFull(src: HTMLCanvasElement, x: number, y: number, w = this.canvas.width, h = this.canvas.height) {
+    const c = makeCanvas(w, h);
+    ctx2d(c).drawImage(src, x, y);
+    this.canvas = c; this.touch();
+    const clipped = x < 0 || y < 0 || x + src.width > w || y + src.height > h;
+    this.full = clipped ? { canvas: src, x, y, version: this.version } : null;
+  }
+}
+
+/** Capas "paramétricas": se redibujan a partir de sus propiedades (texto, formas). */
+export interface Parametric { props: any; render(): void; translate(dx: number, dy: number): void; scale(sx: number, sy: number): void; }
+export function isParametric(l: Layer | null | undefined): l is RasterLayer & Parametric {
+  return !!l && (l.kind === 'text' || l.kind === 'shape');
 }
 
 export class TextLayer extends RasterLayer {
@@ -124,6 +148,8 @@ export class TextLayer extends RasterLayer {
     const x = p.align === 'left' ? p.x : p.align === 'center' ? p.x - w / 2 : p.x - w;
     return { x, y: p.y, w, h: lh * lines.length };
   }
+  translate(dx: number, dy: number) { this.props.x += dx; this.props.y += dy; this.render(); }
+  scale(sx: number, sy: number) { const p = this.props; p.x *= sx; p.y *= sy; p.size *= Math.min(sx, sy); this.render(); }
   render() {
     clearCanvas(this.canvas);
     const p = this.props;
@@ -135,6 +161,49 @@ export class TextLayer extends RasterLayer {
     ctx.textBaseline = 'top';
     const lh = p.size * p.lineHeight;
     p.text.split('\n').forEach((line, i) => ctx.fillText(line, p.x, p.y + i * lh + (lh - p.size) / 2));
+    ctx.restore();
+    this.touch();
+  }
+}
+
+export interface ShapeProps {
+  shape: 'rect' | 'round' | 'ellipse' | 'line';
+  x0: number; y0: number; x1: number; y1: number;
+  fill: string | null;
+  stroke: string | null;
+  strokeWidth: number;
+  radius: number;
+}
+
+/** Forma vectorial: se puede cambiar de color, trazo y tamaño sin perder calidad. */
+export class ShapeLayer extends RasterLayer {
+  readonly kind = 'shape' as const;
+  props: ShapeProps;
+  constructor(name: string, w: number, h: number, props: ShapeProps) {
+    super(name, w, h);
+    this.props = props;
+    this.render();
+  }
+  translate(dx: number, dy: number) { const p = this.props; p.x0 += dx; p.x1 += dx; p.y0 += dy; p.y1 += dy; this.render(); }
+  scale(sx: number, sy: number) {
+    const p = this.props; p.x0 *= sx; p.x1 *= sx; p.y0 *= sy; p.y1 *= sy;
+    const k = Math.min(sx, sy); p.strokeWidth = Math.max(1, p.strokeWidth * k); p.radius *= k; this.render();
+  }
+  render() {
+    clearCanvas(this.canvas);
+    const p = this.props, ctx = ctx2d(this.canvas);
+    const x = Math.min(p.x0, p.x1), y = Math.min(p.y0, p.y1), w = Math.abs(p.x1 - p.x0), h = Math.abs(p.y1 - p.y0);
+    ctx.save();
+    ctx.beginPath();
+    if (p.shape === 'line') { ctx.moveTo(p.x0, p.y0); ctx.lineTo(p.x1, p.y1); }
+    else if (p.shape === 'ellipse') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    else if (p.shape === 'round' && (ctx as any).roundRect) (ctx as any).roundRect(x, y, w, h, Math.min(p.radius, w / 2, h / 2));
+    else ctx.rect(x, y, w, h);
+    if (p.shape === 'line') { ctx.strokeStyle = p.stroke ?? p.fill ?? '#000'; ctx.lineWidth = p.strokeWidth; ctx.lineCap = 'round'; ctx.stroke(); }
+    else {
+      if (p.fill) { ctx.fillStyle = p.fill; ctx.fill(); }
+      if (p.stroke) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.lineJoin = 'round'; ctx.stroke(); }
+    }
     ctx.restore();
     this.touch();
   }
@@ -166,5 +235,5 @@ export function* walkLayers(group: GroupLayer): Generator<Layer> {
 }
 
 export function isRaster(l: Layer | null | undefined): l is RasterLayer {
-  return !!l && (l.kind === 'raster' || l.kind === 'text');
+  return !!l && l.kind !== 'group';
 }

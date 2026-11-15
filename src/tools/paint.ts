@@ -3,7 +3,7 @@
 
 import { app } from '../ui/app';
 import { cloneCanvas, ctx2d, makeCanvas, Rect, rectInt, rectIntersect, luminance } from '../core/canvas';
-import { Layer, RasterLayer, TextLayer, GroupLayer } from '../core/layers';
+import { Layer, RasterLayer, GroupLayer, isParametric } from '../core/layers';
 
 export interface PaintTarget {
   layer: Layer;
@@ -12,7 +12,7 @@ export interface PaintTarget {
 }
 
 /** Convierte una capa de texto en una capa normal de píxeles. */
-export function rasterizeLayer(l: TextLayer): RasterLayer {
+export function rasterizeLayer(l: RasterLayer): RasterLayer {
   const doc = app.doc!;
   const r = new RasterLayer(l.name, doc.width, doc.height);
   r.canvas = cloneCanvas(l.canvas);
@@ -37,9 +37,9 @@ export function getPaintTarget(opts: { allowText?: boolean } = {}): PaintTarget 
   if (!layer.isVisibleInTree()) { app.toast('La capa está oculta', 'warn'); return null; }
   if (doc.editMask && layer.mask) return { layer, isMask: true, canvas: layer.mask.canvas };
   if (layer instanceof GroupLayer) { app.toast('Selecciona una capa de píxeles (no un grupo)', 'warn'); return null; }
-  if (layer instanceof TextLayer && !opts.allowText) {
+  if (isParametric(layer) && !opts.allowText) {
+    app.toast(layer.kind === 'text' ? 'Capa de texto rasterizada para poder editarla' : 'Forma rasterizada para poder editarla');
     layer = rasterizeLayer(layer);
-    app.toast('Capa de texto rasterizada para poder editarla');
   }
   return { layer, isMask: false, canvas: (layer as RasterLayer).canvas };
 }

@@ -3,14 +3,15 @@
 // reutiliza la copia del paso anterior (solo se copian las capas tocadas).
 
 import { cloneCanvas } from './canvas';
-import { Layer, GroupLayer, RasterLayer, TextLayer, LayerMask, TextProps, BlendMode } from './layers';
+import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, LayerMask, BlendMode, isParametric } from './layers';
 import type { EditorDocument } from './document';
 
 interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
   blendMode: BlendMode; locked: boolean;
-  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; text?: TextProps;
+  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any;
+  full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
   children?: LayerSnap[]; expanded?: boolean;
 }
 export interface DocSnap {
@@ -38,7 +39,8 @@ function snapLayer(l: Layer): LayerSnap {
   if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; }
   else if (l instanceof RasterLayer) {
     s.canvas = freeze(l, l.version, l.canvas);
-    if (l instanceof TextLayer) s.text = { ...l.props };
+    if (isParametric(l)) s.props = { ...l.props };
+    const f = l.fullContent(); s.full = f.canvas !== l.canvas ? { canvas: f.canvas, x: f.x, y: f.y } : null;
   }
   return s;
 }
@@ -66,8 +68,9 @@ function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
     for (const c of s.children ?? []) g.add(restoreLayer(c, w, h));
     l = g;
   } else {
-    const r = s.kind === 'text' ? new TextLayer(s.name, w, h, { ...s.text! }) : new RasterLayer(s.name, w, h);
+    const r = s.kind === 'text' ? new TextLayer(s.name, w, h, { ...s.props }) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, { ...s.props }) : new RasterLayer(s.name, w, h);
     r.canvas = cloneCanvas(s.canvas!);
+    if (s.full) r.full = { ...s.full, version: r.version };
     frozen.set(r, { version: r.version, canvas: s.canvas! });
     l = r;
   }

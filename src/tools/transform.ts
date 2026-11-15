@@ -5,67 +5,88 @@ import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
-import { cloneCanvas, contentBounds, ctx2d, makeCanvas, Rect } from '../core/canvas';
-import { GroupLayer, RasterLayer, TextLayer } from '../core/layers';
+import { cloneCanvas, contentBounds, ctx2d, makeCanvas, Rect, rectUnion } from '../core/canvas';
+import { GroupLayer, RasterLayer, isRaster, isParametric, walkLayers } from '../core/layers';
+import { selectedLayers } from '../ui/ops';
 import { rasterizeLayer } from './paint';
 import { h } from '../ui/dom';
 
 interface TState { cx: number; cy: number; sx: number; sy: number; angle: number; }
 
-interface Session {
+interface Item {
   layer: RasterLayer;
-  src: HTMLCanvasElement;      // píxeles a transformar, recortados a `rect`
-  rect: Rect;                  // posición original de esos píxeles
-  hole: HTMLCanvasElement;     // la capa sin esos píxeles
+  src: HTMLCanvasElement;   // píxeles a transformar
+  rect: Rect;               // posición original de esos píxeles
+  hole: HTMLCanvasElement;  // la capa sin esos píxeles
+}
+interface Session {
+  items: Item[];
+  rect: Rect;                        // caja que engloba todos los elementos
   selMask: HTMLCanvasElement | null; // selección original recortada a rect
   st: TState;
 }
 
 const rot = (x: number, y: number, a: number) => ({ x: x * Math.cos(a) - y * Math.sin(a), y: x * Math.sin(a) + y * Math.cos(a) });
 
-/** Prepara el contenido a transformar. */
+/** Prepara el contenido a transformar: la capa activa, varias capas o grupos enteros. */
 function prepare(): Session | null {
   const doc = app.doc!;
-  let layer = doc.active;
-  if (!layer) { app.toast('No hay ninguna capa seleccionada', 'warn'); return null; }
-  if (layer instanceof GroupLayer) { app.toast('Transformar grupos aún no está disponible: selecciona una capa', 'warn'); return null; }
-  if (layer.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return null; }
-  if (layer instanceof TextLayer) layer = rasterizeLayer(layer);
-  const l = layer as RasterLayer;
+  if (!doc.active) { app.toast('No hay ninguna capa seleccionada', 'warn'); return null; }
+  let chosen = selectedLayers();
+  if (!chosen.includes(doc.active)) chosen = [doc.active];
+  if (chosen.some(l => l.isLocked())) { app.toast('La capa está bloqueada', 'warn'); return null; }
+  const layers = [...new Set(chosen.flatMap(l => l instanceof GroupLayer ? [...walkLayers(l)] : [l]))].filter(l => isRaster(l) && !l.isLocked());
   const sel = doc.selection.mask;
-  const pixels = cloneCanvas(l.canvas);
-  if (sel) { const c = ctx2d(pixels); c.globalCompositeOperation = 'destination-in'; c.drawImage(sel, 0, 0); }
-  const rect = contentBounds(pixels);
-  if (!rect) { app.toast('No hay píxeles que transformar en la capa', 'warn'); return null; }
-  const src = makeCanvas(rect.w, rect.h);
-  ctx2d(src).drawImage(pixels, -rect.x, -rect.y);
-  const hole = cloneCanvas(l.canvas);
-  const hc = ctx2d(hole);
-  if (sel) { hc.globalCompositeOperation = 'destination-out'; hc.drawImage(sel, 0, 0); }
-  else hc.clearRect(0, 0, hole.width, hole.height);
+  const items: Item[] = [];
+  let union: Rect | null = null;
+  for (let layer of layers) {
+    if (isParametric(layer)) layer = rasterizeLayer(layer as RasterLayer);
+    const l = layer as RasterLayer;
+    // Sin selección se usa el contenido completo (incluido lo que esté fuera del lienzo)
+    const f = sel ? { canvas: l.canvas, x: 0, y: 0 } : l.fullContent();
+    const pixels = cloneCanvas(f.canvas);
+    if (sel) { const c = ctx2d(pixels); c.globalCompositeOperation = 'destination-in'; c.drawImage(sel, 0, 0); }
+    const b = contentBounds(pixels);
+    if (!b) continue;
+    const src = makeCanvas(b.w, b.h);
+    ctx2d(src).drawImage(pixels, -b.x, -b.y);
+    const hole = cloneCanvas(l.canvas);
+    const hc = ctx2d(hole);
+    if (sel) { hc.globalCompositeOperation = 'destination-out'; hc.drawImage(sel, 0, 0); }
+    else hc.clearRect(0, 0, hole.width, hole.height);
+    const rect = { x: b.x + f.x, y: b.y + f.y, w: b.w, h: b.h };
+    items.push({ layer: l, src, rect, hole });
+    union = rectUnion(union, rect);
+  }
+  if (!items.length || !union) { app.toast('No hay píxeles que transformar', 'warn'); return null; }
   let selMask: HTMLCanvasElement | null = null;
-  if (sel) { selMask = makeCanvas(rect.w, rect.h); ctx2d(selMask).drawImage(sel, -rect.x, -rect.y); }
-  return { layer: l, src, rect, hole, selMask, st: { cx: rect.x + rect.w / 2, cy: rect.y + rect.h / 2, sx: 1, sy: 1, angle: 0 } };
+  if (sel) { selMask = makeCanvas(union.w, union.h); ctx2d(selMask).drawImage(sel, -union.x, -union.y); }
+  return { items, rect: union, selMask, st: { cx: union.x + union.w / 2, cy: union.y + union.h / 2, sx: 1, sy: 1, angle: 0 } };
 }
 
-function drawTransformed(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: TState) {
+/** Dibuja `src` (situado originalmente en `rect`) con la transformación de la sesión. */
+function drawTransformed(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, rect: Rect, s: Session) {
+  const st = s.st;
   ctx.save();
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.translate(st.cx, st.cy); ctx.rotate(st.angle); ctx.scale(st.sx, st.sy);
-  ctx.drawImage(src, -src.width / 2, -src.height / 2);
+  ctx.drawImage(src, rect.x - (s.rect.x + s.rect.w / 2), rect.y - (s.rect.y + s.rect.h / 2));
   ctx.restore();
 }
 
-/** Aplica una sesión: pinta el resultado en la capa y transforma la selección. */
+function clearOverrides(s: Session) { for (const it of s.items) app.doc?.overrides.delete(it.layer); }
+
+/** Aplica una sesión: pinta el resultado en las capas y transforma la selección. */
 function applySession(s: Session, name: string) {
   const doc = app.doc!;
-  doc.overrides.delete(s.layer);
-  const out = s.hole;
-  drawTransformed(ctx2d(out), s.src, s.st);
-  s.layer.canvas = out; s.layer.touch();
+  clearOverrides(s);
+  for (const it of s.items) {
+    drawTransformed(ctx2d(it.hole), it.src, it.rect, s);
+    it.layer.canvas = it.hole; it.layer.touch();
+  }
   if (s.selMask) {
     const m = makeCanvas(doc.width, doc.height);
-    drawTransformed(ctx2d(m), s.selMask, s.st);
+    drawTransformed(ctx2d(m), s.selMask, s.rect, s);
     doc.selection.setMask(m);
   }
   doc.commit(name);
@@ -97,7 +118,7 @@ export class TransformTool implements Tool {
     this.preview();
   }
   deactivate() { if (this.s) this.commit(); }
-  docChanged() { if (this.s) { app.doc && app.doc.overrides.delete(this.s.layer); this.s = null; } setTimeout(() => app.tool === this && app.restoreTool(), 0); }
+  docChanged() { if (this.s) { clearOverrides(this.s); this.s = null; } setTimeout(() => app.tool === this && app.restoreTool(), 0); }
 
   extraOptions(bar: HTMLElement) {
     const num = (key: string, label: string, unit: string) => {
@@ -134,7 +155,7 @@ export class TransformTool implements Tool {
   private preview() {
     const s = this.s; if (!s) return;
     const doc = app.doc!;
-    doc.overrides.set(s.layer, { canvas: s.hole, extra: ctx => drawTransformed(ctx, s.src, s.st) });
+    for (const it of s.items) doc.overrides.set(it.layer, { canvas: it.hole, extra: ctx => drawTransformed(ctx, it.src, it.rect, s) });
     doc.invalidate();
     this.syncFields();
     app.viewport.requestRender();
@@ -224,14 +245,14 @@ export class TransformTool implements Tool {
     this.s = null;
     const st = s.st;
     if (st.sx === 1 && st.sy === 1 && st.angle === 0 && st.cx === s.rect.x + s.rect.w / 2 && st.cy === s.rect.y + s.rect.h / 2) {
-      app.doc!.overrides.delete(s.layer); app.doc!.invalidate(); return;
+      clearOverrides(s); app.doc!.invalidate(); return;
     }
     applySession(s, 'Transformación libre');
   }
   cancel() {
     const s = this.s; if (!s) return;
     this.s = null;
-    app.doc!.overrides.delete(s.layer); app.doc!.invalidate(); app.viewport.requestRender();
+    clearOverrides(s); app.doc!.invalidate(); app.viewport.requestRender();
   }
   key_(e: KeyboardEvent) {
     if (e.key === 'Enter') { this.commit(); app.restoreTool(); return true; }

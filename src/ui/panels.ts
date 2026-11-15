@@ -4,7 +4,7 @@ import { app } from './app';
 import { h, numberSlider } from './dom';
 import { icon } from './icons';
 import * as ops from './ops';
-import { BLEND_MODES, GroupLayer, Layer, TextLayer, isRaster } from '../core/layers';
+import { BLEND_MODES, GroupLayer, Layer, TextLayer, ShapeLayer, isRaster, isParametric } from '../core/layers';
 import { ctx2d } from '../core/canvas';
 import { renderComposite } from '../core/compositor';
 import { FONTS } from '../tools/text';
@@ -111,7 +111,7 @@ export function buildLayersPanel(parent: HTMLElement) {
       const n = await promptDialog('Cambiar nombre de capa', 'Nombre', l.name);
       if (n !== null) ops.renameLayer(l, n);
     });
-    const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : null;
+    const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : null;
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : null;
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
@@ -214,7 +214,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
   const render = () => {
     const d = app.doc;
     const l = d?.active;
-    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${l instanceof TextLayer ? JSON.stringify(l.props) : ''}` : '';
+    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}` : '';
     if (key === lastKey && body.contains(document.activeElement)) return;
     lastKey = key;
     body.innerHTML = '';
@@ -225,7 +225,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('button', { class: 'btn', onclick: () => actionById.get('imageSize')!.run() }, 'Tamaño de imagen'),
         h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
     if (!l) return;
-    const kind = l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : 'Capa de píxeles';
+    const kind = l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : 'Capa de píxeles';
     body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · editando máscara' : '')));
     if (l instanceof TextLayer) {
       const p = l.props;
@@ -246,6 +246,30 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('div', { class: 'prop-row' }, h('span', {}, 'Fuente'), font),
         h('div', { class: 'prop-row' }, h('span', {}, 'Tamaño'), size, h('span', {}, 'Color'), color),
         h('div', { class: 'prop-row' }, h('label', { class: 'check' }, bold, ' Negrita'), h('label', { class: 'check' }, italic, ' Cursiva'), align));
+    }
+    if (l instanceof ShapeLayer) {
+      const p = l.props;
+      const upd = (fn: () => void) => { fn(); l.render(); d.commit('Editar forma'); };
+      const colorRow = (label: string, key: 'fill' | 'stroke') => {
+        const on = h('input', { type: 'checkbox', checked: !!p[key] });
+        const col = h('input', { type: 'color', class: 'color-input', value: p[key] ?? '#000000' });
+        on.onchange = () => upd(() => p[key] = on.checked ? col.value : null);
+        col.onchange = () => upd(() => p[key] = col.value);
+        return h('div', { class: 'prop-row' }, h('label', { class: 'check' }, on, ' ' + label), col);
+      };
+      const numF = (label: string, get: () => number, set: (v: number) => void) => {
+        const i = h('input', { type: 'number', class: 'num', value: String(Math.round(get())) });
+        i.onchange = () => upd(() => set(+i.value || 0));
+        return [h('span', {}, label), i];
+      };
+      const x = () => Math.min(p.x0, p.x1), y = () => Math.min(p.y0, p.y1), w = () => Math.abs(p.x1 - p.x0), hh = () => Math.abs(p.y1 - p.y0);
+      const setBox = (nx: number, ny: number, nw: number, nh: number) => { p.x0 = nx; p.y0 = ny; p.x1 = nx + Math.max(1, nw); p.y1 = ny + Math.max(1, nh); };
+      if (p.shape !== 'line') body.append(colorRow('Relleno', 'fill'));
+      body.append(colorRow('Trazo', 'stroke'),
+        h('div', { class: 'prop-row' }, ...numF('Grosor', () => p.strokeWidth, v => p.strokeWidth = Math.max(1, v)), ...(p.shape === 'round' ? numF('Radio', () => p.radius, v => p.radius = Math.max(0, v)) : [])));
+      if (p.shape !== 'line') body.append(
+        h('div', { class: 'prop-row' }, ...numF('X', x, v => setBox(v, y(), w(), hh())), ...numF('Y', y, v => setBox(x(), v, w(), hh()))),
+        h('div', { class: 'prop-row' }, ...numF('Ancho', w, v => setBox(x(), y(), v, hh())), ...numF('Alto', hh, v => setBox(x(), y(), w(), v))));
     }
     if (l.mask) {
       body.append(h('div', { class: 'prop-title' }, 'Máscara de capa'),

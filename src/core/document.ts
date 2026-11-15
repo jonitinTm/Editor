@@ -1,7 +1,7 @@
 // Documento: tamaño, árbol de capas, selección, guías, historial y vista.
 
 import { makeCanvas, ctx2d, Rect } from './canvas';
-import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster } from './layers';
+import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric } from './layers';
 import { Selection } from './selection';
 import { History } from './history';
 import { renderComposite, LayerOverride } from './compositor';
@@ -124,10 +124,8 @@ export class EditorDocument {
   /** Cambia el tamaño del lienzo desplazando el contenido (dx, dy). */
   resizeCanvas(w: number, h: number, dx: number, dy: number) {
     for (const l of this.allLayers()) {
-      if (isRaster(l)) {
-        const c = makeCanvas(w, h); ctx2d(c).drawImage(l.canvas, dx, dy); l.canvas = c; l.touch();
-        if (l.kind === 'text') { (l as any).props.x += dx; (l as any).props.y += dy; }
-      }
+      if (isParametric(l)) { l.canvas = makeCanvas(w, h); l.translate(dx, dy); }
+      else if (isRaster(l)) { const f = l.fullContent(); l.placeFull(f.canvas, f.x + dx, f.y + dy, w, h); }
       if (l.mask) {
         const m = makeCanvas(w, h); const mc = ctx2d(m);
         mc.fillStyle = '#fff'; mc.fillRect(0, 0, w, h);
@@ -151,8 +149,8 @@ export class EditorDocument {
       ctx.imageSmoothingQuality = 'high'; ctx.drawImage(src, 0, 0, w, h); return c;
     };
     for (const l of this.allLayers()) {
-      if (isRaster(l)) { l.canvas = scale(l.canvas); l.touch(); }
-      if (l.kind === 'text') { const p = (l as any).props; p.x *= sx; p.y *= sy; p.size *= Math.min(sx, sy); }
+      if (isParametric(l)) { l.canvas = makeCanvas(w, h); l.scale(sx, sy); }
+      else if (isRaster(l)) { l.canvas = scale(l.canvas); l.touch(); }
       if (l.mask) { l.mask.canvas = scale(l.mask.canvas); l.mask.touch(); }
     }
     if (this.selection.mask) this.selection.setMask(scale(this.selection.mask));

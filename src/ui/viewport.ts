@@ -276,7 +276,7 @@ export class Viewport {
     cv.addEventListener('pointerdown', e => {
       if (!this.doc) return;
       (document.activeElement as HTMLElement | null)?.blur?.();
-      cv.setPointerCapture(e.pointerId);
+      try { cv.setPointerCapture(e.pointerId); } catch { /* puntero sintético */ }
       const r = cv.getBoundingClientRect();
       this.pointers.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
       if (this.pointers.size === 2 && e.pointerType === 'touch') {
