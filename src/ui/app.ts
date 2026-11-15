@@ -1,0 +1,133 @@
+// Estado global de la aplicación: documentos abiertos, herramienta activa,
+// colores y opciones. Los componentes de la interfaz se suscriben a eventos.
+
+import { EditorDocument } from '../core/document';
+import type { Tool } from '../tools/tool';
+import type { Viewport } from './viewport';
+
+type EventName = 'docs' | 'doc' | 'tool' | 'colors' | 'view' | 'options';
+
+class App {
+  docs: EditorDocument[] = [];
+  doc: EditorDocument | null = null;
+  tools = new Map<string, Tool>();
+  tool!: Tool;
+  /** Última herramienta usada de cada grupo de la barra. */
+  groupChoice: Record<string, string> = {};
+  fg = '#000000';
+  bg = '#ffffff';
+  opts: Record<string, Record<string, any>> = {};
+  viewport!: Viewport;
+  showRulers = true;
+  showGuides = true;
+  /** Herramienta a la que volver al terminar un modo temporal (p. ej. transformar). */
+  private returnTool: string | null = null;
+  private handlers = new Map<EventName, Set<() => void>>();
+  private docUnsub: (() => void) | null = null;
+  private pending = new Set<EventName>();
+  private raf = 0;
+
+  constructor() {
+    try {
+      const saved = JSON.parse(localStorage.getItem('editor.opts') || '{}');
+      if (saved && typeof saved === 'object') this.opts = saved;
+      const c = JSON.parse(localStorage.getItem('editor.colors') || 'null');
+      if (c) { this.fg = c.fg; this.bg = c.bg; }
+    } catch { /* sin almacenamiento disponible */ }
+  }
+
+  on(ev: EventName, fn: () => void) {
+    if (!this.handlers.has(ev)) this.handlers.set(ev, new Set());
+    this.handlers.get(ev)!.add(fn);
+  }
+  /** Emite un evento; se agrupan en el siguiente fotograma para no repintar de más. */
+  emit(ev: EventName) {
+    this.pending.add(ev);
+    if (!this.raf) this.raf = requestAnimationFrame(() => {
+      this.raf = 0;
+      const evs = [...this.pending]; this.pending.clear();
+      for (const e of evs) this.handlers.get(e)?.forEach(f => f());
+    });
+  }
+
+  registerTool(t: Tool) {
+    this.tools.set(t.id, t);
+    const o = (this.opts[t.id] ??= {});
+    for (const d of t.options ?? []) if (!(d.key in o)) o[d.key] = d.default;
+  }
+
+  setTool(id: string, temporary = false) {
+    const t = this.tools.get(id);
+    if (!t || t === this.tool) return;
+    if (!temporary) this.returnTool = null;
+    else this.returnTool = this.tool?.id ?? null;
+    this.tool?.deactivate?.();
+    this.tool = t;
+    if (t.group) this.groupChoice[t.group] = t.id;
+    t.activate?.();
+    this.emit('tool');
+    this.viewport?.requestRender();
+  }
+  /** Sale de un modo temporal y vuelve a la herramienta anterior. */
+  restoreTool() {
+    const id = this.returnTool ?? 'move';
+    this.returnTool = null;
+    this.setTool(id);
+  }
+
+  opt<T = any>(key: string, toolId = this.tool.id): T { return this.opts[toolId]?.[key]; }
+  setOpt(toolId: string, key: string, value: any) {
+    (this.opts[toolId] ??= {})[key] = value;
+    this.saveOpts();
+    this.emit('options');
+  }
+  saveOpts() { try { localStorage.setItem('editor.opts', JSON.stringify(this.opts)); } catch { /* */ } }
+
+  setColors(fg = this.fg, bg = this.bg) {
+    this.fg = fg; this.bg = bg;
+    try { localStorage.setItem('editor.colors', JSON.stringify({ fg, bg })); } catch { /* */ }
+    this.emit('colors');
+  }
+
+  addDocument(doc: EditorDocument) {
+    if (doc.history.steps.length === 0) doc.history.push(doc, 'Abrir');
+    doc.modified = false;
+    this.docs.push(doc);
+    this.setDocument(doc);
+    this.emit('docs');
+  }
+  setDocument(doc: EditorDocument | null) {
+    if (this.doc === doc) return;
+    this.tool?.deactivate?.();
+    this.docUnsub?.();
+    this.doc = doc;
+    this.docUnsub = doc ? doc.onChange(() => { this.emit('doc'); this.viewport?.requestRender(); }) as any : null;
+    this.tool?.activate?.();
+    this.emit('docs'); this.emit('doc'); this.emit('view');
+    this.viewport?.requestRender();
+  }
+  closeDocument(doc: EditorDocument) {
+    const i = this.docs.indexOf(doc);
+    if (i < 0) return;
+    this.docs.splice(i, 1);
+    if (this.doc === doc) this.setDocument(this.docs[Math.min(i, this.docs.length - 1)] ?? null);
+    this.emit('docs');
+  }
+
+  /** Notifica que el documento activo ha cambiado sin crear paso de historial. */
+  touchDoc() { this.doc?.invalidate(); this.doc?.changed(); }
+
+  toast(msg: string, kind: 'info' | 'warn' = 'info') {
+    const box = document.getElementById('toasts');
+    if (!box) return;
+    const t = document.createElement('div');
+    t.className = 'toast ' + kind;
+    t.textContent = msg;
+    box.append(t);
+    setTimeout(() => t.classList.add('out'), 2600);
+    setTimeout(() => t.remove(), 3100);
+  }
+}
+
+export const app = new App();
+(window as any).editorApp = app; // útil para depurar desde la consola

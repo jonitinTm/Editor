@@ -1,0 +1,267 @@
+// Paneles de la derecha: Capas, Historial y Propiedades.
+
+import { app } from './app';
+import { h, numberSlider } from './dom';
+import { icon } from './icons';
+import * as ops from './ops';
+import { BLEND_MODES, GroupLayer, Layer, TextLayer, isRaster } from '../core/layers';
+import { ctx2d } from '../core/canvas';
+import { renderComposite } from '../core/compositor';
+import { FONTS } from '../tools/text';
+import { actionById } from './actions';
+import { promptDialog } from './dialog';
+
+function panel(title: string, body: HTMLElement, extraHeader?: HTMLElement) {
+  return h('section', { class: 'panel' },
+    h('header', { class: 'panel-head' }, h('span', {}, title), extraHeader ?? null),
+    body);
+}
+
+// ---- Miniaturas ------------------------------------------------------------------
+
+const thumbCache = new WeakMap<object, { v: number; c: HTMLCanvasElement }>();
+function thumb(owner: object, version: number, draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void, cls = 'thumb'): HTMLCanvasElement {
+  const d = app.doc!;
+  const cached = thumbCache.get(owner);
+  if (cached && cached.v === version && cached.c.dataset.dw === `${d.width}x${d.height}`) return cached.c;
+  const max = 36;
+  const k = Math.min(max / d.width, max / d.height);
+  const w = Math.max(1, Math.round(d.width * k)), hh = Math.max(1, Math.round(d.height * k));
+  const c = cached?.c ?? h('canvas', { class: cls });
+  c.width = w; c.height = hh; c.dataset.dw = `${d.width}x${d.height}`;
+  const ctx = ctx2d(c);
+  ctx.clearRect(0, 0, w, hh);
+  ctx.imageSmoothingQuality = 'high';
+  draw(ctx, w, hh);
+  thumbCache.set(owner, { v: version, c });
+  return c;
+}
+function layerThumb(l: Layer) {
+  if (l instanceof GroupLayer) return h('span', { class: 'thumb folder', html: icon('folder') });
+  const r = l as any;
+  return thumb(l, l.version, (ctx, w, hh) => ctx.drawImage(r.canvas, 0, 0, w, hh));
+}
+function maskThumb(l: Layer) {
+  const m = l.mask!;
+  return thumb(m, m.version, (ctx, w, hh) => { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, hh); ctx.drawImage(m.canvas, 0, 0, w, hh); }, 'thumb mask');
+}
+
+// ---- Capas -------------------------------------------------------------------------
+
+export function buildLayersPanel(parent: HTMLElement) {
+  const blend = h('select', { class: 'blend', title: 'Modo de fusión' }, ...BLEND_MODES.map(m => h('option', { value: m.id }, m.label)));
+  let opacityChanging = false;
+  const opacity = numberSlider({
+    label: 'Opacidad', min: 0, max: 100, value: 100, unit: '%', compact: true,
+    onInput: v => {
+      const l = app.doc?.active; if (!l) return;
+      ops.setLayerProp(l, 'opacity', v / 100, false);
+      opacityChanging = true;
+    },
+  });
+  const commitOpacity = () => { if (opacityChanging && app.doc) { opacityChanging = false; app.doc.commit('Opacidad de capa'); } };
+  opacity.el.addEventListener('change', commitOpacity);
+  opacity.el.addEventListener('pointerup', commitOpacity);
+  opacity.el.addEventListener('focusout', commitOpacity);
+  blend.addEventListener('change', () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'blendMode', blend.value); });
+  const lockBtn = h('button', { class: 'btn icon-btn', title: 'Bloquear / desbloquear capa', html: icon('lock') });
+  lockBtn.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'locked', !l.locked); };
+
+  const list = h('div', { class: 'layer-list' });
+  const footBtn = (ic: string, title: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, html: icon(ic), onclick: fn });
+  const foot = h('div', { class: 'panel-foot' },
+    footBtn('mask', 'Añadir máscara de capa', () => ops.addMask('reveal')),
+    footBtn('folder', 'Nuevo grupo', ops.newGroup),
+    footBtn('newLayer', 'Nueva capa', ops.newLayer),
+    footBtn('duplicate', 'Duplicar capa', ops.duplicateLayer),
+    footBtn('trash', 'Eliminar capa', ops.deleteLayers));
+  const top = h('div', { class: 'layer-controls' }, blend, opacity.el, lockBtn);
+  const body = h('div', { class: 'panel-body layers' }, top, list, foot);
+  parent.append(panel('Capas', body));
+
+  let dragLayer: Layer | null = null;
+
+  const row = (l: Layer, depth: number): HTMLElement[] => {
+    const d = app.doc!;
+    const isActive = d.active === l;
+    const selected = d.selectedIds.has(l.id);
+    const eye = h('button', { class: 'eye' + (l.visible ? '' : ' off'), title: l.visible ? 'Ocultar' : 'Mostrar', html: l.visible ? icon('eye') : '' });
+    eye.onclick = e => { e.stopPropagation(); ops.setLayerProp(l, 'visible', !l.visible); };
+    const arrow = l instanceof GroupLayer
+      ? h('button', { class: 'arrow', html: icon(l.expanded ? 'chevronDown' : 'chevronRight'), onclick: (e: Event) => { e.stopPropagation(); l.expanded = !l.expanded; render(); } })
+      : h('span', { class: 'arrow-space' });
+    const lt = layerThumb(l);
+    const thumbWrap = h('span', { class: 'thumb-wrap' + (isActive && !d.editMask ? ' editing' : '') }, lt);
+    thumbWrap.addEventListener('click', e => {
+      if (e.ctrlKey || e.metaKey) { e.stopPropagation(); ops.selectionFromLayer(l); return; }
+      if (isActive && d.editMask) { e.stopPropagation(); d.editMask = false; d.changed(); }
+    });
+    let maskEl: HTMLElement | null = null;
+    if (l.mask) {
+      maskEl = h('span', { class: 'thumb-wrap' + (isActive && d.editMask ? ' editing' : '') + (l.mask.enabled ? '' : ' disabled'), title: 'Máscara de capa (clic para editarla, Mayús+clic para desactivarla)' }, maskThumb(l));
+      maskEl.addEventListener('click', e => {
+        e.stopPropagation();
+        if (e.shiftKey) { d.setActive(l, false); ops.toggleMask(); return; }
+        d.setActive(l, false); d.editMask = true; d.changed();
+      });
+    }
+    const name = h('span', { class: 'lname' }, l.name);
+    name.addEventListener('dblclick', async e => {
+      e.stopPropagation();
+      const n = await promptDialog('Cambiar nombre de capa', 'Nombre', l.name);
+      if (n !== null) ops.renameLayer(l, n);
+    });
+    const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : null;
+    const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : null;
+    const el = h('div', {
+      class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
+      draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
+    }, eye, arrow, thumbWrap, maskEl, name, kindTag, lock);
+    el.addEventListener('click', e => {
+      if (e.ctrlKey || e.metaKey) {
+        if (d.selectedIds.has(l.id) && d.selectedIds.size > 1) d.selectedIds.delete(l.id); else d.selectedIds.add(l.id);
+        d.active = l; d.changed(); return;
+      }
+      if (e.shiftKey && d.active) {
+        const all = d.allLayers();
+        const a = all.indexOf(d.active), b = all.indexOf(l);
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        const ids = new Set(all.slice(lo, hi + 1).filter(x => x.parent === l.parent).map(x => x.id));
+        d.active = l; d.selectedIds = ids; d.changed(); return;
+      }
+      const wasMask = d.active === l && d.editMask;
+      d.setActive(l, false);
+      d.editMask = wasMask && !!l.mask;
+      d.changed();
+    });
+    // Arrastrar para reordenar
+    el.addEventListener('dragstart', e => { dragLayer = l; e.dataTransfer!.effectAllowed = 'move'; e.dataTransfer!.setData('text/plain', String(l.id)); });
+    el.addEventListener('dragend', () => { dragLayer = null; list.querySelectorAll('.drop-above,.drop-below,.drop-into').forEach(x => x.classList.remove('drop-above', 'drop-below', 'drop-into')); });
+    el.addEventListener('dragover', e => {
+      if (!dragLayer || dragLayer === l) return;
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const y = (e.clientY - r.top) / r.height;
+      el.classList.remove('drop-above', 'drop-below', 'drop-into');
+      el.classList.add(l instanceof GroupLayer && y > .3 && y < .7 ? 'drop-into' : y < .5 ? 'drop-above' : 'drop-below');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drop-above', 'drop-below', 'drop-into'));
+    el.addEventListener('drop', e => {
+      e.preventDefault();
+      const src = dragLayer; if (!src || src === l) return;
+      const into = el.classList.contains('drop-into'), above = el.classList.contains('drop-above');
+      el.classList.remove('drop-above', 'drop-below', 'drop-into');
+      if (into && l instanceof GroupLayer) ops.moveLayerTo(src, l, l.children.length);
+      else {
+        const p = l.parent!; const i = p.children.indexOf(l);
+        // La lista se muestra de arriba abajo; "encima" = índice mayor
+        ops.moveLayerTo(src, p, above ? i + 1 : i);
+      }
+    });
+    const rows: HTMLElement[] = [el];
+    if (l instanceof GroupLayer && l.expanded) for (let i = l.children.length - 1; i >= 0; i--) rows.push(...row(l.children[i], depth + 1));
+    return rows;
+  };
+
+  const render = () => {
+    const d = app.doc;
+    list.innerHTML = '';
+    body.classList.toggle('disabled', !d);
+    if (!d) return;
+    const rows: HTMLElement[] = [];
+    for (let i = d.root.children.length - 1; i >= 0; i--) rows.push(...row(d.root.children[i], 0));
+    list.append(...rows);
+    const l = d.active;
+    blend.value = l?.blendMode ?? 'source-over';
+    if (!opacityChanging) opacity.set(Math.round((l?.opacity ?? 1) * 100));
+    lockBtn.classList.toggle('on', !!l?.locked);
+  };
+  app.on('doc', render); app.on('docs', render);
+  render();
+}
+
+// ---- Historial ---------------------------------------------------------------------
+
+export function buildHistoryPanel(parent: HTMLElement) {
+  const list = h('div', { class: 'history-list' });
+  const body = h('div', { class: 'panel-body' }, list);
+  const sec = panel('Historial', body);
+  parent.append(sec);
+  let lastLen = -1;
+  const render = () => {
+    const d = app.doc;
+    list.innerHTML = '';
+    if (!d) return;
+    const hst = d.history;
+    hst.steps.forEach((s, i) => {
+      const el = h('div', { class: 'history-row' + (i === hst.index ? ' active' : '') + (i > hst.index ? ' future' : '') }, s.name);
+      el.onclick = () => ops.gotoHistory(i);
+      list.append(el);
+    });
+    if (hst.steps.length !== lastLen) { list.scrollTop = list.scrollHeight; lastLen = hst.steps.length; }
+  };
+  app.on('doc', render); app.on('docs', render);
+  render();
+  return sec;
+}
+
+// ---- Propiedades ---------------------------------------------------------------------
+
+export function buildPropertiesPanel(parent: HTMLElement) {
+  const body = h('div', { class: 'panel-body props' });
+  parent.append(panel('Propiedades', body));
+  let lastKey = '';
+  const render = () => {
+    const d = app.doc;
+    const l = d?.active;
+    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${l instanceof TextLayer ? JSON.stringify(l.props) : ''}` : '';
+    if (key === lastKey && body.contains(document.activeElement)) return;
+    lastKey = key;
+    body.innerHTML = '';
+    if (!d) { body.append(h('div', { class: 'hint' }, 'Abre o crea un documento.')); return; }
+    body.append(h('div', { class: 'prop-title' }, 'Documento'),
+      h('div', { class: 'prop-row' }, h('span', {}, 'Tamaño'), h('b', {}, `${d.width} × ${d.height} px`)),
+      h('div', { class: 'prop-btns' },
+        h('button', { class: 'btn', onclick: () => actionById.get('imageSize')!.run() }, 'Tamaño de imagen'),
+        h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
+    if (!l) return;
+    const kind = l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : 'Capa de píxeles';
+    body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · editando máscara' : '')));
+    if (l instanceof TextLayer) {
+      const p = l.props;
+      const upd = (fn: () => void) => { fn(); l.render(); d.commit('Editar texto'); };
+      const ta = h('textarea', { class: 'prop-text', rows: 3 }, p.text);
+      ta.addEventListener('change', () => upd(() => { p.text = ta.value; l.name = ta.value.split('\n')[0].slice(0, 30) || l.name; }));
+      const font = h('select', {}, ...FONTS.map(f => h('option', { value: f }, f)));
+      font.value = p.font; font.onchange = () => upd(() => p.font = font.value);
+      const size = h('input', { type: 'number', class: 'num', value: String(Math.round(p.size)), min: '1', max: '2000' });
+      size.onchange = () => upd(() => p.size = Math.max(1, +size.value));
+      const color = h('input', { type: 'color', value: p.color, class: 'color-input' });
+      color.onchange = () => upd(() => p.color = color.value);
+      const bold = h('input', { type: 'checkbox', checked: p.bold }); bold.onchange = () => upd(() => p.bold = bold.checked);
+      const italic = h('input', { type: 'checkbox', checked: p.italic }); italic.onchange = () => upd(() => p.italic = italic.checked);
+      const align = h('select', {}, h('option', { value: 'left' }, 'Izquierda'), h('option', { value: 'center' }, 'Centro'), h('option', { value: 'right' }, 'Derecha'));
+      align.value = p.align; align.onchange = () => upd(() => p.align = align.value as any);
+      body.append(ta,
+        h('div', { class: 'prop-row' }, h('span', {}, 'Fuente'), font),
+        h('div', { class: 'prop-row' }, h('span', {}, 'Tamaño'), size, h('span', {}, 'Color'), color),
+        h('div', { class: 'prop-row' }, h('label', { class: 'check' }, bold, ' Negrita'), h('label', { class: 'check' }, italic, ' Cursiva'), align));
+    }
+    if (l.mask) {
+      body.append(h('div', { class: 'prop-title' }, 'Máscara de capa'),
+        h('div', { class: 'prop-btns' },
+          h('button', { class: 'btn' + (d.editMask ? ' on' : ''), onclick: () => { d.editMask = !d.editMask; d.changed(); } }, d.editMask ? 'Editando máscara' : 'Editar máscara'),
+          h('button', { class: 'btn', onclick: () => ops.toggleMask() }, l.mask.enabled ? 'Desactivar' : 'Activar'),
+          h('button', { class: 'btn', onclick: () => ops.invertMask(l) }, 'Invertir'),
+          h('button', { class: 'btn', onclick: () => ops.deleteMask(true) }, 'Aplicar'),
+          h('button', { class: 'btn', onclick: () => ops.deleteMask(false) }, 'Eliminar')),
+        h('div', { class: 'hint' }, 'Pinta en negro para ocultar y en blanco para mostrar.'));
+    } else if (isRaster(l) || l instanceof GroupLayer) {
+      body.append(h('div', { class: 'prop-btns' }, h('button', { class: 'btn', onclick: () => ops.addMask('reveal') }, 'Añadir máscara')));
+    }
+  };
+  app.on('doc', render); app.on('docs', render);
+  render();
+}
+
+void renderComposite;

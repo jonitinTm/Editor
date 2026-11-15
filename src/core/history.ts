@@ -1,0 +1,111 @@
+// Historial (deshacer/rehacer). Cada paso guarda una "foto" del documento.
+// Para no gastar memoria de más, una capa cuyos píxeles no han cambiado
+// reutiliza la copia del paso anterior (solo se copian las capas tocadas).
+
+import { cloneCanvas } from './canvas';
+import { Layer, GroupLayer, RasterLayer, TextLayer, LayerMask, TextProps, BlendMode } from './layers';
+import type { EditorDocument } from './document';
+
+interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; }
+export interface LayerSnap {
+  id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
+  blendMode: BlendMode; locked: boolean;
+  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; text?: TextProps;
+  children?: LayerSnap[]; expanded?: boolean;
+}
+export interface DocSnap {
+  width: number; height: number; root: LayerSnap; activeId: number | null;
+  selection: HTMLCanvasElement | null;
+}
+export interface HistoryStep { name: string; icon?: string; snap: DocSnap; }
+
+// Copias congeladas asociadas a cada objeto vivo (capa o máscara).
+const frozen = new WeakMap<object, { version: number; canvas: HTMLCanvasElement }>();
+function freeze(owner: object, version: number, canvas: HTMLCanvasElement): HTMLCanvasElement {
+  const f = frozen.get(owner);
+  if (f && f.version === version) return f.canvas;
+  const c = cloneCanvas(canvas);
+  frozen.set(owner, { version, canvas: c });
+  return c;
+}
+
+function snapLayer(l: Layer): LayerSnap {
+  const s: LayerSnap = {
+    id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,
+    blendMode: l.blendMode, locked: l.locked,
+    mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled } : null,
+  };
+  if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; }
+  else if (l instanceof RasterLayer) {
+    s.canvas = freeze(l, l.version, l.canvas);
+    if (l instanceof TextLayer) s.text = { ...l.props };
+  }
+  return s;
+}
+
+let selFrozen: { version: number; canvas: HTMLCanvasElement | null; owner: object } | null = null;
+
+export function snapshot(doc: EditorDocument): DocSnap {
+  const sel = doc.selection;
+  let selCanvas: HTMLCanvasElement | null = null;
+  if (sel.mask) {
+    if (selFrozen && selFrozen.owner === sel && selFrozen.version === sel.version) selCanvas = selFrozen.canvas;
+    else { selCanvas = cloneCanvas(sel.mask); selFrozen = { version: sel.version, canvas: selCanvas, owner: sel }; }
+  }
+  return {
+    width: doc.width, height: doc.height, root: snapLayer(doc.root),
+    activeId: doc.active?.id ?? null, selection: selCanvas,
+  };
+}
+
+function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
+  let l: Layer;
+  if (s.kind === 'group') {
+    const g = new GroupLayer(s.name);
+    g.expanded = s.expanded ?? true;
+    for (const c of s.children ?? []) g.add(restoreLayer(c, w, h));
+    l = g;
+  } else {
+    const r = s.kind === 'text' ? new TextLayer(s.name, w, h, { ...s.text! }) : new RasterLayer(s.name, w, h);
+    r.canvas = cloneCanvas(s.canvas!);
+    frozen.set(r, { version: r.version, canvas: s.canvas! });
+    l = r;
+  }
+  l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked;
+  if (s.mask) {
+    const m = new LayerMask(w, h, 'black');
+    m.canvas = cloneCanvas(s.mask.canvas); m.enabled = s.mask.enabled;
+    frozen.set(m, { version: m.version, canvas: s.mask.canvas });
+    l.mask = m;
+  }
+  return l;
+}
+
+export function restore(doc: EditorDocument, snap: DocSnap) {
+  doc.width = snap.width; doc.height = snap.height;
+  const root = restoreLayer(snap.root, snap.width, snap.height) as GroupLayer;
+  doc.root = root;
+  doc.selection.width = snap.width; doc.selection.height = snap.height;
+  doc.selection.setMask(snap.selection);
+  if (snap.selection) selFrozen = { version: doc.selection.version, canvas: snap.selection, owner: doc.selection };
+  doc.setActive(doc.findLayer(snap.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);
+}
+
+export class History {
+  steps: HistoryStep[] = [];
+  index = -1;
+  limit = 60;
+  push(doc: EditorDocument, name: string) {
+    this.steps.length = this.index + 1;
+    this.steps.push({ name, snap: snapshot(doc) });
+    if (this.steps.length > this.limit) this.steps.splice(1, 1); // conserva el estado inicial
+    this.index = this.steps.length - 1;
+  }
+  canUndo() { return this.index > 0; }
+  canRedo() { return this.index < this.steps.length - 1; }
+  goto(doc: EditorDocument, i: number) {
+    if (i < 0 || i >= this.steps.length || i === this.index) return;
+    this.index = i;
+    restore(doc, this.steps[i].snap);
+  }
+}

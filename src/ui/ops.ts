@@ -1,0 +1,540 @@
+// Operaciones del editor (capas, edición, imagen, selección, archivos).
+// Los menús y los atajos de teclado llaman a estas funciones.
+
+import { app } from './app';
+import { EditorDocument } from '../core/document';
+import { GroupLayer, Layer, LayerMask, RasterLayer, TextLayer, isRaster, walkLayers } from '../core/layers';
+import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
+import { compositeGroup } from '../core/compositor';
+import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
+import { FilterDef } from '../filters/registry';
+import * as io from '../io/files';
+import { alertDialog, confirmDialog } from './dialog';
+
+const doc = () => app.doc;
+
+/** Llamar tras deshacer/rehacer o cambiar de documento. */
+export function notifyToolDocChanged() { app.tool?.docChanged?.(); }
+
+export function undo() { const d = doc(); if (!d) return; app.tool?.cancel?.(); d.undo(); notifyToolDocChanged(); }
+export function redo() { const d = doc(); if (!d) return; app.tool?.cancel?.(); d.redo(); notifyToolDocChanged(); }
+export function gotoHistory(i: number) { const d = doc(); if (!d) return; app.tool?.cancel?.(); d.gotoHistory(i); notifyToolDocChanged(); }
+
+// ---- Documentos -------------------------------------------------------------
+
+export function newDocument(name: string, w: number, h: number, bg: string | null) {
+  const d = new EditorDocument(name, w, h);
+  const l = new RasterLayer(bg ? 'Fondo' : 'Capa 1', w, h);
+  if (bg) { const c = ctx2d(l.canvas); c.fillStyle = bg; c.fillRect(0, 0, w, h); }
+  d.root.add(l); d.setActive(l, false);
+  app.addDocument(d);
+}
+
+export async function openFiles(files: File[], asLayers = false) {
+  for (const f of files) {
+    try {
+      if (io.isProjectFile(f)) { app.addDocument(await io.openProject(f)); continue; }
+      if (!io.isImageFile(f)) { app.toast(`Formato no admitido: ${f.name}`, 'warn'); continue; }
+      if (asLayers && app.doc) await placeImage(f, io.baseName(f.name));
+      else app.addDocument(await io.documentFromImage(f, f.name));
+    } catch (e: any) {
+      alertDialog('No se pudo abrir', `${f.name}: ${e?.message ?? e}`);
+    }
+  }
+}
+
+/** Coloca una imagen como capa nueva, centrada (o en la posición indicada). */
+export async function placeImage(src: Blob | HTMLCanvasElement, name: string, pos?: { x: number; y: number }) {
+  const d = doc(); if (!d) return;
+  const c = src instanceof HTMLCanvasElement ? src : await io.imageToCanvas(src);
+  const l = new RasterLayer(name, d.width, d.height);
+  const x = pos?.x ?? Math.round((d.width - c.width) / 2), y = pos?.y ?? Math.round((d.height - c.height) / 2);
+  ctx2d(l.canvas).drawImage(c, x, y);
+  d.insertAboveActive(l);
+  d.commit('Pegar');
+}
+
+export async function closeDocument(d = doc()) {
+  if (!d) return;
+  if (d.modified && !(await confirmDialog('Cerrar documento', `«${d.name}» tiene cambios sin guardar. ¿Cerrarlo de todas formas?`, 'Cerrar sin guardar'))) return;
+  app.closeDocument(d);
+}
+
+const handles = new WeakMap<EditorDocument, any>();
+export async function saveProject(saveAs = false) {
+  const d = doc(); if (!d) return;
+  try {
+    const blob = await io.serializeProject(d);
+    const h = await io.saveBlob(blob, d.name + io.PROJECT_EXT, saveAs ? undefined : handles.get(d));
+    if (h) { handles.set(d, h); if (h.name) d.name = io.baseName(h.name); }
+    d.modified = false; app.emit('docs');
+    app.toast('Proyecto guardado');
+  } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
+}
+
+// ---- Capas ------------------------------------------------------------------
+
+export function newLayer() { const d = doc(); if (!d) return; d.newRasterLayer(); d.commit('Nueva capa'); }
+
+export function newGroup() {
+  const d = doc(); if (!d) return;
+  let n = 1; const names = new Set(d.allLayers().map(l => l.name));
+  while (names.has(`Grupo ${n}`)) n++;
+  const g = new GroupLayer(`Grupo ${n}`);
+  d.insertAboveActive(g);
+  d.commit('Nuevo grupo');
+}
+
+function cloneLayer(l: Layer, d: EditorDocument): Layer {
+  let c: Layer;
+  if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
+  else if (l instanceof TextLayer) { c = new TextLayer(l.name, d.width, d.height, { ...l.props }); }
+  else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
+  c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
+  if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
+  return c;
+}
+
+/** Capas seleccionadas en el panel, sin incluir las que ya están dentro de otro grupo seleccionado. */
+export function selectedLayers(): Layer[] {
+  const d = doc(); if (!d) return [];
+  const sel = d.allLayers().filter(l => d.selectedIds.has(l.id));
+  return sel.filter(l => { let p = l.parent; while (p) { if (sel.includes(p)) return false; p = p.parent; } return true; });
+}
+
+export function duplicateLayer() {
+  const d = doc(); if (!d) return;
+  const layers = selectedLayers(); if (!layers.length) return;
+  let last: Layer | null = null;
+  for (const l of layers) {
+    const c = cloneLayer(l, d);
+    c.name = l.name + ' copia';
+    l.parent!.add(c, l.parent!.children.indexOf(l) + 1);
+    last = c;
+  }
+  d.setActive(last, false);
+  d.commit('Duplicar capa');
+}
+
+export function deleteLayers() {
+  const d = doc(); if (!d) return;
+  const layers = selectedLayers(); if (!layers.length) return;
+  const first = layers[0];
+  const parent = first.parent!;
+  const idx = parent.children.indexOf(first);
+  for (const l of layers) l.parent?.remove(l);
+  const next = parent.children[Math.max(0, idx - 1)] ?? (parent !== d.root ? parent : d.allLayers().pop()) ?? null;
+  d.setActive(next ?? null, false);
+  d.commit('Eliminar capa');
+}
+
+export function renameLayer(l: Layer, name: string) {
+  const d = doc(); if (!d || !name.trim() || name === l.name) return;
+  l.name = name.trim(); d.commit('Cambiar nombre de capa');
+}
+
+export function groupLayers() {
+  const d = doc(); if (!d) return;
+  const layers = selectedLayers(); if (!layers.length) return;
+  const top = layers[layers.length - 1];
+  const parent = top.parent!;
+  let n = 1; const names = new Set(d.allLayers().map(l => l.name));
+  while (names.has(`Grupo ${n}`)) n++;
+  const g = new GroupLayer(`Grupo ${n}`);
+  parent.add(g, parent.children.indexOf(top) + 1);
+  // Mantener el orden visual
+  const ordered = d.allLayers().filter(l => layers.includes(l));
+  for (const l of ordered) g.add(l);
+  d.setActive(g, false);
+  d.commit('Agrupar capas');
+}
+
+export function ungroup() {
+  const d = doc(); if (!d) return;
+  const g = d.active;
+  if (!(g instanceof GroupLayer)) { app.toast('Selecciona un grupo para desagrupar', 'warn'); return; }
+  const parent = g.parent!;
+  let i = parent.children.indexOf(g);
+  const kids = [...g.children];
+  parent.remove(g);
+  for (const k of kids) parent.add(k, i++);
+  d.setActive(kids[kids.length - 1] ?? null, false);
+  d.selectedIds = new Set(kids.map(k => k.id));
+  d.commit('Desagrupar capas');
+}
+
+/** Mueve la capa activa: 'up', 'down', 'top', 'bottom'. */
+export function arrangeLayer(where: 'up' | 'down' | 'top' | 'bottom') {
+  const d = doc(); const l = d?.active; if (!d || !l || !l.parent) return;
+  const p = l.parent; const i = p.children.indexOf(l);
+  const to = where === 'up' ? i + 1 : where === 'down' ? i - 1 : where === 'top' ? p.children.length - 1 : 0;
+  if (to < 0 || to >= p.children.length || to === i) return;
+  p.children.splice(i, 1); p.children.splice(to, 0, l);
+  d.commit('Organizar capa');
+}
+
+/** Mueve `layer` a una posición en `parent` (usado al arrastrar en el panel). */
+export function moveLayerTo(layer: Layer, parent: GroupLayer, index: number) {
+  const d = doc(); if (!d) return;
+  // No se puede meter un grupo dentro de sí mismo
+  let p: Layer | null = parent; while (p) { if (p === layer) return; p = p.parent; }
+  const old = layer.parent!;
+  const oi = old.children.indexOf(layer);
+  if (old === parent && oi < index) index--;
+  old.remove(layer);
+  parent.add(layer, Math.max(0, Math.min(index, parent.children.length)));
+  d.commit('Mover capa');
+}
+
+export function setLayerProp(l: Layer, prop: 'opacity' | 'blendMode' | 'visible' | 'locked', value: any, record = true) {
+  const d = doc(); if (!d) return;
+  (l as any)[prop] = value;
+  d.invalidate();
+  if (record) d.commit({ opacity: 'Opacidad de capa', blendMode: 'Modo de fusión', visible: value ? 'Mostrar capa' : 'Ocultar capa', locked: value ? 'Bloquear capa' : 'Desbloquear capa' }[prop]);
+  else d.changed();
+}
+
+/** Aplica la máscara de una capa a sus píxeles (para combinar). */
+function bakeLayer(l: Layer, d: EditorDocument): HTMLCanvasElement {
+  const c = makeCanvas(d.width, d.height);
+  const ctx = ctx2d(c);
+  if (l instanceof GroupLayer) compositeGroup(l, ctx, d.width, d.height, {});
+  else ctx.drawImage((l as RasterLayer).canvas, 0, 0);
+  if (l.mask?.enabled) { ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(l.mask.canvas, 0, 0); }
+  return c;
+}
+
+export function mergeDown() {
+  const d = doc(); const l = d?.active; if (!d || !l || !l.parent) return;
+  const p = l.parent; const i = p.children.indexOf(l);
+  const below = p.children[i - 1];
+  if (!below) { app.toast('No hay ninguna capa debajo', 'warn'); return; }
+  if (below instanceof GroupLayer) { app.toast('No se puede combinar con un grupo', 'warn'); return; }
+  const base = bakeLayer(below, d);
+  const top = bakeLayer(l, d);
+  const ctx = ctx2d(base);
+  ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = l.blendMode;
+  if (l.visible) ctx.drawImage(top, 0, 0);
+  let target = below as RasterLayer;
+  if (target instanceof TextLayer) target = rasterizeLayer(target);
+  target.canvas = base; target.mask = null; target.touch();
+  p.remove(l);
+  d.setActive(target, false);
+  d.commit('Combinar hacia abajo');
+}
+
+export function mergeVisible() {
+  const d = doc(); if (!d) return;
+  const merged = d.flatten();
+  const visibleTop = d.root.children.filter(l => l.visible);
+  if (visibleTop.length < 2) { app.toast('Hace falta más de una capa visible', 'warn'); return; }
+  const idx = d.root.children.indexOf(visibleTop[visibleTop.length - 1]);
+  const l = new RasterLayer('Combinada', d.width, d.height);
+  l.canvas = merged;
+  d.root.add(l, idx + 1);
+  for (const v of visibleTop) d.root.remove(v);
+  d.setActive(l, false);
+  d.commit('Combinar visibles');
+}
+
+export function flattenImage() {
+  const d = doc(); if (!d) return;
+  const c = makeCanvas(d.width, d.height);
+  const ctx = ctx2d(c);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, d.width, d.height);
+  ctx.drawImage(d.flatten(), 0, 0);
+  const l = new RasterLayer('Fondo', d.width, d.height); l.canvas = c;
+  d.root.children.slice().forEach(ch => d.root.remove(ch));
+  d.root.add(l); d.setActive(l, false);
+  d.commit('Acoplar imagen');
+}
+
+export function rasterize() {
+  const d = doc(); const l = d?.active;
+  if (!d || !(l instanceof TextLayer)) { app.toast('Solo las capas de texto se pueden rasterizar', 'warn'); return; }
+  rasterizeLayer(l); d.commit('Rasterizar capa');
+}
+
+// ---- Máscaras -----------------------------------------------------------------
+
+export function addMask(mode: 'reveal' | 'hide' | 'selection') {
+  const d = doc(); const l = d?.active; if (!d || !l) return;
+  if (l.mask) { app.toast('La capa ya tiene una máscara', 'warn'); return; }
+  const m = new LayerMask(d.width, d.height, mode === 'hide' ? 'black' : 'white');
+  if (mode === 'selection' || (mode === 'reveal' && d.selection.active)) {
+    if (d.selection.mask) { m.canvas = cloneCanvas(d.selection.mask); m.touch(); }
+  }
+  l.mask = m; d.editMask = true;
+  d.commit('Añadir máscara de capa');
+}
+export function deleteMask(apply: boolean) {
+  const d = doc(); const l = d?.active; if (!d || !l || !l.mask) return;
+  if (apply) {
+    if (l instanceof GroupLayer) { app.toast('No se puede aplicar la máscara de un grupo', 'warn'); return; }
+    let r = l as RasterLayer;
+    if (r instanceof TextLayer) r = rasterizeLayer(r);
+    const c = ctx2d(r.canvas); c.globalCompositeOperation = 'destination-in'; c.drawImage(l.mask.canvas, 0, 0); c.globalCompositeOperation = 'source-over';
+    r.touch(); r.mask = null;
+  } else l.mask = null;
+  d.editMask = false;
+  d.commit(apply ? 'Aplicar máscara de capa' : 'Eliminar máscara de capa');
+}
+export function toggleMask() {
+  const d = doc(); const l = d?.active; if (!d || !l?.mask) return;
+  l.mask.enabled = !l.mask.enabled; d.commit(l.mask.enabled ? 'Activar máscara' : 'Desactivar máscara');
+}
+export function invertMask(l: Layer) {
+  const d = doc(); if (!d || !l.mask) return;
+  const inv = makeCanvas(d.width, d.height); const c = ctx2d(inv);
+  c.fillStyle = '#fff'; c.fillRect(0, 0, d.width, d.height);
+  c.globalCompositeOperation = 'destination-out'; c.drawImage(l.mask.canvas, 0, 0);
+  l.mask.canvas = inv; l.mask.touch(); d.commit('Invertir máscara');
+}
+
+// ---- Selección ----------------------------------------------------------------
+
+export function selectAll() { const d = doc(); if (!d) return; d.selection.selectAll(); d.commit('Seleccionar todo'); }
+export function deselect() { const d = doc(); if (!d || !d.selection.active) return; d.selection.clear(); d.commit('Deseleccionar'); }
+export function invertSelection() { const d = doc(); if (!d) return; d.selection.invert(); d.commit('Invertir selección'); }
+export function selectionFromLayer(l: Layer) {
+  const d = doc(); if (!d || !isRaster(l)) return;
+  d.selection.setMask(l.canvas); d.commit('Cargar selección');
+}
+
+// ---- Edición ------------------------------------------------------------------
+
+let clipboard: { canvas: HTMLCanvasElement; x: number; y: number } | null = null;
+let clipboardFresh = false;
+window.addEventListener('blur', () => { clipboardFresh = false; });
+
+/** Píxeles seleccionados de la capa activa (o de todas si `merged`). */
+function selectedPixels(merged: boolean): { canvas: HTMLCanvasElement; rect: Rect } | null {
+  const d = doc(); if (!d) return null;
+  const src = merged ? d.flatten() : d.activeRaster()?.canvas;
+  if (!src) { app.toast('Selecciona una capa de píxeles', 'warn'); return null; }
+  const tmp = cloneCanvas(src);
+  if (d.selection.mask) { const c = ctx2d(tmp); c.globalCompositeOperation = 'destination-in'; c.drawImage(d.selection.mask, 0, 0); }
+  const rect = d.selection.active ? (contentBounds(tmp) ?? null) : { x: 0, y: 0, w: d.width, h: d.height };
+  if (!rect) { app.toast('La zona seleccionada está vacía', 'warn'); return null; }
+  const out = makeCanvas(rect.w, rect.h); ctx2d(out).drawImage(tmp, -rect.x, -rect.y);
+  return { canvas: out, rect };
+}
+
+export async function copy(merged = false) {
+  const p = selectedPixels(merged); if (!p) return;
+  clipboard = { canvas: p.canvas, x: p.rect.x, y: p.rect.y };
+  clipboardFresh = true;
+  try {
+    const blob = await canvasToBlob(p.canvas, 'image/png');
+    await (navigator.clipboard as any)?.write?.([new (window as any).ClipboardItem({ 'image/png': blob })]);
+  } catch { /* el portapapeles del sistema puede no estar disponible */ }
+}
+export async function cut() {
+  const d = doc(); if (!d) return;
+  await copy(false);
+  if (clipboard) clearSelection('Cortar');
+}
+
+/** Se llama desde el evento "paste" del navegador. */
+export async function pasteFromEvent(e: ClipboardEvent) {
+  const files = [...(e.clipboardData?.files ?? [])].filter(f => f.type.startsWith('image/'));
+  if (clipboard && clipboardFresh && app.doc) {
+    const c = clipboard;
+    const d = app.doc;
+    const fits = c.x + c.canvas.width <= d.width && c.y + c.canvas.height <= d.height;
+    await placeImage(c.canvas, d.nextLayerName(), fits ? { x: c.x, y: c.y } : undefined);
+    return;
+  }
+  if (files.length) {
+    if (!app.doc) { app.addDocument(await io.documentFromImage(files[0], 'Pegado')); return; }
+    await placeImage(files[0], app.doc.nextLayerName());
+    return;
+  }
+  if (clipboard && app.doc) await placeImage(clipboard.canvas, app.doc.nextLayerName());
+}
+
+/** Borra el contenido seleccionado (o pinta la máscara con el color de fondo). */
+export function clearSelection(name = 'Borrar') {
+  const d = doc(); if (!d) return;
+  if (!d.selection.active) { app.toast('Haz primero una selección', 'warn'); return; }
+  const t = getPaintTarget(); if (!t) return;
+  const out = cloneCanvas(t.canvas); const c = ctx2d(out);
+  c.globalCompositeOperation = 'destination-out'; c.drawImage(d.selection.mask!, 0, 0);
+  if (t.isMask) {
+    // En máscaras "borrar" = pintar con el color de fondo
+    const lum = luminanceOf(app.bg);
+    c.globalCompositeOperation = 'lighter'; c.globalAlpha = lum; c.drawImage(d.selection.mask!, 0, 0);
+  }
+  setTargetCanvas(t, out);
+  d.commit(name);
+}
+function luminanceOf(hex: string) { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; }
+
+export function fill(color: string, opacity = 1, name = 'Rellenar') {
+  const d = doc(); if (!d) return;
+  const t = getPaintTarget(); if (!t) return;
+  const out = cloneCanvas(t.canvas); const c = ctx2d(out);
+  const area = makeCanvas(d.width, d.height); const ac = ctx2d(area);
+  ac.fillStyle = t.isMask ? '#fff' : color; ac.fillRect(0, 0, d.width, d.height);
+  if (d.selection.mask) { ac.globalCompositeOperation = 'destination-in'; ac.drawImage(d.selection.mask, 0, 0); }
+  c.globalAlpha = opacity;
+  if (t.isMask) {
+    c.globalCompositeOperation = 'destination-out'; c.drawImage(area, 0, 0);
+    c.globalAlpha = opacity * luminanceOf(color); c.globalCompositeOperation = 'lighter'; c.drawImage(area, 0, 0);
+  } else c.drawImage(area, 0, 0);
+  setTargetCanvas(t, out);
+  d.commit(name);
+}
+
+/** Capa vía copiar (Ctrl+J) o vía cortar (Mayús+Ctrl+J). */
+export function layerVia(cutting: boolean) {
+  const d = doc(); if (!d) return;
+  if (!d.selection.active) { if (!cutting) duplicateLayer(); return; }
+  const p = selectedPixels(false); if (!p) return;
+  if (cutting) {
+    const t = getPaintTarget(); if (!t || t.isMask) return;
+    const out = cloneCanvas(t.canvas); const c = ctx2d(out);
+    c.globalCompositeOperation = 'destination-out'; c.drawImage(d.selection.mask!, 0, 0);
+    setTargetCanvas(t, out);
+  }
+  const l = new RasterLayer(d.nextLayerName(), d.width, d.height);
+  ctx2d(l.canvas).drawImage(p.canvas, p.rect.x, p.rect.y);
+  d.insertAboveActive(l);
+  d.commit(cutting ? 'Capa vía cortar' : 'Capa vía copiar');
+}
+
+// ---- Imagen ---------------------------------------------------------------------
+
+export function cropToSelection() {
+  const d = doc(); if (!d) return;
+  const b = d.selection.bounds;
+  if (!b) { app.toast('Haz primero una selección', 'warn'); return; }
+  d.resizeCanvas(b.w, b.h, -b.x, -b.y);
+  d.selection.clear();
+  d.commit('Recortar');
+  app.viewport.fit(true);
+}
+
+export function trimTransparent() {
+  const d = doc(); if (!d) return;
+  const b = contentBounds(d.flatten());
+  if (!b) { app.toast('La imagen está vacía', 'warn'); return; }
+  d.resizeCanvas(b.w, b.h, -b.x, -b.y); d.commit('Cortar transparencia'); app.viewport.fit(true);
+}
+
+/** Gira o voltea el documento entero. */
+export function transformImage(kind: 'rot90' | 'rot-90' | 'rot180' | 'flipH' | 'flipV') {
+  const d = doc(); if (!d) return;
+  const W = d.width, H = d.height;
+  const swap = kind === 'rot90' || kind === 'rot-90';
+  const nw = swap ? H : W, nh = swap ? W : H;
+  const tf = (src: HTMLCanvasElement, bg?: string) => {
+    const c = makeCanvas(nw, nh); const ctx = ctx2d(c);
+    if (bg) { ctx.fillStyle = bg; ctx.fillRect(0, 0, nw, nh); ctx.globalCompositeOperation = 'source-over'; }
+    ctx.save();
+    ctx.translate(nw / 2, nh / 2);
+    if (kind === 'rot90') ctx.rotate(Math.PI / 2);
+    if (kind === 'rot-90') ctx.rotate(-Math.PI / 2);
+    if (kind === 'rot180') ctx.rotate(Math.PI);
+    if (kind === 'flipH') ctx.scale(-1, 1);
+    if (kind === 'flipV') ctx.scale(1, -1);
+    if (bg) ctx.clearRect(-W / 2, -H / 2, W, H);
+    ctx.drawImage(src, -W / 2, -H / 2);
+    ctx.restore();
+    return c;
+  };
+  for (const l of d.allLayers()) {
+    if (l instanceof TextLayer) rasterizeLayer(l);
+  }
+  for (const l of d.allLayers()) {
+    if (isRaster(l)) { l.canvas = tf(l.canvas); l.touch(); }
+    if (l.mask) { l.mask.canvas = tf(l.mask.canvas); l.mask.touch(); }
+  }
+  const sel = d.selection.mask ? tf(d.selection.mask) : null;
+  d.width = nw; d.height = nh;
+  d.selection.width = nw; d.selection.height = nh;
+  d.selection.setMask(sel);
+  d.guides = { h: [], v: [] };
+  d.invalidate();
+  const names = { rot90: 'Rotar lienzo 90° horario', 'rot-90': 'Rotar lienzo 90° antihorario', rot180: 'Rotar lienzo 180°', flipH: 'Voltear lienzo horizontal', flipV: 'Voltear lienzo vertical' };
+  d.commit(names[kind]);
+  if (swap) app.viewport.fit(true);
+}
+
+// ---- Filtros --------------------------------------------------------------------
+
+/** Aplica un filtro con vista previa; respeta la selección y funciona también sobre máscaras. */
+export class FilterSession {
+  t: PaintTarget;
+  region: Rect;
+  private orig: ImageData;
+  private sel: ImageData | null;
+  private preview: HTMLCanvasElement;
+  private seed = (Math.random() * 1e9) | 0;
+  constructor(t: PaintTarget, public def: FilterDef) {
+    const d = doc()!;
+    this.t = t;
+    this.region = d.selection.bounds ?? { x: 0, y: 0, w: d.width, h: d.height };
+    this.orig = getPixels(t.canvas, this.region);
+    if (t.isMask) { // máscara -> imagen en grises
+      const a = this.orig.data;
+      for (let i = 0; i < a.length; i += 4) { a[i] = a[i + 1] = a[i + 2] = a[i + 3]; a[i + 3] = 255; }
+    }
+    this.sel = d.selection.mask ? getPixels(d.selection.mask, this.region) : null;
+    this.preview = cloneCanvas(t.canvas);
+  }
+  static start(def: FilterDef): FilterSession | null {
+    const t = getPaintTarget(); if (!t) return null;
+    return new FilterSession(t, def);
+  }
+  /** Imagen original de la zona (para histogramas). */
+  source() { return this.orig; }
+  private compute(params: any): ImageData {
+    const img = new ImageData(new Uint8ClampedArray(this.orig.data), this.orig.width, this.orig.height);
+    this.def.apply(img, { ...params, seed: this.seed });
+    const o = this.orig.data, n = img.data;
+    if (this.sel) {
+      const s = this.sel.data;
+      for (let i = 0; i < n.length; i += 4) {
+        const k = s[i + 3] / 255;
+        if (k >= 1) continue;
+        for (let c = 0; c < 4; c++) n[i + c] = o[i + c] + (n[i + c] - o[i + c]) * k;
+      }
+    }
+    if (this.t.isMask) for (let i = 0; i < n.length; i += 4) { n[i + 3] = n[i]; n[i] = n[i + 1] = n[i + 2] = 255; }
+    return img;
+  }
+  render(params: any) {
+    putPixels(this.preview, this.compute(params), this.region.x, this.region.y);
+    setPreview(this.t, this.preview);
+    doc()!.invalidate(this.region);
+    app.viewport.requestRender();
+  }
+  clearPreview() {
+    setPreview(this.t, null);
+    doc()!.invalidate(this.region);
+    app.viewport.requestRender();
+  }
+  commit(params: any) {
+    const out = cloneCanvas(this.t.canvas);
+    putPixels(out, this.compute(params), this.region.x, this.region.y);
+    setPreview(this.t, null);
+    setTargetCanvas(this.t, out);
+    doc()!.commit(this.def.name.replace('…', ''));
+  }
+}
+
+export let lastFilter: { def: FilterDef; params: any } | null = null;
+export function setLastFilter(def: FilterDef, params: any) { if (def.group === 'filtro') lastFilter = { def, params }; }
+
+export function applyFilterDirect(def: FilterDef, params: any = {}) {
+  const s = FilterSession.start(def); if (!s) return;
+  s.commit(params);
+  setLastFilter(def, params);
+}
+export function repeatLastFilter() {
+  if (!lastFilter) { app.toast('Aún no has aplicado ningún filtro', 'warn'); return; }
+  applyFilterDirect(lastFilter.def, lastFilter.params);
+}
+
+void walkLayers;
