@@ -3,7 +3,7 @@
 
 import { app } from '../ui/app';
 import { cloneCanvas, ctx2d, makeCanvas, Rect, rectInt, rectIntersect, luminance } from '../core/canvas';
-import { Layer, RasterLayer, GroupLayer, isParametric } from '../core/layers';
+import { Layer, RasterLayer, isRaster, isParametric } from '../core/layers';
 
 export interface PaintTarget {
   layer: Layer;
@@ -36,7 +36,7 @@ export function getPaintTarget(opts: { allowText?: boolean } = {}): PaintTarget 
   if (layer.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return null; }
   if (!layer.isVisibleInTree()) { app.toast('La capa está oculta', 'warn'); return null; }
   if (doc.editMask && layer.mask) return { layer, isMask: true, canvas: layer.mask.canvas };
-  if (layer instanceof GroupLayer) { app.toast('Selecciona una capa de píxeles (no un grupo)', 'warn'); return null; }
+  if (!isRaster(layer)) { app.toast(layer.kind === 'group' ? 'Selecciona una capa de píxeles (no un grupo)' : 'Las capas de ajuste no tienen píxeles: pinta en su máscara', 'warn'); return null; }
   if (isParametric(layer) && !opts.allowText) {
     app.toast(layer.kind === 'text' ? 'Capa de texto rasterizada para poder editarla' : 'Forma rasterizada para poder editarla');
     layer = rasterizeLayer(layer);

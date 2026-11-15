@@ -7,6 +7,7 @@ import * as ops from './ops';
 import * as io from '../io/files';
 import { FilterDef, defaultParams } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
+import type { LayerStyles } from '../core/layers';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
 
@@ -214,7 +215,7 @@ function drawHistogram(ctx: CanvasRenderingContext2D, hist: Uint32Array, w: numb
   }
 }
 
-function levelsBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
+export function levelsBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
   const W = 360, H = 120;
   const cv = h('canvas', { width: W, height: H + 18, class: 'hist' });
   const ctx = cv.getContext('2d')!;
@@ -235,14 +236,14 @@ function levelsBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
   const sync = () => { for (const k of Object.keys(fields)) fields[k].value = String(k === 'gamma' ? (+p[k]).toFixed(2) : Math.round(p[k])); draw(); };
   let dragging: 'inBlack' | 'inWhite' | 'gamma' | null = null;
   cv.addEventListener('pointerdown', e => {
-    const x = e.offsetX / W * 255;
+    const x = e.offsetX * (W / (cv.clientWidth || W)) / W * 255;
     const gx = p.inBlack + (p.inWhite - p.inBlack) * Math.pow(0.5, p.gamma);
     const d = [['inBlack', p.inBlack], ['gamma', gx], ['inWhite', p.inWhite]].map(([k, v]) => [k, Math.abs((v as number) - x)] as const).sort((a, b) => a[1] - b[1]);
     dragging = d[0][0] as any; cv.setPointerCapture(e.pointerId);
   });
   cv.addEventListener('pointermove', e => {
     if (!dragging) return;
-    const x = Math.max(0, Math.min(255, e.offsetX / W * 255));
+    const x = Math.max(0, Math.min(255, e.offsetX * (W / (cv.clientWidth || W)) / W * 255));
     if (dragging === 'inBlack') p.inBlack = Math.min(x, p.inWhite - 2);
     else if (dragging === 'inWhite') p.inWhite = Math.max(x, p.inBlack + 2);
     else { const t = Math.min(0.99, Math.max(0.01, (x - p.inBlack) / (p.inWhite - p.inBlack))); p.gamma = Math.min(9.99, Math.max(0.1, Math.log(t) / Math.log(0.5))); }
@@ -265,7 +266,7 @@ function levelsBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
   return els;
 }
 
-function curvesBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
+export function curvesBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
   const S = 300;
   const cv = h('canvas', { width: S, height: S, class: 'curves' });
   const ctx = cv.getContext('2d')!;
@@ -295,7 +296,8 @@ function curvesBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
     if (active >= 0) readout.textContent = `Entrada: ${Math.round(pts()[active][0])}  ·  Salida: ${Math.round(pts()[active][1])}`;
   };
   let dragging = false;
-  const pos = (e: PointerEvent) => ({ x: Math.max(0, Math.min(255, e.offsetX / S * 255)), y: Math.max(0, Math.min(255, (S - e.offsetY) / S * 255)) });
+  const kk = () => S / (cv.clientWidth || S);
+  const pos = (e: PointerEvent) => ({ x: Math.max(0, Math.min(255, e.offsetX * kk() / S * 255)), y: Math.max(0, Math.min(255, (S - e.offsetY * kk()) / S * 255)) });
   cv.addEventListener('pointerdown', e => {
     const q = pos(e);
     const list = pts();
@@ -310,7 +312,7 @@ function curvesBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
   cv.addEventListener('pointermove', e => {
     if (!dragging || active < 0) return;
     const q = pos(e), list = pts();
-    const out = (e.offsetY < -20 || e.offsetY > S + 20) && list.length > 2 && active > 0 && active < list.length - 1;
+    const out = (e.offsetY * kk() < -20 || e.offsetY * kk() > S + 20) && list.length > 2 && active > 0 && active < list.length - 1;
     if (out) { list.splice(active, 1); active = -1; dragging = false; draw(); update(); return; }
     const lo = active > 0 ? list[active - 1][0] + 1 : 0, hi = active < list.length - 1 ? list[active + 1][0] - 1 : 255;
     list[active] = [Math.round(Math.min(hi, Math.max(lo, q.x))), Math.round(q.y)];
@@ -323,6 +325,40 @@ function curvesBody(src: ImageData, p: any, update: () => void): HTMLElement[] {
   });
   draw();
   return [row('Canal', sel), cv, h('div', { class: 'hint' }, 'Clic para añadir un punto; arrástralo fuera o haz doble clic para quitarlo.'), readout];
+}
+
+// ---- Estilo de capa -------------------------------------------------------------------
+
+export function layerStyleDialog() {
+  const d = app.doc, l = d?.active; if (!d || !l) return;
+  if (l.kind === 'adjust') { app.toast('Las capas de ajuste no admiten estilos', 'warn'); return; }
+  const before = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null;
+  const st: Required<LayerStyles> = {
+    shadow: { enabled: false, color: '#000000', opacity: 60, angle: 120, distance: 8, blur: 10 },
+    stroke: { enabled: false, color: '#000000', size: 3 },
+    glow: { enabled: false, color: '#ffffaa', opacity: 75, size: 12 },
+    ...(before ? JSON.parse(JSON.stringify(before)) : {}),
+  };
+  const update = () => ops.setLayerStyles(l, JSON.parse(JSON.stringify(st)), false);
+  const section = (title: string, obj: any, fields: [string, string, number, number, string?][]) => {
+    const on = h('input', { type: 'checkbox', checked: obj.enabled });
+    const color = h('input', { type: 'color', class: 'color-input', value: obj.color });
+    const enable = () => { if (!obj.enabled) { obj.enabled = true; on.checked = true; } };
+    on.onchange = () => { obj.enabled = on.checked; update(); };
+    color.oninput = () => { obj.color = color.value; enable(); update(); };
+    return [h('div', { class: 'style-head' }, h('label', { class: 'check' }, on, h('b', {}, ' ' + title)), color),
+      ...fields.map(([key, label, min, max, unit]) => row(label, numberSlider({ min, max, value: obj[key], unit, onInput: v => { obj[key] = v; enable(); update(); } }).el))];
+  };
+  showDialog({
+    title: `Estilo de capa: ${l.name}`, width: 400,
+    body: [
+      ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
+      ...section('Trazo (exterior)', st.stroke, [['size', 'Grosor', 1, 60, 'px']]),
+      ...section('Resplandor exterior', st.glow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
+    ],
+    onOk: () => { const any = st.shadow.enabled || st.stroke.enabled || st.glow.enabled; l.styles = before; ops.setLayerStyles(l, any || before ? JSON.parse(JSON.stringify(st)) : null, true); },
+    onCancel: () => ops.setLayerStyles(l, before, false),
+  });
 }
 
 // ---- Ayuda ----------------------------------------------------------------------------

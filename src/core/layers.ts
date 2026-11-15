@@ -65,6 +65,15 @@ export interface TextProps {
   y: number;
 }
 
+export interface LayerStyles {
+  shadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number };
+  stroke?: { enabled: boolean; color: string; size: number };
+  glow?: { enabled: boolean; color: string; opacity: number; size: number };
+}
+export function hasStyles(s: LayerStyles | null | undefined): s is LayerStyles {
+  return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled);
+}
+
 export abstract class Layer {
   id = newLayerId();
   name: string;
@@ -76,7 +85,9 @@ export abstract class Layer {
   parent: GroupLayer | null = null;
   /** Se incrementa cada vez que cambian los píxeles; lo usa el historial. */
   version = 0;
-  abstract readonly kind: 'raster' | 'text' | 'shape' | 'group';
+  abstract readonly kind: 'raster' | 'text' | 'shape' | 'group' | 'adjust';
+  /** Estilos de capa (sombra, trazo, resplandor). null = ninguno. */
+  styles: LayerStyles | null = null;
   constructor(name: string) { this.name = name; }
   touch() { this.version++; }
   /** ¿Está bloqueada esta capa o alguno de sus grupos padre? */
@@ -209,6 +220,15 @@ export class ShapeLayer extends RasterLayer {
   }
 }
 
+/**
+ * Capa de ajuste: no tiene píxeles; aplica un ajuste (niveles, curvas…) a
+ * todo lo que hay debajo, sin modificarlo. Se puede cambiar o quitar siempre.
+ */
+export class AdjustmentLayer extends Layer {
+  readonly kind = 'adjust' as const;
+  constructor(name: string, public filterId: string, public params: any) { super(name); }
+}
+
 export class GroupLayer extends Layer {
   readonly kind = 'group' as const;
   /** Hijos de abajo (índice 0) hacia arriba. */
@@ -235,5 +255,5 @@ export function* walkLayers(group: GroupLayer): Generator<Layer> {
 }
 
 export function isRaster(l: Layer | null | undefined): l is RasterLayer {
-  return !!l && l.kind !== 'group';
+  return !!l && (l.kind === 'raster' || l.kind === 'text' || l.kind === 'shape');
 }

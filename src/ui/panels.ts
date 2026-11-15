@@ -4,12 +4,15 @@ import { app } from './app';
 import { h, numberSlider } from './dom';
 import { icon } from './icons';
 import * as ops from './ops';
-import { BLEND_MODES, GroupLayer, Layer, TextLayer, ShapeLayer, isRaster, isParametric } from '../core/layers';
+import { BLEND_MODES, GroupLayer, AdjustmentLayer, hasStyles, Layer, TextLayer, ShapeLayer, isRaster, isParametric } from '../core/layers';
 import { ctx2d } from '../core/canvas';
 import { renderComposite } from '../core/compositor';
 import { FONTS } from '../tools/text';
 import { actionById } from './actions';
-import { promptDialog } from './dialog';
+import { promptDialog, row as formRow } from './dialog';
+import { layerStyleDialog, levelsBody, curvesBody } from './dialogs';
+import { FILTERS } from '../filters/registry';
+import { getPixels } from '../core/canvas';
 
 function panel(title: string, body: HTMLElement, extraHeader?: HTMLElement, cls = '') {
   return h('section', { class: 'panel ' + cls },
@@ -38,6 +41,7 @@ function thumb(owner: object, version: number, draw: (ctx: CanvasRenderingContex
 }
 function layerThumb(l: Layer) {
   if (l instanceof GroupLayer) return h('span', { class: 'thumb folder', html: icon('folder') });
+  if (l instanceof AdjustmentLayer) return h('span', { class: 'thumb folder adj', html: icon('adjust') });
   const r = l as any;
   return thumb(l, l.version, (ctx, w, hh) => ctx.drawImage(r.canvas, 0, 0, w, hh));
 }
@@ -69,7 +73,16 @@ export function buildLayersPanel(parent: HTMLElement) {
 
   const list = h('div', { class: 'layer-list' });
   const footBtn = (ic: string, title: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, html: icon(ic), onclick: fn });
+  const adjBtn = footBtn('adjust', 'Nueva capa de ajuste', () => {
+    const r = adjBtn.getBoundingClientRect();
+    const fly = h('div', { class: 'flyout', style: { right: window.innerWidth - r.right + 'px', bottom: window.innerHeight - r.top + 4 + 'px' } },
+      ...FILTERS.filter(f => f.group === 'ajuste').map(f => h('div', { class: 'fly-item', onclick: () => { fly.remove(); ops.newAdjustmentLayer(f); } }, f.name.replace('…', ''))));
+    document.body.append(fly);
+    setTimeout(() => document.addEventListener('pointerdown', function off(e) { if (!fly.contains(e.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', off); } }), 0);
+  });
   const foot = h('div', { class: 'panel-foot' },
+    h('button', { class: 'btn icon-btn fx-btn', title: 'Estilo de capa (sombra, trazo, resplandor)', onclick: layerStyleDialog }, 'fx'),
+    adjBtn,
     footBtn('mask', 'Añadir máscara de capa', () => ops.addMask('reveal')),
     footBtn('folder', 'Nuevo grupo', ops.newGroup),
     footBtn('newLayer', 'Nueva capa', ops.newLayer),
@@ -112,11 +125,13 @@ export function buildLayersPanel(parent: HTMLElement) {
       if (n !== null) ops.renameLayer(l, n);
     });
     const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : null;
+    const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
+    fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : null;
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
       draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
-    }, eye, arrow, thumbWrap, maskEl, name, kindTag, lock);
+    }, eye, arrow, thumbWrap, maskEl, name, kindTag, fx, lock);
     el.addEventListener('click', e => {
       if (e.ctrlKey || e.metaKey) {
         if (d.selectedIds.has(l.id) && d.selectedIds.size > 1) d.selectedIds.delete(l.id); else d.selectedIds.add(l.id);
@@ -211,10 +226,12 @@ export function buildPropertiesPanel(parent: HTMLElement) {
   const body = h('div', { class: 'panel-body props' });
   parent.append(panel('Propiedades', body, undefined, 'panel-props'));
   let lastKey = '';
+  let skipRender = false;
   const render = () => {
     const d = app.doc;
     const l = d?.active;
-    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}` : '';
+    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}${l instanceof AdjustmentLayer ? l.filterId + JSON.stringify(l.params) : ''}` : '';
+    if (skipRender) { skipRender = false; lastKey = key; return; }
     if (key === lastKey && body.contains(document.activeElement)) return;
     lastKey = key;
     body.innerHTML = '';
@@ -225,7 +242,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('button', { class: 'btn', onclick: () => actionById.get('imageSize')!.run() }, 'Tamaño de imagen'),
         h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
     if (!l) return;
-    const kind = l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : 'Capa de píxeles';
+    const kind = l instanceof AdjustmentLayer ? 'Capa de ajuste' : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : 'Capa de píxeles';
     body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · editando máscara' : '')));
     if (l instanceof TextLayer) {
       const p = l.props;
@@ -246,6 +263,23 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('div', { class: 'prop-row' }, h('span', {}, 'Fuente'), font),
         h('div', { class: 'prop-row' }, h('span', {}, 'Tamaño'), size, h('span', {}, 'Color'), color),
         h('div', { class: 'prop-row' }, h('label', { class: 'check' }, bold, ' Negrita'), h('label', { class: 'check' }, italic, ' Cursiva'), align));
+    }
+    if (l instanceof AdjustmentLayer) {
+      const def = FILTERS.find(f => f.id === l.filterId);
+      let timer = 0;
+      // Cambios en vivo; se anota un solo paso de historial al terminar de ajustar
+      const changed = () => { d.invalidate(); app.viewport.requestRender(); clearTimeout(timer); timer = window.setTimeout(() => { skipRender = true; d.commit('Editar ajuste'); }, 500); };
+      if (def?.custom) {
+        const below = getPixels(d.getComposite());
+        body.append(...(def.custom === 'levels' ? levelsBody : curvesBody)(below, l.params, changed));
+      } else for (const pd of def?.params ?? []) {
+        if (pd.type === 'checkbox') {
+          const c = h('input', { type: 'checkbox', checked: !!l.params[pd.key] });
+          c.onchange = () => { l.params[pd.key] = c.checked; changed(); };
+          body.append(h('label', { class: 'check' }, c, ' ' + pd.label));
+        } else body.append(formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, onInput: v => { l.params[pd.key] = v; changed(); } }).el));
+      }
+      if (def && !def.custom && !def.params) body.append(h('div', { class: 'hint' }, 'Este ajuste no tiene opciones.'));
     }
     if (l instanceof ShapeLayer) {
       const p = l.props;
@@ -280,7 +314,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           h('button', { class: 'btn', onclick: () => ops.deleteMask(true) }, 'Aplicar'),
           h('button', { class: 'btn', onclick: () => ops.deleteMask(false) }, 'Eliminar')),
         h('div', { class: 'hint' }, 'Pinta en negro para ocultar y en blanco para mostrar.'));
-    } else if (isRaster(l) || l instanceof GroupLayer) {
+    } else {
       body.append(h('div', { class: 'prop-btns' }, h('button', { class: 'btn', onclick: () => ops.addMask('reveal') }, 'Añadir máscara')));
     }
   };

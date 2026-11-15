@@ -27,6 +27,7 @@ export const ICONS: Record<string, string> = {
   newLayer: S('<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M12 8.5v7M8.5 12h7"/>'),
   trash: S('<path d="M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5l1 13h9l1-13M10 10v6.5M14 10v6.5"/>'),
   mask: S('<rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="12" cy="12" r="4" fill="currentColor" fill-opacity=".35"/>'),
+  adjust: S('<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 010 16z" fill="currentColor"/>'),
   duplicate: S('<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0014.5 4h-9A1.5 1.5 0 004 5.5v9A1.5 1.5 0 005.5 16H8"/>'),
   chevronRight: S('<path d="M9 6l6 6-6 6"/>'),
   chevronDown: S('<path d="M6 9l6 6 6-6"/>'),

@@ -82,6 +82,8 @@ export const ACTIONS: Action[] = [
   { id: 'maskInvert', label: 'Invertir máscara', enabled: hasMask, run: () => ops.invertMask(app.doc!.active!) },
   { id: 'maskApply', label: 'Aplicar máscara', enabled: hasMask, run: () => ops.deleteMask(true) },
   { id: 'maskDelete', label: 'Eliminar máscara', enabled: hasMask, run: () => ops.deleteMask(false) },
+  { id: 'layerStyle', label: 'Estilo de capa (sombra, trazo, resplandor)…', enabled: hasLayer, run: dlg.layerStyleDialog },
+  { id: 'clearStyle', label: 'Quitar estilo de capa', enabled: () => !!app.doc?.active?.styles, run: () => ops.setLayerStyles(app.doc!.active!, null, true) },
   { id: 'bringFront', label: 'Traer al frente', keys: ['Shift+Ctrl+]'], enabled: hasLayer, run: () => ops.arrangeLayer('top') },
   { id: 'bringForward', label: 'Hacia delante', keys: ['Ctrl+]'], enabled: hasLayer, run: () => ops.arrangeLayer('up') },
   { id: 'sendBackward', label: 'Hacia atrás', keys: ['Ctrl+['], enabled: hasLayer, run: () => ops.arrangeLayer('down') },
@@ -121,6 +123,10 @@ export const ACTIONS: Action[] = [
 // Ajustes y filtros desde el registro
 for (const f of FILTERS) {
   ACTIONS.push({ id: 'filter:' + f.id, label: f.name, keys: f.shortcut ? [f.shortcut] : undefined, enabled: hasLayer, run: () => dlg.filterDialog(f) });
+}
+
+for (const f of FILTERS) if (f.group === 'ajuste') {
+  ACTIONS.push({ id: 'adjust:' + f.id, label: f.name.replace('…', ''), enabled: hasDoc, run: () => ops.newAdjustmentLayer(f) });
 }
 
 export const actionById = new Map(ACTIONS.map(a => [a.id, a]));

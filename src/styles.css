@@ -241,3 +241,13 @@ kbd { background: var(--panel-3); border: 1px solid var(--border); border-radius
   .side { width: 220px; }
   .menu { padding: 0 6px; }
 }
+
+/* Fase 2: capas de ajuste y estilos */
+.thumb.adj { color: #9fb7d9; }
+.ltag.fx { font-style: italic; cursor: pointer; }
+.fx-btn { font-style: italic; font-weight: 700; padding: 3px 7px !important; }
+.style-head { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.style-head:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+.props .form-row > .lbl { width: 72px; }
+.props .form-row .num-slider input[type=range] { min-width: 40px; }
+.props canvas.hist, .props canvas.curves { max-width: 100%; height: auto; }

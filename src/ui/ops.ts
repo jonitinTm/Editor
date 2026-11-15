@@ -3,11 +3,12 @@
 
 import { app } from './app';
 import { EditorDocument } from '../core/document';
-import { GroupLayer, Layer, LayerMask, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
+import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
-import { compositeGroup } from '../core/compositor';
+import { compositeGroup, renderStyles } from '../core/compositor';
+import { hasStyles } from '../core/layers';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
-import { FilterDef } from '../filters/registry';
+import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
 import { alertDialog, confirmDialog } from './dialog';
 
@@ -88,10 +89,12 @@ export function newGroup() {
 function cloneLayer(l: Layer, d: EditorDocument): Layer {
   let c: Layer;
   if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
+  else if (l instanceof AdjustmentLayer) { c = new AdjustmentLayer(l.name, l.filterId, JSON.parse(JSON.stringify(l.params))); }
   else if (l instanceof TextLayer) { c = new TextLayer(l.name, d.width, d.height, { ...l.props }); }
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
+  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null;
   if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
   return c;
 }
@@ -211,14 +214,20 @@ export function mergeDown() {
   const below = p.children[i - 1];
   if (!below) { app.toast('No hay ninguna capa debajo', 'warn'); return; }
   if (below instanceof GroupLayer) { app.toast('No se puede combinar con un grupo', 'warn'); return; }
+  if (l instanceof AdjustmentLayer || below instanceof AdjustmentLayer) { app.toast('Las capas de ajuste no se combinan así: usa «Combinar visibles» o «Acoplar imagen»', 'warn'); return; }
   const base = bakeLayer(below, d);
   const top = bakeLayer(l, d);
   const ctx = ctx2d(base);
+  for (const [layer, c] of [[below, base], [l, top]] as const) if (hasStyles(layer.styles)) {
+    // Los estilos se "hornean" en los píxeles al combinar
+    const plain = cloneCanvas(c), cc = ctx2d(c);
+    cc.clearRect(0, 0, d.width, d.height); renderStyles(cc, plain, layer.styles, 0, 0, d.width, d.height); cc.drawImage(plain, 0, 0);
+  }
   ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = l.blendMode;
   if (l.visible) ctx.drawImage(top, 0, 0);
   let target = below as RasterLayer;
   if (isParametric(target)) target = rasterizeLayer(target);
-  target.canvas = base; target.mask = null; target.touch();
+  target.canvas = base; target.mask = null; target.styles = null; target.touch();
   p.remove(l);
   d.setActive(target, false);
   d.commit('Combinar hacia abajo');
@@ -254,6 +263,24 @@ export function rasterize() {
   const d = doc(); const l = d?.active;
   if (!d || !isParametric(l)) { app.toast('Solo las capas de texto o de forma se pueden rasterizar', 'warn'); return; }
   rasterizeLayer(l); d.commit('Rasterizar capa');
+}
+
+/** Crea una capa de ajuste (con máscara) encima de la capa activa. */
+export function newAdjustmentLayer(def: FilterDef) {
+  const d = doc(); if (!d) return;
+  const l = new AdjustmentLayer(def.name.replace('…', ''), def.id, defaultParams(def));
+  l.mask = new LayerMask(d.width, d.height, 'white');
+  if (d.selection.mask) { l.mask.canvas = cloneCanvas(d.selection.mask); l.mask.touch(); }
+  d.insertAboveActive(l);
+  d.editMask = true;
+  d.commit('Nueva capa de ajuste');
+}
+
+export function setLayerStyles(l: Layer, styles: LayerStyles | null, record: boolean) {
+  const d = doc(); if (!d) return;
+  l.styles = styles;
+  d.invalidate();
+  if (record) d.commit('Estilo de capa'); else d.changed();
 }
 
 // ---- Máscaras -----------------------------------------------------------------

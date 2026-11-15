@@ -3,14 +3,14 @@
 // reutiliza la copia del paso anterior (solo se copian las capas tocadas).
 
 import { cloneCanvas } from './canvas';
-import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, LayerMask, BlendMode, isParametric } from './layers';
+import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, AdjustmentLayer, LayerMask, BlendMode, isParametric } from './layers';
 import type { EditorDocument } from './document';
 
 interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
   blendMode: BlendMode; locked: boolean;
-  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any;
+  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
   children?: LayerSnap[]; expanded?: boolean;
 }
@@ -36,6 +36,8 @@ function snapLayer(l: Layer): LayerSnap {
     blendMode: l.blendMode, locked: l.locked,
     mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled } : null,
   };
+  s.styles = l.styles ? JSON.stringify(l.styles) : null;
+  if (l instanceof AdjustmentLayer) s.adjust = JSON.stringify({ filterId: l.filterId, params: l.params });
   if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; }
   else if (l instanceof RasterLayer) {
     s.canvas = freeze(l, l.version, l.canvas);
@@ -67,6 +69,9 @@ function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
     g.expanded = s.expanded ?? true;
     for (const c of s.children ?? []) g.add(restoreLayer(c, w, h));
     l = g;
+  } else if (s.kind === 'adjust') {
+    const a = JSON.parse(s.adjust!);
+    l = new AdjustmentLayer(s.name, a.filterId, a.params);
   } else {
     const r = s.kind === 'text' ? new TextLayer(s.name, w, h, { ...s.props }) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, { ...s.props }) : new RasterLayer(s.name, w, h);
     r.canvas = cloneCanvas(s.canvas!);
@@ -75,6 +80,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
     l = r;
   }
   l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked;
+  l.styles = s.styles ? JSON.parse(s.styles) : null;
   if (s.mask) {
     const m = new LayerMask(w, h, 'black');
     m.canvas = cloneCanvas(s.mask.canvas); m.enabled = s.mask.enabled;
