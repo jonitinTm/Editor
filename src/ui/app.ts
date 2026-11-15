@@ -102,6 +102,7 @@ class App {
     this.docUnsub?.();
     this.doc = doc;
     this.docUnsub = doc ? doc.onChange(() => { this.emit('doc'); this.viewport?.requestRender(); }) as any : null;
+    if (doc && !doc.viewInitialized) this.viewport?.fit(true);
     this.tool?.activate?.();
     this.emit('docs'); this.emit('doc'); this.emit('view');
     this.viewport?.requestRender();
