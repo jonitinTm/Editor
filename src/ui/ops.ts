@@ -27,7 +27,7 @@ export function newDocument(name: string, w: number, h: number, bg: string | nul
   const l = new RasterLayer(bg ? 'Fondo' : 'Capa 1', w, h);
   if (bg) { const c = ctx2d(l.canvas); c.fillStyle = bg; c.fillRect(0, 0, w, h); }
   d.root.add(l); d.setActive(l, false);
-  app.addDocument(d);
+  app.addDocument(d, 'Nuevo');
 }
 
 export async function openFiles(files: File[], asLayers = false) {

@@ -89,8 +89,8 @@ class App {
     this.emit('colors');
   }
 
-  addDocument(doc: EditorDocument) {
-    if (doc.history.steps.length === 0) doc.history.push(doc, 'Abrir');
+  addDocument(doc: EditorDocument, firstStep = 'Abrir') {
+    if (doc.history.steps.length === 0) doc.history.push(doc, firstStep);
     doc.modified = false;
     this.docs.push(doc);
     this.setDocument(doc);

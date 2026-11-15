@@ -11,8 +11,8 @@ import { FONTS } from '../tools/text';
 import { actionById } from './actions';
 import { promptDialog } from './dialog';
 
-function panel(title: string, body: HTMLElement, extraHeader?: HTMLElement) {
-  return h('section', { class: 'panel' },
+function panel(title: string, body: HTMLElement, extraHeader?: HTMLElement, cls = '') {
+  return h('section', { class: 'panel ' + cls },
     h('header', { class: 'panel-head' }, h('span', {}, title), extraHeader ?? null),
     body);
 }
@@ -209,7 +209,7 @@ export function buildHistoryPanel(parent: HTMLElement) {
 
 export function buildPropertiesPanel(parent: HTMLElement) {
   const body = h('div', { class: 'panel-body props' });
-  parent.append(panel('Propiedades', body));
+  parent.append(panel('Propiedades', body, undefined, 'panel-props'));
   let lastKey = '';
   const render = () => {
     const d = app.doc;

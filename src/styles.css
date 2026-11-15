@@ -146,11 +146,13 @@ svg { display: block; }
 
 /* Paneles */
 .side { width: 280px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; min-height: 0; }
-.side-top { flex: 0 0 42%; display: flex; flex-direction: column; min-height: 0; }
+.side-top { flex: 0 0 46%; display: flex; flex-direction: column; min-height: 0; }
 .side-bottom { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .splitter { height: 5px; cursor: row-resize; background: var(--border); flex-shrink: 0; }
 .panel { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .panel + .panel { border-top: 1px solid var(--border); }
+.panel-props { flex: 0 1 auto; max-height: 60%; }
+.panel-props .panel-body { flex: 0 1 auto; }
 .panel-head { display: flex; align-items: center; height: 26px; padding: 0 10px; background: var(--panel-2); border-bottom: 1px solid var(--border); font-weight: 600; flex-shrink: 0; text-transform: uppercase; font-size: 10.5px; letter-spacing: .6px; color: #b6b9bf; }
 .panel-body { flex: 1; overflow: auto; min-height: 0; }
 .panel-body.disabled { opacity: .5; pointer-events: none; }

@@ -46,7 +46,7 @@ export const ACTIONS: Action[] = [
   { id: 'fill', label: 'Rellenar…', keys: ['Shift+F5'], enabled: hasLayer, run: dlg.fillDialog },
   { id: 'fillFg', label: 'Rellenar con color frontal', keys: ['Alt+Backspace', 'Alt+Delete'], enabled: hasLayer, run: () => ops.fill(app.fg) },
   { id: 'fillBg', label: 'Rellenar con color de fondo', keys: ['Ctrl+Backspace', 'Ctrl+Delete'], enabled: hasLayer, run: () => ops.fill(app.bg) },
-  { id: 'freeTransform', label: 'Transformación libre', keys: ['Ctrl+T', 'Alt+Ctrl+T'], enabled: hasLayer, run: () => app.setTool('transform', true) },
+  { id: 'freeTransform', label: 'Transformación libre', keys: ['Alt+Ctrl+T', 'Ctrl+T'], enabled: hasLayer, run: () => app.setTool('transform', true) },
   { id: 'flipH', label: 'Voltear horizontal', enabled: hasLayer, run: () => quickTransform('flipH') },
   { id: 'flipV', label: 'Voltear vertical', enabled: hasLayer, run: () => quickTransform('flipV') },
   { id: 'rot90', label: 'Rotar 90° horario', enabled: hasLayer, run: () => quickTransform('rot90') },

@@ -121,7 +121,7 @@ export class Stroke {
   private last: { x: number; y: number; p: number } | null = null;
   private residue = 0;
   private sel: HTMLCanvasElement | null;
-  private tmp: HTMLCanvasElement;
+  private tmp: HTMLCanvasElement | null = null;
   constructor(
     public target: PaintTarget,
     public mode: StrokeMode,
@@ -131,7 +131,6 @@ export class Stroke {
   ) {
     const w = target.canvas.width, h = target.canvas.height;
     this.buffer = makeCanvas(w, h);
-    this.tmp = makeCanvas(w, h);
     this.original = cloneCanvas(target.canvas);
     this.preview = cloneCanvas(target.canvas);
     this.sel = app.doc!.selection.mask;
@@ -185,6 +184,7 @@ export class Stroke {
     // Búfer recortado por la selección
     let src = this.buffer;
     if (this.sel) {
+      this.tmp ??= makeCanvas(this.buffer.width, this.buffer.height);
       const t = ctx2d(this.tmp);
       t.save(); t.beginPath(); t.rect(r.x, r.y, r.w, r.h); t.clip();
       t.globalCompositeOperation = 'copy'; t.drawImage(this.buffer, 0, 0);

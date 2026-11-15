@@ -196,7 +196,8 @@ window.addEventListener('keydown', e => {
   if (tools.length) {
     e.preventDefault();
     if (e.shiftKey && tools.length > 1) {
-      const i = tools.findIndex(t => t.id === app.tool.id);
+      let i = tools.findIndex(t => t.id === app.tool.id);
+      if (i < 0) i = Math.max(0, tools.findIndex(t => t.id === app.groupChoice[t.group ?? '']));
       app.setTool(tools[(i + 1) % tools.length].id);
     } else {
       const g = tools[0].group;

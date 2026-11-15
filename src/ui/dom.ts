@@ -29,12 +29,12 @@ export function numberSlider(opts: {
   const step = opts.step ?? 1;
   const num = h('input', { type: 'number', min: opts.min, max: opts.max, step, value: String(opts.value), class: 'num' });
   const range = h('input', { type: 'range', min: opts.min, max: opts.max, step, value: String(opts.value) });
-  const set = (v: number, from?: HTMLInputElement) => {
+  const set = (v: number, from?: HTMLInputElement, silent = false) => {
     if (isNaN(v)) return;
     v = Math.min(opts.max, Math.max(opts.min, v));
     if (from !== num) num.value = String(+v.toFixed(2));
     if (from !== range) range.value = String(v);
-    opts.onInput(v);
+    if (!silent) opts.onInput(v);
   };
   num.addEventListener('input', () => set(parseFloat(num.value), num));
   num.addEventListener('change', () => set(parseFloat(num.value)));
@@ -50,5 +50,5 @@ export function numberSlider(opts: {
     document.addEventListener('pointerdown', e => { if (!el.contains(e.target as Node)) pop.classList.remove('open'); });
     el.append(btn, pop);
   }
-  return { el, set: (v: number) => set(v) };
+  return { el, set: (v: number) => set(v, undefined, true) };
 }

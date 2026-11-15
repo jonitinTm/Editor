@@ -88,7 +88,11 @@ export function restore(doc: EditorDocument, snap: DocSnap) {
   doc.selection.width = snap.width; doc.selection.height = snap.height;
   doc.selection.setMask(snap.selection);
   if (snap.selection) selFrozen = { version: doc.selection.version, canvas: snap.selection, owner: doc.selection };
-  doc.setActive(doc.findLayer(snap.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);
+  // Se mantiene la capa que el usuario tenía seleccionada si sigue existiendo.
+  const keepId = doc.active?.id ?? -1;
+  const editMask = doc.editMask;
+  doc.setActive(doc.findLayer(keepId) ?? doc.findLayer(snap.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);
+  doc.editMask = editMask && !!doc.active?.mask;
 }
 
 export class History {
