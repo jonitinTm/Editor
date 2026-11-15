@@ -16,12 +16,28 @@ Ese único archivo `Editor.html` contiene el programa entero: puedes copiarlo a 
 
 | Área | Funciones |
 |---|---|
-| Documento | Nuevo (tamaños predefinidos), abrir PNG/JPG/WebP/GIF desde archivo, arrastrando o pegando (Ctrl+V); varias pestañas; zoom, desplazamiento, reglas y guías |
+| Documento | Nuevo (tamaños predefinidos), abrir PNG/JPG/WebP/GIF/PSD desde archivo, arrastrando o pegando (Ctrl+V); varias pestañas; zoom, desplazamiento, reglas y guías |
 | Capas | Crear, duplicar, borrar, renombrar (doble clic), reordenar arrastrando, grupos, opacidad, visibilidad, bloqueo, 17 modos de fusión, máscaras de capa, combinar, acoplar |
 | Herramientas | Mover, marco rectangular/elíptico, lazo, varita mágica, recortar, pincel, lápiz, borrador, bote de pintura, degradado, cuentagotas, texto (editable), formas, tampón de clonar, mano, zoom y transformación libre (escalar, girar, voltear) |
 | Ajustes y filtros | Brillo/contraste, niveles, curvas, tono/saturación, blanco y negro, desaturar, invertir, desenfoque gaussiano, máscara de enfoque, enfocar, añadir ruido (con vista previa) |
 | Historial | Deshacer/rehacer y panel con todos los pasos |
-| Guardar | Exportar a PNG, JPG y WebP; proyecto `.edp` que conserva capas, máscaras, textos y guías |
+| Guardar | Exportar a PNG, JPG, WebP y PSD; proyecto `.edp` que conserva todo (capas, máscaras, textos, formas, ajustes, estilos y guías) |
+
+## Fase 2 (en marcha)
+
+Ya disponible:
+
+- **Capas de ajuste** (no destructivas): brillo/contraste, niveles, curvas, tono/saturación, blanco y negro, desaturar e
+  invertir. Se crean desde *Capa › Nueva capa de ajuste* o con el botón ◐ del panel de capas, se editan en *Propiedades*
+  y llevan máscara propia.
+- **Estilos de capa**: sombra paralela, trazo exterior y resplandor exterior (botón *fx* del panel de capas).
+- **PSD**: abrir y guardar archivos de Photoshop (RGB o grises de 8 bits) con capas, grupos, máscaras, opacidad,
+  visibilidad y modos de fusión. El texto, las formas y los efectos viajan como píxeles; las capas de ajuste
+  (salvo *Invertir*) aún no se guardan en PSD.
+- **Formas vectoriales** editables (color, trazo, tamaño) y **transformación de grupos** y de varias capas a la vez.
+- Al mover una capa se conserva lo que queda fuera del lienzo (*Imagen › Revelar todo* lo muestra).
+
+Pendiente: objetos inteligentes, pluma y trazados, filtros avanzados, RAW, animación, texto y ajustes dentro del PSD.
 
 ### Atajos principales
 

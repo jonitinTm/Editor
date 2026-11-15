@@ -38,7 +38,8 @@ export async function documentFromImage(file: File | Blob, name = 'Sin título')
 }
 
 export function isProjectFile(f: File) { return f.name.toLowerCase().endsWith(PROJECT_EXT); }
-export function isImageFile(f: File) { return f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(f.name); }
+export function isPsdFile(f: File) { return /\.psd$/i.test(f.name); }
+export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(f.name); }
 
 // ---- Formato de proyecto (.edp) ---------------------------------------------
 // Un archivo JSON con la estructura de capas; los píxeles de cada capa van como

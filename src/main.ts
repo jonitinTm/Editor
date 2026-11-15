@@ -120,7 +120,7 @@ renderStatus();
 // ---- Pantalla de bienvenida ------------------------------------------------------------
 function buildWelcome() {
   const openBtn = h('button', { class: 'btn primary big', html: icon('open') + '<span>Abrir desde el equipo</span>' });
-  openBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*,' + io.PROJECT_EXT));
+  openBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*,.psd,' + io.PROJECT_EXT));
   const newBtn = h('button', { class: 'btn big', html: icon('plus') + '<span>Nuevo documento</span>' });
   newBtn.onclick = newDocumentDialog;
   const presets = h('div', { class: 'welcome-presets' }, ...[[1920, 1080], [1080, 1080], [1280, 720], [800, 600]].map(([w, hh]) =>
@@ -133,7 +133,7 @@ function buildWelcome() {
       h('p', {}, 'Editor de imágenes por capas. Todo se procesa en tu equipo: tus imágenes no salen de él.'),
       h('div', { class: 'welcome-actions' }, openBtn, newBtn),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,
-      h('div', { class: 'drop-hint' }, 'También puedes arrastrar imágenes (PNG, JPG, WebP, GIF) o proyectos .edp aquí, o pegar con Ctrl+V.')));
+      h('div', { class: 'drop-hint' }, 'También puedes arrastrar imágenes (PNG, JPG, WebP, GIF) PSD o proyectos .edp aquí, o pegar con Ctrl+V.')));
 }
 
 // ---- Teclado -----------------------------------------------------------------------------
@@ -225,7 +225,8 @@ window.addEventListener('drop', e => {
   e.preventDefault(); dragDepth = 0; dropHint.classList.remove('show');
   const onTabs = (e.target as HTMLElement).closest?.('.tabs');
   const files = [...e.dataTransfer.files];
-  const projects = files.filter(io.isProjectFile), images = files.filter(f => !io.isProjectFile(f));
+  const isDoc = (f: File) => io.isProjectFile(f) || io.isPsdFile(f);
+  const projects = files.filter(isDoc), images = files.filter(f => !isDoc(f));
   if (projects.length) ops.openFiles(projects);
   if (images.length) ops.openFiles(images, !!app.doc && !onTabs);
 });

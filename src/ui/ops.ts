@@ -10,6 +10,7 @@ import { hasStyles } from '../core/layers';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
 import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
+import { readPsd, writePsd } from '../io/psd';
 import { alertDialog, confirmDialog } from './dialog';
 
 const doc = () => app.doc;
@@ -35,6 +36,12 @@ export async function openFiles(files: File[], asLayers = false) {
   for (const f of files) {
     try {
       if (io.isProjectFile(f)) { app.addDocument(await io.openProject(f)); continue; }
+      if (io.isPsdFile(f)) {
+        const { doc: pd, warnings } = readPsd(await f.arrayBuffer(), io.baseName(f.name));
+        app.addDocument(pd);
+        if (warnings.length) alertDialog('PSD abierto con avisos', warnings.join('. ') + '.');
+        continue;
+      }
       if (!io.isImageFile(f)) { app.toast(`Formato no admitido: ${f.name}`, 'warn'); continue; }
       if (asLayers && app.doc) await placeImage(f, io.baseName(f.name));
       else app.addDocument(await io.documentFromImage(f, f.name));
@@ -70,6 +77,15 @@ export async function saveProject(saveAs = false) {
     if (h) { handles.set(d, h); if (h.name) d.name = io.baseName(h.name); }
     d.modified = false; app.emit('docs');
     app.toast('Proyecto guardado');
+  } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
+}
+
+export async function savePsd(name: string) {
+  const d = doc(); if (!d) return;
+  try {
+    const { blob, warnings } = writePsd(d);
+    await io.saveBlob(blob, name + '.psd');
+    if (warnings.length) alertDialog('PSD guardado con avisos', warnings.join('. ') + '.'); else app.toast('PSD guardado');
   } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
 }
 
