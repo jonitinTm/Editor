@@ -126,7 +126,7 @@ export class EditorDocument {
   /** Cambia el tamaño del lienzo desplazando el contenido (dx, dy). */
   resizeCanvas(w: number, h: number, dx: number, dy: number) {
     for (const l of this.allLayers()) {
-      if (isParametric(l)) { l.canvas = makeCanvas(w, h); l.translate(dx, dy); }
+      if (isParametric(l)) { const old = l.canvas; l.canvas = makeCanvas(w, h); if (l.props.keepPixels) ctx2d(l.canvas).drawImage(old, 0, 0); l.translate(dx, dy); }
       else if (isRaster(l)) { const f = l.fullContent(); l.placeFull(f.canvas, f.x + dx, f.y + dy, w, h); }
       if (l.mask) {
         const m = makeCanvas(w, h); const mc = ctx2d(m);
@@ -151,7 +151,7 @@ export class EditorDocument {
       ctx.imageSmoothingQuality = 'high'; ctx.drawImage(src, 0, 0, w, h); return c;
     };
     for (const l of this.allLayers()) {
-      if (isParametric(l)) { l.canvas = makeCanvas(w, h); l.scale(sx, sy); }
+      if (isParametric(l)) { l.canvas = l.props.keepPixels ? scale(l.canvas) : makeCanvas(w, h); l.scale(sx, sy); }
       else if (isRaster(l)) { l.canvas = scale(l.canvas); l.touch(); }
       if (l.mask) { l.mask.canvas = scale(l.mask.canvas); l.mask.touch(); }
     }

@@ -96,7 +96,7 @@ async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
     l = new AdjustmentLayer(p.name, p.adjust!.filterId, p.adjust!.params);
   } else {
     const r = p.type === 'text' ? new TextLayer(p.name, w, h, p.text) : p.type === 'shape' ? new ShapeLayer(p.name, w, h, p.shape) : new RasterLayer(p.name, w, h);
-    if (p.image && !isParametric(r)) { const img = await loadImage(p.image); ctx2d(r.canvas).clearRect(0, 0, w, h); ctx2d(r.canvas).drawImage(img, 0, 0); }
+    if (p.image && (!isParametric(r) || (r as any).props?.keepPixels)) { const img = await loadImage(p.image); ctx2d(r.canvas).clearRect(0, 0, w, h); ctx2d(r.canvas).drawImage(img, 0, 0); }
     l = r;
   }
   l.id = p.id; bumpLayerId(p.id);

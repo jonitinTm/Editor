@@ -31,12 +31,20 @@ Ya disponible:
   invertir. Se crean desde *Capa › Nueva capa de ajuste* o con el botón ◐ del panel de capas, se editan en *Propiedades*
   y llevan máscara propia.
 - **Estilos de capa**: sombra paralela, trazo exterior y resplandor exterior (botón *fx* del panel de capas).
-- **PSD y PSB**: abrir y guardar archivos de Photoshop con capas, grupos (incluido el modo «Pasar»), máscaras de píxeles
-  y vectoriales, máscaras de recorte, opacidad, visibilidad y modos de fusión. Se leen documentos de 8, 16 y 32 bits
-  (convertidos a 8), con compresión RLE o ZIP. También van y vuelven las capas de ajuste de brillo/contraste, niveles,
-  curvas, tono/saturación e invertir; y se leen las formas (relleno de color o degradado) y los efectos de sombra
-  paralela, trazo y resplandor exterior. Comprobado contra 123 archivos reales de Photoshop.
-  Lo que aún viaja como píxeles: texto, objetos inteligentes y, al guardar, formas y estilos.
+- **PSD y PSB**: abrir y guardar archivos de Photoshop. Comprobado contra 126 archivos reales de Photoshop.
+  - *Al abrir*: capas, grupos (también en modo «Pasar»), máscaras de píxeles y vectoriales, máscaras de recorte,
+    opacidad y modos de fusión; documentos RGB, grises y CMYK (convertido a RGB) de 8, 16 y 32 bits; formas;
+    **texto editable** (se ve como en Photoshop hasta que lo cambias); **objetos inteligentes** con su contenido;
+    efectos (sombra paralela e interior, resplandor exterior e interior, trazo, superposición de color y de degradado)
+    y ajustes (brillo/contraste, niveles, curvas, tono/saturación, exposición, intensidad, equilibrio de color,
+    blanco y negro, mezclador de canales, posterizar, umbral, invertir).
+  - *Al guardar*: todo lo anterior salvo que se guardan como píxeles el texto creado o editado en Editor, los objetos
+    inteligentes y las formas con trazo. El texto de Photoshop que no hayas editado se devuelve intacto.
+  - Sin soporte todavía: biselado, satinado y motivos; filtro de fotografía, mapa de degradado, corrección selectiva
+    y consulta de colores; modos Lab e indexado.
+- **Ajustes y estilos nuevos** en el propio editor: exposición, intensidad, equilibrio de color, mezclador de canales,
+  posterizar, umbral y blanco y negro por familias de color; sombra y resplandor interiores y superposición de color
+  y de degradado.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
   (el documento principal se actualiza solo). Las copias comparten contenido.
@@ -44,8 +52,7 @@ Ya disponible:
 - **Formas vectoriales** editables (color, trazo, tamaño) y **transformación de grupos** y de varias capas a la vez.
 - Al mover una capa se conserva lo que queda fuera del lienzo (*Imagen › Revelar todo* lo muestra).
 
-Pendiente: pluma y trazados, filtros avanzados, RAW, animación; en PSD, texto editable, objetos inteligentes
-enlazados y el resto de efectos y ajustes de Photoshop.
+Pendiente: pluma y trazados, filtros avanzados, RAW y animación.
 
 ### Atajos principales
 

@@ -119,7 +119,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
   else if (l instanceof AdjustmentLayer) { c = new AdjustmentLayer(l.name, l.filterId, JSON.parse(JSON.stringify(l.params))); }
   else if (l instanceof SmartLayer) { c = new SmartLayer(l.name, d.width, d.height, l.inner, l.props.m); }
-  else if (l instanceof TextLayer) { c = new TextLayer(l.name, d.width, d.height, { ...l.props }); }
+  else if (l instanceof TextLayer) { const t = new TextLayer(l.name, d.width, d.height, { ...l.props }); if (l.props.keepPixels) t.canvas = cloneCanvas(l.canvas); c = t; }
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;

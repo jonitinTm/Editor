@@ -66,6 +66,10 @@ export interface TextProps {
   lineHeight: number;
   x: number;
   y: number;
+  /** true = se muestran los píxeles originales (p. ej. de un PSD) hasta que se edite el texto. */
+  keepPixels?: boolean;
+  /** Datos originales del texto de Photoshop (base64), para devolverlos intactos al guardar en PSD. */
+  psdTySh?: string;
 }
 
 export interface LayerStyles {
@@ -152,7 +156,9 @@ export class TextLayer extends RasterLayer {
   constructor(name: string, w: number, h: number, props: TextProps) {
     super(name, w, h);
     this.props = props;
+    const keep = props.keepPixels, raw = props.psdTySh;
     this.render();
+    if (keep) { this.props.keepPixels = true; this.props.psdTySh = raw; }
   }
   fontString() {
     const p = this.props;
@@ -169,11 +175,19 @@ export class TextLayer extends RasterLayer {
     const x = p.align === 'left' ? p.x : p.align === 'center' ? p.x - w / 2 : p.x - w;
     return { x, y: p.y, w, h: lh * lines.length };
   }
-  translate(dx: number, dy: number) { this.props.x += dx; this.props.y += dy; this.render(); }
-  scale(sx: number, sy: number) { const p = this.props; p.x *= sx; p.y *= sy; p.size *= Math.min(sx, sy); this.render(); }
+  translate(dx: number, dy: number) {
+    this.props.x += dx; this.props.y += dy;
+    if (!this.props.keepPixels) { this.render(); return; }
+    const c = makeCanvas(this.canvas.width, this.canvas.height); ctx2d(c).drawImage(this.canvas, dx, dy); this.canvas = c; this.touch();
+  }
+  scale(sx: number, sy: number) {
+    const p = this.props; p.x *= sx; p.y *= sy; p.size *= Math.min(sx, sy);
+    if (p.keepPixels) this.touch(); else this.render();
+  }
   render() {
     clearCanvas(this.canvas);
     const p = this.props;
+    p.keepPixels = false; delete p.psdTySh;
     const ctx = ctx2d(this.canvas);
     ctx.save();
     ctx.font = this.fontString();
