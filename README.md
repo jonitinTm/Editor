@@ -45,6 +45,9 @@ Ya disponible:
 - **Ajustes y estilos nuevos** en el propio editor: exposición, intensidad, equilibrio de color, mezclador de canales,
   posterizar, umbral y blanco y negro por familias de color; sombra y resplandor interiores y superposición de color
   y de degradado.
+- **Pluma y trazados**: la pluma (`P`) dibuja curvas Bézier y crea una capa de forma vectorial; la selección directa
+  (`A`) mueve sus puntos y tiradores; *Seleccionar › Trazado a selección* (`Ctrl+Intro`) la convierte en selección.
+  Los trazados cerrados se guardan en PSD como formas vectoriales.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
   (el documento principal se actualiza solo). Las copias comparten contenido.
@@ -52,12 +55,12 @@ Ya disponible:
 - **Formas vectoriales** editables (color, trazo, tamaño) y **transformación de grupos** y de varias capas a la vez.
 - Al mover una capa se conserva lo que queda fuera del lienzo (*Imagen › Revelar todo* lo muestra).
 
-Pendiente: pluma y trazados, filtros avanzados, RAW y animación.
+Pendiente: filtros avanzados, RAW y animación.
 
 ### Atajos principales
 
 `V` mover · `M` marcos (Mayús+M alterna) · `L` lazo · `W` varita · `C` recortar · `I` cuentagotas · `S` tampón ·
-`B` pincel/lápiz · `E` borrador · `G` degradado/bote · `T` texto · `U` formas · `H` mano · `Z` zoom ·
+`B` pincel/lápiz · `E` borrador · `G` degradado/bote · `T` texto · `P` pluma · `A` selección directa · `U` formas · `H` mano · `Z` zoom ·
 `D` colores por defecto · `X` intercambiar colores · `[` `]` tamaño del pincel · Espacio (mantener) para desplazar.
 
 `Ctrl+Z` deshacer · `Mayús+Ctrl+Z` rehacer · `Ctrl+S` guardar proyecto · `Mayús+Ctrl+S` exportar ·

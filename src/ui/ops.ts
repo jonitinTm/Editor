@@ -6,7 +6,7 @@ import { EditorDocument } from '../core/document';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, composeStyled } from '../core/compositor';
-import { hasStyles, canvasBlend } from '../core/layers';
+import { hasStyles, canvasBlend, tracePath } from '../core/layers';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
 import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
@@ -423,6 +423,14 @@ export function invertMask(l: Layer) {
 export function selectAll() { const d = doc(); if (!d) return; d.selection.selectAll(); d.commit('Seleccionar todo'); }
 export function deselect() { const d = doc(); if (!d || !d.selection.active) return; d.selection.clear(); d.commit('Deseleccionar'); }
 export function invertSelection() { const d = doc(); if (!d) return; d.selection.invert(); d.commit('Invertir selección'); }
+/** Convierte el trazado de la capa activa en selección. */
+export function pathToSelection() {
+  const d = doc(); const l = d?.active;
+  if (!d || !(l instanceof ShapeLayer) || l.props.shape !== 'path' || !l.props.path) { app.toast('Selecciona una capa de trazado (creada con la pluma)', 'warn'); return; }
+  const path = l.props.path;
+  d.selection.combine('new', ctx => { ctx.beginPath(); tracePath(ctx, path.pts, true); ctx.fill(); });
+  d.commit('Trazado a selección');
+}
 export function selectionFromLayer(l: Layer) {
   const d = doc(); if (!d || !isRaster(l)) return;
   d.selection.setMask(l.canvas); d.commit('Cargar selección');

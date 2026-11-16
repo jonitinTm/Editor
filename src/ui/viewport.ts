@@ -28,6 +28,7 @@ export class Viewport {
   /** Guía que se está arrastrando. */
   private guideDrag: { axis: 'h' | 'v'; index: number; pos: number } | null = null;
   private checker: CanvasPattern | null = null;
+  private lastClick: { t: number; x: number; y: number; n: number } | null = null;
 
   constructor(parent: HTMLElement) {
     this.canvas = h('canvas', { class: 'view-canvas' });
@@ -285,6 +286,10 @@ export class Viewport {
         this.startPinch(); return;
       }
       const te = this.makeEvent(e);
+      // Los eventos de puntero no indican doble clic: se detecta por tiempo y distancia
+      const now = performance.now(), lc = this.lastClick;
+      te.detail = lc && now - lc.t < 400 && Math.hypot(te.sx - lc.x, te.sy - lc.y) < 6 ? lc.n + 1 : 1;
+      this.lastClick = { t: now, x: te.sx, y: te.sy, n: te.detail };
       if (this.spaceDown || e.button === 1 || app.tool?.id === 'hand' && e.button === 0) {
         this.panning = { x: te.sx, y: te.sy, px: this.doc.view.panX, py: this.doc.view.panY };
         this.updateCursor(); return;

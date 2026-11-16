@@ -201,8 +201,20 @@ export class TextLayer extends RasterLayer {
   }
 }
 
+/** Punto de un trazado: ancla (x, y) y sus dos tiradores (entrada y salida). */
+export interface PathPoint { x: number; y: number; ix: number; iy: number; ox: number; oy: number; }
+/** Añade un trazado de curvas Bézier a un contexto o Path2D. */
+export function tracePath(ctx: { moveTo(x: number, y: number): void; bezierCurveTo(a: number, b: number, c: number, d: number, e: number, f: number): void; closePath(): void }, pts: PathPoint[], closed: boolean) {
+  if (!pts.length) return;
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.bezierCurveTo(pts[i - 1].ox, pts[i - 1].oy, pts[i].ix, pts[i].iy, pts[i].x, pts[i].y);
+  if (closed && pts.length > 1) { const a = pts[pts.length - 1], b = pts[0]; ctx.bezierCurveTo(a.ox, a.oy, b.ix, b.iy, b.x, b.y); ctx.closePath(); }
+}
+
 export interface ShapeProps {
-  shape: 'rect' | 'round' | 'ellipse' | 'line';
+  shape: 'rect' | 'round' | 'ellipse' | 'line' | 'path';
+  /** Solo para shape = 'path' (dibujado con la pluma). */
+  path?: { closed: boolean; pts: PathPoint[] };
   x0: number; y0: number; x1: number; y1: number;
   fill: string | null;
   stroke: string | null;
@@ -219,9 +231,14 @@ export class ShapeLayer extends RasterLayer {
     this.props = props;
     this.render();
   }
-  translate(dx: number, dy: number) { const p = this.props; p.x0 += dx; p.x1 += dx; p.y0 += dy; p.y1 += dy; this.render(); }
+  private mapPath(f: (x: number, y: number) => [number, number]) {
+    const p = this.props; if (!p.path) return;
+    p.path = { closed: p.path.closed, pts: p.path.pts.map(q => { const [x, y] = f(q.x, q.y), [ix, iy] = f(q.ix, q.iy), [ox, oy] = f(q.ox, q.oy); return { x, y, ix, iy, ox, oy }; }) };
+  }
+  translate(dx: number, dy: number) { const p = this.props; p.x0 += dx; p.x1 += dx; p.y0 += dy; p.y1 += dy; this.mapPath((x, y) => [x + dx, y + dy]); this.render(); }
   scale(sx: number, sy: number) {
     const p = this.props; p.x0 *= sx; p.x1 *= sx; p.y0 *= sy; p.y1 *= sy;
+    this.mapPath((x, y) => [x * sx, y * sy]);
     const k = Math.min(sx, sy); p.strokeWidth = Math.max(1, p.strokeWidth * k); p.radius *= k; this.render();
   }
   render() {
@@ -230,7 +247,8 @@ export class ShapeLayer extends RasterLayer {
     const x = Math.min(p.x0, p.x1), y = Math.min(p.y0, p.y1), w = Math.abs(p.x1 - p.x0), h = Math.abs(p.y1 - p.y0);
     ctx.save();
     ctx.beginPath();
-    if (p.shape === 'line') { ctx.moveTo(p.x0, p.y0); ctx.lineTo(p.x1, p.y1); }
+    if (p.shape === 'path') { if (p.path) tracePath(ctx, p.path.pts, p.path.closed); ctx.lineCap = 'round'; }
+    else if (p.shape === 'line') { ctx.moveTo(p.x0, p.y0); ctx.lineTo(p.x1, p.y1); }
     else if (p.shape === 'ellipse') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
     else if (p.shape === 'round' && (ctx as any).roundRect) (ctx as any).roundRect(x, y, w, h, Math.min(p.radius, w / 2, h / 2));
     else ctx.rect(x, y, w, h);

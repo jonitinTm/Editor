@@ -25,10 +25,11 @@ import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool } from './
 import { TextTool } from './tools/text';
 import { ShapeTool } from './tools/shape';
 import { TransformTool } from './tools/transform';
+import { PenTool, NodeTool } from './tools/pen';
 
 // ---- Herramientas ----------------------------------------------------------------
 for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, WandTool, CropTool, EyedropperTool, CloneTool,
-  BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, TextTool, ShapeTool, HandTool, ZoomTool, TransformTool]) {
+  BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, ZoomTool, TransformTool]) {
   app.registerTool(new T());
 }
 

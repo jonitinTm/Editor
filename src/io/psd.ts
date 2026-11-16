@@ -764,7 +764,10 @@ function shapeBlocks(l: ShapeLayer, W: number, H: number): { soco: Uint8Array; v
   type P = [number, number];
   const knots: [P, P, P][] = []; // [control anterior, ancla, control siguiente]
   const K = 0.5523;
-  if (p.shape === 'ellipse') {
+  if (p.shape === 'path') {
+    if (!p.path?.closed) return null;
+    for (const q of p.path.pts) knots.push([[q.ix, q.iy], [q.x, q.y], [q.ox, q.oy]]);
+  } else if (p.shape === 'ellipse') {
     const cx = x + w / 2, cy = y + h / 2, rx = w / 2, ry = h / 2;
     knots.push([[cx - rx * K, y], [cx, y], [cx + rx * K, y]], [[x + w, cy - ry * K], [x + w, cy], [x + w, cy + ry * K]],
       [[cx + rx * K, y + h], [cx, y + h], [cx - rx * K, y + h]], [[x, cy + ry * K], [x, cy], [x, cy - ry * K]]);

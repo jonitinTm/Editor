@@ -25,7 +25,7 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Objeto inteligente', items: ['toSmart', 'editSmart', 'rasterize'] }, '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'flatten'] },
-  { label: 'Seleccionar', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
+  { label: 'Seleccionar', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
   { label: 'Filtro', items: ['lastFilter', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', '-', 'rulers', 'guides', 'newGuide', 'clearGuides'] },
   { label: 'Ayuda', items: ['shortcuts', 'about'] },

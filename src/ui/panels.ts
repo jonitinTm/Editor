@@ -313,7 +313,8 @@ export function buildPropertiesPanel(parent: HTMLElement) {
       if (p.shape !== 'line') body.append(colorRow('Relleno', 'fill'));
       body.append(colorRow('Trazo', 'stroke'),
         h('div', { class: 'prop-row' }, ...numF('Grosor', () => p.strokeWidth, v => p.strokeWidth = Math.max(1, v)), ...(p.shape === 'round' ? numF('Radio', () => p.radius, v => p.radius = Math.max(0, v)) : [])));
-      if (p.shape !== 'line') body.append(
+      if (p.shape === 'path') body.append(h('div', { class: 'hint' }, 'Trazado de pluma: usa la herramienta Selección directa (A) para mover sus puntos.'));
+      if (p.shape !== 'line' && p.shape !== 'path') body.append(
         h('div', { class: 'prop-row' }, ...numF('X', x, v => setBox(v, y(), w(), hh())), ...numF('Y', y, v => setBox(x(), v, w(), hh()))),
         h('div', { class: 'prop-row' }, ...numF('Ancho', w, v => setBox(x(), y(), v, hh())), ...numF('Alto', hh, v => setBox(x(), y(), w(), v))));
     }

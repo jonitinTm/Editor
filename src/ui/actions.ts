@@ -101,6 +101,7 @@ export const ACTIONS: Action[] = [
   { id: 'deselect', label: 'Deseleccionar', keys: ['Ctrl+D'], enabled: hasSel, run: ops.deselect },
   { id: 'invertSel', label: 'Invertir', keys: ['Shift+Ctrl+I'], enabled: hasDoc, run: ops.invertSelection },
   { id: 'selFromLayer', label: 'Cargar selección desde la capa', enabled: hasLayer, run: () => ops.selectionFromLayer(app.doc!.active!) },
+  { id: 'pathToSel', label: 'Trazado a selección', keys: ['Ctrl+Enter'], enabled: () => app.doc?.active?.kind === 'shape', run: ops.pathToSelection },
   { id: 'feather', label: 'Calar…', keys: ['Shift+F6'], enabled: hasSel, run: () => dlg.modifySelectionDialog('feather') },
   { id: 'expand', label: 'Expandir…', enabled: hasSel, run: () => dlg.modifySelectionDialog('expand') },
   { id: 'contract', label: 'Contraer…', enabled: hasSel, run: () => dlg.modifySelectionDialog('contract') },

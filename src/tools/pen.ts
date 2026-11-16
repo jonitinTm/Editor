@@ -1,0 +1,165 @@
+// Pluma y selección directa: trazados vectoriales con curvas Bézier.
+// La pluma crea una capa de forma de tipo "trazado"; la selección directa
+// permite mover después sus puntos de ancla y sus tiradores.
+
+import { app } from '../ui/app';
+import { Tool, ToolEvent } from './tool';
+import { icon } from '../ui/icons';
+import type { Viewport } from '../ui/viewport';
+import { PathPoint, ShapeLayer, tracePath } from '../core/layers';
+import { h } from '../ui/dom';
+
+function drawPathOverlay(ctx: CanvasRenderingContext2D, vp: Viewport, pts: PathPoint[], closed: boolean, active = -1) {
+  const z = vp.zoom, v = vp.doc!.view;
+  ctx.save();
+  ctx.translate(v.panX, v.panY); ctx.scale(z, z);
+  ctx.beginPath(); tracePath(ctx, pts, closed);
+  ctx.lineWidth = 1.5 / z; ctx.strokeStyle = '#3d8bfd'; ctx.stroke();
+  ctx.restore();
+  pts.forEach((p, i) => {
+    const a = vp.toScreen(p.x, p.y);
+    if (i === active || active === -2) for (const [hx, hy] of [[p.ix, p.iy], [p.ox, p.oy]]) {
+      if (hx === p.x && hy === p.y) continue;
+      const s = vp.toScreen(hx, hy);
+      ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(s.x, s.y); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(s.x, s.y, 3.5, 0, 7); ctx.fill(); ctx.stroke();
+    }
+    ctx.fillStyle = i === active ? '#3d8bfd' : '#fff'; ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1.5;
+    ctx.fillRect(a.x - 4, a.y - 4, 8, 8); ctx.strokeRect(a.x - 4, a.y - 4, 8, 8);
+  });
+}
+
+export class PenTool implements Tool {
+  id = 'pen'; name = 'Pluma'; icon = icon('pen'); key = 'P'; group = 'pen'; cursor = 'crosshair';
+  options = [
+    { key: 'fill', label: 'Relleno (color frontal)', type: 'checkbox', default: true },
+    { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
+    { key: 'strokeColor', type: 'color', default: '#000000' },
+    { key: 'strokeWidth', label: 'Grosor', type: 'range', min: 1, max: 200, default: 4, unit: 'px' },
+  ] as any[];
+  private pts: PathPoint[] = [];
+  private dragging = false;
+
+  extraOptions(bar: HTMLElement) {
+    bar.append(h('span', { class: 'hint' }, 'Clic: punto recto · Arrastrar: curva · Clic en el primer punto: cerrar · Intro: terminar · Retroceso: quitar punto'));
+  }
+  down(e: ToolEvent) {
+    if (this.pts.length >= 2) {
+      const f = app.viewport.toScreen(this.pts[0].x, this.pts[0].y);
+      if (Math.hypot(f.x - e.sx, f.y - e.sy) < 8) { this.finish(true); return; }
+    }
+    this.pts.push({ x: e.x, y: e.y, ix: e.x, iy: e.y, ox: e.x, oy: e.y });
+    this.dragging = true;
+  }
+  move(e: ToolEvent) {
+    if (!this.dragging) return;
+    const p = this.pts[this.pts.length - 1];
+    if (Math.hypot(e.x - p.x, e.y - p.y) * app.viewport.zoom < 3) return;
+    p.ox = e.x; p.oy = e.y; p.ix = 2 * p.x - e.x; p.iy = 2 * p.y - e.y;
+  }
+  up() { this.dragging = false; }
+  /** Convierte el trazado en una capa de forma. */
+  finish(closed: boolean) {
+    const doc = app.doc, pts = this.pts; this.pts = []; this.dragging = false;
+    if (!doc || pts.length < 2) { app.viewport.requestRender(); return; }
+    const fill = closed && app.opt('fill', this.id), stroke = app.opt('stroke', this.id) || !fill;
+    let n = 1; const names = new Set(doc.allLayers().map(l => l.name));
+    while (names.has(`Trazado ${n}`)) n++;
+    const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+    const layer = new ShapeLayer(`Trazado ${n}`, doc.width, doc.height, {
+      shape: 'path', path: { closed, pts }, x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys),
+      fill: fill ? app.fg : null, stroke: stroke ? (app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : app.fg) : null,
+      strokeWidth: app.opt('strokeWidth', this.id), radius: 0,
+    });
+    doc.insertAboveActive(layer);
+    doc.commit('Pluma');
+  }
+  cancel() { this.pts = []; this.dragging = false; app.viewport?.requestRender(); }
+  deactivate() { if (this.pts.length >= 2) this.finish(false); else this.pts = []; }
+  docChanged() { this.pts = []; }
+  key_(e: KeyboardEvent) {
+    if (!this.pts.length) return false;
+    if (e.key === 'Enter') { this.finish(false); return true; }
+    if (e.key === 'Escape') { this.cancel(); return true; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { this.pts.pop(); app.viewport.requestRender(); return true; }
+    return false;
+  }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (!this.pts.length) return;
+    drawPathOverlay(ctx, vp, this.pts, false, this.pts.length - 1);
+    if (vp.mouseScreen && !this.dragging) { // línea elástica hasta el cursor
+      const l = this.pts[this.pts.length - 1], a = vp.toScreen(l.x, l.y), c = vp.toScreen(l.ox, l.oy);
+      ctx.strokeStyle = 'rgba(61,139,253,.6)'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(a.x, a.y);
+      ctx.bezierCurveTo(c.x, c.y, vp.mouseScreen.x, vp.mouseScreen.y, vp.mouseScreen.x, vp.mouseScreen.y); ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+}
+
+/** Selección directa: mueve anclas y tiradores de un trazado ya creado. */
+export class NodeTool implements Tool {
+  id = 'node'; name = 'Selección directa'; icon = icon('node'); key = 'A'; group = 'pen'; cursor = 'default';
+  private active = -1;
+  private drag: { i: number; part: 'a' | 'i' | 'o'; moved: boolean } | null = null;
+
+  extraOptions(bar: HTMLElement) {
+    bar.append(h('span', { class: 'hint' }, 'Arrastra los puntos o sus tiradores (Alt: tirador independiente) · Doble clic: esquina ↔ curva · Supr: borrar punto'));
+  }
+  private layer(): ShapeLayer | null {
+    const l = app.doc?.active;
+    return l instanceof ShapeLayer && l.props.shape === 'path' && l.props.path ? l : null;
+  }
+  activate() { this.active = -1; if (app.doc && !this.layer()) app.toast('Selecciona una capa de trazado (creada con la pluma)'); }
+  docChanged() { this.active = -1; this.drag = null; }
+  private hit(e: ToolEvent): { i: number; part: 'a' | 'i' | 'o' } | null {
+    const l = this.layer(); if (!l) return null;
+    const vp = app.viewport, near = (x: number, y: number) => { const s = vp.toScreen(x, y); return Math.hypot(s.x - e.sx, s.y - e.sy) < 8; };
+    const pts = l.props.path!.pts;
+    if (this.active >= 0 && pts[this.active]) { const p = pts[this.active]; if (near(p.ox, p.oy) && (p.ox !== p.x || p.oy !== p.y)) return { i: this.active, part: 'o' }; if (near(p.ix, p.iy) && (p.ix !== p.x || p.iy !== p.y)) return { i: this.active, part: 'i' }; }
+    for (let i = pts.length - 1; i >= 0; i--) if (near(pts[i].x, pts[i].y)) return { i, part: 'a' };
+    return null;
+  }
+  hover(e: ToolEvent) { this.cursor = this.hit(e) ? 'move' : 'default'; }
+  down(e: ToolEvent) {
+    const l = this.layer(); if (!l) return;
+    if (l.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return; }
+    const hit = this.hit(e);
+    if (!hit) { this.active = -1; return; }
+    this.active = hit.i;
+    if (e.detail >= 2 && hit.part === 'a') { // esquina ↔ curva
+      const pts = l.props.path!.pts, p = pts[hit.i];
+      if (p.ix !== p.x || p.iy !== p.y || p.ox !== p.x || p.oy !== p.y) { p.ix = p.ox = p.x; p.iy = p.oy = p.y; }
+      else {
+        const a = pts[(hit.i - 1 + pts.length) % pts.length], b = pts[(hit.i + 1) % pts.length];
+        const dx = (b.x - a.x) / 6, dy = (b.y - a.y) / 6; p.ix = p.x - dx; p.iy = p.y - dy; p.ox = p.x + dx; p.oy = p.y + dy;
+      }
+      l.render(); app.doc!.commit('Editar trazado'); return;
+    }
+    this.drag = { ...hit, moved: false };
+  }
+  move(e: ToolEvent) {
+    const l = this.layer(), d = this.drag; if (!l || !d) return;
+    const p = l.props.path!.pts[d.i];
+    if (d.part === 'a') { const dx = e.x - p.x, dy = e.y - p.y; p.x += dx; p.y += dy; p.ix += dx; p.iy += dy; p.ox += dx; p.oy += dy; }
+    else if (d.part === 'o') { p.ox = e.x; p.oy = e.y; if (!e.alt) { p.ix = 2 * p.x - e.x; p.iy = 2 * p.y - e.y; } }
+    else { p.ix = e.x; p.iy = e.y; if (!e.alt) { p.ox = 2 * p.x - e.x; p.oy = 2 * p.y - e.y; } }
+    d.moved = true;
+    l.render(); app.doc!.invalidate();
+  }
+  up() {
+    const d = this.drag; this.drag = null;
+    if (d?.moved) app.doc!.commit('Editar trazado');
+  }
+  key_(e: KeyboardEvent) {
+    const l = this.layer();
+    if (!l || this.active < 0 || (e.key !== 'Delete' && e.key !== 'Backspace')) return false;
+    const pts = l.props.path!.pts;
+    if (pts.length <= 2) { app.toast('Un trazado necesita al menos dos puntos', 'warn'); return true; }
+    pts.splice(this.active, 1); this.active = -1;
+    l.render(); app.doc!.commit('Borrar punto');
+    return true;
+  }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    const l = this.layer(); if (!l) return;
+    drawPathOverlay(ctx, vp, l.props.path!.pts, l.props.path!.closed, this.active);
+  }
+}
