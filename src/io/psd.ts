@@ -7,7 +7,7 @@
 import { EditorDocument } from '../core/document';
 import { GroupLayer, Layer, LayerMask, LayerStyles, RasterLayer, AdjustmentLayer, BlendMode, isRaster, hasStyles } from '../core/layers';
 import { cloneCanvas, contentBounds, ctx2d, makeCanvas, getPixels } from '../core/canvas';
-import { renderStyles } from '../core/compositor';
+import { composeStyled } from '../core/compositor';
 
 const BLEND_KEYS: [string, BlendMode][] = [
   ['pass', 'pass-through'], ['norm', 'source-over'], ['dark', 'darken'], ['mul ', 'multiply'], ['idiv', 'color-burn'], ['lite', 'lighten'],
@@ -118,7 +118,7 @@ function readItem(r: Reader, type: string): any {
     case 'comp': return r.u64();
     case 'bool': return r.u8() !== 0;
     case 'type': case 'GlbC': r.ustr(); return readId(r);
-    case 'alis': case 'tdta': { const n = r.u32(); r.pos += n; return null; }
+    case 'alis': case 'tdta': { const n = r.u32(); return r.bytes(n); }
     default: throw new Error('descriptor: tipo ' + type);
   }
 }
@@ -135,7 +135,16 @@ function parseEffects(bytes: Uint8Array): LayerStyles | null {
   if (sh?.enab) st.shadow = { enabled: true, color: descColor(sh.Clr), opacity: Math.round(sh.Opct ?? 75), angle: Math.round(sh.lagl ?? 120), distance: Math.round(sh.Dstn ?? 5), blur: Math.round(sh.blur ?? 5) };
   if (gl?.enab) st.glow = { enabled: true, color: descColor(gl.Clr), opacity: Math.round(gl.Opct ?? 75), size: Math.round(gl.blur ?? 5) };
   if (fr?.enab) st.stroke = { enabled: true, color: descColor(fr.Clr), size: Math.round(fr.Sz ?? 3) };
-  return st.shadow || st.glow || st.stroke ? st : null;
+  const is = d.IrSh, ig = d.IrGl, so = d.SoFi, gr = d.GrFl;
+  if (is?.enab) st.innerShadow = { enabled: true, color: descColor(is.Clr), opacity: Math.round(is.Opct ?? 75), angle: Math.round(is.lagl ?? 120), distance: Math.round(is.Dstn ?? 5), blur: Math.round(is.blur ?? 5) };
+  if (ig?.enab) st.innerGlow = { enabled: true, color: descColor(ig.Clr), opacity: Math.round(ig.Opct ?? 75), size: Math.round(ig.blur ?? 5) };
+  if (so?.enab) st.colorOverlay = { enabled: true, color: descColor(so.Clr), opacity: Math.round(so.Opct ?? 100) };
+  if (gr?.enab && gr.Grad?.Clrs?.length) {
+    const stops = (gr.Grad.Clrs as any[]).map(c => [Math.max(0, Math.min(1, (c.Lctn ?? 0) / 4096)), descColor(c.Clr)] as [number, string]);
+    if (gr.Rvrs) stops.forEach(x => x[0] = 1 - x[0]);
+    st.gradientOverlay = { enabled: true, opacity: Math.round(gr.Opct ?? 100), angle: Math.round(gr.Angl ?? 90), stops: stops.sort((p, q) => p[0] - q[0]) };
+  }
+  return Object.keys(st).length ? st : null;
 }
 
 function fillLayer(l: RasterLayer, soco?: Uint8Array, gdfl?: Uint8Array, bounds?: { x: number; y: number; w: number; h: number } | null) {
@@ -213,8 +222,24 @@ function vectorMask(b: Uint8Array, W: number, H: number): HTMLCanvasElement | nu
 }
 
 /** Capas de ajuste de Photoshop → capas de ajuste del editor. */
-function parseAdjustment(key: string, b: Uint8Array): { id: string; params: any } | null {
+function descOf(b: Uint8Array, skip: number): any {
+  const r = new Reader(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer);
+  r.pos = skip; return readDescriptor(r);
+}
+function parseAdjustment(key: string, b: Uint8Array, cged?: Uint8Array): { id: string; params: any } | null {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  if (key === 'brit' && cged) { const d = descOf(cged, 4); if (d.Brgh !== undefined) return { id: 'brightness', params: { brightness: d.Brgh, contrast: d.Cntr ?? 0 } }; }
+  if (key === 'expA') return { id: 'exposure', params: { stops: v.getFloat32(2), offset: v.getFloat32(6), gamma: v.getFloat32(10) || 1 } };
+  if (key === 'post') return { id: 'posterize', params: { levels: v.getUint16(0) } };
+  if (key === 'thrs') return { id: 'threshold', params: { level: v.getUint16(0) } };
+  if (key === 'blnc') { const p: any = { preserve: v.getUint8(18) !== 0 }; ['s', 'm', 'h'].forEach((t, i) => { for (let c = 0; c < 3; c++) p[t + c] = v.getInt16((i * 3 + c) * 2); }); return { id: 'colorbalance', params: p }; }
+  if (key === 'mixr') {
+    const mono = v.getUint16(2) !== 0, p: any = { mono };
+    ['r', 'g', 'b'].forEach((o, i) => { const off = 4 + (mono ? 0 : i) * 10; p[o + 'r'] = v.getInt16(off); p[o + 'g'] = v.getInt16(off + 2); p[o + 'b'] = v.getInt16(off + 4); p[o + 'c'] = v.getInt16(off + 8); });
+    return { id: 'mixer', params: p };
+  }
+  if (key === 'vibA') { const d = descOf(b, 4); return { id: 'vibrance', params: { vibrance: d.vibrance ?? 0, sat: d.Strt ?? 0 } }; }
+  if (key === 'blwh') { const d = descOf(b, 4); return { id: 'bw', params: { reds: d.Rd ?? 40, yellows: d.Yllw ?? 60, greens: d.Grn ?? 40, cyans: d.Cyn ?? 60, blues: d.Bl ?? 20, magentas: d.Mgnt ?? 80 } }; }
   if (key === 'nvrt') return { id: 'invert', params: {} };
   if (key === 'brit' && b.length >= 4) return { id: 'brightness', params: { brightness: v.getInt16(0), contrast: v.getInt16(2) } };
   if (key === 'levl' && b.length >= 12) return { id: 'levels', params: { inBlack: v.getUint16(2), inWhite: v.getUint16(4), outBlack: v.getUint16(6), outWhite: v.getUint16(8), gamma: Math.max(0.1, v.getUint16(10) / 100) } };
@@ -237,8 +262,8 @@ function parseAdjustment(key: string, b: Uint8Array): { id: string; params: any 
   }
   return null;
 }
-const ADJ_KEYS = ['nvrt', 'brit', 'levl', 'hue2', 'curv'];
-const ADJ_OTHER = ['blwh', 'expA', 'vibA', 'blnc', 'phfl', 'mixr', 'clrL', 'post', 'thrs', 'grdm', 'selc', 'PtFl', 'CgEd'];
+const ADJ_KEYS = ['nvrt', 'brit', 'levl', 'hue2', 'curv', 'expA', 'post', 'thrs', 'blnc', 'mixr', 'vibA', 'blwh'];
+const ADJ_OTHER = ['phfl', 'clrL', 'grdm', 'selc', 'PtFl'];
 const BIG_KEYS = new Set(['LMsk', 'Lr16', 'Lr32', 'Layr', 'Mt16', 'Mt32', 'Mtrn', 'Alph', 'FMsk', 'lnk2', 'FEid', 'FXid', 'PxSD', 'cinf']);
 
 interface Rec {
@@ -285,7 +310,7 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, gray: b
       if (key === 'luni') lname = r.ustr();
       else if (key === 'lsct' || key === 'lsdk') { section = r.u32(); if (len >= 12) { r.pos += 4; sectionBlend = r.str(4); } }
       else if (key === 'iOpa') fillOpacity = r.u8();
-      else if (ADJ_KEYS.includes(key) || ['lfx2', 'SoCo', 'GdFl', 'vmsk', 'vsms'].includes(key)) blocks[key] = new Uint8Array(r.buf, start, len);
+      else if (ADJ_KEYS.includes(key) || ['vstk', 'lfx2', 'SoCo', 'GdFl', 'vmsk', 'vsms', 'CgEd', 'TySh', 'SoLd', 'PlLd'].includes(key)) blocks[key] = new Uint8Array(r.buf, start, len);
       // El relleno tras cada bloque varía según el programa: se busca la siguiente firma
       r.pos = start + len;
       for (let pad = 0; pad < 4; pad++) { r.pos = start + len + pad; if (r.pos >= extraEnd || r.isSig()) break; }
@@ -316,7 +341,8 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, gray: b
       layer = g;
     } else {
       const adjKey = ADJ_KEYS.find(k => rec.blocks[k]);
-      const adj = adjKey ? parseAdjustment(adjKey, rec.blocks[adjKey]) : null;
+      let adj: ReturnType<typeof parseAdjustment> = null;
+      try { adj = adjKey ? parseAdjustment(adjKey, rec.blocks[adjKey], rec.blocks.CgEd) : null; } catch { /* formato inesperado */ }
       if (adj) layer = new AdjustmentLayer(rec.name || 'Ajuste', adj.id, adj.params);
       else if (rec.keys.some(k => ADJ_OTHER.includes(k) || ADJ_KEYS.includes(k))) { skippedAdj++; continue; }
       else if (rec.blocks.SoCo || rec.blocks.GdFl) {
@@ -343,6 +369,14 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, gray: b
     layer.clip = rec.clip;
     if (rec.blocks.lfx2 && layer.kind !== 'adjust') {
       try { layer.styles = parseEffects(rec.blocks.lfx2); } catch { /* efecto no reconocido */ }
+    }
+    if (rec.blocks.vstk) {
+      // Trazo de las formas vectoriales → estilo de trazo
+      try {
+        const d = descOf(rec.blocks.vstk, 4);
+        if (d.strokeEnabled && d.strokeStyleContent?.Clr) (layer.styles ??= {}).stroke = { enabled: true, color: descColor(d.strokeStyleContent.Clr), size: Math.max(1, Math.round((d.strokeStyleLineWidth ?? 1) * (d.strokeStyleLineAlignment === 'strokeStyleAlignOutside' ? 1 : 0.5))) };
+        if (d.fillEnabled === false && isRaster(layer)) { ctx2d(layer.canvas).clearRect(0, 0, W, H); layer.touch(); }
+      } catch { /* */ }
     }
     const pixelMask = (m: { top: number; left: number; bottom: number; right: number; def: number }, src: Uint8Array, density?: number) => {
       const mw = m.right - m.left, mh = m.bottom - m.top;
@@ -380,7 +414,7 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, gray: b
   if (skippedAdj) warnings.push(`${skippedAdj} capa(s) de ajuste de un tipo aún no admitido no se han importado`);
   if (recs.some(x => x.keys.includes('TySh'))) warnings.push('El texto se ha importado como píxeles (no editable)');
   if (recs.some(x => x.keys.includes('SoLd') || x.keys.includes('PlLd'))) warnings.push('Los objetos inteligentes de Photoshop se han importado como píxeles');
-  if (recs.some(x => (x.keys.includes('lfx2') || x.keys.includes('lrFX')))) warnings.push('De los efectos de capa solo se importan sombra paralela, trazo y resplandor exterior');
+  if (recs.some(x => (x.keys.includes('lfx2') || x.keys.includes('lrFX')))) warnings.push('De los efectos de capa no se importan biselado, satinado ni superposición de motivo');
 }
 
 export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult> {
@@ -460,6 +494,11 @@ class Writer {
   u16(v: number) { this.u8((v >> 8) & 255); this.u8(v & 255); }
   u32(v: number) { this.u16((v >>> 16) & 65535); this.u16(v & 65535); }
   i32(v: number) { this.u32(v >>> 0); }
+  f32(v: number) { const b = new DataView(new ArrayBuffer(4)); b.setFloat32(0, v); this.bytes(new Uint8Array(b.buffer)); }
+  f64(v: number) { const b = new DataView(new ArrayBuffer(8)); b.setFloat64(0, v); this.bytes(new Uint8Array(b.buffer)); }
+  ustr(t: string) { this.u32(t.length + 1); for (let i = 0; i < t.length; i++) this.u16(t.charCodeAt(i)); this.u16(0); }
+  id(t: string) { if (t.length === 4) { this.u32(0); this.str(t); } else { this.u32(t.length); this.str(t); } }
+  flat() { const out = new Uint8Array(this.size); let o = 0; for (const c of this.parts()) { out.set(c, o); o += c.length; } return out; }
   str(s: string) { for (let i = 0; i < s.length; i++) this.u8(s.charCodeAt(i) & 255); }
   bytes(b: Uint8Array) { this.room(b.length); this.cur.set(b, this.n); this.n += b.length; this.size += b.length; }
   writer(w: Writer) { for (const c of w.parts()) this.bytes(c); }
@@ -488,6 +527,28 @@ function encodeChannel(plane: Uint8Array, w: number, h: number, withHeader = tru
   return { counts, data: Uint8Array.from(all), bytes };
 }
 
+/** Valor de descriptor para escribir: [tipo, ...datos]. */
+type DV = ['bool', boolean] | ['long', number] | ['doub', number] | ['UntF', string, number] | ['enum', string, string] | ['TEXT', string] | ['Objc', string, Record<string, DV>] | ['VlLs', DV[]];
+function writeValue(w: Writer, v: DV) {
+  w.str(v[0]);
+  switch (v[0]) {
+    case 'bool': w.u8(v[1] ? 1 : 0); break;
+    case 'long': w.i32(v[1]); break;
+    case 'doub': w.f64(v[1]); break;
+    case 'UntF': w.str(v[1]); w.f64(v[2]); break;
+    case 'enum': w.id(v[1]); w.id(v[2]); break;
+    case 'TEXT': w.ustr(v[1]); break;
+    case 'Objc': writeDescriptor(w, v[1], v[2]); break;
+    case 'VlLs': w.u32(v[1].length); for (const x of v[1]) writeValue(w, x); break;
+  }
+}
+function writeDescriptor(w: Writer, classId: string, items: Record<string, DV>) {
+  w.ustr(''); w.id(classId);
+  const keys = Object.keys(items); w.u32(keys.length);
+  for (const k of keys) { w.id(k); writeValue(w, items[k]); }
+}
+const rgbDV = (hex: string): DV => { const n = parseInt(hex.slice(1), 16); return ['Objc', 'RGBC', { 'Rd  ': ['doub', n >> 16 & 255], 'Grn ': ['doub', n >> 8 & 255], 'Bl  ': ['doub', n & 255] }]; };
+
 /** Datos de una capa de ajuste en el formato de Photoshop (null = tipo no admitido). */
 function adjustmentBlock(l: AdjustmentLayer): { key: string; bytes: Uint8Array } | null {
   const w = new Writer(), p = l.params;
@@ -495,6 +556,18 @@ function adjustmentBlock(l: AdjustmentLayer): { key: string; bytes: Uint8Array }
   const i16 = (v: number) => w.u16(Math.round(v) & 0xffff);
   switch (l.filterId) {
     case 'invert': return done('nvrt');
+    case 'exposure': w.u16(1); w.f32(p.stops); w.f32(p.offset); w.f32(p.gamma); return done('expA');
+    case 'posterize': w.u16(Math.round(p.levels)); w.u16(0); return done('post');
+    case 'threshold': w.u16(Math.round(p.level)); w.u16(0); return done('thrs');
+    case 'colorbalance': for (const t of ['s', 'm', 'h']) for (let c = 0; c < 3; c++) i16(p[t + c] ?? 0); w.u8(p.preserve === false ? 0 : 1); return done('blnc');
+    case 'mixer':
+      w.u16(1); w.u16(p.mono ? 1 : 0);
+      for (const o of p.mono ? ['r'] : ['r', 'g', 'b']) { i16(p[o + 'r']); i16(p[o + 'g']); i16(p[o + 'b']); i16(0); i16(p[o + 'c'] ?? 0); }
+      if (p.mono) for (let k = 0; k < 10; k++) i16(0);
+      return done('mixr');
+    case 'vibrance': w.u32(16); writeDescriptor(w, 'null', { vibrance: ['long', Math.round(p.vibrance)], 'Strt': ['long', Math.round(p.sat)] }); return done('vibA');
+    case 'bw': if (p.reds === undefined) return null;
+      w.u32(16); writeDescriptor(w, 'null', { 'Rd  ': ['long', Math.round(p.reds)], 'Yllw': ['long', Math.round(p.yellows)], 'Grn ': ['long', Math.round(p.greens)], 'Cyn ': ['long', Math.round(p.cyans)], 'Bl  ': ['long', Math.round(p.blues)], 'Mgnt': ['long', Math.round(p.magentas)], useTint: ['bool', false], tintColor: rgbDV('#e1d3b3'), bwPresetKind: ['long', 1], blackAndWhitePresetFileName: ['TEXT', ''] }); return done('blwh');
     case 'brightness': i16(p.brightness); i16(p.contrast); i16(127); w.u8(0); return done('brit');
     case 'levels':
       w.u16(2);
@@ -544,7 +617,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
         recs.push({ name: l.name, layer: l, section: l.expanded ? 1 : 2, rect: { x: 0, y: 0, w: 0, h: 0 }, chans: m ? [m] : [], hasMask: !!m });
       } else if (isRaster(l)) {
         let c = l.canvas;
-        if (hasStyles(l.styles)) { baked++; const out = makeCanvas(W, H), x = ctx2d(out); renderStyles(x, c, l.styles, 0, 0, W, H); x.drawImage(c, 0, 0); c = out; }
+        if (hasStyles(l.styles)) { baked++; const out = makeCanvas(W, H), x = ctx2d(out); composeStyled(x, c, l.styles, 0, 0, W, H); c = out; }
         const b = contentBounds(c) ?? { x: 0, y: 0, w: 0, h: 0 };
         const chans: OutRec['chans'] = [];
         if (b.w > 0) {
@@ -564,7 +637,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
     }
   };
   visit(doc.root);
-  if (skipped) warnings.push(`${skipped} capa(s) (ajuste «Blanco y negro») no se pueden guardar en PSD todavía y se han omitido`);
+  if (skipped) warnings.push(`${skipped} capa(s) no se pueden guardar en PSD y se han omitido`);
   if (baked) warnings.push('Los estilos de capa se han guardado ya aplicados sobre los píxeles');
   if (doc.allLayers().some(l => l.kind === 'text' || l.kind === 'shape')) warnings.push('El texto y las formas se guardan como píxeles en el PSD');
 

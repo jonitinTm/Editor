@@ -122,13 +122,87 @@ export function invert(img: ImageData) {
   for (let i = 0; i < d.length; i += 4) { d[i] = 255 - d[i]; d[i + 1] = 255 - d[i + 1]; d[i + 2] = 255 - d[i + 2]; }
 }
 
-/** Blanco y negro con mezcla de canales (por defecto, luminancia perceptual). */
-export function blackWhite(img: ImageData, rw = 30, gw = 59, bw = 11) {
+/**
+ * Blanco y negro por familias de color (rojos, amarillos, verdes, cian, azules, magentas),
+ * como en los editores profesionales. Los valores son porcentajes de claridad.
+ */
+export function blackWhite(img: ImageData, p: { reds: number; yellows: number; greens: number; cyans: number; blues: number; magentas: number } = { reds: 40, yellows: 60, greens: 40, cyans: 60, blues: 20, magentas: 80 }) {
   const d = img.data;
-  const tot = Math.max(1, rw + gw + bw);
+  const prim = [p.reds / 100, p.greens / 100, p.blues / 100];
+  // secundario entre el canal mayor y el mediano: R+G=amarillo, G+B=cian, R+B=magenta
+  const sec = [[0, p.yellows / 100, p.magentas / 100], [p.yellows / 100, 0, p.cyans / 100], [p.magentas / 100, p.cyans / 100, 0]];
   for (let i = 0; i < d.length; i += 4) {
-    const v = clamp((d[i] * rw + d[i + 1] * gw + d[i + 2] * bw) / tot);
+    const c = [d[i], d[i + 1], d[i + 2]];
+    let hi = 0, lo = 0;
+    for (let k = 1; k < 3; k++) { if (c[k] > c[hi]) hi = k; if (c[k] < c[lo]) lo = k; }
+    if (hi === lo) continue; // ya es gris
+    const mid = 3 - hi - lo;
+    const v = clamp(c[lo] + (c[hi] - c[mid]) * prim[hi] + (c[mid] - c[lo]) * sec[hi][mid]);
     d[i] = d[i + 1] = d[i + 2] = v;
+  }
+}
+export function desaturate(img: ImageData) {
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const v = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]); d[i] = d[i + 1] = d[i + 2] = v; }
+}
+
+/** Exposición en pasos de diafragma, con desplazamiento y gamma (trabaja en luz lineal). */
+export function exposure(img: ImageData, stops: number, offset: number, gamma: number) {
+  const lut = new Uint8ClampedArray(256), k = Math.pow(2, stops);
+  for (let i = 0; i < 256; i++) {
+    const lin = Math.pow(i / 255, 2.2) * k + offset;
+    lut[i] = clamp(Math.pow(Math.max(0, Math.pow(Math.max(0, lin), 1 / gamma)), 1 / 2.2) * 255);
+  }
+  applyLut(img, lut);
+}
+export function posterize(img: ImageData, levels: number) {
+  const n = Math.max(2, Math.round(levels)), lut = new Uint8ClampedArray(256);
+  for (let i = 0; i < 256; i++) lut[i] = Math.min(n - 1, Math.floor(i * n / 256)) * 255 / (n - 1);
+  applyLut(img, lut);
+}
+export function threshold(img: ImageData, level: number) {
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const v = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2] >= level ? 255 : 0; d[i] = d[i + 1] = d[i + 2] = v; }
+}
+/** Equilibrio de color: desplaza sombras, medios tonos e iluminaciones hacia un color. */
+export function colorBalance(img: ImageData, p: any) {
+  const luts = [0, 1, 2].map(c => {
+    const s = p['s' + c] ?? 0, m = p['m' + c] ?? 0, h = p['h' + c] ?? 0, lut = new Uint8ClampedArray(256);
+    for (let i = 0; i < 256; i++) {
+      const x = i / 255;
+      const ws = Math.max(0, 1 - x * 3) , wh = Math.max(0, x * 3 - 2), wm = Math.max(0, 1 - Math.abs(x - 0.5) * 2.2);
+      lut[i] = clamp(i + (s * ws * 0.9 + m * wm * 0.7 + h * wh * 0.9) * 1.0);
+    }
+    return lut;
+  });
+  const d = img.data, keep = p.preserve !== false;
+  for (let i = 0; i < d.length; i += 4) {
+    const l0 = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    let r = luts[0][d[i]], g = luts[1][d[i + 1]], b = luts[2][d[i + 2]];
+    if (keep) { const dl = l0 - (0.299 * r + 0.587 * g + 0.114 * b); r += dl; g += dl; b += dl; }
+    d[i] = r; d[i + 1] = g; d[i + 2] = b;
+  }
+}
+/** Mezclador de canales: cada canal de salida es una mezcla (en %) de los de entrada más una constante. */
+export function channelMixer(img: ImageData, p: any) {
+  const d = img.data, m = ['r', 'g', 'b'].map(o => [p[o + 'r'] / 100, p[o + 'g'] / 100, p[o + 'b'] / 100, (p[o + 'c'] ?? 0) * 2.55]);
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    if (p.mono) { const v = r * m[0][0] + g * m[0][1] + b * m[0][2] + m[0][3]; d[i] = d[i + 1] = d[i + 2] = v; continue; }
+    d[i] = r * m[0][0] + g * m[0][1] + b * m[0][2] + m[0][3];
+    d[i + 1] = r * m[1][0] + g * m[1][1] + b * m[1][2] + m[1][3];
+    d[i + 2] = r * m[2][0] + g * m[2][1] + b * m[2][2] + m[2][3];
+  }
+}
+/** Intensidad: satura más los colores apagados y protege los ya saturados. */
+export function vibrance(img: ImageData, vib: number, sat: number) {
+  const d = img.data, kv = vib / 100, ks = sat / 100;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (r + g + b) / 3;
+    const cur = mx === 0 ? 0 : (mx - mn) / mx;
+    const f = 1 + ks + kv * (1 - cur) * (kv > 0 ? 1 : cur + 0.5);
+    d[i] = l + (r - l) * f; d[i + 1] = l + (g - l) * f; d[i + 2] = l + (b - l) * f;
   }
 }
 

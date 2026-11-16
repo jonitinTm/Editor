@@ -72,9 +72,14 @@ export interface LayerStyles {
   shadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number };
   stroke?: { enabled: boolean; color: string; size: number };
   glow?: { enabled: boolean; color: string; opacity: number; size: number };
+  innerShadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number };
+  innerGlow?: { enabled: boolean; color: string; opacity: number; size: number };
+  colorOverlay?: { enabled: boolean; color: string; opacity: number };
+  /** Degradado sobre la capa; `stops` = [posición 0-1, color]. */
+  gradientOverlay?: { enabled: boolean; opacity: number; angle: number; stops: [number, string][] };
 }
 export function hasStyles(s: LayerStyles | null | undefined): s is LayerStyles {
-  return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled);
+  return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled || s.innerShadow?.enabled || s.innerGlow?.enabled || s.colorOverlay?.enabled || s.gradientOverlay?.enabled);
 }
 
 export abstract class Layer {

@@ -100,7 +100,7 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
     gctx.restore();
     if (hasStyles(layer.styles)) {
       const st = borrowCanvas(w, h), sc = ctx2d(st); extra.push(st);
-      renderStyles(sc, surface, layer.styles, off.x, off.y, w, h); sc.drawImage(g, 0, 0);
+      composeStyled(sc, surface, layer.styles, off.x, off.y, w, h, g);
       surface = st;
     } else surface = g;
     off = { x: 0, y: 0 };
@@ -113,8 +113,7 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
       let out: HTMLCanvasElement;
       if (key) out = makeCanvas(w, h); else { out = borrowCanvas(w, h); extra.push(out); }
       const sctx = ctx2d(out);
-      renderStyles(sctx, surface, layer.styles, off.x, off.y, w, h);
-      sctx.drawImage(surface, off.x, off.y);
+      composeStyled(sctx, surface, layer.styles, off.x, off.y, w, h);
       if (key) styleCache.set(layer, { key, canvas: out });
       surface = out;
     }
@@ -156,6 +155,64 @@ export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasEleme
     ctx.drawImage(t, 0, 0);
     returnCanvas(t);
   }
+}
+
+/** Efectos que van por encima de la capa, recortados a su forma (superposiciones, sombra y resplandor interiores). */
+function innerStyled(src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number): HTMLCanvasElement | null {
+  if (!(st.innerShadow?.enabled || st.innerGlow?.enabled || st.colorOverlay?.enabled || st.gradientOverlay?.enabled)) return null;
+  const o = borrowCanvas(w, h), c = ctx2d(o);
+  c.drawImage(src, ox, oy);
+  c.globalCompositeOperation = 'source-atop';
+  const go = st.gradientOverlay;
+  if (go?.enabled && go.stops.length) {
+    const b = contentBoundsFast(src, ox, oy, w, h);
+    const a = -go.angle * Math.PI / 180, cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+    const half = (Math.abs(Math.cos(a)) * b.w + Math.abs(Math.sin(a)) * b.h) / 2;
+    const g = c.createLinearGradient(cx - Math.cos(a) * half, cy - Math.sin(a) * half, cx + Math.cos(a) * half, cy + Math.sin(a) * half);
+    for (const [t, col] of go.stops) g.addColorStop(Math.max(0, Math.min(1, t)), col);
+    c.globalAlpha = go.opacity / 100; c.fillStyle = g; c.fillRect(0, 0, w, h); c.globalAlpha = 1;
+  }
+  if (st.colorOverlay?.enabled) { c.globalAlpha = st.colorOverlay.opacity / 100; c.fillStyle = st.colorOverlay.color; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
+  if (st.innerGlow?.enabled || st.innerShadow?.enabled) {
+    // Silueta invertida: su "sombra" cae hacia dentro de la capa
+    const inv = borrowCanvas(w, h), ic = ctx2d(inv);
+    ic.fillStyle = '#000'; ic.fillRect(0, 0, w, h);
+    ic.globalCompositeOperation = 'destination-out'; ic.drawImage(src, ox, oy); ic.globalCompositeOperation = 'source-over';
+    const FAR = w + 4096;
+    const cast = (color: string, blur: number, dx: number, dy: number, times: number) => {
+      c.shadowColor = color; c.shadowBlur = blur; c.shadowOffsetX = FAR + dx; c.shadowOffsetY = dy;
+      // margen extra para que el borde del lienzo no cuente como "fuera"
+      for (let i = 0; i < times; i++) c.drawImage(inv, -FAR, 0);
+      c.shadowColor = 'transparent'; c.shadowBlur = 0; c.shadowOffsetX = 0; c.shadowOffsetY = 0;
+    };
+    if (st.innerGlow?.enabled) cast(rgba(st.innerGlow.color, st.innerGlow.opacity / 100), st.innerGlow.size, 0, 0, 2);
+    if (st.innerShadow?.enabled) { const s = st.innerShadow, a = s.angle * Math.PI / 180; cast(rgba(s.color, s.opacity / 100), s.blur, -Math.cos(a) * s.distance, Math.sin(a) * s.distance, 1); }
+    returnCanvas(inv);
+  }
+  c.globalCompositeOperation = 'source-over';
+  return o;
+}
+const boundsCache = new WeakMap<HTMLCanvasElement, { w: number; h: number; b: Rect }>();
+/** Caja del contenido para orientar degradados (se recalcula solo si cambia el tamaño del lienzo fuente). */
+function contentBoundsFast(src: HTMLCanvasElement, ox: number, oy: number, w: number, h: number): Rect {
+  const d = ctx2d(src).getImageData(0, 0, src.width, src.height).data;
+  let x0 = src.width, y0 = src.height, x1 = -1, y1 = -1;
+  const step = Math.max(1, Math.floor(Math.max(src.width, src.height) / 512));
+  for (let y = 0; y < src.height; y += step) for (let x = 0; x < src.width; x += step) if (d[(y * src.width + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  void boundsCache;
+  return x1 < 0 ? { x: 0, y: 0, w, h } : { x: x0 + ox, y: y0 + oy, w: x1 - x0 + step, h: y1 - y0 + step };
+}
+
+/** Capa con todos sus estilos: efectos de fondo, la capa (o `body`) y efectos interiores. */
+export function composeStyled(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, body?: HTMLCanvasElement) {
+  renderStyles(ctx, src, st, ox, oy, w, h);
+  const top = body ? null : innerStyled(src, st, ox, oy, w, h);
+  if (top) { ctx.drawImage(top, 0, 0); returnCanvas(top); }
+  else if (body) {
+    // Grupo de recorte: los efectos interiores se aplican sobre el conjunto ya recortado
+    const t2 = innerStyled(body, st, 0, 0, w, h);
+    ctx.drawImage(t2 ?? body, 0, 0); if (t2) returnCanvas(t2);
+  } else ctx.drawImage(src, ox, oy);
 }
 
 const filterById = new Map(FILTERS.map(f => [f.id, f]));

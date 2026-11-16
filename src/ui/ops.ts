@@ -5,7 +5,7 @@ import { app } from './app';
 import { EditorDocument } from '../core/document';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
-import { compositeGroup, renderStyles } from '../core/compositor';
+import { compositeGroup, composeStyled } from '../core/compositor';
 import { hasStyles, canvasBlend } from '../core/layers';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
 import { FilterDef, defaultParams } from '../filters/registry';
@@ -250,7 +250,7 @@ export function mergeDown() {
   for (const [layer, c] of [[below, base], [l, top]] as const) if (hasStyles(layer.styles)) {
     // Los estilos se "hornean" en los píxeles al combinar
     const plain = cloneCanvas(c), cc = ctx2d(c);
-    cc.clearRect(0, 0, d.width, d.height); renderStyles(cc, plain, layer.styles, 0, 0, d.width, d.height); cc.drawImage(plain, 0, 0);
+    cc.clearRect(0, 0, d.width, d.height); composeStyled(cc, plain, layer.styles, 0, 0, d.width, d.height);
   }
   ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode);
   if (l.visible) ctx.drawImage(top, 0, 0);

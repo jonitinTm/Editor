@@ -340,17 +340,27 @@ export function layerStyleDialog() {
     shadow: { enabled: false, color: '#000000', opacity: 60, angle: 120, distance: 8, blur: 10 },
     stroke: { enabled: false, color: '#000000', size: 3 },
     glow: { enabled: false, color: '#ffffaa', opacity: 75, size: 12 },
+    innerShadow: { enabled: false, color: '#000000', opacity: 60, angle: 120, distance: 6, blur: 8 },
+    innerGlow: { enabled: false, color: '#ffffaa', opacity: 75, size: 10 },
+    colorOverlay: { enabled: false, color: '#ff0000', opacity: 100 },
+    gradientOverlay: { enabled: false, opacity: 100, angle: 90, stops: [[0, '#000000'], [1, '#ffffff']] },
     ...(before ? JSON.parse(JSON.stringify(before)) : {}),
   };
   const update = () => ops.setLayerStyles(l, JSON.parse(JSON.stringify(st)), false);
   const section = (title: string, obj: any, fields: [string, string, number, number, string?][]) => {
     const on = h('input', { type: 'checkbox', checked: obj.enabled });
-    const color = h('input', { type: 'color', class: 'color-input', value: obj.color });
+    const color = h('input', { type: 'color', class: 'color-input', value: obj.color ?? '#000000', style: { display: obj.color === undefined ? 'none' : '' } });
     const enable = () => { if (!obj.enabled) { obj.enabled = true; on.checked = true; } };
     on.onchange = () => { obj.enabled = on.checked; update(); };
     color.oninput = () => { obj.color = color.value; enable(); update(); };
     return [h('div', { class: 'style-head' }, h('label', { class: 'check' }, on, h('b', {}, ' ' + title)), color),
       ...fields.map(([key, label, min, max, unit]) => row(label, numberSlider({ min, max, value: obj[key], unit, onInput: v => { obj[key] = v; enable(); update(); } }).el))];
+  };
+  const gradSection = () => {
+    const g = st.gradientOverlay, els = section('Superposición de degradado', g, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°']]);
+    const pick = (i: number) => { const c = h('input', { type: 'color', class: 'color-input', value: g.stops[i][1] }); c.oninput = () => { g.stops[i][1] = c.value; g.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; update(); }; return c; };
+    els.push(row('Colores', pick(0), '→', pick(g.stops.length - 1)));
+    return els;
   };
   showDialog({
     title: `Estilo de capa: ${l.name}`, width: 400,
@@ -358,8 +368,12 @@ export function layerStyleDialog() {
       ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
       ...section('Trazo (exterior)', st.stroke, [['size', 'Grosor', 1, 60, 'px']]),
       ...section('Resplandor exterior', st.glow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
+      ...section('Sombra interior', st.innerShadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
+      ...section('Resplandor interior', st.innerGlow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
+      ...section('Superposición de color', st.colorOverlay, [['opacity', 'Opacidad', 0, 100, '%']]),
+      ...gradSection(),
     ],
-    onOk: () => { const any = st.shadow.enabled || st.stroke.enabled || st.glow.enabled; l.styles = before; ops.setLayerStyles(l, any || before ? JSON.parse(JSON.stringify(st)) : null, true); },
+    onOk: () => { const any = Object.values(st).some((x: any) => x.enabled); l.styles = before; ops.setLayerStyles(l, any || before ? JSON.parse(JSON.stringify(st)) : null, true); },
     onCancel: () => ops.setLayerStyles(l, before, false),
   });
 }
