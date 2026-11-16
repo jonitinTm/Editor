@@ -38,7 +38,7 @@ export function getPaintTarget(opts: { allowText?: boolean } = {}): PaintTarget 
   if (doc.editMask && layer.mask) return { layer, isMask: true, canvas: layer.mask.canvas };
   if (!isRaster(layer)) { app.toast(layer.kind === 'group' ? 'Selecciona una capa de píxeles (no un grupo)' : 'Las capas de ajuste no tienen píxeles: pinta en su máscara', 'warn'); return null; }
   if (isParametric(layer) && !opts.allowText) {
-    app.toast(layer.kind === 'text' ? 'Capa de texto rasterizada para poder editarla' : 'Forma rasterizada para poder editarla');
+    app.toast(layer.kind === 'text' ? 'Capa de texto rasterizada para poder editarla' : layer.kind === 'smart' ? 'Objeto inteligente rasterizado para poder pintar en él (para conservarlo, edita su contenido con doble clic)' : 'Forma rasterizada para poder editarla');
     layer = rasterizeLayer(layer);
   }
   return { layer, isMask: false, canvas: (layer as RasterLayer).canvas };

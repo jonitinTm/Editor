@@ -24,6 +24,8 @@ export class EditorDocument {
   view: ViewState = { zoom: 1, panX: 0, panY: 0 };
   viewInitialized = false;
   overrides = new Map<Layer, LayerOverride>();
+  /** true = es el contenido de un objeto inteligente (vive dentro de otro documento). */
+  embedded = false;
   /** ¿Hay cambios sin guardar? */
   modified = false;
   composite: HTMLCanvasElement;

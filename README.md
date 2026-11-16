@@ -31,13 +31,21 @@ Ya disponible:
   invertir. Se crean desde *Capa › Nueva capa de ajuste* o con el botón ◐ del panel de capas, se editan en *Propiedades*
   y llevan máscara propia.
 - **Estilos de capa**: sombra paralela, trazo exterior y resplandor exterior (botón *fx* del panel de capas).
-- **PSD**: abrir y guardar archivos de Photoshop (RGB o grises de 8 bits) con capas, grupos, máscaras, opacidad,
-  visibilidad y modos de fusión. El texto, las formas y los efectos viajan como píxeles; las capas de ajuste
-  (salvo *Invertir*) aún no se guardan en PSD.
+- **PSD y PSB**: abrir y guardar archivos de Photoshop con capas, grupos (incluido el modo «Pasar»), máscaras de píxeles
+  y vectoriales, máscaras de recorte, opacidad, visibilidad y modos de fusión. Se leen documentos de 8, 16 y 32 bits
+  (convertidos a 8), con compresión RLE o ZIP. También van y vuelven las capas de ajuste de brillo/contraste, niveles,
+  curvas, tono/saturación e invertir; y se leen las formas (relleno de color o degradado) y los efectos de sombra
+  paralela, trazo y resplandor exterior. Comprobado contra 123 archivos reales de Photoshop.
+  Lo que aún viaja como píxeles: texto, objetos inteligentes y, al guardar, formas y estilos.
+- **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
+  Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
+  (el documento principal se actualiza solo). Las copias comparten contenido.
+- **Máscaras de recorte** (`Alt+Ctrl+G`): la capa solo se ve donde la de debajo tiene píxeles.
 - **Formas vectoriales** editables (color, trazo, tamaño) y **transformación de grupos** y de varias capas a la vez.
 - Al mover una capa se conserva lo que queda fuera del lienzo (*Imagen › Revelar todo* lo muestra).
 
-Pendiente: objetos inteligentes, pluma y trazados, filtros avanzados, RAW, animación, texto y ajustes dentro del PSD.
+Pendiente: pluma y trazados, filtros avanzados, RAW, animación; en PSD, texto editable, objetos inteligentes
+enlazados y el resto de efectos y ajustes de Photoshop.
 
 ### Atajos principales
 

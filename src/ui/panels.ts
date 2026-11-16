@@ -4,7 +4,7 @@ import { app } from './app';
 import { h, numberSlider } from './dom';
 import { icon } from './icons';
 import * as ops from './ops';
-import { BLEND_MODES, GroupLayer, AdjustmentLayer, hasStyles, Layer, TextLayer, ShapeLayer, isRaster, isParametric } from '../core/layers';
+import { BLEND_MODES, GroupLayer, AdjustmentLayer, SmartLayer, hasStyles, Layer, TextLayer, ShapeLayer, isRaster, isParametric } from '../core/layers';
 import { ctx2d } from '../core/canvas';
 import { renderComposite } from '../core/compositor';
 import { FONTS } from '../tools/text';
@@ -106,6 +106,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const clipMark = l.clip ? h('span', { class: 'clip-mark', title: 'Recortada por la capa de debajo' }, '↳') : null;
     const lt = layerThumb(l);
     const thumbWrap = h('span', { class: 'thumb-wrap' + (isActive && !d.editMask ? ' editing' : '') }, lt);
+    if (l instanceof SmartLayer) thumbWrap.addEventListener('dblclick', e => { e.stopPropagation(); ops.editSmartContents(l); });
     thumbWrap.addEventListener('click', e => {
       if (e.ctrlKey || e.metaKey) { e.stopPropagation(); ops.selectionFromLayer(l); return; }
       if (isActive && d.editMask) { e.stopPropagation(); d.editMask = false; d.changed(); }
@@ -125,7 +126,7 @@ export function buildLayersPanel(parent: HTMLElement) {
       const n = await promptDialog('Cambiar nombre de capa', 'Nombre', l.name);
       if (n !== null) ops.renameLayer(l, n);
     });
-    const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : null;
+    const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : l instanceof SmartLayer ? h('span', { class: 'ltag', title: 'Objeto inteligente (doble clic en la miniatura para editar su contenido)' }, '▣') : null;
     const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : null;
@@ -231,7 +232,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
   const render = () => {
     const d = app.doc;
     const l = d?.active;
-    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}${l instanceof AdjustmentLayer ? l.filterId + JSON.stringify(l.params) : ''}` : '';
+    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}${l instanceof SmartLayer ? l.inner.width + 'x' + l.inner.height : ''}${l instanceof AdjustmentLayer ? l.filterId + JSON.stringify(l.params) : ''}` : '';
     if (skipRender) { skipRender = false; lastKey = key; return; }
     if (key === lastKey && body.contains(document.activeElement)) return;
     lastKey = key;
@@ -243,7 +244,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('button', { class: 'btn', onclick: () => actionById.get('imageSize')!.run() }, 'Tamaño de imagen'),
         h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
     if (!l) return;
-    const kind = l instanceof AdjustmentLayer ? 'Capa de ajuste' : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : 'Capa de píxeles';
+    const kind = l instanceof AdjustmentLayer ? 'Capa de ajuste' : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : l instanceof SmartLayer ? 'Objeto inteligente' : 'Capa de píxeles';
     body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · editando máscara' : '')));
     if (l instanceof TextLayer) {
       const p = l.props;
@@ -281,6 +282,16 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         } else body.append(formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, onInput: v => { l.params[pd.key] = v; changed(); } }).el));
       }
       if (def && !def.custom && !def.params) body.append(h('div', { class: 'hint' }, 'Este ajuste no tiene opciones.'));
+    }
+    if (l instanceof SmartLayer) {
+      const m = l.props.m, sx = Math.hypot(m[0], m[1]), sy = Math.hypot(m[2], m[3]);
+      body.append(
+        h('div', { class: 'prop-row' }, h('span', {}, 'Original'), h('b', {}, `${l.inner.width} × ${l.inner.height} px`)),
+        h('div', { class: 'prop-row' }, h('span', {}, 'Escala'), h('b', {}, `${Math.round(sx * 100)} % × ${Math.round(sy * 100)} %`), h('span', {}, 'Giro'), h('b', {}, `${Math.round(Math.atan2(m[1], m[0]) * 180 / Math.PI)}°`)),
+        h('div', { class: 'prop-btns' },
+          h('button', { class: 'btn primary', onclick: () => ops.editSmartContents(l) }, 'Editar contenido'),
+          h('button', { class: 'btn', onclick: () => ops.rasterize() }, 'Rasterizar')),
+        h('div', { class: 'hint' }, 'Se puede escalar y girar las veces que quieras sin perder calidad.'));
     }
     if (l instanceof ShapeLayer) {
       const p = l.props;

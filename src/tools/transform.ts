@@ -6,7 +6,7 @@ import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
 import { cloneCanvas, contentBounds, ctx2d, makeCanvas, Rect, rectUnion } from '../core/canvas';
-import { GroupLayer, RasterLayer, isRaster, isParametric, walkLayers } from '../core/layers';
+import { GroupLayer, RasterLayer, SmartLayer, Matrix, matMul, isRaster, isParametric, walkLayers } from '../core/layers';
 import { selectedLayers } from '../ui/ops';
 import { rasterizeLayer } from './paint';
 import { h } from '../ui/dom';
@@ -18,6 +18,8 @@ interface Item {
   src: HTMLCanvasElement;   // píxeles a transformar
   rect: Rect;               // posición original de esos píxeles
   hole: HTMLCanvasElement;  // la capa sin esos píxeles
+  /** Objeto inteligente: no se tocan píxeles, solo se compone su matriz. */
+  m0?: Matrix;
 }
 interface Session {
   items: Item[];
@@ -40,6 +42,15 @@ function prepare(): Session | null {
   const items: Item[] = [];
   let union: Rect | null = null;
   for (let layer of layers) {
+    if (layer instanceof SmartLayer && !sel) {
+      // Caja = contorno del objeto ya transformado
+      const m = layer.props.m, w = layer.src.width, h = layer.src.height;
+      const xs = [0, w, 0, w].map((x, i) => m[0] * x + m[2] * (i < 2 ? 0 : h) + m[4]), ys = [0, w, 0, w].map((x, i) => m[1] * x + m[3] * (i < 2 ? 0 : h) + m[5]);
+      const rect = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+      items.push({ layer, src: layer.src, rect, hole: makeCanvas(doc.width, doc.height), m0: m });
+      union = rectUnion(union, rect);
+      continue;
+    }
     if (isParametric(layer)) layer = rasterizeLayer(layer as RasterLayer);
     const l = layer as RasterLayer;
     // Sin selección se usa el contenido completo (incluido lo que esté fuera del lienzo)
@@ -65,13 +76,20 @@ function prepare(): Session | null {
 }
 
 /** Dibuja `src` (situado originalmente en `rect`) con la transformación de la sesión. */
-function drawTransformed(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, rect: Rect, s: Session) {
+function drawTransformed(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, rect: Rect, s: Session, m0?: Matrix) {
   const st = s.st;
   ctx.save();
   ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   ctx.translate(st.cx, st.cy); ctx.rotate(st.angle); ctx.scale(st.sx, st.sy);
-  ctx.drawImage(src, rect.x - (s.rect.x + s.rect.w / 2), rect.y - (s.rect.y + s.rect.h / 2));
+  if (m0) { ctx.translate(-(s.rect.x + s.rect.w / 2), -(s.rect.y + s.rect.h / 2)); ctx.transform(...m0); ctx.drawImage(src, 0, 0); }
+  else ctx.drawImage(src, rect.x - (s.rect.x + s.rect.w / 2), rect.y - (s.rect.y + s.rect.h / 2));
   ctx.restore();
+}
+/** Matriz de la transformación de la sesión (espacio del documento → documento). */
+function sessionMatrix(s: Session): Matrix {
+  const { cx, cy, sx, sy, angle } = s.st, c = Math.cos(angle), n = Math.sin(angle);
+  const ux = s.rect.x + s.rect.w / 2, uy = s.rect.y + s.rect.h / 2;
+  return matMul([c * sx, n * sx, -n * sy, c * sy, cx, cy], [1, 0, 0, 1, -ux, -uy]);
 }
 
 function clearOverrides(s: Session) { for (const it of s.items) app.doc?.overrides.delete(it.layer); }
@@ -81,6 +99,7 @@ function applySession(s: Session, name: string) {
   const doc = app.doc!;
   clearOverrides(s);
   for (const it of s.items) {
+    if (it.m0 && it.layer instanceof SmartLayer) { it.layer.applyMatrix(sessionMatrix(s)); continue; }
     drawTransformed(ctx2d(it.hole), it.src, it.rect, s);
     it.layer.canvas = it.hole; it.layer.touch();
   }
@@ -155,7 +174,7 @@ export class TransformTool implements Tool {
   private preview() {
     const s = this.s; if (!s) return;
     const doc = app.doc!;
-    for (const it of s.items) doc.overrides.set(it.layer, { canvas: it.hole, extra: ctx => drawTransformed(ctx, it.src, it.rect, s) });
+    for (const it of s.items) doc.overrides.set(it.layer, { canvas: it.hole, extra: ctx => drawTransformed(ctx, it.src, it.rect, s, it.m0) });
     doc.invalidate();
     this.syncFields();
     app.viewport.requestRender();

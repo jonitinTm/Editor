@@ -2,7 +2,7 @@
 // navegador: nada se envía a ningún servidor.
 
 import { EditorDocument } from '../core/document';
-import { RasterLayer, TextLayer, ShapeLayer, AdjustmentLayer, GroupLayer, LayerMask, Layer, bumpLayerId, isRaster, isParametric } from '../core/layers';
+import { RasterLayer, TextLayer, ShapeLayer, SmartLayer, AdjustmentLayer, GroupLayer, LayerMask, Layer, bumpLayerId, isRaster, isParametric } from '../core/layers';
 import { canvasToBlob, ctx2d, makeCanvas } from '../core/canvas';
 
 export const PROJECT_EXT = '.edp';
@@ -47,7 +47,7 @@ export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith
 
 interface ProjLayer {
   id: number; type: string; name: string; visible: boolean; opacity: number; blendMode: string; locked: boolean; clip?: boolean;
-  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean;
+  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean;
 }
 interface ProjFile {
   format: 'editor-proyecto'; version: 1; name: string; width: number; height: number;
@@ -67,17 +67,20 @@ async function layerToProj(l: Layer): Promise<ProjLayer> {
   if (l.styles) p.styles = l.styles;
   if (l instanceof AdjustmentLayer) p.adjust = { filterId: l.filterId, params: l.params };
   if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; }
+  else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument) };
   else if (isRaster(l)) { p.image = await canvasToDataURL(l.canvas); if (l instanceof TextLayer) p.text = { ...l.props }; if (l instanceof ShapeLayer) p.shape = { ...l.props }; }
   return p;
 }
 
 export async function serializeProject(doc: EditorDocument): Promise<Blob> {
-  const data: ProjFile = {
+  return new Blob([JSON.stringify(await projectData(doc))], { type: 'application/json' });
+}
+async function projectData(doc: EditorDocument): Promise<ProjFile> {
+  return {
     format: 'editor-proyecto', version: 1, name: doc.name, width: doc.width, height: doc.height,
     guides: doc.guides, activeId: doc.active?.id ?? null,
     layers: await Promise.all(doc.root.children.map(layerToProj)),
   };
-  return new Blob([JSON.stringify(data)], { type: 'application/json' });
 }
 
 async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
@@ -86,6 +89,9 @@ async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
     const g = new GroupLayer(p.name); g.expanded = p.expanded ?? true;
     for (const c of p.children ?? []) g.add(await projToLayer(c, w, h));
     l = g;
+  } else if (p.type === 'smart') {
+    const inner = await docFromData(p.smart!.doc); inner.embedded = true;
+    l = new SmartLayer(p.name, w, h, inner, p.smart!.m as any);
   } else if (p.type === 'adjust') {
     l = new AdjustmentLayer(p.name, p.adjust!.filterId, p.adjust!.params);
   } else {
@@ -108,6 +114,9 @@ export async function openProject(file: Blob): Promise<EditorDocument> {
   const data = JSON.parse(await file.text()) as ProjFile;
   if (data.format !== 'editor-proyecto') throw new Error('El archivo no es un proyecto de Editor');
   if (data.version > 1) throw new Error('Este proyecto se creó con una versión más nueva de Editor');
+  return docFromData(data);
+}
+async function docFromData(data: ProjFile): Promise<EditorDocument> {
   const doc = new EditorDocument(data.name, data.width, data.height);
   for (const p of data.layers) doc.root.add(await projToLayer(p, data.width, data.height));
   doc.guides = data.guides ?? { h: [], v: [] };

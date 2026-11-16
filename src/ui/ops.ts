@@ -3,7 +3,7 @@
 
 import { app } from './app';
 import { EditorDocument } from '../core/document';
-import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
+import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, renderStyles } from '../core/compositor';
 import { hasStyles, canvasBlend } from '../core/layers';
@@ -44,7 +44,7 @@ export async function openFiles(files: File[], asLayers = false) {
         continue;
       }
       if (!io.isImageFile(f)) { app.toast(`Formato no admitido: ${f.name}`, 'warn'); continue; }
-      if (asLayers && app.doc) await placeImage(f, io.baseName(f.name));
+      if (asLayers && app.doc) await placeImage(f, io.baseName(f.name), undefined, true);
       else app.addDocument(await io.documentFromImage(f, f.name));
     } catch (e: any) {
       alertDialog('No se pudo abrir', `${f.name}: ${e?.message ?? e}`);
@@ -53,9 +53,19 @@ export async function openFiles(files: File[], asLayers = false) {
 }
 
 /** Coloca una imagen como capa nueva, centrada (o en la posición indicada). */
-export async function placeImage(src: Blob | HTMLCanvasElement, name: string, pos?: { x: number; y: number }) {
+export async function placeImage(src: Blob | HTMLCanvasElement, name: string, pos?: { x: number; y: number }, smart = false) {
   const d = doc(); if (!d) return;
   const c = src instanceof HTMLCanvasElement ? src : await io.imageToCanvas(src);
+  if (smart) {
+    // Como objeto inteligente: conserva la imagen original y se ajusta al lienzo si es más grande
+    const inner = new EditorDocument(name, c.width, c.height);
+    const il = new RasterLayer('Fondo', c.width, c.height); il.canvas = c; inner.root.add(il); inner.setActive(il, false); inner.embedded = true;
+    const k = Math.min(1, d.width / c.width, d.height / c.height);
+    const sl = new SmartLayer(name, d.width, d.height, inner, [k, 0, 0, k, Math.round((d.width - c.width * k) / 2), Math.round((d.height - c.height * k) / 2)]);
+    d.insertAboveActive(sl);
+    d.commit('Colocar objeto inteligente');
+    return;
+  }
   const l = new RasterLayer(name, d.width, d.height);
   const x = pos?.x ?? Math.round((d.width - c.width) / 2), y = pos?.y ?? Math.round((d.height - c.height) / 2);
   ctx2d(l.canvas).drawImage(c, x, y);
@@ -65,13 +75,14 @@ export async function placeImage(src: Blob | HTMLCanvasElement, name: string, po
 
 export async function closeDocument(d = doc()) {
   if (!d) return;
-  if (d.modified && !(await confirmDialog('Cerrar documento', `«${d.name}» tiene cambios sin guardar. ¿Cerrarlo de todas formas?`, 'Cerrar sin guardar'))) return;
+  if (!d.embedded && d.modified && !(await confirmDialog('Cerrar documento', `«${d.name}» tiene cambios sin guardar. ¿Cerrarlo de todas formas?`, 'Cerrar sin guardar'))) return;
   app.closeDocument(d);
 }
 
 const handles = new WeakMap<EditorDocument, any>();
 export async function saveProject(saveAs = false) {
   const d = doc(); if (!d) return;
+  if (d.embedded) { app.toast('Es el contenido de un objeto inteligente: los cambios ya se aplican solos al documento principal'); return; }
   try {
     const blob = await io.serializeProject(d);
     const h = await io.saveBlob(blob, d.name + io.PROJECT_EXT, saveAs ? undefined : handles.get(d));
@@ -107,6 +118,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   let c: Layer;
   if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
   else if (l instanceof AdjustmentLayer) { c = new AdjustmentLayer(l.name, l.filterId, JSON.parse(JSON.stringify(l.params))); }
+  else if (l instanceof SmartLayer) { c = new SmartLayer(l.name, d.width, d.height, l.inner, l.props.m); }
   else if (l instanceof TextLayer) { c = new TextLayer(l.name, d.width, d.height, { ...l.props }); }
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
@@ -278,7 +290,7 @@ export function flattenImage() {
 
 export function rasterize() {
   const d = doc(); const l = d?.active;
-  if (!d || !isParametric(l)) { app.toast('Solo las capas de texto o de forma se pueden rasterizar', 'warn'); return; }
+  if (!d || !isParametric(l)) { app.toast('Solo se rasterizan capas de texto, formas u objetos inteligentes', 'warn'); return; }
   rasterizeLayer(l); d.commit('Rasterizar capa');
 }
 
@@ -291,6 +303,70 @@ export function newAdjustmentLayer(def: FilterDef) {
   d.insertAboveActive(l);
   d.editMask = true;
   d.commit('Nueva capa de ajuste');
+}
+
+// ---- Objetos inteligentes -----------------------------------------------------------
+
+/** Convierte las capas seleccionadas en un objeto inteligente. */
+export function convertToSmart() {
+  const d = doc(); if (!d) return;
+  const layers = selectedLayers(); if (!layers.length) return;
+  if (layers.length === 1 && layers[0] instanceof SmartLayer) { app.toast('La capa ya es un objeto inteligente'); return; }
+  const ordered = d.allLayers().filter(l => layers.includes(l));
+  const top = ordered[ordered.length - 1];
+  const parent = top.parent!; const index = parent.children.indexOf(top);
+  const name = layers.length === 1 ? top.name : 'Objeto inteligente';
+  const inner = new EditorDocument(name, d.width, d.height);
+  inner.embedded = true;
+  const marker = new GroupLayer('');           // guarda el sitio mientras se mueven las capas
+  parent.add(marker, index + 1);
+  for (const l of ordered) inner.root.add(l);
+  inner.setActive(inner.allLayers().pop() ?? null, false);
+  // El documento interno se recorta a su contenido
+  const b = contentBounds(inner.flatten());
+  let m: Matrix = [1, 0, 0, 1, 0, 0];
+  if (b && (b.w < d.width || b.h < d.height)) { inner.resizeCanvas(b.w, b.h, -b.x, -b.y); m = [1, 0, 0, 1, b.x, b.y]; }
+  const sl = new SmartLayer(name, d.width, d.height, inner, m);
+  parent.add(sl, parent.children.indexOf(marker)); parent.remove(marker);
+  d.setActive(sl, false);
+  d.commit('Convertir en objeto inteligente');
+}
+
+const watched = new WeakSet<object>();
+/** Abre el contenido de un objeto inteligente en su propia pestaña. */
+export function editSmartContents(l = doc()?.active) {
+  if (!(l instanceof SmartLayer)) { app.toast('Selecciona un objeto inteligente', 'warn'); return; }
+  const inner = l.inner as EditorDocument;
+  if (!watched.has(inner)) {
+    watched.add(inner);
+    let last: unknown = null, pending = false;
+    inner.onChange(() => {
+      const step = inner.history.steps[inner.history.index];
+      if (step === last || pending) return;
+      pending = true;
+      setTimeout(() => { pending = false; last = inner.history.steps[inner.history.index]; refreshSmart(inner); }, 0);
+    });
+  }
+  if (app.docs.includes(inner)) app.setDocument(inner); else app.addDocument(inner);
+  notifyToolDocChanged();
+  app.toast('Edita el contenido: el documento principal se actualiza solo');
+}
+/** Redibuja todos los objetos inteligentes que usan `inner` (en cualquier documento abierto). */
+function refreshSmart(inner: EditorDocument) {
+  const seen = new Set<EditorDocument>();
+  const visit = (d: EditorDocument): boolean => {
+    if (seen.has(d)) return false; seen.add(d);
+    let changed = false;
+    for (const l of d.allLayers()) if (l instanceof SmartLayer) {
+      const sub = l.inner as EditorDocument;
+      if (sub === inner || visit(sub)) { l.refresh(); changed = true; }
+    }
+    if (changed) { d.invalidate(); if (app.docs.includes(d)) d.changed(); }
+    return changed;
+  };
+  for (const d of app.docs) if (d !== inner) visit(d);
+  inner.modified = false;
+  app.viewport.requestRender();
 }
 
 export function toggleClip() {
@@ -509,10 +585,12 @@ export function transformImage(kind: 'rot90' | 'rot-90' | 'rot180' | 'flipH' | '
     return c;
   };
   for (const l of d.allLayers()) {
-    if (isParametric(l)) rasterizeLayer(l);
+    if (isParametric(l) && !(l instanceof SmartLayer)) rasterizeLayer(l);
   }
+  const D: Matrix = kind === 'rot90' ? [0, 1, -1, 0, H, 0] : kind === 'rot-90' ? [0, -1, 1, 0, 0, W] : kind === 'rot180' ? [-1, 0, 0, -1, W, H] : kind === 'flipH' ? [-1, 0, 0, 1, W, 0] : [1, 0, 0, -1, 0, H];
   for (const l of d.allLayers()) {
-    if (isRaster(l)) { l.canvas = tf(l.canvas); l.touch(); }
+    if (l instanceof SmartLayer) { l.canvas = makeCanvas(nw, nh); l.applyMatrix(D); }
+    else if (isRaster(l)) { l.canvas = tf(l.canvas); l.touch(); }
     if (l.mask) { l.mask.canvas = tf(l.mask.canvas); l.mask.touch(); }
   }
   const sel = d.selection.mask ? tf(d.selection.mask) : null;

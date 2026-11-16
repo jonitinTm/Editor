@@ -3,14 +3,14 @@
 // reutiliza la copia del paso anterior (solo se copian las capas tocadas).
 
 import { cloneCanvas } from './canvas';
-import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, AdjustmentLayer, LayerMask, BlendMode, isParametric } from './layers';
+import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, SmartLayer, SmartSource, AdjustmentLayer, LayerMask, BlendMode, isParametric } from './layers';
 import type { EditorDocument } from './document';
 
 interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
   blendMode: BlendMode; locked: boolean; clip: boolean;
-  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; styles?: string | null; adjust?: string;
+  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
   children?: LayerSnap[]; expanded?: boolean;
 }
@@ -42,6 +42,7 @@ function snapLayer(l: Layer): LayerSnap {
   else if (l instanceof RasterLayer) {
     s.canvas = freeze(l, l.version, l.canvas);
     if (isParametric(l)) s.props = { ...l.props };
+    if (l instanceof SmartLayer) s.smart = l.inner;
     const f = l.fullContent(); s.full = f.canvas !== l.canvas ? { canvas: f.canvas, x: f.x, y: f.y } : null;
   }
   return s;
@@ -73,10 +74,10 @@ function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
     const a = JSON.parse(s.adjust!);
     l = new AdjustmentLayer(s.name, a.filterId, a.params);
   } else {
-    const r = s.kind === 'text' ? new TextLayer(s.name, w, h, { ...s.props }) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, { ...s.props }) : new RasterLayer(s.name, w, h);
-    r.canvas = cloneCanvas(s.canvas!);
+    const r = s.kind === 'smart' ? new SmartLayer(s.name, w, h, s.smart!, s.props.m) : s.kind === 'text' ? new TextLayer(s.name, w, h, { ...s.props }) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, { ...s.props }) : new RasterLayer(s.name, w, h);
+    if (s.kind !== 'smart') r.canvas = cloneCanvas(s.canvas!); // el objeto inteligente se redibuja desde su contenido actual
     if (s.full) r.full = { ...s.full, version: r.version };
-    frozen.set(r, { version: r.version, canvas: s.canvas! });
+    if (s.kind !== 'smart') frozen.set(r, { version: r.version, canvas: s.canvas! });
     l = r;
   }
   l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.clip = s.clip;

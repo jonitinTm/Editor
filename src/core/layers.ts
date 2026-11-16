@@ -90,7 +90,7 @@ export abstract class Layer {
   parent: GroupLayer | null = null;
   /** Se incrementa cada vez que cambian los píxeles; lo usa el historial. */
   version = 0;
-  abstract readonly kind: 'raster' | 'text' | 'shape' | 'group' | 'adjust';
+  abstract readonly kind: 'raster' | 'text' | 'shape' | 'smart' | 'group' | 'adjust';
   /** Estilos de capa (sombra, trazo, resplandor). null = ninguno. */
   styles: LayerStyles | null = null;
   constructor(name: string) { this.name = name; }
@@ -109,7 +109,7 @@ export abstract class Layer {
 }
 
 export class RasterLayer extends Layer {
-  readonly kind: 'raster' | 'text' | 'shape' = 'raster';
+  readonly kind: 'raster' | 'text' | 'shape' | 'smart' = 'raster';
   canvas: HTMLCanvasElement;
   /**
    * Contenido completo de la capa cuando parte queda fuera del lienzo (tras
@@ -138,7 +138,7 @@ export class RasterLayer extends Layer {
 /** Capas "paramétricas": se redibujan a partir de sus propiedades (texto, formas). */
 export interface Parametric { props: any; render(): void; translate(dx: number, dy: number): void; scale(sx: number, sy: number): void; }
 export function isParametric(l: Layer | null | undefined): l is RasterLayer & Parametric {
-  return !!l && (l.kind === 'text' || l.kind === 'shape');
+  return !!l && (l.kind === 'text' || l.kind === 'shape' || l.kind === 'smart');
 }
 
 export class TextLayer extends RasterLayer {
@@ -225,6 +225,48 @@ export class ShapeLayer extends RasterLayer {
   }
 }
 
+/** Matriz afín [a, b, c, d, e, f] como la de canvas: x' = a·x + c·y + e, y' = b·x + d·y + f. */
+export type Matrix = [number, number, number, number, number, number];
+/** Composición A∘B (primero se aplica B, luego A). */
+export function matMul(A: Matrix, B: Matrix): Matrix {
+  return [A[0] * B[0] + A[2] * B[1], A[1] * B[0] + A[3] * B[1], A[0] * B[2] + A[2] * B[3], A[1] * B[2] + A[3] * B[3],
+    A[0] * B[4] + A[2] * B[5] + A[4], A[1] * B[4] + A[3] * B[5] + A[5]];
+}
+/** Lo que un objeto inteligente necesita de su documento interno. */
+export interface SmartSource { name: string; width: number; height: number; flatten(): HTMLCanvasElement; }
+
+/**
+ * Objeto inteligente: guarda dentro un documento completo (con sus capas) y lo
+ * muestra transformado. Escalar o girar no pierde calidad porque siempre se
+ * redibuja desde el original, y su contenido se puede editar aparte.
+ */
+export class SmartLayer extends RasterLayer {
+  readonly kind = 'smart' as const;
+  props: { m: Matrix };
+  /** Imagen combinada del documento interno. */
+  src!: HTMLCanvasElement;
+  constructor(name: string, w: number, h: number, public inner: SmartSource, m: Matrix) {
+    super(name, w, h);
+    this.props = { m: [...m] as Matrix };
+    this.refresh();
+  }
+  /** Vuelve a leer el contenido (tras editarlo) y redibuja. */
+  refresh() { this.src = this.inner.flatten(); this.render(); }
+  translate(dx: number, dy: number) { this.applyMatrix([1, 0, 0, 1, dx, dy]); }
+  scale(sx: number, sy: number) { this.applyMatrix([sx, 0, 0, sy, 0, 0]); }
+  applyMatrix(D: Matrix) { this.props = { m: matMul(D, this.props.m) }; this.render(); }
+  render() {
+    clearCanvas(this.canvas);
+    const ctx = ctx2d(this.canvas);
+    ctx.save();
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.setTransform(...this.props.m);
+    ctx.drawImage(this.src, 0, 0);
+    ctx.restore();
+    this.touch();
+  }
+}
+
 /**
  * Capa de ajuste: no tiene píxeles; aplica un ajuste (niveles, curvas…) a
  * todo lo que hay debajo, sin modificarlo. Se puede cambiar o quitar siempre.
@@ -261,5 +303,5 @@ export function* walkLayers(group: GroupLayer): Generator<Layer> {
 }
 
 export function isRaster(l: Layer | null | undefined): l is RasterLayer {
-  return !!l && (l.kind === 'raster' || l.kind === 'text' || l.kind === 'shape');
+  return !!l && (l.kind === 'raster' || l.kind === 'text' || l.kind === 'shape' || l.kind === 'smart');
 }
