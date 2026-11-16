@@ -3,7 +3,17 @@
 Editor de imágenes por capas que funciona en el navegador, con la interfaz en español.
 **Todo ocurre en tu equipo**: las imágenes no se suben a ningún servidor y funciona sin conexión a internet.
 
-## Cómo abrirlo en Windows (sin instalar nada)
+## Abrirlo en la web
+
+**https://jonitintm.github.io/Editor/** — se abre directamente en el navegador, sin descargar nada.
+Aunque esté en la web, todo sigue ocurriendo en tu equipo: las imágenes no se envían a ningún sitio.
+Tras la primera visita funciona también sin conexión, y en Chrome o Edge se puede instalar como aplicación
+(icono «Instalar» en la barra de direcciones).
+
+> La página la publica GitHub Pages desde la raíz de la rama principal (`index.html`). Si no apareciera, revisa en
+> GitHub *Settings › Pages* que la fuente sea «Deploy from a branch», rama `claude/nice-galileo-6pmws2`, carpeta `/ (root)`.
+
+## Abrirlo desde un archivo en Windows
 
 1. En GitHub, entra en el repositorio, elige la rama `claude/nice-galileo-6pmws2` y pulsa **Code › Download ZIP**.
 2. Descomprime el ZIP (clic derecho › *Extraer todo…*).
@@ -87,7 +97,7 @@ Tecnología: **TypeScript + Vite**, sin librerías en tiempo de ejecución. El d
 ```bash
 npm install        # una vez
 npm run dev        # servidor de desarrollo con recarga automática
-npm run build      # genera app/Editor.html (un solo archivo autocontenido)
+npm run build      # genera app/Editor.html y el index.html de la raíz (un solo archivo autocontenido)
 ```
 
 Hace falta [Node.js](https://nodejs.org) 18 o superior.

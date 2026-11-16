@@ -270,3 +270,6 @@ window.addEventListener('drop', e => {
 window.addEventListener('beforeunload', e => {
   if (app.docs.some(d => d.modified)) { e.preventDefault(); e.returnValue = ''; }
 });
+
+// En la web (https) se registra un service worker para poder usar Editor sin conexión
+if ((location.protocol === 'https:' || location.hostname === 'localhost') && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});

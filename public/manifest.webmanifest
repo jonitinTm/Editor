@@ -1,0 +1,12 @@
+{
+  "name": "Editor",
+  "short_name": "Editor",
+  "description": "Editor de imágenes por capas que funciona en el navegador, sin servidor.",
+  "lang": "es",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1d1e21",
+  "theme_color": "#1d1e21",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
