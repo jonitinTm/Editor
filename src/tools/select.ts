@@ -129,7 +129,7 @@ export class EllipseSelectTool extends DragSelectTool {
 }
 
 export class LassoTool implements Tool {
-  id = 'lasso'; name = 'Lazo'; icon = icon('lasso'); key = 'L'; cursor = 'crosshair';
+  id = 'lasso'; name = 'Lazo'; icon = icon('lasso'); key = 'L'; group = 'lasso'; cursor = 'crosshair';
   options = [MODE_OPT, FEATHER_OPT] as any[];
   private pts: { x: number; y: number }[] = [];
   private mode: SelMode = 'new';
@@ -163,6 +163,47 @@ export class LassoTool implements Tool {
     if (this.pts.length < 2) return;
     const p = new Path2D();
     this.pts.forEach((q, i) => i ? p.lineTo(q.x, q.y) : p.moveTo(q.x, q.y));
+    vp.drawAnts(p);
+  }
+}
+
+/** Lazo poligonal: cada clic añade un vértice; doble clic, Intro o clic en el inicio cierran. */
+export class PolyLassoTool implements Tool {
+  id = 'polyLasso'; name = 'Lazo poligonal'; icon = icon('polyLasso'); key = 'L'; group = 'lasso'; cursor = 'crosshair';
+  options = [MODE_OPT, FEATHER_OPT] as any[];
+  private pts: { x: number; y: number }[] = [];
+  private mode: SelMode = 'new';
+  down(e: ToolEvent) {
+    if (!this.pts.length) this.mode = selMode(this.id, e);
+    else {
+      const f = app.viewport.toScreen(this.pts[0].x, this.pts[0].y);
+      if (e.detail >= 2 || (this.pts.length > 2 && Math.hypot(f.x - e.sx, f.y - e.sy) < 8)) { this.close(); return; }
+    }
+    let x = e.x, y = e.y;
+    if (e.shift && this.pts.length) { const l = this.pts[this.pts.length - 1], a = Math.round(Math.atan2(y - l.y, x - l.x) / (Math.PI / 4)) * Math.PI / 4, d = Math.hypot(x - l.x, y - l.y); x = l.x + Math.cos(a) * d; y = l.y + Math.sin(a) * d; }
+    this.pts.push({ x, y });
+  }
+  private close() {
+    const doc = app.doc!, pts = this.pts; this.pts = [];
+    if (pts.length < 3) return;
+    doc.selection.polygon(pts, this.mode);
+    const f = app.opt<number>('feather', this.id); if (f > 0) doc.selection.feather(f / 2);
+    doc.commit('Lazo poligonal');
+  }
+  cancel() { this.pts = []; app.viewport?.requestRender(); }
+  deactivate() { this.pts = []; }
+  key_(e: KeyboardEvent) {
+    if (!this.pts.length) return false;
+    if (e.key === 'Enter') { this.close(); return true; }
+    if (e.key === 'Escape') { this.cancel(); return true; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { this.pts.pop(); app.viewport.requestRender(); return true; }
+    return false;
+  }
+  drawOverlay(_ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (!this.pts.length) return;
+    const p = new Path2D();
+    this.pts.forEach((q, i) => i ? p.lineTo(q.x, q.y) : p.moveTo(q.x, q.y));
+    if (vp.mouse) p.lineTo(vp.mouse.x, vp.mouse.y);
     vp.drawAnts(p);
   }
 }

@@ -10,6 +10,7 @@ import { renderComposite } from '../core/compositor';
 import { FONTS } from '../tools/text';
 import { actionById } from './actions';
 import { promptDialog, row as formRow } from './dialog';
+import { createPicker, SWATCHES } from './colorpicker';
 import { layerStyleDialog, levelsBody, curvesBody } from './dialogs';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';
@@ -48,6 +49,41 @@ function layerThumb(l: Layer) {
 function maskThumb(l: Layer) {
   const m = l.mask!;
   return thumb(m, m.version, (ctx, w, hh) => { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, hh); ctx.drawImage(m.canvas, 0, 0, w, hh); }, 'thumb mask');
+}
+
+// ---- Color y Muestras ---------------------------------------------------------------
+
+export function buildColorPanel(parent: HTMLElement) {
+  let target: 'fg' | 'bg' = 'fg';
+  const picker = createPicker(app.fg, c => target === 'fg' ? app.setColors(c, app.bg) : app.setColors(app.fg, c));
+  const fg = h('button', { class: 'cp-target on', title: 'Color frontal' }), bg = h('button', { class: 'cp-target', title: 'Color de fondo' });
+  const choose = (t: 'fg' | 'bg') => { target = t; fg.classList.toggle('on', t === 'fg'); bg.classList.toggle('on', t === 'bg'); picker.set(t === 'fg' ? app.fg : app.bg); };
+  fg.onclick = () => choose('fg'); bg.onclick = () => choose('bg');
+  const body = h('div', { class: 'panel-body color-panel' }, h('div', { class: 'cp-targets' }, fg, bg), picker.el);
+  parent.append(panel('Color', body));
+  const upd = () => { fg.style.background = app.fg; bg.style.background = app.bg; if (!body.contains(document.activeElement) || document.activeElement === document.body) picker.set(target === 'fg' ? app.fg : app.bg); };
+  app.on('colors', upd); upd();
+}
+export function buildSwatchesPanel(parent: HTMLElement) {
+  const grid = h('div', { class: 'swatch-grid' }, ...SWATCHES.map(c => {
+    const b = h('button', { class: 'sw', style: { background: c }, title: c + ' (Alt+clic: color de fondo)' });
+    b.onclick = e => e.altKey ? app.setColors(app.fg, c) : app.setColors(c, app.bg);
+    return b;
+  }));
+  parent.append(panel('Muestras', h('div', { class: 'panel-body' }, grid)));
+}
+
+/** Menú contextual con acciones del catálogo. */
+function contextMenu(x: number, y: number, ids: string[]) {
+  document.querySelector('.flyout.ctx')?.remove();
+  const fly = h('div', { class: 'flyout ctx', style: { left: Math.min(x, window.innerWidth - 260) + 'px', top: Math.min(y, window.innerHeight - ids.length * 24 - 20) + 'px' } },
+    ...ids.map(id => {
+      if (id === '-') return h('div', { class: 'menu-sep' });
+      const a = actionById.get(id)!; const off = a.enabled ? !a.enabled() : false;
+      return h('div', { class: 'fly-item' + (off ? ' disabled' : ''), onclick: () => { fly.remove(); if (!off) a.run(); } }, a.label);
+    }));
+  document.body.append(fly);
+  setTimeout(() => document.addEventListener('pointerdown', function off(e) { if (!fly.contains(e.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', off); } }), 0);
 }
 
 // ---- Capas -------------------------------------------------------------------------
@@ -99,7 +135,15 @@ export function buildLayersPanel(parent: HTMLElement) {
     const isActive = d.active === l;
     const selected = d.selectedIds.has(l.id);
     const eye = h('button', { class: 'eye' + (l.visible ? '' : ' off'), title: l.visible ? 'Ocultar' : 'Mostrar', html: l.visible ? icon('eye') : '' });
-    eye.onclick = e => { e.stopPropagation(); ops.setLayerProp(l, 'visible', !l.visible); };
+    eye.onclick = e => {
+      e.stopPropagation();
+      if (e.altKey) { // Alt+clic: ver solo esta capa (o volver a mostrarlas todas)
+        const sibs = l.parent!.children, solo = sibs.every(s => s === l ? s.visible : !s.visible);
+        for (const s of sibs) s.visible = solo ? true : s === l;
+        d.commit(solo ? 'Mostrar todas las capas' : 'Ver solo una capa'); return;
+      }
+      ops.setLayerProp(l, 'visible', !l.visible);
+    };
     const arrow = l instanceof GroupLayer
       ? h('button', { class: 'arrow', html: icon(l.expanded ? 'chevronDown' : 'chevronRight'), onclick: (e: Event) => { e.stopPropagation(); l.expanded = !l.expanded; render(); } })
       : h('span', { class: 'arrow-space' });
@@ -151,6 +195,12 @@ export function buildLayersPanel(parent: HTMLElement) {
       d.editMask = wasMask && !!l.mask;
       d.changed();
     });
+    el.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      if (!d.selectedIds.has(l.id)) d.setActive(l);
+      contextMenu(e.clientX, e.clientY, ['dupLayer', 'delLayer', 'renameLayer', '-', 'layerStyle', 'clearStyle', 'clip', '-', 'toSmart', 'editSmart', 'rasterize', '-', 'group', 'ungroup', '-', 'mergeDown', 'mergeVisible', 'flatten']);
+    });
+    el.addEventListener('dblclick', e => { if ((e.target as HTMLElement).closest('.lname, .thumb-wrap, .eye, .arrow')) return; d.setActive(l); layerStyleDialog(); });
     // Arrastrar para reordenar
     el.addEventListener('dragstart', e => { dragLayer = l; e.dataTransfer!.effectAllowed = 'move'; e.dataTransfer!.setData('text/plain', String(l.id)); });
     el.addEventListener('dragend', () => { dragLayer = null; list.querySelectorAll('.drop-above,.drop-below,.drop-into').forEach(x => x.classList.remove('drop-above', 'drop-below', 'drop-into')); });

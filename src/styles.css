@@ -252,3 +252,45 @@ kbd { background: var(--panel-3); border: 1px solid var(--border); border-radius
 .props .form-row .num-slider input[type=range] { min-width: 40px; }
 .props canvas.hist, .props canvas.curves { max-width: 100%; height: auto; }
 .clip-mark { color: var(--muted); font-size: 14px; margin: 0 -2px 0 4px; }
+
+/* Grupos de paneles con pestañas */
+.tab-group { display: flex; flex-direction: column; min-height: 0; flex: 1; border-top: 1px solid var(--border); }
+.tab-group:first-child { border-top: 0; }
+.tab-group.closed { display: none; }
+.tab-group[data-group=color] { flex: 0 0 auto; }
+.tg-tabs { display: flex; background: var(--bg); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.tg-tab { background: transparent; border: 0; border-right: 1px solid var(--border); padding: 5px 12px; cursor: pointer; color: var(--muted); font-size: 11px; }
+.tg-tab.on { background: var(--panel); color: var(--text); font-weight: 600; }
+.tg-page { display: none; flex: 1; min-height: 0; flex-direction: column; }
+.tg-page.on { display: flex; }
+.tab-group .panel-head { display: none; }
+.tab-group .panel, .tab-group .panel-props { flex: 1; max-height: none; }
+.tab-group .panel-props .panel-body { flex: 1; }
+.side-top { flex: 0 0 56%; }
+body.hide-panels .side, body.hide-panels .toolbar, body.hide-panels .optionsbar, body.no-tools .toolbar, body.no-options .optionsbar { display: none; }
+/* Selector de color */
+.cp { display: flex; flex-direction: column; gap: 6px; }
+.cp-top { display: flex; gap: 6px; }
+.cp-sv, .cp-hue { cursor: crosshair; border: 1px solid #111; touch-action: none; }
+.cp-fields { display: flex; align-items: center; gap: 4px; color: var(--muted); }
+.cp-hex { width: 62px; } .cp-num { width: 44px !important; }
+.color-panel { padding: 8px; display: flex; gap: 8px; overflow: hidden; }
+.cp-targets { position: relative; width: 34px; height: 34px; flex-shrink: 0; }
+.cp-target { position: absolute; width: 22px; height: 22px; border: 1px solid #fff; outline: 1px solid #000; padding: 0; cursor: pointer; left: 12px; top: 12px; }
+.cp-target:first-child { left: 0; top: 0; z-index: 1; }
+.cp-target.on { outline: 2px solid var(--accent); }
+.cp-dialog { display: flex; gap: 12px; }
+.cp-compare { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cp-new, .cp-old { width: 44px; height: 30px; border: 1px solid #111; }
+.swatch-grid { display: grid; grid-template-columns: repeat(auto-fill, 18px); gap: 3px; padding: 8px; }
+.sw { width: 18px; height: 18px; border: 1px solid #111; padding: 0; cursor: pointer; }
+.sw:hover { outline: 1px solid #fff; }
+.fly-item.disabled { color: #686c74; }
+.flyout .menu-sep { margin: 3px 0; }
+/* El lienzo no debe impedir que su zona encoja (al redimensionar la ventana o mostrar paneles) */
+.viewport { grid-template-columns: 20px minmax(0, 1fr); grid-template-rows: 20px minmax(0, 1fr); }
+.viewport.no-rulers { grid-template-columns: 0 minmax(0, 1fr); grid-template-rows: 0 minmax(0, 1fr); }
+.view-wrap { min-width: 0; min-height: 0; }
+.view-canvas { position: absolute; left: 0; top: 0; }
+.ruler-h, .ruler-v { min-width: 0; min-height: 0; overflow: hidden; }
+.color-panel .cp-num { width: 38px !important; padding: 2px 3px; } .color-panel .cp-hex { width: 56px; padding: 2px 3px; } .color-panel .cp-fields { gap: 3px; font-size: 11px; }

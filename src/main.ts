@@ -8,7 +8,7 @@ import { Viewport, isTyping } from './ui/viewport';
 import { buildMenuBar } from './ui/menus';
 import { buildToolbar } from './ui/toolbar';
 import { buildOptionsBar } from './ui/optionsbar';
-import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel } from './ui/panels';
+import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel, buildColorPanel, buildSwatchesPanel } from './ui/panels';
 import { ACTIONS } from './ui/actions';
 import * as ops from './ui/ops';
 import { dialogOpen } from './ui/dialog';
@@ -18,7 +18,8 @@ import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
-import { RectSelectTool, EllipseSelectTool, LassoTool, WandTool } from './tools/select';
+import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool } from './tools/select';
+import { retouchTools } from './tools/retouch';
 import { CropTool } from './tools/crop';
 import { BrushTool, PencilTool, EraserTool, CloneTool } from './tools/brush';
 import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool } from './tools/misc';
@@ -32,6 +33,8 @@ for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, WandToo
   BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, ZoomTool, TransformTool]) {
   app.registerTool(new T());
 }
+app.registerTool(new PolyLassoTool());
+for (const t of retouchTools()) app.registerTool(t);
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;
@@ -58,9 +61,22 @@ main.append(side);
 const sideTop = h('div', { class: 'side-top' });
 const sideBottom = h('div', { class: 'side-bottom' });
 side.append(sideTop, h('div', { class: 'splitter', title: 'Arrastra para cambiar el tamaño' }), sideBottom);
-buildPropertiesPanel(sideTop);
-buildHistoryPanel(sideTop);
-buildLayersPanel(sideBottom);
+/** Grupo de paneles con pestañas, como en los editores profesionales. */
+function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLElement) => void][]) {
+  const head = h('div', { class: 'tg-tabs' }), group = h('div', { class: 'tab-group', 'data-group': id }, head);
+  const pages: HTMLElement[] = [];
+  tabs.forEach(([title, build], i) => {
+    const page = h('div', { class: 'tg-page' + (i ? '' : ' on') }); build(page); pages.push(page); group.append(page);
+    const b = h('button', { class: 'tg-tab' + (i ? '' : ' on') }, title);
+    b.onclick = () => { pages.forEach((p, j) => p.classList.toggle('on', j === i)); [...head.children].forEach((c, j) => c.classList.toggle('on', j === i)); };
+    head.append(b);
+  });
+  parent.append(group);
+  return group;
+}
+tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel]]);
+tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel]]);
+tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel]]);
 root.append(h('div', { id: 'toasts' }));
 
 // Separador ajustable entre paneles
@@ -78,6 +94,11 @@ root.append(h('div', { id: 'toasts' }));
 app.setTool('brush');
 app.setTool('move');
 
+/** Título de pestaña: nombre @ zoom (capa activa, modo). */
+function tabTitle(d: NonNullable<typeof app.doc>) {
+  const z = Math.round(d.view.zoom * 1000) / 10;
+  return `${d.name}${d.modified ? ' *' : ''} @ ${String(z).replace('.', ',')} % (${d.active ? d.active.name + ', ' : ''}RGB/8)`;
+}
 // ---- Pestañas de documentos ----------------------------------------------------------
 function renderTabs() {
   tabs.innerHTML = '';
@@ -85,7 +106,7 @@ function renderTabs() {
     const close = h('button', { class: 'tab-close', title: 'Cerrar', html: icon('close') });
     close.onclick = e => { e.stopPropagation(); ops.closeDocument(d); };
     const t = h('div', { class: 'tab' + (d === app.doc ? ' active' : ''), title: `${d.name} (${d.width} × ${d.height})` },
-      h('span', {}, d.name + (d.modified ? ' •' : '')), close);
+      h('span', {}, tabTitle(d)), close);
     t.onclick = () => { app.setDocument(d); ops.notifyToolDocChanged(); };
     t.addEventListener('auxclick', e => { if (e.button === 1) ops.closeDocument(d); });
     tabs.append(t);
@@ -98,8 +119,9 @@ app.on('docs', renderTabs);
 app.on('doc', () => {
   // El indicador de "sin guardar" de la pestaña
   const t = tabs.querySelector('.tab.active span');
-  if (t && app.doc) t.textContent = app.doc.name + (app.doc.modified ? ' •' : '');
+  if (t && app.doc) t.textContent = tabTitle(app.doc);
 });
+app.on('view', () => { const t = tabs.querySelector('.tab.active span'); if (t && app.doc) t.textContent = tabTitle(app.doc); });
 renderTabs();
 
 // ---- Barra de estado ------------------------------------------------------------------
@@ -181,6 +203,15 @@ window.addEventListener('keydown', e => {
   }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const key = e.key.toUpperCase();
+  if (e.key === 'Tab') { e.preventDefault(); document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); return; }
+  if (key === 'F' && !e.shiftKey) { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); return; }
+  if (/^[0-9]$/.test(e.key) && app.doc) {
+    // Teclas numéricas: opacidad de la herramienta de pintura o, si no la tiene, de la capa
+    const v = e.key === '0' ? 100 : +e.key * 10;
+    if (typeof app.opt('opacity', app.tool.id) === 'number') app.setOpt(app.tool.id, 'opacity', v);
+    else if (app.doc.active) ops.setLayerProp(app.doc.active, 'opacity', v / 100);
+    return;
+  }
   if (key === 'D' && !e.shiftKey) { app.setColors('#000000', '#ffffff'); return; }
   if (key === 'X' && !e.shiftKey) { app.setColors(app.bg, app.fg); return; }
   if (e.key === '[' || e.key === ']') {

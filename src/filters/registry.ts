@@ -3,6 +3,7 @@
 // filtro nuevo = añadir una entrada.
 
 import * as A from './adjustments';
+import * as F from './advanced';
 
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string }
@@ -152,6 +153,20 @@ export const FILTERS: FilterDef[] = [
     ],
     apply: (img, p) => A.addNoise(img, p.amount, p.mono, p.gaussian),
   },
+  { id: 'motion', name: 'Desenfoque de movimiento…', group: 'filtro', submenu: 'Desenfocar', params: [{ key: 'angle', label: 'Ángulo', type: 'range', min: -180, max: 180, default: 0, unit: '°' }, { key: 'distance', label: 'Distancia', type: 'range', min: 1, max: 300, default: 20, unit: 'px' }], apply: (img, p) => F.motionBlur(img, p.angle, p.distance) },
+  { id: 'radial', name: 'Desenfoque radial…', group: 'filtro', submenu: 'Desenfocar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: 1, max: 100, default: 20 }, { key: 'spin', label: 'Giro (si no, zoom)', type: 'checkbox', default: false }], apply: (img, p) => F.radialBlur(img, p.amount, p.spin) },
+  { id: 'twirl', name: 'Molinete…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'angle', label: 'Ángulo', type: 'range', min: -999, max: 999, default: 120, unit: '°' }], apply: (img, p) => F.twirl(img, p.angle) },
+  { id: 'pinch', name: 'Encoger…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: -100, max: 100, default: 50, unit: '%' }], apply: (img, p) => F.pinch(img, p.amount) },
+  { id: 'spherize', name: 'Esferizar…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: -100, max: 100, default: 60, unit: '%' }], apply: (img, p) => F.pinch(img, -p.amount) },
+  { id: 'wave', name: 'Onda…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'amplitude', label: 'Amplitud', type: 'range', min: 1, max: 200, default: 10, unit: 'px' }, { key: 'wavelength', label: 'Longitud de onda', type: 'range', min: 2, max: 999, default: 80, unit: 'px' }], apply: (img, p) => F.wave(img, p.amplitude, p.wavelength) },
+  { id: 'edges', name: 'Hallar bordes', group: 'filtro', submenu: 'Estilizar', apply: img => F.findEdges(img) },
+  { id: 'emboss', name: 'Relieve…', group: 'filtro', submenu: 'Estilizar', params: [{ key: 'angle', label: 'Ángulo', type: 'range', min: -180, max: 180, default: 135, unit: '°' }, { key: 'height', label: 'Altura', type: 'range', min: 1, max: 20, default: 3, unit: 'px' }, { key: 'amount', label: 'Cantidad', type: 'range', min: 1, max: 500, default: 100, unit: '%' }], apply: (img, p) => F.emboss(img, p.angle, p.height, p.amount) },
+  { id: 'mosaic', name: 'Mosaico…', group: 'filtro', submenu: 'Pixelizar', params: [{ key: 'cell', label: 'Tamaño de celda', type: 'range', min: 2, max: 200, default: 10, unit: 'px' }], apply: (img, p) => F.mosaic(img, p.cell) },
+  { id: 'median', name: 'Mediana…', group: 'filtro', submenu: 'Ruido', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 6, default: 2, unit: 'px' }], apply: (img, p) => F.median(img, p.radius) },
+  { id: 'highpass', name: 'Paso alto…', group: 'filtro', submenu: 'Otro', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 0.1, max: 250, default: 10, unit: 'px', step: 0.1 }], apply: (img, p) => F.highPass(img, p.radius) },
+  { id: 'offset', name: 'Desplazamiento…', group: 'filtro', submenu: 'Otro', params: [{ key: 'dx', label: 'Horizontal', type: 'range', min: -2000, max: 2000, default: 50, unit: 'px' }, { key: 'dy', label: 'Vertical', type: 'range', min: -2000, max: 2000, default: 50, unit: 'px' }], apply: (img, p) => F.offset(img, p.dx, p.dy) },
+  { id: 'maximum', name: 'Máximo…', group: 'filtro', submenu: 'Otro', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 50, default: 2, unit: 'px' }], apply: (img, p) => F.minMax(img, p.radius, true) },
+  { id: 'minimum', name: 'Mínimo…', group: 'filtro', submenu: 'Otro', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 50, default: 2, unit: 'px' }], apply: (img, p) => F.minMax(img, p.radius, false) },
 ];
 
 export function defaultParams(f: FilterDef): any {

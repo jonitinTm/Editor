@@ -36,7 +36,7 @@ export const ACTIONS: Action[] = [
   { id: 'close', label: 'Cerrar', keys: ['Alt+Ctrl+W'], enabled: hasDoc, run: () => ops.closeDocument() },
 
   // Edición
-  { id: 'undo', label: 'Deshacer', keys: ['Ctrl+Z'], enabled: () => !!app.doc?.history.canUndo(), run: ops.undo },
+  { id: 'undo', label: 'Deshacer', keys: ['Ctrl+Z', 'Alt+Ctrl+Z'], enabled: () => !!app.doc?.history.canUndo(), run: ops.undo },
   { id: 'redo', label: 'Rehacer', keys: ['Shift+Ctrl+Z', 'Ctrl+Y'], enabled: () => !!app.doc?.history.canRedo(), run: ops.redo },
   { id: 'cut', label: 'Cortar', keys: ['Ctrl+X'], enabled: hasSel, run: () => ops.cut() },
   { id: 'copy', label: 'Copiar', keys: ['Ctrl+C'], enabled: hasDoc, run: () => ops.copy(false) },
@@ -94,6 +94,7 @@ export const ACTIONS: Action[] = [
   { id: 'rasterize', label: 'Rasterizar capa (texto, forma u objeto inteligente)', enabled: () => isParametric(app.doc?.active), run: ops.rasterize },
   { id: 'mergeDown', label: 'Combinar hacia abajo', keys: ['Ctrl+E'], enabled: hasLayer, run: ops.mergeDown },
   { id: 'mergeVisible', label: 'Combinar visibles', keys: ['Shift+Ctrl+E'], enabled: hasDoc, run: ops.mergeVisible },
+  { id: 'stamp', label: 'Estampar visibles en una capa nueva', keys: ['Alt+Shift+Ctrl+E'], enabled: hasDoc, run: () => { const d = app.doc!; d.setActive(d.root.children[d.root.children.length - 1] ?? null, false); ops.placeImage(d.flatten(), 'Estampado', { x: 0, y: 0 }); } },
   { id: 'flatten', label: 'Acoplar imagen', enabled: hasDoc, run: ops.flattenImage },
 
   // Selección
@@ -118,6 +119,15 @@ export const ACTIONS: Action[] = [
   { id: 'guides', label: 'Mostrar guías', keys: ['Ctrl+;', "Ctrl+'"], checked: () => app.showGuides, run: () => { app.showGuides = !app.showGuides; app.viewport.requestRender(); } },
   { id: 'newGuide', label: 'Nueva guía…', enabled: hasDoc, run: newGuideDialog },
   { id: 'clearGuides', label: 'Borrar guías', enabled: () => !!app.doc && (app.doc.guides.h.length + app.doc.guides.v.length > 0), run: () => { app.doc!.guides = { h: [], v: [] }; app.viewport.requestRender(); } },
+
+  // Ventana
+  ...([['color', 'Color y Muestras'], ['props', 'Propiedades e Historial'], ['layers', 'Capas']] as const).map(([g, label]): Action => ({
+    id: 'win:' + g, label, checked: () => !(document.querySelector(`[data-group=${g}]`) as HTMLElement)?.classList.contains('closed'),
+    run: () => { document.querySelector(`[data-group=${g}]`)?.classList.toggle('closed'); },
+  })),
+  { id: 'win:tools', label: 'Herramientas', checked: () => !document.body.classList.contains('no-tools'), run: () => { document.body.classList.toggle('no-tools'); requestAnimationFrame(() => app.viewport.resize()); } },
+  { id: 'win:options', label: 'Opciones', checked: () => !document.body.classList.contains('no-options'), run: () => { document.body.classList.toggle('no-options'); requestAnimationFrame(() => app.viewport.resize()); } },
+  { id: 'win:all', label: 'Ocultar / mostrar todos los paneles', keys: ['Tab'], run: () => { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); } },
 
   // Ayuda
   { id: 'shortcuts', label: 'Atajos de teclado', keys: ['F1'], run: () => dlg.shortcutsDialog(shortcutList()) },
@@ -148,7 +158,7 @@ export function shortcutList(): [string, string][] {
   const out: [string, string][] = [];
   for (const t of app.tools.values()) if (t.key) out.push([t.key, 'Herramienta: ' + t.name]);
   out.push(['Mayús + letra', 'Alternar herramientas del mismo grupo'], ['Espacio (mantener)', 'Desplazar con la mano'],
-    ['[ y ]', 'Reducir / aumentar tamaño del pincel'], ['D', 'Colores por defecto'], ['X', 'Intercambiar colores'],
+    ['[ y ]', 'Reducir / aumentar tamaño del pincel'], ['D', 'Colores por defecto'], ['X', 'Intercambiar colores'], ['1 … 9, 0', 'Opacidad 10 % … 90 %, 100 % (herramienta o capa)'], ['F', 'Pantalla completa'],
     ['Alt + rueda', 'Zoom'], ['Flechas', 'Mover la capa 1 px (Mayús: 10 px)'], ['Intro / Esc', 'Aplicar / cancelar (recorte, transformación, texto)']);
   for (const a of ACTIONS) if (a.keys) out.push([a.keys[0], a.label.replace('…', '')]);
   return out;

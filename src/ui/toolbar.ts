@@ -3,12 +3,13 @@
 import { app } from './app';
 import { h } from './dom';
 import { icon } from './icons';
+import { colorDialog } from './colorpicker';
 import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
-  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso'], ['wand'], ['crop'], ['eyedropper'],
-  ['clone'], ['brush', 'pencil'], ['eraser'], ['gradient', 'bucket'], ['text'], ['pen', 'node'], ['shape'], ['hand'], ['zoom'],
+  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso'], ['wand'], ['crop'], ['eyedropper'],
+  ['clone'], ['brush', 'pencil'], ['eraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn'], ['text'], ['pen', 'node'], ['shape'], ['hand'], ['zoom'],
 ];
 
 export function buildToolbar(parent: HTMLElement) {
@@ -44,14 +45,14 @@ export function buildToolbar(parent: HTMLElement) {
   const bgSw = h('button', { class: 'swatch bg', title: 'Color de fondo (clic para cambiar)' });
   const swap = h('button', { class: 'mini-btn swap', title: 'Intercambiar colores (X)', html: icon('swap') });
   const reset = h('button', { class: 'mini-btn reset', title: 'Colores por defecto (D)' }, h('span', { class: 'mini-fg' }), h('span', { class: 'mini-bg' }));
-  const picker = h('input', { type: 'color', class: 'hidden-color' });
-  let which: 'fg' | 'bg' = 'fg';
-  const pick = (w: 'fg' | 'bg') => { which = w; picker.value = w === 'fg' ? app.fg : app.bg; picker.click(); };
-  picker.addEventListener('input', () => which === 'fg' ? app.setColors(picker.value, app.bg) : app.setColors(app.fg, picker.value));
+  const pick = async (w: 'fg' | 'bg') => {
+    const c = await colorDialog(w === 'fg' ? 'Selector de color (color frontal)' : 'Selector de color (color de fondo)', w === 'fg' ? app.fg : app.bg);
+    if (c) w === 'fg' ? app.setColors(c, app.bg) : app.setColors(app.fg, c);
+  };
   fgSw.onclick = () => pick('fg'); bgSw.onclick = () => pick('bg');
   swap.onclick = () => app.setColors(app.bg, app.fg);
   reset.onclick = () => app.setColors('#000000', '#ffffff');
-  bar.append(h('div', { class: 'colors' }, bgSw, fgSw, swap, reset, picker));
+  bar.append(h('div', { class: 'colors' }, bgSw, fgSw, swap, reset));
 
   const update = () => {
     for (const b of buttons) {

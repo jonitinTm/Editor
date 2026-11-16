@@ -11,7 +11,8 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
   if (group === 'ajuste') return list.map(f => 'filter:' + f.id);
   const subs = new Map<string, Item[]>();
   for (const f of list) { const k = f.submenu ?? 'Otros'; if (!subs.has(k)) subs.set(k, []); subs.get(k)!.push('filter:' + f.id); }
-  return [...subs].map(([label, items]) => ({ label, items }));
+  const order = ['Desenfocar', 'Distorsionar', 'Enfocar', 'Estilizar', 'Pixelizar', 'Ruido', 'Otro'];
+  return [...subs].sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0])).map(([label, items]) => ({ label, items }));
 };
 
 const MENUS: { label: string; items: Item[] }[] = [
@@ -24,10 +25,11 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste').map(f => 'adjust:' + f.id) }, 'layerStyle', 'clearStyle', 'clip',
     { label: 'Objeto inteligente', items: ['toSmart', 'editSmart', 'rasterize'] }, '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
-    { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'flatten'] },
-  { label: 'Seleccionar', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
+    { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
+  { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
   { label: 'Filtro', items: ['lastFilter', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', '-', 'rulers', 'guides', 'newGuide', 'clearGuides'] },
+  { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', '-', 'win:all'] },
   { label: 'Ayuda', items: ['shortcuts', 'about'] },
 ];
 
