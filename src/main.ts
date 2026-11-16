@@ -273,3 +273,21 @@ window.addEventListener('beforeunload', e => {
 
 // En la web (https) se registra un service worker para poder usar Editor sin conexión
 if ((location.protocol === 'https:' || location.hostname === 'localhost') && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+
+// ---- Guardado automático y recuperación ---------------------------------------------------
+import('./io/autosave').then(async ({ autosave, listSaved, restoreSaved, removeSaved }) => {
+  setInterval(() => autosave(app.docs), 15000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(app.docs); });
+  (app as any).debug.autosave = () => autosave(app.docs);
+  const saved = await listSaved();
+  if (!saved.length) return;
+  const box = h('div', { class: 'recover' }, h('b', {}, 'Trabajo sin guardar de una sesión anterior'));
+  for (const s of saved) {
+    const row = h('div', { class: 'recover-row' }, h('span', {}, `${s.name} · ${s.size} px · ${new Date(s.date).toLocaleString('es')}`));
+    const open = h('button', { class: 'btn primary' }, 'Recuperar'), del = h('button', { class: 'btn' }, 'Descartar');
+    open.onclick = async () => { try { const d = await restoreSaved(s); app.addDocument(d, 'Recuperado'); d.modified = true; app.emit('docs'); row.remove(); } catch { app.toast('No se pudo recuperar', 'warn'); } };
+    del.onclick = async () => { await removeSaved(s.key); row.remove(); if (!box.querySelector('.recover-row')) box.remove(); };
+    row.append(open, del); box.append(row);
+  }
+  welcome.querySelector('.welcome-card')!.append(box);
+});

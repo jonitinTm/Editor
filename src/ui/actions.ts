@@ -43,6 +43,7 @@ export const ACTIONS: Action[] = [
   { id: 'copyMerged', label: 'Copiar combinado', keys: ['Shift+Ctrl+C'], enabled: hasDoc, run: () => ops.copy(true) },
   { id: 'paste', label: 'Pegar', keys: ['Ctrl+V'], run: () => app.toast('Pulsa Ctrl+V para pegar (el navegador solo permite pegar con el teclado)') },
   { id: 'clear', label: 'Borrar', keys: ['Delete', 'Backspace'], enabled: hasSel, run: () => ops.clearSelection() },
+  { id: 'stroke', label: 'Contornear…', enabled: hasSel, run: dlg.strokeDialog },
   { id: 'fill', label: 'Rellenar…', keys: ['Shift+F5'], enabled: hasLayer, run: dlg.fillDialog },
   { id: 'fillFg', label: 'Rellenar con color frontal', keys: ['Alt+Backspace', 'Alt+Delete'], enabled: hasLayer, run: () => ops.fill(app.fg) },
   { id: 'fillBg', label: 'Rellenar con color de fondo', keys: ['Ctrl+Backspace', 'Ctrl+Delete'], enabled: hasLayer, run: () => ops.fill(app.bg) },
@@ -103,6 +104,7 @@ export const ACTIONS: Action[] = [
   { id: 'invertSel', label: 'Invertir', keys: ['Shift+Ctrl+I'], enabled: hasDoc, run: ops.invertSelection },
   { id: 'selFromLayer', label: 'Cargar selección desde la capa', enabled: hasLayer, run: () => ops.selectionFromLayer(app.doc!.active!) },
   { id: 'pathToSel', label: 'Trazado a selección', keys: ['Ctrl+Enter'], enabled: () => app.doc?.active?.kind === 'shape', run: ops.pathToSelection },
+  { id: 'colorRange', label: 'Gama de colores…', enabled: hasDoc, run: dlg.colorRangeDialog },
   { id: 'feather', label: 'Calar…', keys: ['Shift+F6'], enabled: hasSel, run: () => dlg.modifySelectionDialog('feather') },
   { id: 'expand', label: 'Expandir…', enabled: hasSel, run: () => dlg.modifySelectionDialog('expand') },
   { id: 'contract', label: 'Contraer…', enabled: hasSel, run: () => dlg.modifySelectionDialog('contract') },
@@ -116,7 +118,8 @@ export const ACTIONS: Action[] = [
   { id: 'fit', label: 'Ajustar a la pantalla', keys: ['Ctrl+0'], enabled: hasDoc, run: () => app.viewport.fit() },
   { id: 'actual', label: 'Píxeles reales (100 %)', keys: ['Ctrl+1'], enabled: hasDoc, run: () => app.viewport.setZoom(1, null) },
   { id: 'rulers', label: 'Reglas', keys: ['Ctrl+R'], checked: () => app.showRulers, run: () => app.viewport.setRulers(!app.showRulers) },
-  { id: 'guides', label: 'Mostrar guías', keys: ['Ctrl+;', "Ctrl+'"], checked: () => app.showGuides, run: () => { app.showGuides = !app.showGuides; app.viewport.requestRender(); } },
+  { id: 'guides', label: 'Mostrar guías', keys: ['Ctrl+;'], checked: () => app.showGuides, run: () => { app.showGuides = !app.showGuides; app.viewport.requestRender(); } },
+  { id: 'grid', label: 'Cuadrícula', keys: ["Ctrl+'"], checked: () => app.showGrid, run: () => { app.showGrid = !app.showGrid; app.viewport.requestRender(); } },
   { id: 'newGuide', label: 'Nueva guía…', enabled: hasDoc, run: newGuideDialog },
   { id: 'clearGuides', label: 'Borrar guías', enabled: () => !!app.doc && (app.doc.guides.h.length + app.doc.guides.v.length > 0), run: () => { app.doc!.guides = { h: [], v: [] }; app.viewport.requestRender(); } },
 
@@ -140,7 +143,7 @@ for (const f of FILTERS) {
   ACTIONS.push({ id: 'filter:' + f.id, label: f.name, keys: f.shortcut ? [f.shortcut] : undefined, enabled: hasLayer, run: () => dlg.filterDialog(f) });
 }
 
-for (const f of FILTERS) if (f.group === 'ajuste') {
+for (const f of FILTERS) if (f.group === 'ajuste' && !f.noLayer) {
   ACTIONS.push({ id: 'adjust:' + f.id, label: f.name.replace('…', ''), enabled: hasDoc, run: () => ops.newAdjustmentLayer(f) });
 }
 

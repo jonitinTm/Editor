@@ -5,7 +5,7 @@ import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import { GroupLayer, Layer, RasterLayer, isRaster, isParametric, walkLayers } from '../core/layers';
-import { selectedLayers } from '../ui/ops';
+import { selectedLayers, alignLayer } from '../ui/ops';
 import { rasterizeLayer } from './paint';
 
 /** Desplaza el contenido de un lienzo (los bordes que quedan vacíos se rellenan con `fill`). */
@@ -31,6 +31,16 @@ function layerAt(x: number, y: number): RasterLayer | null {
 export class MoveTool implements Tool {
   id = 'move'; name = 'Mover'; icon = icon('move'); key = 'V'; cursor = 'move';
   options = [{ key: 'autoSelect', label: 'Selección automática de capa', type: 'checkbox', default: false }] as any[];
+  extraOptions(bar: HTMLElement) {
+    const sep = document.createElement('span'); sep.className = 'opt-sep'; bar.append(sep);
+    const lbl = document.createElement('span'); lbl.className = 'lbl hint'; lbl.textContent = 'Alinear:'; bar.append(lbl);
+    const g = document.createElement('div'); g.className = 'btn-group';
+    for (const [m, t, title] of [['left', '⇤', 'Bordes izquierdos'], ['hcenter', '↔', 'Centros horizontales'], ['right', '⇥', 'Bordes derechos'], ['top', '⤒', 'Bordes superiores'], ['vcenter', '↕', 'Centros verticales'], ['bottom', '⤓', 'Bordes inferiores']] as const) {
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; b.title = title + ' (respecto a la selección o al lienzo)'; b.dataset.align = m;
+      b.onclick = () => alignLayer(m); g.append(b);
+    }
+    bar.append(g);
+  }
   private start: { x: number; y: number } | null = null;
   private offset = { x: 0, y: 0 };
   private layers: Layer[] = [];

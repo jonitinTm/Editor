@@ -162,6 +162,16 @@ export class Viewport {
       ctx.stroke(); ctx.restore();
     }
 
+    // Cuadrícula
+    if (app.showGrid && app.gridSize * zoom >= 6) {
+      const g = app.gridSize;
+      ctx.save(); ctx.beginPath(); ctx.rect(panX, panY, dw, dh); ctx.clip();
+      ctx.strokeStyle = 'rgba(120,120,120,.55)'; ctx.lineWidth = 1; ctx.beginPath();
+      for (let x = 0; x <= d.width; x += g) { const sx = Math.round(panX + x * zoom) + .5; ctx.moveTo(sx, panY); ctx.lineTo(sx, panY + dh); }
+      for (let y = 0; y <= d.height; y += g) { const sy = Math.round(panY + y * zoom) + .5; ctx.moveTo(panX, sy); ctx.lineTo(panX + dw, sy); }
+      ctx.stroke(); ctx.restore();
+    }
+
     // Selección
     const outline = d.selection.getOutline();
     if (outline) this.drawAnts(outline, (d as any).selectionOffset);

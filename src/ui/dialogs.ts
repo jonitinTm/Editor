@@ -153,6 +153,29 @@ export function fillDialog() {
   });
 }
 
+// ---- Contornear y gama de colores ---------------------------------------------------
+
+export function strokeDialog() {
+  const d = app.doc; if (!d) return;
+  if (!d.selection.active) { app.toast('Haz primero una selección', 'warn'); return; }
+  const w = numInput(3, 1, 500);
+  const pos = h('select', {}, h('option', { value: 'center' }, 'Centro'), h('option', { value: 'inside' }, 'Interior'), h('option', { value: 'outside' }, 'Exterior'));
+  showDialog({ title: 'Contornear', body: [row('Anchura', w, 'px'), row('Posición', pos), h('div', { class: 'hint' }, 'Se usa el color frontal.')], onOk: () => ops.strokeSelection(Math.max(1, +w.value), pos.value as any) });
+}
+
+export function colorRangeDialog() {
+  const d = app.doc; if (!d) return;
+  let tol = 40;
+  const before = d.selection.mask;
+  const preview = () => ops.colorRange(tol, false);
+  const s = numberSlider({ min: 0, max: 200, value: tol, onInput: v => { tol = v; preview(); } });
+  showDialog({
+    title: 'Gama de colores', body: [h('div', { class: 'hint' }, 'Selecciona todo lo que se parezca al color frontal (elígelo antes con el cuentagotas).'), row('Tolerancia', s.el)],
+    onOk: () => ops.colorRange(tol, true), onCancel: () => { d.selection.setMask(before); d.changed(); },
+  });
+  preview();
+}
+
 // ---- Modificar selección ------------------------------------------------------------
 
 export function modifySelectionDialog(kind: 'feather' | 'expand' | 'contract') {
@@ -192,6 +215,11 @@ export function filterDialog(def: FilterDef) {
       const c = h('input', { type: 'checkbox', checked: p.default });
       c.addEventListener('change', () => { params[p.key] = c.checked; update(); });
       return row('', h('label', { class: 'check' }, c, ' ' + p.label));
+    }
+    if (p.type === 'color') {
+      const c = h('input', { type: 'color', class: 'color-input', value: p.default });
+      c.addEventListener('input', () => { params[p.key] = c.value; update(); });
+      return row(p.label, c);
     }
     return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: p.default, unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el);
   });

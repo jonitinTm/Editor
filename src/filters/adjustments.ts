@@ -249,3 +249,33 @@ export function histogram(img: ImageData, channel: 'rgb' | 'r' | 'g' | 'b' = 'rg
   }
   return hist;
 }
+
+/** Mapa de degradado: las sombras toman un color y las luces otro. */
+export function gradientMap(img: ImageData, c1: string, c2: string) {
+  const h2 = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const a = h2(c1), b = h2(c2), d = img.data;
+  for (let i = 0; i < d.length; i += 4) { const t = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255; d[i] = a[0] + (b[0] - a[0]) * t; d[i + 1] = a[1] + (b[1] - a[1]) * t; d[i + 2] = a[2] + (b[2] - a[2]) * t; }
+}
+/** Filtro de fotografía: tiñe la imagen como un filtro de color delante del objetivo. */
+export function photoFilter(img: ImageData, color: string, density: number, preserve: boolean) {
+  const c = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16) / 255), k = density / 100, d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const l0 = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    let r = d[i] * (1 - k + c[0] * k), g = d[i + 1] * (1 - k + c[1] * k), b = d[i + 2] * (1 - k + c[2] * k);
+    if (preserve) { const l1 = 0.299 * r + 0.587 * g + 0.114 * b; if (l1 > 0) { const f = l0 / l1; r *= f; g *= f; b *= f; } }
+    d[i] = r; d[i + 1] = g; d[i + 2] = b;
+  }
+}
+/** Ajustes automáticos: 'tone' estira cada canal, 'contrast' solo la luminosidad, 'color' además neutraliza dominantes. */
+export function autoAdjust(img: ImageData, mode: 'tone' | 'contrast' | 'color') {
+  const d = img.data, hist = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+  let n = 0; const sum = [0, 0, 0];
+  for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0) { for (let c = 0; c < 3; c++) { hist[c][d[i + c]]++; sum[c] += d[i + c]; } n++; }
+  if (!n) return;
+  const range = (h: Uint32Array) => { const clip = n * 0.001; let lo = 0, hi = 255, a = 0; while (lo < 255 && (a += h[lo]) <= clip) lo++; a = 0; while (hi > 0 && (a += h[hi]) <= clip) hi--; return [lo, Math.max(lo + 1, hi)]; };
+  let rs = hist.map(range);
+  if (mode === 'contrast') { const lo = Math.min(...rs.map(r => r[0])), hi = Math.max(...rs.map(r => r[1])); rs = [[lo, hi], [lo, hi], [lo, hi]]; }
+  const avg = (sum[0] + sum[1] + sum[2]) / 3;
+  const luts = rs.map(([lo, hi], c) => { const g = mode === 'color' && sum[c] > 0 ? Math.max(0.6, Math.min(1.6, avg / sum[c])) : 1; const l = new Uint8ClampedArray(256); for (let i = 0; i < 256; i++) l[i] = clamp((i - lo) / (hi - lo) * 255 * g); return l; });
+  applyLut(img, luts[0], luts[1], luts[2]);
+}

@@ -112,7 +112,7 @@ export function buildLayersPanel(parent: HTMLElement) {
   const adjBtn = footBtn('adjust', 'Nueva capa de ajuste', () => {
     const r = adjBtn.getBoundingClientRect();
     const fly = h('div', { class: 'flyout', style: { right: window.innerWidth - r.right + 'px', bottom: window.innerHeight - r.top + 4 + 'px' } },
-      ...FILTERS.filter(f => f.group === 'ajuste').map(f => h('div', { class: 'fly-item', onclick: () => { fly.remove(); ops.newAdjustmentLayer(f); } }, f.name.replace('…', ''))));
+      ...FILTERS.filter(f => f.group === 'ajuste' && !f.noLayer).map(f => h('div', { class: 'fly-item', onclick: () => { fly.remove(); ops.newAdjustmentLayer(f); } }, f.name.replace('…', ''))));
     document.body.append(fly);
     setTimeout(() => document.addEventListener('pointerdown', function off(e) { if (!fly.contains(e.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', off); } }), 0);
   });
@@ -329,6 +329,10 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           const c = h('input', { type: 'checkbox', checked: !!l.params[pd.key] });
           c.onchange = () => { l.params[pd.key] = c.checked; changed(); };
           body.append(h('label', { class: 'check' }, c, ' ' + pd.label));
+        } else if (pd.type === 'color') {
+          const c = h('input', { type: 'color', class: 'color-input', value: l.params[pd.key] });
+          c.oninput = () => { l.params[pd.key] = c.value; changed(); };
+          body.append(formRow(pd.label, c));
         } else body.append(formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, onInput: v => { l.params[pd.key] = v; changed(); } }).el));
       }
       if (def && !def.custom && !def.params) body.append(h('div', { class: 'hint' }, 'Este ajuste no tiene opciones.'));

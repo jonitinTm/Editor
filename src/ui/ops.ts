@@ -11,6 +11,7 @@ import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLaye
 import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
 import { readPsd, writePsd } from '../io/psd';
+import { forget } from '../io/autosave';
 import { encodeGif } from '../io/gif';
 import { renderFrames } from './timeline';
 import { alertDialog, confirmDialog } from './dialog';
@@ -86,6 +87,7 @@ export async function placeImage(src: Blob | HTMLCanvasElement, name: string, po
 export async function closeDocument(d = doc()) {
   if (!d) return;
   if (!d.embedded && d.modified && !(await confirmDialog('Cerrar documento', `«${d.name}» tiene cambios sin guardar. ¿Cerrarlo de todas formas?`, 'Cerrar sin guardar'))) return;
+  forget(d);
   app.closeDocument(d);
 }
 
@@ -98,6 +100,7 @@ export async function saveProject(saveAs = false) {
     const h = await io.saveBlob(blob, d.name + io.PROJECT_EXT, saveAs ? undefined : handles.get(d));
     if (h) { handles.set(d, h); if (h.name) d.name = io.baseName(h.name); }
     d.modified = false; app.emit('docs');
+    forget(d);
     app.toast('Proyecto guardado');
   } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
 }
@@ -442,6 +445,53 @@ export function invertMask(l: Layer) {
 export function selectAll() { const d = doc(); if (!d) return; d.selection.selectAll(); d.commit('Seleccionar todo'); }
 export function deselect() { const d = doc(); if (!d || !d.selection.active) return; d.selection.clear(); d.commit('Deseleccionar'); }
 export function invertSelection() { const d = doc(); if (!d) return; d.selection.invert(); d.commit('Invertir selección'); }
+/** Pinta el borde de la selección con el color frontal. */
+export function strokeSelection(width: number, pos: 'center' | 'inside' | 'outside') {
+  const d = doc(); if (!d || !d.selection.mask) return;
+  const t = getPaintTarget(); if (!t || t.isMask) return;
+  const sel = d.selection.mask, line = makeCanvas(d.width, d.height), lc = ctx2d(line);
+  const outline = d.selection.getOutline()!;
+  lc.strokeStyle = app.fg; lc.lineWidth = pos === 'center' ? width : width * 2; lc.lineCap = 'square'; lc.lineJoin = 'round';
+  lc.stroke(outline);
+  if (pos !== 'center') { lc.globalCompositeOperation = pos === 'inside' ? 'destination-in' : 'destination-out'; lc.drawImage(sel, 0, 0); }
+  const out = cloneCanvas(t.canvas); ctx2d(out).drawImage(line, 0, 0);
+  setTargetCanvas(t, out);
+  d.commit('Contornear');
+}
+
+/** Selecciona los píxeles de la imagen parecidos al color frontal. */
+export function colorRange(tolerance: number, record: boolean) {
+  const d = doc(); if (!d) return;
+  const src = getPixels(d.flatten()), s = src.data, n = parseInt(app.fg.slice(1), 16), r0 = n >> 16 & 255, g0 = n >> 8 & 255, b0 = n & 255;
+  const m = makeCanvas(d.width, d.height), img = ctx2d(m).createImageData(d.width, d.height), o = img.data;
+  for (let i = 0; i < s.length; i += 4) {
+    const dist = Math.max(Math.abs(s[i] - r0), Math.abs(s[i + 1] - g0), Math.abs(s[i + 2] - b0));
+    // borde suave: del todo dentro hasta la tolerancia, y se desvanece un poco más allá
+    const a = s[i + 3] === 0 ? 0 : dist <= tolerance ? 255 : Math.max(0, 255 - (dist - tolerance) * 12);
+    o[i] = o[i + 1] = o[i + 2] = 255; o[i + 3] = a;
+  }
+  ctx2d(m).putImageData(img, 0, 0);
+  d.selection.setMask(m);
+  if (record) d.commit('Gama de colores'); else d.changed();
+}
+
+/** Alinea la capa activa respecto a la selección (si hay) o al lienzo. */
+export function alignLayer(mode: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') {
+  const d = doc(); const l = d?.active; if (!d || !l) return;
+  if (!isRaster(l)) { app.toast('Selecciona una capa (no un grupo ni un ajuste)', 'warn'); return; }
+  if (l.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return; }
+  const f = l.fullContent(), cb = contentBounds(f.canvas); if (!cb) return;
+  const b = { x: cb.x + f.x, y: cb.y + f.y, w: cb.w, h: cb.h }, box = d.selection.bounds ?? { x: 0, y: 0, w: d.width, h: d.height };
+  let dx = 0, dy = 0;
+  if (mode === 'left') dx = box.x - b.x; if (mode === 'right') dx = box.x + box.w - b.x - b.w; if (mode === 'hcenter') dx = box.x + (box.w - b.w) / 2 - b.x;
+  if (mode === 'top') dy = box.y - b.y; if (mode === 'bottom') dy = box.y + box.h - b.y - b.h; if (mode === 'vcenter') dy = box.y + (box.h - b.h) / 2 - b.y;
+  dx = Math.round(dx); dy = Math.round(dy);
+  if (!dx && !dy) return;
+  if (isParametric(l)) l.translate(dx, dy); else l.placeFull(f.canvas, f.x + dx, f.y + dy);
+  if (l.mask) { const m = makeCanvas(d.width, d.height), mc = ctx2d(m); mc.fillStyle = '#fff'; mc.fillRect(0, 0, d.width, d.height); mc.clearRect(dx, dy, d.width, d.height); mc.drawImage(l.mask.canvas, dx, dy); l.mask.canvas = m; l.mask.touch(); }
+  d.commit('Alinear capa');
+}
+
 /** Convierte el trazado de la capa activa en selección. */
 export function pathToSelection() {
   const d = doc(); const l = d?.active;

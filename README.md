@@ -67,6 +67,10 @@ Ya disponible:
   Todavía no se revelan los datos en bruto del sensor.
 - **Interfaz**: selector de color propio, paneles *Color* y *Muestras*, paneles agrupados en pestañas, menú *Ventana*,
   menú contextual en las capas, teclas numéricas para la opacidad, `Tab` para ocultar paneles y `F` para pantalla completa.
+- **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
+  por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
+- **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;
+  *Edición › Contornear*; *Selección › Gama de colores*; botones de alinear en la herramienta Mover; cuadrícula (`Ctrl+'`).
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
   (el documento principal se actualiza solo). Las copias comparten contenido.

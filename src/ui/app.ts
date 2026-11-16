@@ -20,6 +20,9 @@ class App {
   viewport!: Viewport;
   showRulers = true;
   showGuides = true;
+  showGrid = false;
+  /** Separación de la cuadrícula en píxeles. */
+  gridSize = 50;
   /** Herramienta a la que volver al terminar un modo temporal (p. ej. transformar). */
   private returnTool: string | null = null;
   private handlers = new Map<EventName, Set<() => void>>();

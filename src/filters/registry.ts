@@ -7,7 +7,8 @@ import * as F from './advanced';
 
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string }
-  | { key: string; label: string; type: 'checkbox'; default: boolean };
+  | { key: string; label: string; type: 'checkbox'; default: boolean }
+  | { key: string; label: string; type: 'color'; default: string };
 
 export interface FilterDef {
   id: string;
@@ -19,6 +20,8 @@ export interface FilterDef {
   params?: ParamDef[];
   /** Diálogo especial ('levels' | 'curves'). */
   custom?: 'levels' | 'curves';
+  /** true = no tiene sentido como capa de ajuste (se calcula a partir de la propia imagen). */
+  noLayer?: boolean;
   apply(img: ImageData, p: any): void;
 }
 
@@ -129,6 +132,11 @@ export const FILTERS: FilterDef[] = [
     ],
     apply: (img, p) => A.threshold(img, p.level),
   },
+  { id: 'gradmap', name: 'Mapa de degradado…', group: 'ajuste', params: [{ key: 'c1', label: 'Sombras', type: 'color', default: '#1a1040' }, { key: 'c2', label: 'Luces', type: 'color', default: '#ffd27a' }], apply: (img, p) => A.gradientMap(img, p.c1, p.c2) },
+  { id: 'photofilter', name: 'Filtro de fotografía…', group: 'ajuste', params: [{ key: 'color', label: 'Color', type: 'color', default: '#ec8a00' }, { key: 'density', label: 'Densidad', type: 'range', min: 1, max: 100, default: 25, unit: '%' }, { key: 'preserve', label: 'Conservar luminosidad', type: 'checkbox', default: true }], apply: (img, p) => A.photoFilter(img, p.color, p.density, p.preserve) },
+  { id: 'autotone', name: 'Tono automático', group: 'ajuste', shortcut: 'Shift+Ctrl+L', noLayer: true, apply: img => A.autoAdjust(img, 'tone') },
+  { id: 'autocontrast', name: 'Contraste automático', group: 'ajuste', shortcut: 'Alt+Shift+Ctrl+L', noLayer: true, apply: img => A.autoAdjust(img, 'contrast') },
+  { id: 'autocolor', name: 'Color automático', group: 'ajuste', shortcut: 'Shift+Ctrl+B', noLayer: true, apply: img => A.autoAdjust(img, 'color') },
   {
     id: 'gblur', name: 'Desenfoque gaussiano…', group: 'filtro', submenu: 'Desenfocar',
     params: [{ key: 'radius', label: 'Radio', type: 'range', min: 0.1, max: 100, step: 0.1, default: 4, unit: 'px' }],
