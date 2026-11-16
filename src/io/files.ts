@@ -4,6 +4,7 @@
 import { EditorDocument } from '../core/document';
 import { RasterLayer, TextLayer, ShapeLayer, SmartLayer, AdjustmentLayer, GroupLayer, LayerMask, Layer, bumpLayerId, isRaster, isParametric } from '../core/layers';
 import { canvasToBlob, ctx2d, makeCanvas } from '../core/canvas';
+import { decodeGifFrames } from './gif';
 
 export const PROJECT_EXT = '.edp';
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/svg+xml'];
@@ -27,7 +28,36 @@ export async function imageToCanvas(file: Blob): Promise<HTMLCanvasElement> {
 
 export function baseName(name: string) { return name.replace(/\.[^.]+$/, ''); }
 
+/** Extensiones de archivos RAW de cámara. */
+export const RAW_EXT = /\.(cr2|cr3|nef|nrw|arw|sr2|dng|orf|rw2|raf|pef|srw|3fr|erf|kdc|mrw)$/i;
+export function isRawFile(f: File) { return RAW_EXT.test(f.name); }
+/**
+ * Los RAW llevan dentro una vista previa JPEG hecha por la cámara. Se busca la
+ * de mayor tamaño y se abre esa (no se revelan los datos en bruto del sensor).
+ */
+export async function rawPreview(file: Blob): Promise<HTMLCanvasElement> {
+  const b = new Uint8Array(await file.arrayBuffer());
+  const starts: number[] = [];
+  for (let i = 0; i + 3 < b.length && starts.length < 40; i++) if (b[i] === 0xff && b[i + 1] === 0xd8 && b[i + 2] === 0xff && (b[i + 3] === 0xdb || b[i + 3] === 0xe0 || b[i + 3] === 0xe1 || b[i + 3] === 0xc4)) starts.push(i);
+  let best: ImageBitmap | null = null;
+  for (const s of starts) {
+    try { const bmp = await createImageBitmap(new Blob([b.subarray(s)], { type: 'image/jpeg' })); if (!best || bmp.width * bmp.height > best.width * best.height) best = bmp; } catch { /* no era un JPEG completo */ }
+  }
+  if (!best) throw new Error('Este RAW no contiene una vista previa que se pueda abrir');
+  const c = makeCanvas(best.width, best.height); ctx2d(c).drawImage(best, 0, 0);
+  return c;
+}
+
 export async function documentFromImage(file: File | Blob, name = 'Sin título'): Promise<EditorDocument> {
+  if (file.type === 'image/gif') {
+    const frames = await decodeGifFrames(file);
+    if (frames) { // GIF animado: una capa y un cuadro por fotograma
+      const doc = new EditorDocument(baseName(name), frames[0].canvas.width, frames[0].canvas.height);
+      frames.forEach((f, i) => { const l = new RasterLayer(`Cuadro ${i + 1}`, doc.width, doc.height); ctx2d(l.canvas).drawImage(f.canvas, 0, 0); l.visible = i === 0; doc.root.add(l); doc.frames.push({ delay: f.delay, visible: [l.id] }); });
+      doc.setActive(doc.root.children[0], false);
+      return doc;
+    }
+  }
   const c = await imageToCanvas(file);
   const doc = new EditorDocument(baseName(name), c.width, c.height);
   const l = new RasterLayer('Fondo', c.width, c.height);
@@ -51,7 +81,7 @@ interface ProjLayer {
 }
 interface ProjFile {
   format: 'editor-proyecto'; version: 1; name: string; width: number; height: number;
-  guides: { h: number[]; v: number[] }; activeId: number | null; layers: ProjLayer[];
+  guides: { h: number[]; v: number[] }; activeId: number | null; layers: ProjLayer[]; frames?: { delay: number; visible: number[] }[];
 }
 
 async function canvasToDataURL(c: HTMLCanvasElement) {
@@ -78,7 +108,7 @@ export async function serializeProject(doc: EditorDocument): Promise<Blob> {
 async function projectData(doc: EditorDocument): Promise<ProjFile> {
   return {
     format: 'editor-proyecto', version: 1, name: doc.name, width: doc.width, height: doc.height,
-    guides: doc.guides, activeId: doc.active?.id ?? null,
+    guides: doc.guides, activeId: doc.active?.id ?? null, frames: doc.frames,
     layers: await Promise.all(doc.root.children.map(layerToProj)),
   };
 }
@@ -120,6 +150,7 @@ async function docFromData(data: ProjFile): Promise<EditorDocument> {
   const doc = new EditorDocument(data.name, data.width, data.height);
   for (const p of data.layers) doc.root.add(await projToLayer(p, data.width, data.height));
   doc.guides = data.guides ?? { h: [], v: [] };
+  doc.frames = data.frames ?? [];
   doc.setActive(doc.findLayer(data.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);
   return doc;
 }

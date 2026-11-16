@@ -52,6 +52,7 @@ export function exportDialog() {
     h('option', { value: 'image/png' }, 'PNG (sin pérdida, con transparencia)'),
     h('option', { value: 'image/jpeg' }, 'JPG (fotografías, sin transparencia)'),
     h('option', { value: 'image/webp' }, 'WebP (moderno, ligero)'),
+    h('option', { value: 'gif' }, 'GIF (animado si hay cuadros en la línea de tiempo)'),
     h('option', { value: 'psd' }, 'PSD (Photoshop, conserva capas)'),
     h('option', { value: 'project' }, 'Proyecto de Editor (.edp, conserva todo)'));
   let quality = 90;
@@ -63,6 +64,7 @@ export function exportDialog() {
     clearTimeout(timer);
     qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
     if (fmt.value === 'project') { info.textContent = 'Guarda todo (capas, texto, formas, ajustes, estilos) para seguir editando.'; return; }
+    if (fmt.value === 'gif') { info.textContent = d.frames.length > 1 ? `Animación de ${d.frames.length} cuadros, 256 colores.` : 'Imagen de 256 colores. Para animar, crea cuadros en Ventana › Línea de tiempo.'; return; }
     if (fmt.value === 'psd') { info.textContent = 'Capas, grupos, máscaras, opacidad y modos de fusión. El texto y las formas van como píxeles.'; return; }
     info.textContent = 'Calculando tamaño…';
     timer = window.setTimeout(async () => {
@@ -78,6 +80,7 @@ export function exportDialog() {
     onOk: async () => {
       if (fmt.value === 'project') { d.name = name.value || d.name; await ops.saveProject(true); return; }
       if (fmt.value === 'psd') { await ops.savePsd(name.value || d.name); return; }
+      if (fmt.value === 'gif') { await ops.saveGif(name.value || d.name); return; }
       const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[fmt.value]!;
       try {
         const b = await io.exportImage(d, fmt.value as any, quality / 100);

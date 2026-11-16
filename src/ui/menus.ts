@@ -29,7 +29,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
   { label: 'Filtro', items: ['lastFilter', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', '-', 'rulers', 'guides', 'newGuide', 'clearGuides'] },
-  { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', '-', 'win:all'] },
+  { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'win:all'] },
   { label: 'Ayuda', items: ['shortcuts', 'about'] },
 ];
 

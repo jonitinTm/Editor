@@ -24,6 +24,9 @@ export class EditorDocument {
   view: ViewState = { zoom: 1, panX: 0, panY: 0 };
   viewInitialized = false;
   overrides = new Map<Layer, LayerOverride>();
+  /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
+  frames: { delay: number; visible: number[] }[] = [];
+  frameIndex = 0;
   /** true = es el contenido de un objeto inteligente (vive dentro de otro documento). */
   embedded = false;
   /** ¿Hay cambios sin guardar? */

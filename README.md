@@ -48,6 +48,15 @@ Ya disponible:
 - **Pluma y trazados**: la pluma (`P`) dibuja curvas Bézier y crea una capa de forma vectorial; la selección directa
   (`A`) mueve sus puntos y tiradores; *Seleccionar › Trazado a selección* (`Ctrl+Intro`) la convierte en selección.
   Los trazados cerrados se guardan en PSD como formas vectoriales.
+- **Filtros avanzados** (menú *Filtro*): desenfoque de movimiento y radial; molinete, encoger, esferizar y onda;
+  hallar bordes y relieve; mosaico; mediana; paso alto, desplazamiento, máximo y mínimo.
+- **Herramientas de retoque**: lazo poligonal, desenfocar, enfocar, dedo, sobreexponer y subexponer.
+- **Animación**: *Ventana › Línea de tiempo*. Cada cuadro recuerda qué capas se ven; se reproduce en el editor y se
+  exporta como **GIF animado**. Los GIF animados se abren con una capa y un cuadro por fotograma.
+- **RAW de cámara** (CR2, NEF, ARW, DNG…): se abre la vista previa JPEG que la cámara guarda dentro del archivo.
+  Todavía no se revelan los datos en bruto del sensor.
+- **Interfaz**: selector de color propio, paneles *Color* y *Muestras*, paneles agrupados en pestañas, menú *Ventana*,
+  menú contextual en las capas, teclas numéricas para la opacidad, `Tab` para ocultar paneles y `F` para pantalla completa.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
   (el documento principal se actualiza solo). Las copias comparten contenido.
@@ -55,7 +64,7 @@ Ya disponible:
 - **Formas vectoriales** editables (color, trazo, tamaño) y **transformación de grupos** y de varias capas a la vez.
 - Al mover una capa se conserva lo que queda fuera del lienzo (*Imagen › Revelar todo* lo muestra).
 
-Pendiente: filtros avanzados, RAW y animación.
+Pendiente: revelado real de RAW, y en PSD los efectos y ajustes que aún no existen en el editor (biselado, motivos, mapa de degradado…).
 
 ### Atajos principales
 

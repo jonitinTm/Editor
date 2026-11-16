@@ -294,3 +294,15 @@ body.hide-panels .side, body.hide-panels .toolbar, body.hide-panels .optionsbar,
 .view-canvas { position: absolute; left: 0; top: 0; }
 .ruler-h, .ruler-v { min-width: 0; min-height: 0; overflow: hidden; }
 .color-panel .cp-num { width: 38px !important; padding: 2px 3px; } .color-panel .cp-hex { width: 56px; padding: 2px 3px; } .color-panel .cp-fields { gap: 3px; font-size: 11px; }
+
+/* Línea de tiempo */
+.timeline { flex: 0 0 auto; background: var(--panel); border-top: 1px solid var(--border); }
+.timeline.closed { display: none; }
+.tl-bar { display: flex; align-items: center; gap: 8px; padding: 4px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; }
+.tl-frames { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; min-height: 92px; align-items: flex-start; }
+.tl-frame { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; background: var(--panel-2); }
+.tl-frame.on { border-color: var(--accent); background: var(--accent-soft); }
+.tl-frame canvas { background: repeating-conic-gradient(#cfcfcf 0 25%, #fff 0 50%) 0 0 / 8px 8px; }
+.tl-n { position: absolute; left: 3px; top: 1px; font-size: 10px; color: #fff; text-shadow: 0 0 2px #000; }
+.tl-delay { font-size: 10px; padding: 0 2px; }
+.tl-empty { padding: 20px; }

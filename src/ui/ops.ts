@@ -11,6 +11,8 @@ import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLaye
 import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
 import { readPsd, writePsd } from '../io/psd';
+import { encodeGif } from '../io/gif';
+import { renderFrames } from './timeline';
 import { alertDialog, confirmDialog } from './dialog';
 
 const doc = () => app.doc;
@@ -41,6 +43,14 @@ export async function openFiles(files: File[], asLayers = false) {
         const { doc: pd, warnings } = await readPsd(await f.arrayBuffer(), io.baseName(f.name));
         app.addDocument(pd);
         if (warnings.length) alertDialog('PSD abierto con avisos', warnings.join('. ') + '.');
+        continue;
+      }
+      if (io.isRawFile(f)) {
+        const c = await io.rawPreview(f);
+        const rd = new EditorDocument(io.baseName(f.name), c.width, c.height);
+        const rl = new RasterLayer('Fondo', c.width, c.height); rl.canvas = c; rd.root.add(rl); rd.setActive(rl, false);
+        app.addDocument(rd);
+        alertDialog('Archivo RAW', `Se ha abierto la vista previa JPEG que la cámara guardó dentro del RAW (${c.width} × ${c.height} px). Editor todavía no revela los datos en bruto del sensor, así que no hay margen extra de exposición ni de balance de blancos.`);
         continue;
       }
       if (!io.isImageFile(f)) { app.toast(`Formato no admitido: ${f.name}`, 'warn'); continue; }
@@ -89,6 +99,15 @@ export async function saveProject(saveAs = false) {
     if (h) { handles.set(d, h); if (h.name) d.name = io.baseName(h.name); }
     d.modified = false; app.emit('docs');
     app.toast('Proyecto guardado');
+  } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
+}
+
+export async function saveGif(name: string) {
+  const d = doc(); if (!d) return;
+  try {
+    const frames = d.frames.length ? renderFrames(d) : [{ canvas: d.flatten(), delay: 100 }];
+    await io.saveBlob(encodeGif(frames), name + '.gif');
+    app.toast(frames.length > 1 ? `GIF animado guardado (${frames.length} cuadros)` : 'GIF guardado');
   } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
 }
 

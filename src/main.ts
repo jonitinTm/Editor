@@ -14,6 +14,7 @@ import * as ops from './ui/ops';
 import { dialogOpen } from './ui/dialog';
 import { newDocumentDialog } from './ui/dialogs';
 import * as io from './io/files';
+import { buildTimeline } from './ui/timeline';
 import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
@@ -54,6 +55,7 @@ center.append(viewHost);
 app.viewport = new Viewport(viewHost);
 const welcome = buildWelcome();
 viewHost.append(welcome);
+const timeline = buildTimeline(center);
 const status = h('div', { class: 'statusbar' });
 center.append(status);
 const side = h('aside', { class: 'side' });
@@ -145,7 +147,7 @@ renderStatus();
 // ---- Pantalla de bienvenida ------------------------------------------------------------
 function buildWelcome() {
   const openBtn = h('button', { class: 'btn primary big', html: icon('open') + '<span>Abrir desde el equipo</span>' });
-  openBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,' + io.PROJECT_EXT));
+  openBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,' + io.PROJECT_EXT));
   const newBtn = h('button', { class: 'btn big', html: icon('plus') + '<span>Nuevo documento</span>' });
   newBtn.onclick = newDocumentDialog;
   const presets = h('div', { class: 'welcome-presets' }, ...[[1920, 1080], [1080, 1080], [1280, 720], [800, 600]].map(([w, hh]) =>
@@ -259,7 +261,7 @@ window.addEventListener('drop', e => {
   e.preventDefault(); dragDepth = 0; dropHint.classList.remove('show');
   const onTabs = (e.target as HTMLElement).closest?.('.tabs');
   const files = [...e.dataTransfer.files];
-  const isDoc = (f: File) => io.isProjectFile(f) || io.isPsdFile(f);
+  const isDoc = (f: File) => io.isProjectFile(f) || io.isPsdFile(f) || io.isRawFile(f);
   const projects = files.filter(isDoc), images = files.filter(f => !isDoc(f));
   if (projects.length) ops.openFiles(projects);
   if (images.length) ops.openFiles(images, !!app.doc && !onTabs);

@@ -28,7 +28,7 @@ const hasMask = () => !!app.doc?.active?.mask;
 export const ACTIONS: Action[] = [
   // Archivo
   { id: 'new', label: 'Nuevo…', keys: ['Alt+Ctrl+N', 'Ctrl+N'], run: dlg.newDocumentDialog },
-  { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,' + io.PROJECT_EXT)) },
+  { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,' + io.PROJECT_EXT)) },
   { id: 'place', label: 'Colocar imagen como objeto inteligente…', keys: ['Shift+Ctrl+P'], enabled: hasDoc, run: async () => ops.openFiles(await io.pickFiles('image/*'), true) },
   { id: 'save', label: 'Guardar proyecto (.edp)', keys: ['Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(false) },
   { id: 'saveAs', label: 'Guardar proyecto como…', keys: ['Alt+Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(true) },
@@ -125,6 +125,7 @@ export const ACTIONS: Action[] = [
     id: 'win:' + g, label, checked: () => !(document.querySelector(`[data-group=${g}]`) as HTMLElement)?.classList.contains('closed'),
     run: () => { document.querySelector(`[data-group=${g}]`)?.classList.toggle('closed'); },
   })),
+  { id: 'win:timeline', label: 'Línea de tiempo (animación)', checked: () => !document.querySelector('.timeline')?.classList.contains('closed'), run: () => { document.querySelector('.timeline')?.classList.toggle('closed'); app.doc?.changed(); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:tools', label: 'Herramientas', checked: () => !document.body.classList.contains('no-tools'), run: () => { document.body.classList.toggle('no-tools'); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:options', label: 'Opciones', checked: () => !document.body.classList.contains('no-options'), run: () => { document.body.classList.toggle('no-options'); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:all', label: 'Ocultar / mostrar todos los paneles', keys: ['Tab'], run: () => { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); } },
