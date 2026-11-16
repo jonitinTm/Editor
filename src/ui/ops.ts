@@ -6,7 +6,7 @@ import { EditorDocument } from '../core/document';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, renderStyles } from '../core/compositor';
-import { hasStyles } from '../core/layers';
+import { hasStyles, canvasBlend } from '../core/layers';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
 import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
@@ -37,7 +37,8 @@ export async function openFiles(files: File[], asLayers = false) {
     try {
       if (io.isProjectFile(f)) { app.addDocument(await io.openProject(f)); continue; }
       if (io.isPsdFile(f)) {
-        const { doc: pd, warnings } = readPsd(await f.arrayBuffer(), io.baseName(f.name));
+        if (asLayers && app.doc) { app.toast('Los PSD se abren en una pestaña aparte'); }
+        const { doc: pd, warnings } = await readPsd(await f.arrayBuffer(), io.baseName(f.name));
         app.addDocument(pd);
         if (warnings.length) alertDialog('PSD abierto con avisos', warnings.join('. ') + '.');
         continue;
@@ -110,7 +111,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
-  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null;
+  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip;
   if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
   return c;
 }
@@ -239,7 +240,7 @@ export function mergeDown() {
     const plain = cloneCanvas(c), cc = ctx2d(c);
     cc.clearRect(0, 0, d.width, d.height); renderStyles(cc, plain, layer.styles, 0, 0, d.width, d.height); cc.drawImage(plain, 0, 0);
   }
-  ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = l.blendMode;
+  ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode);
   if (l.visible) ctx.drawImage(top, 0, 0);
   let target = below as RasterLayer;
   if (isParametric(target)) target = rasterizeLayer(target);
@@ -290,6 +291,12 @@ export function newAdjustmentLayer(def: FilterDef) {
   d.insertAboveActive(l);
   d.editMask = true;
   d.commit('Nueva capa de ajuste');
+}
+
+export function toggleClip() {
+  const d = doc(); const l = d?.active; if (!d || !l || !l.parent) return;
+  if (!l.clip && l.parent.children.indexOf(l) === 0) { app.toast('No hay ninguna capa debajo a la que recortar', 'warn'); return; }
+  l.clip = !l.clip; d.commit(l.clip ? 'Crear máscara de recorte' : 'Soltar máscara de recorte');
 }
 
 export function setLayerStyles(l: Layer, styles: LayerStyles | null, record: boolean) {

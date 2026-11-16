@@ -103,6 +103,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const arrow = l instanceof GroupLayer
       ? h('button', { class: 'arrow', html: icon(l.expanded ? 'chevronDown' : 'chevronRight'), onclick: (e: Event) => { e.stopPropagation(); l.expanded = !l.expanded; render(); } })
       : h('span', { class: 'arrow-space' });
+    const clipMark = l.clip ? h('span', { class: 'clip-mark', title: 'Recortada por la capa de debajo' }, '↳') : null;
     const lt = layerThumb(l);
     const thumbWrap = h('span', { class: 'thumb-wrap' + (isActive && !d.editMask ? ' editing' : '') }, lt);
     thumbWrap.addEventListener('click', e => {
@@ -131,7 +132,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
       draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
-    }, eye, arrow, thumbWrap, maskEl, name, kindTag, fx, lock);
+    }, eye, arrow, clipMark, thumbWrap, maskEl, name, kindTag, fx, lock);
     el.addEventListener('click', e => {
       if (e.ctrlKey || e.metaKey) {
         if (d.selectedIds.has(l.id) && d.selectedIds.size > 1) d.selectedIds.delete(l.id); else d.selectedIds.add(l.id);

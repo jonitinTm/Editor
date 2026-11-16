@@ -55,7 +55,7 @@ export function borrowCanvas(w: number, h: number): HTMLCanvasElement {
   return c;
 }
 export function returnCanvas(c: HTMLCanvasElement) {
-  if (pool.length < 12) pool.push(c);
+  if (pool.length < 16) pool.push(c);
 }
 
 export function rectUnion(a: Rect | null, b: Rect | null): Rect | null {

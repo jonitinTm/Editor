@@ -21,7 +21,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'imageSize', 'canvasSize',
     { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
   { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
-    { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste').map(f => 'adjust:' + f.id) }, 'layerStyle', 'clearStyle', '-', 'group', 'ungroup', '-',
+    { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste').map(f => 'adjust:' + f.id) }, 'layerStyle', 'clearStyle', 'clip', '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'flatten'] },
   { label: 'Seleccionar', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },

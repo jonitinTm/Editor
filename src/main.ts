@@ -14,6 +14,8 @@ import * as ops from './ui/ops';
 import { dialogOpen } from './ui/dialog';
 import { newDocumentDialog } from './ui/dialogs';
 import * as io from './io/files';
+import { readPsd, writePsd } from './io/psd';
+(app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
 import { RectSelectTool, EllipseSelectTool, LassoTool, WandTool } from './tools/select';
@@ -120,7 +122,7 @@ renderStatus();
 // ---- Pantalla de bienvenida ------------------------------------------------------------
 function buildWelcome() {
   const openBtn = h('button', { class: 'btn primary big', html: icon('open') + '<span>Abrir desde el equipo</span>' });
-  openBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*,.psd,' + io.PROJECT_EXT));
+  openBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,' + io.PROJECT_EXT));
   const newBtn = h('button', { class: 'btn big', html: icon('plus') + '<span>Nuevo documento</span>' });
   newBtn.onclick = newDocumentDialog;
   const presets = h('div', { class: 'welcome-presets' }, ...[[1920, 1080], [1080, 1080], [1280, 720], [800, 600]].map(([w, hh]) =>

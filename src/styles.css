@@ -251,3 +251,4 @@ kbd { background: var(--panel-3); border: 1px solid var(--border); border-radius
 .props .form-row > .lbl { width: 72px; }
 .props .form-row .num-slider input[type=range] { min-width: 40px; }
 .props canvas.hist, .props canvas.curves { max-width: 100%; height: auto; }
+.clip-mark { color: var(--muted); font-size: 14px; margin: 0 -2px 0 4px; }

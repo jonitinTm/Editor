@@ -4,9 +4,12 @@
 
 import { makeCanvas, ctx2d, clearCanvas } from './canvas';
 
-export type BlendMode = GlobalCompositeOperation;
+/** 'pass-through' solo vale para grupos: sus capas se mezclan directamente con lo de debajo. */
+export type BlendMode = GlobalCompositeOperation | 'pass-through';
+export const canvasBlend = (b: BlendMode): GlobalCompositeOperation => b === 'pass-through' ? 'source-over' : b;
 
 export const BLEND_MODES: { id: BlendMode; label: string }[] = [
+  { id: 'pass-through', label: 'Pasar (solo grupos)' },
   { id: 'source-over', label: 'Normal' },
   { id: 'darken', label: 'Oscurecer' },
   { id: 'multiply', label: 'Multiplicar' },
@@ -81,6 +84,8 @@ export abstract class Layer {
   opacity = 1;
   blendMode: BlendMode = 'source-over';
   locked = false;
+  /** Máscara de recorte: la capa solo se ve donde la capa de debajo tiene píxeles. */
+  clip = false;
   mask: LayerMask | null = null;
   parent: GroupLayer | null = null;
   /** Se incrementa cada vez que cambian los píxeles; lo usa el historial. */
@@ -231,6 +236,7 @@ export class AdjustmentLayer extends Layer {
 
 export class GroupLayer extends Layer {
   readonly kind = 'group' as const;
+  blendMode: BlendMode = 'pass-through';
   /** Hijos de abajo (índice 0) hacia arriba. */
   children: Layer[] = [];
   expanded = true;

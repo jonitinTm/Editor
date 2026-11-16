@@ -28,7 +28,7 @@ const hasMask = () => !!app.doc?.active?.mask;
 export const ACTIONS: Action[] = [
   // Archivo
   { id: 'new', label: 'Nuevo…', keys: ['Alt+Ctrl+N', 'Ctrl+N'], run: dlg.newDocumentDialog },
-  { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles('image/*,.psd,' + io.PROJECT_EXT)) },
+  { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,' + io.PROJECT_EXT)) },
   { id: 'place', label: 'Colocar imagen como capa…', keys: ['Shift+Ctrl+P'], enabled: hasDoc, run: async () => ops.openFiles(await io.pickFiles('image/*'), true) },
   { id: 'save', label: 'Guardar proyecto (.edp)', keys: ['Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(false) },
   { id: 'saveAs', label: 'Guardar proyecto como…', keys: ['Alt+Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(true) },
@@ -82,6 +82,7 @@ export const ACTIONS: Action[] = [
   { id: 'maskInvert', label: 'Invertir máscara', enabled: hasMask, run: () => ops.invertMask(app.doc!.active!) },
   { id: 'maskApply', label: 'Aplicar máscara', enabled: hasMask, run: () => ops.deleteMask(true) },
   { id: 'maskDelete', label: 'Eliminar máscara', enabled: hasMask, run: () => ops.deleteMask(false) },
+  { id: 'clip', label: 'Crear / soltar máscara de recorte', keys: ['Alt+Ctrl+G'], enabled: hasLayer, checked: () => !!app.doc?.active?.clip, run: ops.toggleClip },
   { id: 'layerStyle', label: 'Estilo de capa (sombra, trazo, resplandor)…', enabled: hasLayer, run: dlg.layerStyleDialog },
   { id: 'clearStyle', label: 'Quitar estilo de capa', enabled: () => !!app.doc?.active?.styles, run: () => ops.setLayerStyles(app.doc!.active!, null, true) },
   { id: 'bringFront', label: 'Traer al frente', keys: ['Shift+Ctrl+]'], enabled: hasLayer, run: () => ops.arrangeLayer('top') },
