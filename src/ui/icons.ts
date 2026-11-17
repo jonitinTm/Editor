@@ -7,6 +7,7 @@ export const ICONS: Record<string, string> = {
   move: S('<path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>'),
   marqueeRect: S('<rect x="4" y="5" width="16" height="14" stroke-dasharray="2.5 2.2"/>'),
   marqueeEllipse: S('<ellipse cx="12" cy="12" rx="8.5" ry="6.5" stroke-dasharray="2.5 2.2"/>'),
+  magLasso: S('<path d="M7 16c-3-1.5-4-4-2.5-6.5C6.5 6 12 4.5 16.5 6s5 5.5 1.5 8"/><path d="M7 16c-.5 2 .5 3.5 2 4"/><path d="M14 15.5v3a2.5 2.5 0 0 0 5 0v-3M14 17h1.6M17.4 17H19"/>'),
   lasso: S('<path d="M7 16c-3-1.5-4-4-2.5-6.5C6.5 6 12 4.5 16.5 6s5 5.5 1.5 8-9 2.5-11 2z"/><path d="M7 16c-.5 2 .5 3.5 2 4"/><circle cx="7.3" cy="16.4" r="1.2"/>'),
   wand: S('<path d="M4 20l11-11"/><path d="M13.5 7.5l3 3"/><path d="M18 3v3M16.5 4.5h3M20.5 9v2M19.5 10h2M11 3.5v2M10 4.5h2"/>'),
   crop: S('<path d="M6 2v16h16"/><path d="M2 6h16v16"/>'),

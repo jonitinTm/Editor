@@ -407,3 +407,17 @@ body[data-theme=light] {
 body[data-theme=light] .tool-btn.active, body[data-theme=light] .menu-item:hover { color: #0b2a5c; }
 body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 .pat-select { display: flex; gap: 6px; align-items: center; } .pat-select select { flex: 1; }
+.brush-panel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.brush-list { flex: 1; overflow: auto; padding: 4px; }
+.brush-item { display: flex; align-items: center; gap: 6px; padding: 3px 6px; border-radius: 3px; cursor: pointer; position: relative; }
+.brush-item:hover { background: var(--hover); }
+.brush-item.on { background: var(--sel); }
+.brush-meta { display: flex; flex-direction: column; min-width: 0; font-size: 11px; }
+.brush-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brush-size { color: var(--muted); }
+.brush-del { position: absolute; right: 4px; top: 4px; background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 14px; display: none; }
+.brush-item:hover .brush-del { display: block; }
+.brush-foot { padding: 6px; border-bottom: 1px solid var(--border); }
+/* La lista de pinceles no debe agrandar el grupo de color: se desplaza dentro */
+.tab-group[data-group=color] .brush-panel { height: 172px; }
+.brush-item { padding: 1px 6px; }

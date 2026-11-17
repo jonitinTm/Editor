@@ -265,10 +265,13 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
     clearTimeout(timer);
     timer = window.setTimeout(() => { if (previewOn) session.render(params); else session.clearPreview(); }, 30);
   };
+  const conds: [HTMLElement, [string, string]][] = [];
+  const syncShow = () => conds.forEach(([r, [k, v]]) => r.style.display = params[k] === v ? '' : 'none');
   let body: HTMLElement[];
   if (def.custom === 'levels') body = levelsBody(session.source(), params, update);
   else if (def.custom === 'curves') body = curvesBody(session.source(), params, update);
   else body = (def.params ?? []).flatMap(p => [...((p as any).section ? [h('div', { class: 'dlg-section' }, (p as any).section)] : []), paramRow(p)]);
+  syncShow();
   function paramRow(p: any): HTMLElement {
     if (p.type === 'checkbox') {
       const c = h('input', { type: 'checkbox', checked: !!params[p.key] });
@@ -281,6 +284,12 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
       return row(p.label, c);
     }
     if (p.type === 'pattern') return row(p.label, patternSelect(params[p.key], v => { params[p.key] = v; update(); }));
+    if (p.type === 'select') {
+      const sel = h('select', {}, ...p.choices.map(([v, n]: [string, string]) => h('option', { value: v, selected: params[p.key] === v }, n)));
+      sel.addEventListener('change', () => { params[p.key] = sel.value; syncShow(); update(); });
+      return row(p.label, sel);
+    }
+    if (p.showIf) { const r = row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el); conds.push([r, p.showIf]); return r; }
     return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el);
   }
   const prev = h('input', { type: 'checkbox', checked: true });

@@ -123,6 +123,18 @@ Ya disponible:
 - **Deformar** (*Edición › Transformar › Deformar*, o el modo «Deformar» con `Ctrl+T`): malla de 4×4 puntos como en
   Photoshop; arrastra los puntos, sus tiradores o directamente la imagen. Estilos predefinidos: arco, abultamiento,
   bandera, onda, pez, ascender, inflar, comprimir y giro, con su curvatura.
+- **Lazo magnético** (grupo del lazo, `L`): haz clic en el borde y mueve el ratón; el contorno se pega solo a los
+  bordes. Clic fija un punto, Alt+clic hace un tramo recto, Retroceso quita el último punto, Intro o doble clic cierra.
+  Opciones de anchura, contraste y frecuencia, como en Photoshop.
+- **Seleccionar sujeto** (*Selección › Sujeto*, o el botón en Selección rápida y Varita): selecciona automáticamente el
+  objeto principal. Funciona muy bien cuando el fondo se distingue del sujeto (productos, retratos sobre fondo liso);
+  en fotos muy complejas conviene retocar después con Selección rápida o *Seleccionar y aplicar máscara*.
+- **Panel Pinceles** (junto a Color y Muestras): ajustes de pincel listos (duro, suave, aerógrafo, entintado,
+  caligráfico, marcador, tiza, salpicado…) con vista previa del trazo; «+ Nuevo ajuste de pincel» guarda el tuyo.
+- **Más ajustes**: *Corrección selectiva* (también como capa de ajuste, y se guarda en PSD), *Reemplazar color* y
+  *Ecualizar*.
+- **Más filtros**: desenfoque de superficie (suaviza la piel sin perder bordes), inclinación-desplazamiento (efecto
+  miniatura), enfoque suavizado, polvo y rascaduras, coordenadas polares, rizo, cristalizar, pintura al óleo y nubes.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

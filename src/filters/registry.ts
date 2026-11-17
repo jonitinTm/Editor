@@ -5,9 +5,11 @@
 import * as A from './adjustments';
 import * as F from './advanced';
 import { develop, DEVELOP_DEFAULTS } from './develop';
+import * as M from './more';
 
 export type ParamDef =
-  | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string }
+  | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string; showIf?: [string, string] }
+  | { key: string; label: string; type: 'select'; choices: [string, string][]; default: string; section?: string }
   | { key: string; label: string; type: 'checkbox'; default: boolean }
   | { key: string; label: string; type: 'color'; default: string }
   | { key: string; label: string; type: 'pattern'; default: string };
@@ -182,6 +184,29 @@ export const FILTERS: FilterDef[] = [
   { id: 'develop', name: 'Revelado (tipo Camera Raw)…', group: 'filtro', shortcut: 'Shift+Ctrl+A', params: [{ key: 'temp', label: 'Temperatura', type: 'range', min: -100, max: 100, default: 0, section: 'Balance de blancos' }, { key: 'tint', label: 'Matiz', type: 'range', min: -100, max: 100, default: 0 }, { key: 'exposure', label: 'Exposición', type: 'range', min: -5, max: 5, default: 0, step: 0.05, section: 'Tono' }, { key: 'contrast', label: 'Contraste', type: 'range', min: -100, max: 100, default: 0 }, { key: 'highlights', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0 }, { key: 'shadows', label: 'Sombras', type: 'range', min: -100, max: 100, default: 0 }, { key: 'whites', label: 'Blancos', type: 'range', min: -100, max: 100, default: 0 }, { key: 'blacks', label: 'Negros', type: 'range', min: -100, max: 100, default: 0 }, { key: 'clarity', label: 'Claridad', type: 'range', min: -100, max: 100, default: 0, section: 'Presencia' }, { key: 'dehaze', label: 'Neblina', type: 'range', min: -100, max: 100, default: 0 }, { key: 'vibrance', label: 'Intensidad', type: 'range', min: -100, max: 100, default: 0 }, { key: 'saturation', label: 'Saturación', type: 'range', min: -100, max: 100, default: 0 }, { key: 'vignette', label: 'Viñeta', type: 'range', min: -100, max: 100, default: 0, section: 'Efectos' }, { key: 'sharpen', label: 'Enfoque', type: 'range', min: 0, max: 150, default: 0, section: 'Detalle' }, { key: 'noise', label: 'Reducción de ruido', type: 'range', min: 0, max: 100, default: 0 }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, ...p }) },
   { id: 'shadowsHighlights', name: 'Sombras/Iluminaciones…', group: 'ajuste', params: [{ key: 'shadows', label: 'Sombras', type: 'range', min: -100, max: 100, default: 35, unit: '%' }, { key: 'highlights', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0, unit: '%' }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, ...p }) },
   { id: 'denoise', name: 'Reducir ruido…', group: 'filtro', submenu: 'Ruido', params: [{ key: 'strength', label: 'Intensidad', type: 'range', min: 1, max: 100, default: 40, unit: '%' }, { key: 'detail', label: 'Conservar detalles', type: 'range', min: 0, max: 100, default: 10, unit: '%' }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, noise: p.strength, sharpen: p.detail }) },
+  { id: 'selcolor', name: 'Corrección selectiva…', group: 'ajuste',
+    params: [{ key: 'group', label: 'Colores', type: 'select', choices: M.SELCOLOR_GROUPS, default: 'reds' },
+      ...M.SELCOLOR_GROUPS.flatMap(([g]) => ([['c', 'Cian'], ['m', 'Magenta'], ['y', 'Amarillo'], ['k', 'Negro']] as const).map(([c, n]) => ({ key: `${g}_${c}`, label: n, type: 'range' as const, min: -100, max: 100, default: 0, unit: '%', showIf: ['group', g] as [string, string] }))),
+      { key: 'absolute', label: 'Absoluto (si no, relativo)', type: 'checkbox', default: false }],
+    apply: (img, p) => M.selectiveColor(img, p) },
+  { id: 'replacecolor', name: 'Reemplazar color…', group: 'ajuste', noLayer: true,
+    params: [{ key: 'color', label: 'Color a cambiar', type: 'color', default: '#d03030' }, { key: 'fuzziness', label: 'Tolerancia', type: 'range', min: 1, max: 200, default: 40 },
+      { key: 'hue', label: 'Tono', type: 'range', min: -180, max: 180, default: 0, unit: '°', section: 'Reemplazo' }, { key: 'sat', label: 'Saturación', type: 'range', min: -100, max: 100, default: 0 }, { key: 'light', label: 'Luminosidad', type: 'range', min: -100, max: 100, default: 0 }],
+    apply: (img, p) => M.replaceColor(img, p) },
+  { id: 'equalize', name: 'Ecualizar', group: 'ajuste', noLayer: true, apply: img => M.equalize(img) },
+  { id: 'surfaceblur', name: 'Desenfoque de superficie…', group: 'filtro', submenu: 'Desenfocar', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 40, default: 5, unit: 'px' }, { key: 'threshold', label: 'Umbral', type: 'range', min: 2, max: 255, default: 15 }], apply: (img, p) => M.surfaceBlur(img, p.radius, p.threshold) },
+  { id: 'tiltshift', name: 'Inclinación-desplazamiento…', group: 'filtro', submenu: 'Desenfocar',
+    params: [{ key: 'blur', label: 'Desenfoque', type: 'range', min: 1, max: 100, default: 15, unit: 'px' }, { key: 'center', label: 'Posición', type: 'range', min: 0, max: 100, default: 55, unit: '%' },
+      { key: 'focus', label: 'Zona nítida', type: 'range', min: 0, max: 100, default: 20, unit: '%' }, { key: 'transition', label: 'Transición', type: 'range', min: 1, max: 100, default: 25, unit: '%' },
+      { key: 'angle', label: 'Ángulo', type: 'range', min: -90, max: 90, default: 0, unit: '°' }, { key: 'saturation', label: 'Saturación extra', type: 'range', min: 0, max: 100, default: 0, unit: '%' }],
+    apply: (img, p) => M.tiltShift(img, p) },
+  { id: 'smartsharpen', name: 'Enfoque suavizado…', group: 'filtro', submenu: 'Enfocar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: 1, max: 500, default: 150, unit: '%' }, { key: 'radius', label: 'Radio', type: 'range', min: 0.1, max: 64, step: 0.1, default: 1.5, unit: 'px' }, { key: 'noise', label: 'Reducir ruido', type: 'range', min: 0, max: 100, default: 10, unit: '%' }], apply: (img, p) => M.smartSharpen(img, p.amount, p.radius, p.noise) },
+  { id: 'dust', name: 'Polvo y rascaduras…', group: 'filtro', submenu: 'Ruido', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 6, default: 2, unit: 'px' }, { key: 'threshold', label: 'Umbral', type: 'range', min: 0, max: 255, default: 10 }], apply: (img, p) => M.dustScratches(img, p.radius, p.threshold) },
+  { id: 'polar', name: 'Coordenadas polares…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'toPolar', label: 'Rectangulares a polares', type: 'checkbox', default: true }], apply: (img, p) => M.polar(img, p.toPolar) },
+  { id: 'ripple', name: 'Rizo…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: -999, max: 999, default: 100, unit: '%' }, { key: 'size', label: 'Tamaño', type: 'range', min: 4, max: 100, default: 12, unit: 'px' }], apply: (img, p) => M.ripple(img, p.amount, p.size) },
+  { id: 'crystallize', name: 'Cristalizar…', group: 'filtro', submenu: 'Pixelizar', params: [{ key: 'cell', label: 'Tamaño de celda', type: 'range', min: 3, max: 300, default: 10, unit: 'px' }], apply: (img, p) => M.crystallize(img, p.cell) },
+  { id: 'oilpaint', name: 'Pintura al óleo…', group: 'filtro', submenu: 'Estilizar', params: [{ key: 'radius', label: 'Pincelada', type: 'range', min: 1, max: 20, default: 4, unit: 'px' }], apply: (img, p) => M.oilPaint(img, p.radius) },
+  { id: 'clouds', name: 'Nubes', group: 'filtro', submenu: 'Interpretar', params: [{ key: 'c1', label: 'Color 1', type: 'color', default: '#000000' }, { key: 'c2', label: 'Color 2', type: 'color', default: '#ffffff' }, { key: 'scale', label: 'Escala', type: 'range', min: 8, max: 1000, default: 120, unit: 'px' }], apply: (img, p) => M.clouds(img, p.c1, p.c2, p.scale) },
   { id: 'solidfill', name: 'Color sólido', group: 'relleno', fill: true, params: [{ key: 'color', label: 'Color', type: 'color', default: '#3d8bfd' }],
     apply: (img, p) => { const n = parseInt(String(p.color).slice(1), 16), d = img.data; for (let i = 0; i < d.length; i += 4) { d[i] = n >> 16 & 255; d[i + 1] = n >> 8 & 255; d[i + 2] = n & 255; d[i + 3] = 255; } } },
   { id: 'gradfill', name: 'Degradado', group: 'relleno', fill: true,

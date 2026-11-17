@@ -356,7 +356,10 @@ export function buildPropertiesPanel(parent: HTMLElement) {
       if (def?.custom) {
         const below = getPixels(d.getComposite());
         body.append(...(def.custom === 'levels' ? levelsBody : curvesBody)(below, l.params, changed));
-      } else for (const pd of def?.params ?? []) {
+      }
+      const conds: [HTMLElement, [string, string]][] = [];
+      const syncShow = () => conds.forEach(([r, [k, v]]) => r.style.display = l.params[k] === v ? '' : 'none');
+      if (!def?.custom) for (const pd of def?.params ?? []) {
         if (pd.type === 'checkbox') {
           const c = h('input', { type: 'checkbox', checked: !!l.params[pd.key] });
           c.onchange = () => { l.params[pd.key] = c.checked; changed(); };
@@ -367,8 +370,17 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           body.append(formRow(pd.label, c));
         } else if (pd.type === 'pattern') {
           body.append(formRow(pd.label, patternSelect(l.params[pd.key], v => { l.params[pd.key] = v; changed(); })));
-        } else body.append(formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, onInput: v => { l.params[pd.key] = v; changed(); } }).el));
+        } else if (pd.type === 'select') {
+          const sel = h('select', {}, ...pd.choices.map(([v, n]) => h('option', { value: v, selected: l.params[pd.key] === v }, n)));
+          sel.onchange = () => { l.params[pd.key] = sel.value; syncShow(); changed(); };
+          body.append(formRow(pd.label, sel));
+        } else {
+          const r = formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, onInput: v => { l.params[pd.key] = v; changed(); } }).el);
+          if (pd.showIf) conds.push([r, pd.showIf]);
+          body.append(r);
+        }
       }
+      syncShow();
       if (def && !def.custom && !def.params) body.append(h('div', { class: 'hint' }, 'Este ajuste no tiene opciones.'));
     }
     if (l instanceof SmartLayer) {

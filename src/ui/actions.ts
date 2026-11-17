@@ -135,6 +135,7 @@ export const ACTIONS: Action[] = [
   { id: 'quickMask', label: 'Editar en modo máscara rápida', keys: ['Q'], enabled: hasDoc, checked: () => !!app.doc?.quickMask, run: ops.toggleQuickMask },
   { id: 'contentFill', label: 'Rellenar según contenido', keys: ['Shift+Backspace', 'Shift+Delete'], enabled: hasSel, run: () => ops.contentAwareFill() },
   { id: 'refine', label: 'Seleccionar y aplicar máscara…', keys: ['Alt+Ctrl+R'], enabled: hasSel, run: refineDialog },
+  { id: 'selectSubject', label: 'Sujeto', enabled: hasDoc, run: ops.selectSubjectOp },
   { id: 'colorRange', label: 'Gama de colores…', enabled: hasDoc, run: dlg.colorRangeDialog },
   { id: 'feather', label: 'Calar…', keys: ['Shift+F6'], enabled: hasSel, run: () => dlg.modifySelectionDialog('feather') },
   { id: 'expand', label: 'Expandir…', enabled: hasSel, run: () => dlg.modifySelectionDialog('expand') },

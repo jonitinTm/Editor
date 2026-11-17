@@ -6,7 +6,7 @@ import { gaussianBlur } from './blur';
 const copyOf = (img: ImageData) => new Uint8ClampedArray(img.data);
 
 /** Lee un píxel con interpolación bilineal (fuera de la imagen repite el borde). */
-function sample(src: Uint8ClampedArray, w: number, h: number, x: number, y: number, out: number[]) {
+export function sample(src: Uint8ClampedArray, w: number, h: number, x: number, y: number, out: number[]) {
   x = x < 0 ? 0 : x > w - 1 ? w - 1 : x; y = y < 0 ? 0 : y > h - 1 ? h - 1 : y;
   const x0 = x | 0, y0 = y | 0, x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1), fx = x - x0, fy = y - y0;
   const a = (y0 * w + x0) * 4, b = (y0 * w + x1) * 4, c = (y1 * w + x0) * 4, d = (y1 * w + x1) * 4;
@@ -14,7 +14,7 @@ function sample(src: Uint8ClampedArray, w: number, h: number, x: number, y: numb
 }
 
 /** Distorsión genérica: para cada píxel de destino, `map` dice de dónde tomar el color. */
-function displace(img: ImageData, map: (x: number, y: number, out: number[]) => void) {
+export function displace(img: ImageData, map: (x: number, y: number, out: number[]) => void) {
   const { width: w, height: h, data: d } = img, src = copyOf(img), p = [0, 0], c = [0, 0, 0, 0];
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     map(x, y, p); sample(src, w, h, p[0], p[1], c);

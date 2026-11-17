@@ -257,6 +257,12 @@ function parseAdjustment(key: string, b: Uint8Array, cged?: Uint8Array): { id: s
   }
   if (key === 'vibA') { const d = descOf(b, 4); return { id: 'vibrance', params: { vibrance: d.vibrance ?? 0, sat: d.Strt ?? 0 } }; }
   if (key === 'blwh') { const d = descOf(b, 4); return { id: 'bw', params: { reds: d.Rd ?? 40, yellows: d.Yllw ?? 60, greens: d.Grn ?? 40, cyans: d.Cyn ?? 60, blues: d.Bl ?? 20, magentas: d.Mgnt ?? 80 } }; }
+  if (key === 'selc' && b.length >= 84) {
+    // versión, método (0 relativo, 1 absoluto) y 10 grupos de cian/magenta/amarillo/negro; el primero no se usa
+    const p: any = { group: 'reds', absolute: v.getUint16(2) === 1 };
+    ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks'].forEach((g, i) => ['c', 'm', 'y', 'k'].forEach((c, k) => { p[g + '_' + c] = v.getInt16(4 + (i + 1) * 8 + k * 2); }));
+    return { id: 'selcolor', params: p };
+  }
   if (key === 'nvrt') return { id: 'invert', params: {} };
   if (key === 'brit' && b.length >= 4) return { id: 'brightness', params: { brightness: v.getInt16(0), contrast: v.getInt16(2) } };
   if (key === 'levl' && b.length >= 12) return { id: 'levels', params: { inBlack: v.getUint16(2), inWhite: v.getUint16(4), outBlack: v.getUint16(6), outWhite: v.getUint16(8), gamma: Math.max(0.1, v.getUint16(10) / 100) } };
@@ -279,8 +285,8 @@ function parseAdjustment(key: string, b: Uint8Array, cged?: Uint8Array): { id: s
   }
   return null;
 }
-const ADJ_KEYS = ['nvrt', 'brit', 'levl', 'hue2', 'curv', 'expA', 'post', 'thrs', 'blnc', 'mixr', 'vibA', 'blwh'];
-const ADJ_OTHER = ['phfl', 'clrL', 'grdm', 'selc', 'PtFl'];
+const ADJ_KEYS = ['nvrt', 'brit', 'levl', 'hue2', 'curv', 'expA', 'post', 'thrs', 'blnc', 'mixr', 'vibA', 'blwh', 'selc'];
+const ADJ_OTHER = ['phfl', 'clrL', 'grdm', 'PtFl'];
 const BIG_KEYS = new Set(['LMsk', 'Lr16', 'Lr32', 'Layr', 'Mt16', 'Mt32', 'Mtrn', 'Alph', 'FMsk', 'lnk2', 'FEid', 'FXid', 'PxSD', 'cinf']);
 
 interface Rec {
@@ -723,6 +729,9 @@ function adjustmentBlock(l: AdjustmentLayer): { key: string; bytes: Uint8Array }
         Clrs: ['VlLs', [[0, p.c1], [4096, p.c2]].map(([l, c]) => ['Objc', 'Clrt', { 'Clr ': rgbDV(c as string), Type: ['enum', 'Clry', 'UsrS'], Lctn: ['long', l as number], Mdpn: ['long', 50] }] as DV)],
         Trns: ['VlLs', [0, 4096].map(l => ['Objc', 'TrnS', { Opct: ['UntF', '#Prc', 100], Lctn: ['long', l], Mdpn: ['long', 50] }] as DV)] }] });
       return done('GdFl');
+    case 'selcolor': w.u16(1); w.u16(p.absolute ? 1 : 0); for (let k = 0; k < 4; k++) w.u16(0);
+      for (const g of ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks']) for (const c of ['c', 'm', 'y', 'k']) i16(p[g + '_' + c] ?? 0);
+      return done('selc');
     case 'invert': return done('nvrt');
     case 'exposure': w.u16(1); w.f32(p.stops); w.f32(p.offset); w.f32(p.gamma); return done('expA');
     case 'posterize': w.u16(Math.round(p.levels)); w.u16(0); return done('post');

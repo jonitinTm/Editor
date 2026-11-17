@@ -219,6 +219,7 @@ export class WandTool implements Tool {
     { key: 'contiguous', label: 'Contiguo', type: 'checkbox', default: true },
     { key: 'all', label: 'Todas las capas', type: 'checkbox', default: false },
   ] as any[];
+  extraOptions(bar: HTMLElement) { const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Seleccionar sujeto'; b.onclick = () => import('../ui/ops').then(o => o.selectSubjectOp()); bar.append(b); }
   down(e: ToolEvent) {
     const doc = app.doc!;
     const mode = selMode(this.id, e);

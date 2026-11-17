@@ -1043,3 +1043,24 @@ export function repeatLastFilter() {
 }
 
 void walkLayers;
+
+/** Selección › Sujeto: selecciona automáticamente el objeto principal de la imagen. */
+export async function selectSubjectOp() {
+  const d = doc(); if (!d) return;
+  app.toast('Buscando el sujeto…');
+  await new Promise(r => setTimeout(r, 30));
+  const { selectSubject } = await import('../filters/subject');
+  const l = d.active;
+  // una capa recortada (con transparencia) se usa tal cual; si no, la imagen combinada
+  const src = l && isRaster(l) && !(l as any).full && hasTransparency(l.canvas) ? l.canvas : d.getComposite();
+  const m = selectSubject(src);
+  if (!m) { app.toast('No se ha encontrado un sujeto claro', 'warn'); return; }
+  d.selection.setMask(m);
+  d.commit('Seleccionar sujeto');
+}
+function hasTransparency(c: HTMLCanvasElement) {
+  const k = Math.min(1, 200 / Math.max(c.width, c.height)), w = Math.max(1, Math.round(c.width * k)), h = Math.max(1, Math.round(c.height * k));
+  const t = makeCanvas(w, h); ctx2d(t).drawImage(c, 0, 0, w, h);
+  const a = ctx2d(t).getImageData(0, 0, w, h).data; let n = 0; for (let i = 3; i < a.length; i += 4) if (a[i] < 128) n++;
+  return n > w * h * 0.05;
+}

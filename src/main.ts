@@ -32,6 +32,8 @@ import { TextTool } from './tools/text';
 import { ShapeTool } from './tools/shape';
 import { TransformTool } from './tools/transform';
 import { PenTool, NodeTool } from './tools/pen';
+import { MagneticLassoTool } from './tools/maglasso';
+import { buildBrushesPanel } from './ui/brushes';
 
 // ---- Herramientas ----------------------------------------------------------------
 for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSelectTool, WandTool, CropTool, EyedropperTool, CloneTool,
@@ -39,6 +41,7 @@ for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSe
   app.registerTool(new T());
 }
 app.registerTool(new PolyLassoTool());
+app.registerTool(new MagneticLassoTool());
 app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
@@ -82,7 +85,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
   parent.append(group);
   return group;
 }
-tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel]]);
+tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel]]);
 tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel]]);
 tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Acciones', buildActionsPanel]]);
 root.append(h('div', { id: 'toasts' }));

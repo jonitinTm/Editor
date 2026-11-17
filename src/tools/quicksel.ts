@@ -11,6 +11,7 @@ import { drawBrushCursor } from './brush';
 
 export class QuickSelectTool implements Tool {
   id = 'quickSel'; name = 'Selección rápida'; icon = icon('quickSel'); key = 'W'; group = 'wand'; cursor = 'none';
+  extraOptions(bar: HTMLElement) { const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Seleccionar sujeto'; b.onclick = () => import('../ui/ops').then(o => o.selectSubjectOp()); bar.append(b); }
   options = [
     { key: 'size', label: 'Tamaño', type: 'range', min: 2, max: 500, default: 30, unit: 'px' },
     { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 5, max: 120, default: 32 },
