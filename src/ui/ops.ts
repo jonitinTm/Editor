@@ -12,6 +12,9 @@ import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
 import { readPsd, writePsd } from '../io/psd';
 import { heal, findSource } from '../filters/heal';
+import { snapshot, restore } from '../core/history';
+import { addPattern, getPattern, patternFill } from '../core/patterns';
+import { applyOnTarget } from '../tools/misc';
 import { forget } from '../io/autosave';
 import { encodeGif } from '../io/gif';
 import { renderFrames } from './timeline';
@@ -176,7 +179,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
-  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip; c.lockAlpha = l.lockAlpha;
+  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip; c.lockAlpha = l.lockAlpha; c.label = l.label;
   if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
   return c;
 }
@@ -420,6 +423,26 @@ function refreshSmart(inner: EditorDocument) {
   for (const d of app.docs) if (d !== inner) visit(d);
   inner.modified = false;
   app.viewport.requestRender();
+}
+
+export function setLayerLabel(label: string | null) {
+  const d = doc(); if (!d) return;
+  for (const l of selectedLayers()) l.label = label;
+  d.commit('Etiqueta de color');
+}
+
+/** Historial › Nueva instantánea: guarda el estado actual para volver a él cuando se quiera. */
+export function newSnapshot() {
+  const d = doc(); if (!d) return;
+  d.snapshots.push({ name: `Instantánea ${d.snapshots.length + 1}`, snap: snapshot(d) });
+  d.changed();
+}
+export function gotoSnapshot(i: number) {
+  const d = doc(); const s = d?.snapshots[i]; if (!d || !s) return;
+  app.tool?.cancel?.();
+  restore(d, s.snap); d.invalidate();
+  d.commit('Volver a ' + s.name);
+  notifyToolDocChanged();
 }
 
 export function toggleClip() {
@@ -676,6 +699,26 @@ export function clearSelection(name = 'Borrar') {
   d.commit(name);
 }
 function luminanceOf(hex: string) { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; }
+
+/** Edición › Definir motivo: la selección (o la imagen entera) pasa a ser un motivo. */
+export function definePattern(name: string) {
+  const d = doc(); if (!d) return;
+  const src = d.flatten(), b = d.selection.bounds ?? { x: 0, y: 0, w: d.width, h: d.height };
+  if (b.w * b.h > 2048 * 2048) { app.toast('La zona es demasiado grande para un motivo (máximo 2048 × 2048)', 'warn'); return; }
+  const c = makeCanvas(b.w, b.h); ctx2d(c).drawImage(src, -b.x, -b.y);
+  addPattern(name, c);
+  app.toast(`Motivo «${name}» definido`);
+}
+/** Rellena la selección (o la capa) con un motivo. */
+export function fillPattern(id: string, opacity = 1, scale = 1) {
+  const d = doc(); if (!d) return;
+  const p = getPattern(id); if (!p) return;
+  const t = getPaintTarget(); if (!t) return;
+  const area = patternFill(p, d.width, d.height, scale);
+  const out = applyOnTarget(t, t.canvas, area, opacity, 1);
+  setTargetCanvas(t, out);
+  d.commit('Rellenar con motivo');
+}
 
 export function fill(color: string, opacity = 1, name = 'Rellenar') {
   const d = doc(); if (!d) return;

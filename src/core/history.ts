@@ -9,7 +9,7 @@ import type { EditorDocument } from './document';
 interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
-  blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; clip: boolean;
+  blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; clip: boolean; label?: string | null;
   canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
   children?: LayerSnap[]; expanded?: boolean;
@@ -35,7 +35,7 @@ function freeze(owner: object, version: number, canvas: HTMLCanvasElement): HTML
 function snapLayer(l: Layer): LayerSnap {
   const s: LayerSnap = {
     id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,
-    blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, clip: l.clip,
+    blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, clip: l.clip, label: l.label,
     mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled } : null,
   };
   s.styles = l.styles ? JSON.stringify(l.styles) : null;
@@ -82,7 +82,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
     if (s.kind !== 'smart') frozen.set(r, { version: r.version, canvas: s.canvas! });
     l = r;
   }
-  l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.clip = s.clip;
+  l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.clip = s.clip; l.label = s.label ?? null;
   l.styles = s.styles ? JSON.parse(s.styles) : null;
   if (s.mask) {
     const m = new LayerMask(w, h, 'black');

@@ -86,6 +86,8 @@ function contextMenu(x: number, y: number, ids: string[]) {
   setTimeout(() => document.addEventListener('pointerdown', function off(e) { if (!fly.contains(e.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', off); } }), 0);
 }
 
+const LABEL_COLORS: Record<string, string> = { rojo: '#7a3434', naranja: '#7d5222', amarillo: '#776a26', verde: '#335f33', azul: '#30477a', violeta: '#55387a', gris: '#4d4d4d' };
+
 // ---- Capas -------------------------------------------------------------------------
 
 export function buildLayersPanel(parent: HTMLElement) {
@@ -108,6 +110,8 @@ export function buildLayersPanel(parent: HTMLElement) {
   lockBtn.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'locked', !l.locked); };
 
   const list = h('div', { class: 'layer-list' });
+  const search = h('input', { type: 'search', class: 'layer-search', placeholder: 'Buscar capas…' });
+  search.addEventListener('input', () => render());
   const footBtn = (ic: string, title: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, html: icon(ic), onclick: fn });
   const adjBtn = footBtn('adjust', 'Nueva capa de ajuste', () => {
     const r = adjBtn.getBoundingClientRect();
@@ -127,7 +131,7 @@ export function buildLayersPanel(parent: HTMLElement) {
   const lockA = h('button', { class: 'btn icon-btn', title: 'Bloquear transparencia (solo se pinta donde ya hay píxeles)', html: icon('lockAlpha') });
   lockA.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockAlpha', !l.lockAlpha); };
   const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint' }, 'Bloquear:'), lockA, lockBtn));
-  const body = h('div', { class: 'panel-body layers' }, top, list, foot);
+  const body = h('div', { class: 'panel-body layers' }, top, search, list, foot);
   parent.append(panel('Capas', body));
 
   let dragLayer: Layer | null = null;
@@ -176,6 +180,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
+    if (l.label) eye.style.background = LABEL_COLORS[l.label] ?? '';
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
       draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
@@ -200,7 +205,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     el.addEventListener('contextmenu', e => {
       e.preventDefault();
       if (!d.selectedIds.has(l.id)) d.setActive(l);
-      contextMenu(e.clientX, e.clientY, ['dupLayer', 'delLayer', 'renameLayer', '-', 'layerStyle', 'clearStyle', 'clip', '-', 'toSmart', 'editSmart', 'rasterize', '-', 'group', 'ungroup', '-', 'mergeDown', 'mergeVisible', 'flatten']);
+      contextMenu(e.clientX, e.clientY, ['dupLayer', 'delLayer', 'renameLayer', '-', 'label:rojo', 'label:naranja', 'label:amarillo', 'label:verde', 'label:azul', 'label:violeta', 'label:gris', 'label:none', '-', 'layerStyle', 'clearStyle', 'clip', '-', 'toSmart', 'editSmart', 'rasterize', '-', 'group', 'ungroup', '-', 'mergeDown', 'mergeVisible', 'flatten']);
     });
     el.addEventListener('dblclick', e => { if ((e.target as HTMLElement).closest('.lname, .thumb-wrap, .eye, .arrow')) return; d.setActive(l); layerStyleDialog(); });
     // Arrastrar para reordenar
@@ -238,7 +243,11 @@ export function buildLayersPanel(parent: HTMLElement) {
     body.classList.toggle('disabled', !d);
     if (!d) return;
     const rows: HTMLElement[] = [];
-    for (let i = d.root.children.length - 1; i >= 0; i--) rows.push(...row(d.root.children[i], 0));
+    const q = search.value.trim().toLowerCase();
+    if (q) { // búsqueda: lista plana de las capas que coinciden
+      for (const l of [...d.allLayers()].reverse()) if (l.name.toLowerCase().includes(q)) rows.push(row(l, 0)[0]);
+      if (!rows.length) rows.push(h('div', { class: 'hint ch-empty' }, 'Ninguna capa coincide'));
+    } else for (let i = d.root.children.length - 1; i >= 0; i--) rows.push(...row(d.root.children[i], 0));
     list.append(...rows);
     const l = d.active;
     blend.value = l?.blendMode ?? 'source-over';
@@ -254,7 +263,8 @@ export function buildLayersPanel(parent: HTMLElement) {
 
 export function buildHistoryPanel(parent: HTMLElement) {
   const list = h('div', { class: 'history-list' });
-  const body = h('div', { class: 'panel-body' }, list);
+  const foot = h('div', { class: 'panel-foot' }, h('button', { class: 'btn', title: 'Guarda el estado actual para poder volver a él', onclick: () => ops.newSnapshot() }, 'Nueva instantánea'));
+  const body = h('div', { class: 'panel-body history-body' }, list, foot);
   const sec = panel('Historial', body);
   parent.append(sec);
   let lastLen = -1;
@@ -263,6 +273,13 @@ export function buildHistoryPanel(parent: HTMLElement) {
     list.innerHTML = '';
     if (!d) return;
     const hst = d.history;
+    d.snapshots.forEach((s, i) => {
+      const el = h('div', { class: 'history-row snap' }, h('span', { class: 'snap-ico' }, '▣'), s.name);
+      el.title = 'Clic para volver a este estado';
+      el.onclick = () => ops.gotoSnapshot(i);
+      list.append(el);
+    });
+    if (d.snapshots.length) list.append(h('div', { class: 'info-sep' }));
     hst.steps.forEach((s, i) => {
       const el = h('div', { class: 'history-row' + (i === hst.index ? ' active' : '') + (i > hst.index ? ' future' : '') }, s.name);
       el.onclick = () => ops.gotoHistory(i);

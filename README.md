@@ -86,6 +86,10 @@ Ya disponible:
 - **Canales alfa**: *Selección › Guardar / Cargar selección* y panel *Canales* (junto a Capas).
 - **Filtros inteligentes**: los filtros y ajustes aplicados a un objeto inteligente quedan como filtros inteligentes,
   que se pueden ocultar, editar o eliminar después desde *Propiedades* (también después de escalar o girar el objeto).
+- **Motivos**: *Edición › Definir motivo* (de la selección o la imagen), *Rellenar…* con motivo (con escala) y el bote de
+  pintura con motivo; incluye varios motivos de serie.
+- **Panel Capas**: búsqueda por nombre y etiquetas de color (clic derecho; también se leen y guardan en PSD).
+- **Historial**: instantáneas para volver a un estado guardado.
 - **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;

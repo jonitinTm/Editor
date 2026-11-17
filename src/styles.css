@@ -362,3 +362,12 @@ body.hide-panels .side, body.hide-panels .toolbar, body.hide-panels .optionsbar,
 .ch-row { opacity: .85; }
 .ch-empty { padding: 12px; }
 .sf-row .sf-name { flex: 1; cursor: default; }
+.pat-grid { display: flex; flex-wrap: wrap; gap: 4px; max-height: 128px; overflow: auto; }
+.pat { border: 1px solid var(--border); cursor: pointer; }
+.pat.on { outline: 2px solid var(--accent); }
+
+.layer-search { margin: 4px 6px; padding: 3px 6px; font-size: 11.5px; }
+.history-body { display: flex; flex-direction: column; overflow: hidden; }
+.history-body .history-list { flex: 1; overflow: auto; }
+.history-row.snap { color: #c7d6f0; }
+.snap-ico { margin-right: 6px; color: var(--accent); }

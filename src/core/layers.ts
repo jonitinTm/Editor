@@ -104,6 +104,8 @@ export abstract class Layer {
   locked = false;
   /** Bloquear transparencia: solo se puede pintar donde ya hay píxeles. */
   lockAlpha = false;
+  /** Etiqueta de color en el panel de capas (rojo, naranja, amarillo, verde, azul, violeta, gris). */
+  label: string | null = null;
   /** Máscara de recorte: la capa solo se ve donde la capa de debajo tiene píxeles. */
   clip = false;
   mask: LayerMask | null = null;

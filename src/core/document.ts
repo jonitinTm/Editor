@@ -24,6 +24,8 @@ export class EditorDocument {
   view: ViewState = { zoom: 1, panX: 0, panY: 0 };
   viewInitialized = false;
   overrides = new Map<Layer, LayerOverride>();
+  /** Instantáneas del historial (estados guardados a los que se puede volver). */
+  snapshots: { name: string; snap: import('./history').DocSnap }[] = [];
   /** Canales alfa: selecciones guardadas (lienzos inmutables: se sustituyen, no se editan). */
   channels: { id: number; name: string; canvas: HTMLCanvasElement }[] = [];
   /** Máscara rápida: el pincel edita la selección, que se ve como una capa roja. */

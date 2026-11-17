@@ -8,6 +8,8 @@ import * as io from '../io/files';
 import { FilterDef, defaultParams } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
 import { SmartLayer, type LayerStyles } from '../core/layers';
+import { allPatterns } from '../core/patterns';
+import { colorDialog } from './colorpicker';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
 
@@ -147,13 +149,26 @@ export function canvasSizeDialog() {
 export function fillDialog() {
   if (!app.doc) return;
   const what = h('select', {},
-    h('option', { value: 'fg' }, 'Color frontal'), h('option', { value: 'bg' }, 'Color de fondo'),
-    h('option', { value: '#000000' }, 'Negro'), h('option', { value: '#808080' }, 'Gris 50 %'), h('option', { value: '#ffffff' }, 'Blanco'));
-  let op = 100;
+    h('option', { value: 'fg' }, 'Color frontal'), h('option', { value: 'bg' }, 'Color de fondo'), h('option', { value: 'pick' }, 'Color…'),
+    h('option', { value: '#000000' }, 'Negro'), h('option', { value: '#808080' }, 'Gris 50 %'), h('option', { value: '#ffffff' }, 'Blanco'),
+    h('option', { value: 'pattern' }, 'Motivo'), h('option', { value: 'content' }, 'Según el contenido'));
+  let op = 100, pat = allPatterns()[0]?.id ?? '', picked = app.fg, scale = 100;
   const s = numberSlider({ min: 1, max: 100, value: 100, unit: '%', onInput: v => op = v });
+  const grid = h('div', { class: 'pat-grid' });
+  const renderGrid = () => { grid.innerHTML = ''; for (const p of allPatterns()) { const c = h('canvas', { width: 36, height: 36, class: 'pat' + (p.id === pat ? ' on' : ''), title: p.name }); const x = c.getContext('2d')!; x.fillStyle = x.createPattern(p.canvas, 'repeat')!; x.fillRect(0, 0, 36, 36); c.onclick = () => { pat = p.id; renderGrid(); }; grid.append(c); } };
+  renderGrid();
+  const sc = numberSlider({ min: 10, max: 1000, value: 100, unit: '%', onInput: v => scale = v });
+  const patRows = [row('Motivo', grid), row('Escala', sc.el)];
+  const sync = () => patRows.forEach(r => r.style.display = what.value === 'pattern' ? '' : 'none');
+  what.addEventListener('change', async () => { sync(); if (what.value === 'pick') { const c = await colorDialog('Color de relleno', picked); if (c) picked = c; } });
+  sync();
   showDialog({
-    title: 'Rellenar', body: [row('Contenido', what), row('Opacidad', s.el)],
-    onOk: () => { const c = what.value === 'fg' ? app.fg : what.value === 'bg' ? app.bg : what.value; ops.fill(c, op / 100); },
+    title: 'Rellenar', body: [row('Contenido', what), ...patRows, row('Opacidad', s.el)],
+    onOk: () => {
+      if (what.value === 'pattern') { ops.fillPattern(pat, op / 100, scale / 100); return; }
+      if (what.value === 'content') { ops.contentAwareFill(); return; }
+      const c = what.value === 'fg' ? app.fg : what.value === 'bg' ? app.bg : what.value === 'pick' ? picked : what.value; ops.fill(c, op / 100);
+    },
   });
 }
 

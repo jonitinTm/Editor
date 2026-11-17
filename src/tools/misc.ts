@@ -8,6 +8,7 @@ import { getPaintTarget, setPreview, setTargetCanvas, strokeSetup, PaintTarget, 
 import { floodMask } from './floodfill';
 import { cloneCanvas, ctx2d, getPixels, makeCanvas, rgbToHex, hexToRgb } from '../core/canvas';
 import { gradientEditor, GradStop } from '../ui/gradienteditor';
+import { allPatterns, getPattern } from '../core/patterns';
 
 /** Dibuja `src` sobre el objetivo respetando selección, opacidad y modo (capa/máscara). */
 export function applyOnTarget(t: PaintTarget, base: HTMLCanvasElement, src: HTMLCanvasElement, opacity: number, maskValue: number): HTMLCanvasElement {
@@ -35,7 +36,13 @@ export class BucketTool implements Tool {
     { key: 'opacity', label: 'Opacidad', type: 'range', min: 1, max: 100, default: 100, unit: '%' },
     { key: 'contiguous', label: 'Contiguo', type: 'checkbox', default: true },
     { key: 'all', label: 'Todas las capas', type: 'checkbox', default: false },
+    { key: 'source', label: 'Relleno', type: 'select', default: 'fg', choices: [{ value: 'fg', label: 'Color frontal' }, { value: 'pattern', label: 'Motivo' }] },
+    { key: 'pattern', label: 'Motivo', type: 'select', default: 'base:Damero', choices: [] },
   ] as any[];
+  activate() {
+    // La lista de motivos puede cambiar (motivos definidos por el usuario)
+    const o = this.options.find((x: any) => x.key === 'pattern'); o.choices = allPatterns().map(p => ({ value: p.id, label: p.name }));
+  }
   down(e: ToolEvent) {
     const t = getPaintTarget();
     if (!t) return;
@@ -45,7 +52,10 @@ export class BucketTool implements Tool {
     if (!res) return;
     const st = strokeSetup(t, false);
     const fill = res.canvas; const fc = ctx2d(fill);
-    fc.globalCompositeOperation = 'source-in'; fc.fillStyle = st.color; fc.fillRect(0, 0, fill.width, fill.height);
+    const pat = app.opt('source', this.id) === 'pattern' && !t.isMask ? getPattern(app.opt('pattern', this.id)) : null;
+    fc.globalCompositeOperation = 'source-in';
+    if (pat) { fc.fillStyle = fc.createPattern(pat.canvas, 'repeat')!; } else fc.fillStyle = st.color;
+    fc.fillRect(0, 0, fill.width, fill.height);
     setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, app.opt<number>('opacity', this.id) / 100, st.maskValue));
     doc.commit('Bote de pintura');
   }
