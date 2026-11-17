@@ -15,6 +15,7 @@ import { dialogOpen } from './ui/dialog';
 import { newDocumentDialog } from './ui/dialogs';
 import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
+import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
@@ -79,7 +80,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
   return group;
 }
 tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel]]);
-tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel]]);
+tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel]]);
 tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel]]);
 root.append(h('div', { id: 'toasts' }));
 

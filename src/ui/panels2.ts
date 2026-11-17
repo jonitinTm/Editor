@@ -1,0 +1,111 @@
+// Paneles Navegador, Histograma e Información.
+
+import { app } from './app';
+import { h } from './dom';
+import { ctx2d } from '../core/canvas';
+
+const visible = (el: HTMLElement) => el.offsetParent !== null;
+
+export function buildNavigatorPanel(parent: HTMLElement) {
+  const cv = h('canvas', { class: 'nav-canvas' }), ctx = cv.getContext('2d')!;
+  const zoom = h('input', { type: 'range', min: '-460', max: '415', step: '1', class: 'nav-zoom', title: 'Zoom' });
+  const pct = h('span', { class: 'nav-pct' });
+  const body = h('div', { class: 'panel-body nav' }, cv, h('div', { class: 'nav-bar' }, h('button', { class: 'btn icon-btn', title: 'Alejar', onclick: () => app.viewport.zoomStep(-1) }, '−'), zoom, h('button', { class: 'btn icon-btn', title: 'Acercar', onclick: () => app.viewport.zoomStep(1) }, '+'), pct));
+  parent.append(body);
+  let thumb: HTMLCanvasElement | null = null, k = 1, ox = 0, oy = 0;
+  const layout = () => {
+    const d = app.doc; if (!d) return;
+    const W = Math.max(60, body.clientWidth - 16), H = 150;
+    k = Math.min(W / d.width, H / d.height); const tw = Math.round(d.width * k), th = Math.round(d.height * k);
+    cv.width = W; cv.height = H; ox = Math.round((W - tw) / 2); oy = Math.round((H - th) / 2);
+  };
+  const renderThumb = () => {
+    const d = app.doc; if (!d || !visible(body)) return;
+    layout();
+    thumb = document.createElement('canvas'); thumb.width = Math.max(1, Math.round(d.width * k)); thumb.height = Math.max(1, Math.round(d.height * k));
+    const t = ctx2d(thumb); t.imageSmoothingQuality = 'high'; t.drawImage(d.getComposite(), 0, 0, thumb.width, thumb.height);
+    renderView();
+  };
+  const renderView = () => {
+    const d = app.doc;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (!d || !thumb) return;
+    ctx.fillStyle = '#fff'; ctx.fillRect(ox, oy, thumb.width, thumb.height); ctx.drawImage(thumb, ox, oy);
+    const vp = app.viewport, a = vp.toDoc(0, 0), b = vp.toDoc(vp.width, vp.height);
+    ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = 2;
+    ctx.strokeRect(ox + a.x * k, oy + a.y * k, (b.x - a.x) * k, (b.y - a.y) * k);
+    zoom.value = String(Math.round(Math.log2(d.view.zoom) * 100)); pct.textContent = Math.round(d.view.zoom * 1000) / 10 + ' %';
+  };
+  // Arrastrar en la miniatura mueve la vista
+  const go = (e: PointerEvent) => {
+    const d = app.doc; if (!d) return;
+    const x = (e.offsetX - ox) / k, y = (e.offsetY - oy) / k, vp = app.viewport;
+    d.view.panX = vp.width / 2 - x * d.view.zoom; d.view.panY = vp.height / 2 - y * d.view.zoom;
+    vp.requestRender(); app.emit('view');
+  };
+  cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); go(e); });
+  cv.addEventListener('pointermove', e => { if (e.buttons) go(e); });
+  zoom.addEventListener('input', () => app.viewport.setZoom(Math.pow(2, +zoom.value / 100), null));
+  let t = 0;
+  app.on('doc', () => { clearTimeout(t); t = window.setTimeout(renderThumb, 250); });
+  app.on('docs', renderThumb);
+  app.on('view', renderView);
+  new MutationObserver(() => { if (visible(body)) renderThumb(); }).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}
+
+export function buildHistogramPanel(parent: HTMLElement) {
+  const cv = h('canvas', { class: 'hist-canvas', width: 256, height: 110 }), ctx = cv.getContext('2d')!;
+  const chSel = h('select', {}, h('option', { value: 'colors' }, 'Colores'), h('option', { value: 'lum' }, 'Luminosidad'), h('option', { value: 'r' }, 'Rojo'), h('option', { value: 'g' }, 'Verde'), h('option', { value: 'b' }, 'Azul'));
+  const stats = h('div', { class: 'hist-stats' });
+  const body = h('div', { class: 'panel-body histo' }, h('div', { class: 'prop-row' }, h('span', {}, 'Canal'), chSel), cv, stats);
+  parent.append(body);
+  const render = () => {
+    const d = app.doc; if (!d || !visible(body)) return;
+    const data = d.getComposite().getContext('2d')!.getImageData(0, 0, d.width, d.height).data;
+    const H = [new Uint32Array(256), new Uint32Array(256), new Uint32Array(256), new Uint32Array(256)];
+    const step = Math.max(1, Math.floor(data.length / 4 / 500000)) * 4; let n = 0;
+    for (let i = 0; i < data.length; i += step) { if (data[i + 3] === 0) continue; H[0][data[i]]++; H[1][data[i + 1]]++; H[2][data[i + 2]]++; H[3][Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2])]++; n++; }
+    ctx.fillStyle = '#1b1c1f'; ctx.fillRect(0, 0, 256, 110);
+    const ch = chSel.value;
+    const list = ch === 'colors' ? [[0, 'rgba(255,60,60,.7)'], [1, 'rgba(60,220,60,.7)'], [2, 'rgba(70,120,255,.7)']] : [[{ lum: 3, r: 0, g: 1, b: 2 }[ch]!, ch === 'lum' ? '#ddd' : ch === 'r' ? '#ff5a5a' : ch === 'g' ? '#4cd964' : '#4ea1ff']];
+    let max = 1; for (const [c] of list) for (let i = 1; i < 255; i++) max = Math.max(max, H[c as number][i]);
+    ctx.globalCompositeOperation = ch === 'colors' ? 'lighter' : 'source-over';
+    for (const [c, col] of list) { ctx.fillStyle = col as string; for (let i = 0; i < 256; i++) { const v = Math.min(110, H[c as number][i] / max * 105); ctx.fillRect(i, 110 - v, 1, v); } }
+    ctx.globalCompositeOperation = 'source-over';
+    const L = H[ch === 'r' ? 0 : ch === 'g' ? 1 : ch === 'b' ? 2 : 3];
+    let sum = 0, sq = 0, med = 0, acc = 0; for (let i = 0; i < 256; i++) { sum += i * L[i]; sq += i * i * L[i]; }
+    for (let i = 0; i < 256; i++) { acc += L[i]; if (acc >= n / 2) { med = i; break; } }
+    const mean = n ? sum / n : 0, dev = n ? Math.sqrt(Math.max(0, sq / n - mean * mean)) : 0;
+    stats.innerHTML = '';
+    stats.append(...[['Media', mean.toFixed(2)], ['Desv. típica', dev.toFixed(2)], ['Mediana', String(med)], ['Píxeles', (d.width * d.height).toLocaleString('es')]].map(([a, b]) => h('div', {}, h('span', {}, a), h('b', {}, b))));
+  };
+  chSel.onchange = render;
+  let t = 0;
+  app.on('doc', () => { clearTimeout(t); t = window.setTimeout(render, 400); });
+  app.on('docs', render);
+  new MutationObserver(() => { if (visible(body)) render(); }).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}
+
+export function buildInfoPanel(parent: HTMLElement) {
+  const body = h('div', { class: 'panel-body info' });
+  parent.append(body);
+  const row = (a: string, b: string, color?: string) => h('div', { class: 'info-row' }, h('span', {}, a), color ? h('i', { class: 'info-sw', style: { background: color } }) : null, h('b', {}, b));
+  const render = () => {
+    const d = app.doc; if (!visible(body)) return;
+    body.innerHTML = '';
+    if (!d) { body.append(h('div', { class: 'hint' }, 'Sin documento')); return; }
+    const m = app.viewport.mouse;
+    if (m && m.x >= 0 && m.y >= 0 && m.x < d.width && m.y < d.height) {
+      const c = d.getComposite().getContext('2d')!.getImageData(Math.floor(m.x), Math.floor(m.y), 1, 1).data;
+      const hex = '#' + [c[0], c[1], c[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+      const mx = Math.max(c[0], c[1], c[2]), mn = Math.min(c[0], c[1], c[2]);
+      let hue = 0; if (mx !== mn) hue = mx === c[0] ? ((c[1] - c[2]) / (mx - mn) + 6) % 6 : mx === c[1] ? (c[2] - c[0]) / (mx - mn) + 2 : (c[0] - c[1]) / (mx - mn) + 4;
+      body.append(row('R G B', `${c[0]}  ${c[1]}  ${c[2]}`, hex), row('Hex', hex), row('H S B', `${Math.round(hue * 60)}°  ${mx ? Math.round((mx - mn) / mx * 100) : 0}%  ${Math.round(mx / 2.55)}%`), row('Opacidad', Math.round(c[3] / 2.55) + ' %'));
+      body.append(row('X', Math.floor(m.x) + ' px'), row('Y', Math.floor(m.y) + ' px'));
+    } else body.append(h('div', { class: 'hint' }, 'Pasa el ratón por la imagen para ver el color y la posición.'));
+    const b = d.selection.bounds;
+    body.append(h('div', { class: 'info-sep' }), row('Documento', `${d.width} × ${d.height} px`), row('Selección', b ? `${b.w} × ${b.h} px en (${b.x}, ${b.y})` : '—'), row('Capa', d.active?.name ?? '—'));
+  };
+  app.on('view', render); app.on('doc', render); app.on('docs', render);
+  new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}
