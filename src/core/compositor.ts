@@ -60,7 +60,8 @@ function layerSurface(layer: Layer, w: number, h: number, opts: CompositeOptions
   const ov = opts.overrides?.get(layer);
   const mask = ov?.mask ?? (layer.mask?.enabled ? layer.mask.canvas : null);
   if (isRaster(layer) && !mask && !ov?.extra) return { canvas: ov?.canvas ?? layer.canvas, off: ov?.offset ?? { x: 0, y: 0 }, temp: null };
-  const temp = borrowCanvas(w, h);
+  // Sin estilos, todo lo que se dibuje queda recortado a la zona: basta con vaciar esa zona
+  const temp = borrowCanvas(w, h, hasStyles(layer.styles) ? null : opts.rect);
   const tctx = ctx2d(temp);
   tctx.save(); clipTo(tctx, opts);
   if (layer instanceof GroupLayer) compositeGroup(layer, tctx, w, h, opts);

@@ -65,37 +65,58 @@ export function snapshot(doc: EditorDocument): DocSnap {
   };
 }
 
-function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
+/**
+ * Reconstruye una capa desde la foto. Si la capa viva con el mismo id no ha
+ * cambiado desde esa foto, se reutiliza tal cual (sin copiar píxeles): así
+ * deshacer solo cuesta lo que realmente cambió.
+ */
+function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Layer>): Layer {
+  const old = olds.get(s.id);
   let l: Layer;
   if (s.kind === 'group') {
-    const g = new GroupLayer(s.name);
+    const g = old instanceof GroupLayer ? old : new GroupLayer(s.name);
+    g.children = [];
     g.expanded = s.expanded ?? true;
-    for (const c of s.children ?? []) g.add(restoreLayer(c, w, h));
+    for (const c of s.children ?? []) g.add(restoreLayer(c, w, h, olds));
     l = g;
   } else if (s.kind === 'adjust') {
     const a = JSON.parse(s.adjust!);
-    l = new AdjustmentLayer(s.name, a.filterId, a.params);
+    if (old instanceof AdjustmentLayer) { old.filterId = a.filterId; old.params = a.params; l = old; }
+    else l = new AdjustmentLayer(s.name, a.filterId, a.params);
   } else {
-    const r = s.kind === 'smart' ? new SmartLayer(s.name, w, h, s.smart!, s.props.m, s.props.filters ?? []) : s.kind === 'text' ? new TextLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : new RasterLayer(s.name, w, h);
-    if (s.kind !== 'smart') r.canvas = cloneCanvas(s.canvas!); // el objeto inteligente se redibuja desde su contenido actual
-    if (s.full) r.full = { ...s.full, version: r.version };
-    if (s.kind !== 'smart') frozen.set(r, { version: r.version, canvas: s.canvas! });
+    const f = old ? frozen.get(old) : undefined;
+    const same = old instanceof RasterLayer && old.kind === s.kind && f && f.version === old.version && f.canvas === s.canvas
+      && old.canvas.width === w && old.canvas.height === h
+      && (!isParametric(old) || JSON.stringify(old.props) === JSON.stringify(s.props))
+      && (!(old instanceof SmartLayer) || old.inner === s.smart);
+    let r: RasterLayer;
+    if (same) r = old as RasterLayer;
+    else {
+      r = s.kind === 'smart' ? new SmartLayer(s.name, w, h, s.smart!, s.props.m, s.props.filters ?? []) : s.kind === 'text' ? new TextLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : new RasterLayer(s.name, w, h);
+      if (s.kind !== 'smart') r.canvas = cloneCanvas(s.canvas!); // el objeto inteligente se redibuja desde su contenido actual
+      if (s.kind !== 'smart') frozen.set(r, { version: r.version, canvas: s.canvas! });
+    }
+    r.full = s.full ? { ...s.full, version: r.version } : null;
     l = r;
   }
-  l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.clip = s.clip; l.label = s.label ?? null;
+  l.name = s.name; l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.clip = s.clip; l.label = s.label ?? null;
   l.styles = s.styles ? JSON.parse(s.styles) : null;
   if (s.mask) {
-    const m = new LayerMask(w, h, 'black');
-    m.canvas = cloneCanvas(s.mask.canvas); m.enabled = s.mask.enabled;
-    frozen.set(m, { version: m.version, canvas: s.mask.canvas });
-    l.mask = m;
-  }
+    const om = old?.mask, fm = om ? frozen.get(om) : undefined;
+    if (om && fm && fm.version === om.version && fm.canvas === s.mask.canvas && om.canvas.width === w && om.canvas.height === h) { om.enabled = s.mask.enabled; l.mask = om; }
+    else {
+      const m = new LayerMask(w, h, 'black');
+      m.canvas = cloneCanvas(s.mask.canvas); m.enabled = s.mask.enabled;
+      frozen.set(m, { version: m.version, canvas: s.mask.canvas });
+      l.mask = m;
+    }
+  } else l.mask = null;
   return l;
 }
-
 export function restore(doc: EditorDocument, snap: DocSnap) {
   doc.width = snap.width; doc.height = snap.height;
-  const root = restoreLayer(snap.root, snap.width, snap.height) as GroupLayer;
+  const olds = new Map<number, Layer>([[doc.root.id, doc.root], ...doc.allLayers().map(l => [l.id, l] as [number, Layer])]);
+  const root = restoreLayer(snap.root, snap.width, snap.height, olds) as GroupLayer;
   doc.root = root;
   doc.selection.width = snap.width; doc.selection.height = snap.height;
   doc.selection.setMask(snap.selection);

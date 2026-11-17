@@ -225,6 +225,7 @@ export class HealTool extends CloneTool {
     const s = this.stroke;
     if (s && !s.target.isMask) {
       s.update();
+      s.ensurePreview();
       const b = s.bounds;
       if (b) {
         const d = app.doc!, m = Math.max(6, Math.round(app.opt<number>('size', this.id) * 0.6));

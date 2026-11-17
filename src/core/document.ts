@@ -4,7 +4,7 @@ import { makeCanvas, ctx2d, Rect } from './canvas';
 import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric } from './layers';
 import { Selection } from './selection';
 import { History } from './history';
-import { renderComposite, LayerOverride } from './compositor';
+import { renderComposite, compositeGroup, LayerOverride } from './compositor';
 
 export interface ViewState { zoom: number; panX: number; panY: number; }
 
@@ -104,10 +104,58 @@ export class EditorDocument {
       const rect = d === true ? null : {
         x: Math.floor(d.x) - 1, y: Math.floor(d.y) - 1, w: Math.ceil(d.w) + 3, h: Math.ceil(d.h) + 3,
       };
-      renderComposite(this.root, this.composite, { overrides: this.overrides, rect });
+      const big = !rect || rect.w * rect.h > this.width * this.height / 4;
+      if (!this.renderWithCache(rect, big)) renderComposite(this.root, this.composite, { overrides: this.overrides, rect });
       this.compositeDirty = null;
     }
     return this.composite;
+  }
+
+  // ---- Caché de interacción ----------------------------------------------------------
+  // Mientras se mueve, transforma o pinta una sola capa, lo que hay debajo y encima no
+  // cambia: se combina una vez y en cada fotograma solo se dibujan 3 imágenes.
+  private icache: { key: string; layer: Layer; below: HTMLCanvasElement; above: HTMLCanvasElement } | null = null;
+
+  private interactionLayer(): Layer | null {
+    if (this.overrides.size !== 1) return null;
+    const l = this.overrides.keys().next().value as Layer;
+    if (l.parent !== this.root || l.kind === 'group' || l.clip) return null;
+    const ch = this.root.children, i = ch.indexOf(l);
+    if (i < 0 || ch[i + 1]?.clip) return null;
+    const special = (x: Layer): boolean => x.kind === 'adjust' || (x.blendMode !== 'source-over' && x.blendMode !== 'pass-through') || (x instanceof GroupLayer && x.children.some(special));
+    for (let k = i + 1; k < ch.length; k++) {
+      const a = ch[k];
+      if (!a.visible) continue;
+      if (a.kind === 'adjust' || (a.blendMode !== 'source-over' && a.blendMode !== 'pass-through')) return null;
+      if (a instanceof GroupLayer && a.blendMode === 'pass-through' && a.children.some(special)) return null;
+    }
+    return l;
+  }
+  private signature(skip: Layer): string {
+    const sig = (x: Layer): string => x === skip ? 'X' : `${x.id}:${x.version}:${+x.visible}:${x.opacity}:${x.blendMode}:${+x.clip}:${x.mask ? x.mask.version + '' + +x.mask.enabled : ''}:${x.styles ? JSON.stringify(x.styles) : ''}:${x.kind === 'adjust' ? JSON.stringify((x as any).params) : ''}` + (x instanceof GroupLayer ? '(' + x.children.map(sig).join(',') + ')' : '');
+    return `${this.width}x${this.height}|` + this.root.children.map(sig).join(',');
+  }
+  private renderWithCache(rect: Rect | null, allowBuild: boolean): boolean {
+    const l = this.interactionLayer();
+    if (!l) { this.icache = null; return false; }
+    const key = this.signature(l);
+    if (!this.icache || this.icache.layer !== l || this.icache.key !== key) {
+      if (!allowBuild) return false;
+      const ch = this.root.children, i = ch.indexOf(l);
+      const below = makeCanvas(this.width, this.height), above = makeCanvas(this.width, this.height);
+      renderComposite({ children: ch.slice(0, i) } as GroupLayer, below, {});
+      renderComposite({ children: ch.slice(i + 1) } as GroupLayer, above, {});
+      this.icache = { key, layer: l, below, above };
+    }
+    const c = this.icache, ctx = ctx2d(this.composite);
+    ctx.save();
+    if (rect) { ctx.beginPath(); ctx.rect(rect.x, rect.y, rect.w, rect.h); ctx.clip(); ctx.clearRect(rect.x, rect.y, rect.w, rect.h); }
+    else ctx.clearRect(0, 0, this.width, this.height);
+    ctx.drawImage(c.below, 0, 0);
+    compositeGroup({ children: [l] } as GroupLayer, ctx, this.width, this.height, { overrides: this.overrides, rect });
+    ctx.drawImage(c.above, 0, 0);
+    ctx.restore();
+    return true;
   }
 
   /** Imagen combinada sin previsualizaciones, en un lienzo nuevo. */

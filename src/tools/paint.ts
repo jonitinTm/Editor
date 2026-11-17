@@ -140,7 +140,10 @@ export type StrokeMode = 'paint' | 'erase' | 'mask';
 export class Stroke {
   buffer: HTMLCanvasElement;
   original: HTMLCanvasElement;
-  preview: HTMLCanvasElement;
+  /** Capa resultante; en modo rápido solo se crea al terminar (ver ensurePreview). */
+  preview!: HTMLCanvasElement;
+  /** Modo rápido: pintura normal; el búfer se dibuja encima de la capa sin copiarla. */
+  private fast: boolean;
   dirty: Rect | null = null;
   bounds: Rect | null = null;
   private last: { x: number; y: number; p: number } | null = null;
@@ -156,10 +159,32 @@ export class Stroke {
   ) {
     const w = target.canvas.width, h = target.canvas.height;
     this.buffer = makeCanvas(w, h);
-    this.original = cloneCanvas(target.canvas);
-    this.preview = cloneCanvas(target.canvas);
+    // El lienzo de la capa no se modifica durante el trazo (se pinta sobre la vista previa), así que no hace falta copiarlo
+    this.original = target.canvas;
     this.sel = clipMask(target);
-    setPreview(target, this.preview);
+    this.fast = mode === 'paint' && !target.lockAlpha && !target.quick && !target.isMask;
+    if (this.fast) {
+      const doc = app.doc!, ov = doc.overrides.get(target.layer) ?? {};
+      ov.extra = ctx => { ctx.save(); ctx.globalAlpha = this.opacity; ctx.drawImage(this.sel ? this.tmp! : this.buffer, 0, 0); ctx.restore(); };
+      doc.overrides.set(target.layer, ov);
+    } else {
+      this.preview = cloneCanvas(target.canvas);
+      setPreview(target, this.preview);
+    }
+  }
+  private clearExtra() {
+    const doc = app.doc!, ov = doc.overrides.get(this.target.layer);
+    if (!ov) return;
+    delete ov.extra;
+    if (!ov.mask && !ov.canvas && !ov.offset) doc.overrides.delete(this.target.layer);
+  }
+  /** Crea la capa resultante (si aún no existe) y deja de usar el modo rápido. */
+  ensurePreview() {
+    if (!this.fast) return;
+    this.clearExtra(); this.fast = false;
+    this.preview = cloneCanvas(this.original);
+    if (this.bounds) this.composeInto(this.preview, this.bounds);
+    setPreview(this.target, this.preview);
   }
 
   /** Recorre el segmento desde el último punto colocando toques cada `spacing` píxeles. */
@@ -196,8 +221,18 @@ export class Stroke {
     if (!r) return;
     const b = this.bounds;
     this.bounds = b ? { x: Math.min(b.x, r.x), y: Math.min(b.y, r.y), w: Math.max(b.x + b.w, r.x + r.w) - Math.min(b.x, r.x), h: Math.max(b.y + b.h, r.y + r.h) - Math.min(b.y, r.y) } : r;
-    this.composeInto(this.preview, r);
+    if (this.fast) { if (this.sel) this.clipToSelection(r); }
+    else this.composeInto(this.preview, r);
     app.doc!.invalidate(r);
+  }
+  /** Búfer recortado por la selección, en la zona r. */
+  private clipToSelection(r: Rect) {
+    this.tmp ??= makeCanvas(this.buffer.width, this.buffer.height);
+    const t = ctx2d(this.tmp);
+    t.save(); t.beginPath(); t.rect(r.x, r.y, r.w, r.h); t.clip();
+    t.globalCompositeOperation = 'copy'; t.drawImage(this.buffer, 0, 0);
+    t.globalCompositeOperation = 'destination-in'; t.drawImage(this.sel!, 0, 0);
+    t.restore();
   }
 
   private composeInto(dest: HTMLCanvasElement, r: Rect) {
@@ -208,15 +243,7 @@ export class Stroke {
     ctx.drawImage(this.original, 0, 0);
     // Búfer recortado por la selección
     let src = this.buffer;
-    if (this.sel) {
-      this.tmp ??= makeCanvas(this.buffer.width, this.buffer.height);
-      const t = ctx2d(this.tmp);
-      t.save(); t.beginPath(); t.rect(r.x, r.y, r.w, r.h); t.clip();
-      t.globalCompositeOperation = 'copy'; t.drawImage(this.buffer, 0, 0);
-      t.globalCompositeOperation = 'destination-in'; t.drawImage(this.sel, 0, 0);
-      t.restore();
-      src = this.tmp;
-    }
+    if (this.sel) { this.clipToSelection(r); src = this.tmp!; }
     ctx.globalAlpha = this.opacity;
     if (this.mode === 'paint') {
       ctx.globalCompositeOperation = this.target.lockAlpha ? 'source-atop' : 'source-over'; ctx.drawImage(src, 0, 0);
@@ -233,6 +260,12 @@ export class Stroke {
   /** Termina el trazo y devuelve true si cambió algo. */
   finish(): boolean {
     this.update();
+    if (this.fast) {
+      this.clearExtra(); this.fast = false;
+      if (!this.bounds) { app.doc!.invalidate(); return false; }
+      this.preview = cloneCanvas(this.original);
+      this.composeInto(this.preview, this.bounds);
+    }
     setPreview(this.target, null);
     if (!this.bounds) return false;
     setTargetCanvas(this.target, this.preview);
@@ -240,6 +273,7 @@ export class Stroke {
     return true;
   }
   cancel() {
+    if (this.fast) this.clearExtra();
     setPreview(this.target, null);
     app.doc!.invalidate();
   }

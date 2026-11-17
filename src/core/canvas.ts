@@ -48,9 +48,11 @@ export function putPixels(c: HTMLCanvasElement, data: ImageData, x = 0, y = 0) {
 
 /** Pool de lienzos temporales reutilizables, para no crear objetos en cada fotograma. */
 const pool: HTMLCanvasElement[] = [];
-export function borrowCanvas(w: number, h: number): HTMLCanvasElement {
+/** Lienzo temporal de w×h. Si se indica `only`, solo se garantiza vacía esa zona (más rápido). */
+export function borrowCanvas(w: number, h: number, only?: Rect | null): HTMLCanvasElement {
   const c = pool.pop() ?? document.createElement('canvas');
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  else if (only) { const x = ctx2d(c); x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(only.x, only.y, only.w, only.h); x.restore(); }
   else clearCanvas(c);
   return c;
 }
