@@ -16,6 +16,8 @@ import { computeFilter } from '../filters/compute';
 import FilterWorker from '../filters/worker?worker&inline';
 import { record } from './macros';
 import { snapshot, restore } from '../core/history';
+import { FILTERS } from '../filters/registry';
+const FILTERS_BY_ID = new Map(FILTERS.map(x => [x.id, x]));
 import { addPattern, getPattern, patternFill } from '../core/patterns';
 import { applyOnTarget } from '../tools/misc';
 import { forget } from '../io/autosave';
@@ -353,6 +355,39 @@ export function rasterize() {
   rasterizeLayer(l); d.commit('Rasterizar capa');
 }
 
+/** Capa › Nueva capa de relleno: color, degradado o motivo (editable desde Propiedades). */
+export function newFillLayer(id: 'solidfill' | 'gradfill' | 'patternfill') {
+  const d = doc(); if (!d) return;
+  const def = FILTERS_BY_ID.get(id)!;
+  const p = defaultParams(def);
+  if (id === 'solidfill') p.color = app.fg;
+  if (id === 'gradfill') { p.c1 = app.fg; p.c2 = app.bg; }
+  const l = new AdjustmentLayer(`${def.name} ${d.allLayers().filter(x => x instanceof AdjustmentLayer && x.filterId === id).length + 1}`, id, p);
+  l.mask = new LayerMask(d.width, d.height, 'white');
+  if (d.selection.mask) { l.mask.canvas = cloneCanvas(d.selection.mask); l.mask.touch(); d.selection.clear(); }
+  d.insertAboveActive(l);
+  d.commit('Nueva capa de relleno');
+}
+
+/** Capa › Objeto inteligente › Reemplazar contenido: la misma posición y tamaño, otra imagen. */
+export async function replaceSmartContents(file: File) {
+  const d = doc(); const l = d?.active;
+  if (!d || !(l instanceof SmartLayer)) { app.toast('Selecciona un objeto inteligente', 'warn'); return; }
+  const inner = io.isPsdFile(f(file)) ? (await readPsd(await file.arrayBuffer(), io.baseName(file.name))).doc : await io.documentFromImage(file, file.name);
+  inner.embedded = true;
+  const ow = l.inner.width, oh = l.inner.height, m = l.props.m;
+  // se escala para que ocupe exactamente la misma caja que el contenido anterior
+  const sx = ow / inner.width, sy = oh / inner.height;
+  const nm: Matrix = [m[0] * sx, m[1] * sx, m[2] * sy, m[3] * sy, m[4], m[5]];
+  const nl = new SmartLayer(l.name, d.width, d.height, inner, nm, l.filters);
+  nl.id = l.id; nl.opacity = l.opacity; nl.visible = l.visible; nl.blendMode = l.blendMode; nl.mask = l.mask; nl.styles = l.styles; nl.clip = l.clip; nl.label = l.label;
+  const parent = l.parent!, i = parent.children.indexOf(l);
+  parent.remove(l); parent.add(nl, i);
+  d.setActive(nl, false);
+  d.commit('Reemplazar contenido');
+}
+const f = (x: File) => x;
+
 /** Crea una capa de ajuste (con máscara) encima de la capa activa. */
 export function newAdjustmentLayer(def: FilterDef) {
   const d = doc(); if (!d) return;
@@ -636,6 +671,7 @@ export function selectionFromLayer(l: Layer) {
 
 let clipboard: { canvas: HTMLCanvasElement; x: number; y: number } | null = null;
 let clipboardFresh = false;
+export const hasFreshClipboard = () => !!clipboard && clipboardFresh;
 window.addEventListener('blur', () => { clipboardFresh = false; });
 
 /** Píxeles seleccionados de la capa activa (o de todas si `merged`). */
@@ -669,21 +705,48 @@ export async function cut() {
 }
 
 /** Se llama desde el evento "paste" del navegador. */
+/** Modo del próximo pegado: normal (centro de la vista), en el sitio, o dentro de la selección. */
+export let pasteMode: 'center' | 'inPlace' | 'into' = 'center';
+export function setPasteMode(m: typeof pasteMode) { pasteMode = m; }
+
+/** Posición para pegar una imagen de w×h según el modo. */
+function pastePos(w: number, h: number, orig?: { x: number; y: number }) {
+  const d = app.doc!;
+  if (pasteMode === 'inPlace' && orig) return orig;
+  if (pasteMode === 'into' && d.selection.bounds) { const b = d.selection.bounds; return { x: Math.round(b.x + (b.w - w) / 2), y: Math.round(b.y + (b.h - h) / 2) }; }
+  // como en Photoshop: si el sitio original está a la vista, se pega ahí; si no, en el centro de la vista
+  const vp = app.viewport, a = vp.toDoc(0, 0), z = vp.toDoc(vp.width, vp.height);
+  const vx0 = Math.max(0, Math.min(a.x, z.x)), vy0 = Math.max(0, Math.min(a.y, z.y)), vx1 = Math.min(d.width, Math.max(a.x, z.x)), vy1 = Math.min(d.height, Math.max(a.y, z.y));
+  if (orig && orig.x + w > vx0 && orig.x < vx1 && orig.y + h > vy0 && orig.y < vy1 && w <= d.width * 1.5) return orig;
+  const c = vp.toDoc(vp.width / 2, vp.height / 2);
+  return { x: Math.round(Math.min(Math.max(c.x - w / 2, -w / 2), d.width - w / 2)), y: Math.round(Math.min(Math.max(c.y - h / 2, -h / 2), d.height - h / 2)) };
+}
+async function pasteCanvas(c: HTMLCanvasElement, orig?: { x: number; y: number }) {
+  const d = app.doc!;
+  const mode = pasteMode, sel = d.selection.mask ? cloneCanvas(d.selection.mask) : null;
+  await placeImage(c, d.nextLayerName(), pastePos(c.width, c.height, orig));
+  if (mode === 'into' && sel) { const l = d.active!; const m = new LayerMask(d.width, d.height, 'black'); m.canvas = sel; m.touch(); l.mask = m; d.selection.clear(); d.commit('Pegar dentro'); }
+}
+
+/** Pega lo copiado dentro del editor (si lo hay) con el modo indicado. */
+export async function pasteInternal(mode: typeof pasteMode): Promise<boolean> {
+  if (!clipboard || !app.doc) return false;
+  pasteMode = mode;
+  try { await pasteCanvas(clipboard.canvas, { x: clipboard.x, y: clipboard.y }); } finally { pasteMode = 'center'; }
+  return true;
+}
+
 export async function pasteFromEvent(e: ClipboardEvent) {
   const files = [...(e.clipboardData?.files ?? [])].filter(f => f.type.startsWith('image/'));
-  if (clipboard && clipboardFresh && app.doc) {
-    const c = clipboard;
-    const d = app.doc;
-    const fits = c.x + c.canvas.width <= d.width && c.y + c.canvas.height <= d.height;
-    await placeImage(c.canvas, d.nextLayerName(), fits ? { x: c.x, y: c.y } : undefined);
-    return;
-  }
+  try {
+  if (clipboard && clipboardFresh && app.doc) { await pasteCanvas(clipboard.canvas, { x: clipboard.x, y: clipboard.y }); return; }
   if (files.length) {
     if (!app.doc) { app.addDocument(await io.documentFromImage(files[0], 'Pegado')); return; }
-    await placeImage(files[0], app.doc.nextLayerName());
+    await pasteCanvas(await io.imageToCanvas(files[0]));
     return;
   }
-  if (clipboard && app.doc) await placeImage(clipboard.canvas, app.doc.nextLayerName());
+  if (clipboard && app.doc) await pasteCanvas(clipboard.canvas, { x: clipboard.x, y: clipboard.y });
+  } finally { pasteMode = 'center'; }
 }
 
 /** Borra el contenido seleccionado (o pinta la máscara con el color de fondo). */

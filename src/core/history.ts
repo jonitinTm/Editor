@@ -130,10 +130,13 @@ export function restore(doc: EditorDocument, snap: DocSnap) {
   doc.editMask = editMask && !!doc.active?.mask;
 }
 
+/** Número máximo de pasos del historial (configurable en Preferencias). */
+export const historyConfig = { limit: 60 };
+
 export class History {
   steps: HistoryStep[] = [];
   index = -1;
-  limit = 60;
+  get limit() { return historyConfig.limit; }
   push(doc: EditorDocument, name: string) {
     this.steps.length = this.index + 1;
     this.steps.push({ name, snap: snapshot(doc) });

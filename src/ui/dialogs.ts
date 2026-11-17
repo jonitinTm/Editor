@@ -11,6 +11,7 @@ import { SmartLayer, type LayerStyles } from '../core/layers';
 import { allPatterns } from '../core/patterns';
 import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
+import { prefs, savePrefs } from './prefs';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
 
@@ -173,6 +174,40 @@ export function fillDialog() {
   });
 }
 
+/** Desplegable con miniatura de los motivos disponibles. */
+export function patternSelect(value: string, onChange: (id: string) => void): HTMLElement {
+  const sel = h('select', {}, ...allPatterns().map(p => h('option', { value: p.id, selected: p.id === value }, p.name)));
+  const prev = h('canvas', { width: 24, height: 24, class: 'pat' });
+  const draw = () => { const p = allPatterns().find(x => x.id === sel.value); const c = prev.getContext('2d')!; c.clearRect(0, 0, 24, 24); if (p) { c.fillStyle = c.createPattern(p.canvas, 'repeat')!; c.fillRect(0, 0, 24, 24); } };
+  sel.addEventListener('change', () => { draw(); onChange(sel.value); }); draw();
+  return h('div', { class: 'pat-select' }, prev, sel);
+}
+
+// ---- Preferencias ----------------------------------------------------------------
+
+export function prefsDialog() {
+  const theme = h('select', {}, ...([['dark', 'Oscuro'], ['medium', 'Gris medio'], ['light', 'Claro']] as const).map(([v, n]) => h('option', { value: v, selected: prefs.theme === v }, n)));
+  const before = { ...prefs };
+  theme.addEventListener('change', () => { document.body.dataset.theme = theme.value; app.viewport.requestRender(); });
+  const scale = h('select', {}, ...[90, 100, 110, 125].map(v => h('option', { value: String(v), selected: prefs.uiScale === v }, v + ' %')));
+  let histV = prefs.historySteps, snapV = prefs.snapTolerance;
+  const hist = numberSlider({ min: 10, max: 300, value: prefs.historySteps, onInput: v => histV = v });
+  const snapTol = numberSlider({ min: 1, max: 20, value: prefs.snapTolerance, unit: 'px', onInput: v => snapV = v });
+  const auto = h('input', { type: 'checkbox', checked: prefs.autosave });
+  showDialog({
+    title: 'Preferencias', width: 420,
+    body: [h('div', { class: 'dlg-section' }, 'Interfaz'), row('Tema', theme), row('Tamaño de la interfaz', scale),
+      h('div', { class: 'dlg-section' }, 'Rendimiento'), row('Pasos de historial', hist.el),
+      h('div', { class: 'dlg-section' }, 'Guías y ajuste'), row('Distancia de ajuste', snapTol.el),
+      h('div', { class: 'dlg-section' }, 'Archivos'), row('', h('label', { class: 'check' }, auto, ' Guardar copia de recuperación cada 15 s'))],
+    onOk: () => {
+      Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked });
+      savePrefs(); app.viewport.requestRender(); app.toast('Preferencias guardadas');
+    },
+    onCancel: () => { document.body.dataset.theme = before.theme; app.viewport.requestRender(); },
+  });
+}
+
 // ---- Contornear y gama de colores ---------------------------------------------------
 
 export function strokeDialog() {
@@ -245,6 +280,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
       c.addEventListener('input', () => { params[p.key] = c.value; update(); });
       return row(p.label, c);
     }
+    if (p.type === 'pattern') return row(p.label, patternSelect(params[p.key], v => { params[p.key] = v; update(); }));
     return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el);
   }
   const prev = h('input', { type: 'checkbox', checked: true });

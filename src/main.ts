@@ -1,3 +1,5 @@
+import { prefs, applyPrefs } from './ui/prefs';
+applyPrefs();
 // Punto de entrada: monta la interfaz y conecta teclado, arrastrar y pegar.
 
 import './styles.css';
@@ -209,6 +211,12 @@ window.addEventListener('keydown', e => {
   // La herramienta activa tiene prioridad (Intro, Esc, flechas…)
   if (app.doc && app.tool?.key_?.(e)) { e.preventDefault(); return; }
   if (ks === 'Ctrl+V') return; // lo gestiona el evento "paste"
+  if (ks === 'Shift+Ctrl+V' || ks === 'Alt+Shift+Ctrl+V') {
+    // con algo copiado en el editor se pega ya; si no, se espera al evento "paste" del sistema
+    const mode = ks === 'Shift+Ctrl+V' ? 'inPlace' : 'into';
+    if (ops.hasFreshClipboard()) { e.preventDefault(); ops.pasteInternal(mode); } else ops.setPasteMode(mode);
+    return;
+  }
   const a = keymap.get(ks);
   if (a) {
     e.preventDefault();
@@ -290,8 +298,8 @@ if ((location.protocol === 'https:' || location.hostname === 'localhost') && 'se
 
 // ---- Guardado automático y recuperación ---------------------------------------------------
 import('./io/autosave').then(async ({ autosave, listSaved, restoreSaved, removeSaved }) => {
-  setInterval(() => autosave(app.docs), 15000);
-  document.addEventListener('visibilitychange', () => { if (document.hidden) autosave(app.docs); });
+  setInterval(() => { if (prefs.autosave) autosave(app.docs); }, 15000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden && prefs.autosave) autosave(app.docs); });
   (app as any).debug.autosave = () => autosave(app.docs);
   const saved = await listSaved();
   if (!saved.length) return;

@@ -287,14 +287,15 @@ export class Viewport {
       const ctx = c.getContext('2d')!;
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       const len = horiz ? this.width : this.height;
-      ctx.fillStyle = '#2b2d31'; ctx.fillRect(0, 0, horiz ? len : RULER, horiz ? RULER : len);
-      ctx.fillStyle = '#3a3c42'; horiz ? ctx.fillRect(0, RULER - 1, len, 1) : ctx.fillRect(RULER - 1, 0, 1, len);
+      const css = getComputedStyle(document.body), cv = (n: string, f: string) => css.getPropertyValue(n).trim() || f;
+      ctx.fillStyle = cv('--panel', '#2b2d31'); ctx.fillRect(0, 0, horiz ? len : RULER, horiz ? RULER : len);
+      ctx.fillStyle = cv('--border', '#3a3c42'); horiz ? ctx.fillRect(0, RULER - 1, len, 1) : ctx.fillRect(RULER - 1, 0, 1, len);
       if (!d || this.rot) continue;
       const zoom = d.view.zoom, pan = horiz ? d.view.panX : d.view.panY;
       const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000];
       const step = nice.find(s => s * zoom >= 60) ?? 10000;
       const minor = step / (step % 5 === 0 ? 5 : step % 2 === 0 ? 2 : 1);
-      ctx.strokeStyle = '#80838a'; ctx.fillStyle = '#a9acb3'; ctx.font = '9px system-ui, sans-serif'; ctx.lineWidth = 1;
+      ctx.strokeStyle = cv('--ruler-tick', '#80838a'); ctx.fillStyle = cv('--ruler-text', '#a9acb3'); ctx.font = '9px system-ui, sans-serif'; ctx.lineWidth = 1;
       ctx.beginPath();
       const start = Math.floor(-pan / zoom / minor) * minor, end = (len - pan) / zoom;
       for (let v = start; v <= end; v += minor) {

@@ -9,12 +9,13 @@ import { develop, DEVELOP_DEFAULTS } from './develop';
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string }
   | { key: string; label: string; type: 'checkbox'; default: boolean }
-  | { key: string; label: string; type: 'color'; default: string };
+  | { key: string; label: string; type: 'color'; default: string }
+  | { key: string; label: string; type: 'pattern'; default: string };
 
 export interface FilterDef {
   id: string;
   name: string;
-  group: 'ajuste' | 'filtro';
+  group: 'ajuste' | 'filtro' | 'relleno';
   submenu?: string;
   shortcut?: string;
   /** Sin parámetros = se aplica directamente sin diálogo. */
@@ -23,6 +24,8 @@ export interface FilterDef {
   custom?: 'levels' | 'curves';
   /** true = no tiene sentido como capa de ajuste (se calcula a partir de la propia imagen). */
   noLayer?: boolean;
+  /** Capa de relleno: genera los píxeles en vez de modificar los de debajo. */
+  fill?: boolean;
   apply(img: ImageData, p: any): void;
 }
 
@@ -179,7 +182,39 @@ export const FILTERS: FilterDef[] = [
   { id: 'develop', name: 'Revelado (tipo Camera Raw)…', group: 'filtro', shortcut: 'Shift+Ctrl+A', params: [{ key: 'temp', label: 'Temperatura', type: 'range', min: -100, max: 100, default: 0, section: 'Balance de blancos' }, { key: 'tint', label: 'Matiz', type: 'range', min: -100, max: 100, default: 0 }, { key: 'exposure', label: 'Exposición', type: 'range', min: -5, max: 5, default: 0, step: 0.05, section: 'Tono' }, { key: 'contrast', label: 'Contraste', type: 'range', min: -100, max: 100, default: 0 }, { key: 'highlights', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0 }, { key: 'shadows', label: 'Sombras', type: 'range', min: -100, max: 100, default: 0 }, { key: 'whites', label: 'Blancos', type: 'range', min: -100, max: 100, default: 0 }, { key: 'blacks', label: 'Negros', type: 'range', min: -100, max: 100, default: 0 }, { key: 'clarity', label: 'Claridad', type: 'range', min: -100, max: 100, default: 0, section: 'Presencia' }, { key: 'dehaze', label: 'Neblina', type: 'range', min: -100, max: 100, default: 0 }, { key: 'vibrance', label: 'Intensidad', type: 'range', min: -100, max: 100, default: 0 }, { key: 'saturation', label: 'Saturación', type: 'range', min: -100, max: 100, default: 0 }, { key: 'vignette', label: 'Viñeta', type: 'range', min: -100, max: 100, default: 0, section: 'Efectos' }, { key: 'sharpen', label: 'Enfoque', type: 'range', min: 0, max: 150, default: 0, section: 'Detalle' }, { key: 'noise', label: 'Reducción de ruido', type: 'range', min: 0, max: 100, default: 0 }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, ...p }) },
   { id: 'shadowsHighlights', name: 'Sombras/Iluminaciones…', group: 'ajuste', params: [{ key: 'shadows', label: 'Sombras', type: 'range', min: -100, max: 100, default: 35, unit: '%' }, { key: 'highlights', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0, unit: '%' }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, ...p }) },
   { id: 'denoise', name: 'Reducir ruido…', group: 'filtro', submenu: 'Ruido', params: [{ key: 'strength', label: 'Intensidad', type: 'range', min: 1, max: 100, default: 40, unit: '%' }, { key: 'detail', label: 'Conservar detalles', type: 'range', min: 0, max: 100, default: 10, unit: '%' }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, noise: p.strength, sharpen: p.detail }) },
+  { id: 'solidfill', name: 'Color sólido', group: 'relleno', fill: true, params: [{ key: 'color', label: 'Color', type: 'color', default: '#3d8bfd' }],
+    apply: (img, p) => { const n = parseInt(String(p.color).slice(1), 16), d = img.data; for (let i = 0; i < d.length; i += 4) { d[i] = n >> 16 & 255; d[i + 1] = n >> 8 & 255; d[i + 2] = n & 255; d[i + 3] = 255; } } },
+  { id: 'gradfill', name: 'Degradado', group: 'relleno', fill: true,
+    params: [{ key: 'c1', label: 'Color inicial', type: 'color', default: '#000000' }, { key: 'c2', label: 'Color final', type: 'color', default: '#ffffff' },
+      { key: 'angle', label: 'Ángulo', type: 'range', min: -180, max: 180, default: 90, unit: '°' }, { key: 'scale', label: 'Escala', type: 'range', min: 10, max: 300, default: 100, unit: '%' },
+      { key: 'radial', label: 'Radial', type: 'checkbox', default: false }],
+    apply: (img, p) => {
+      const c1 = parseInt(String(p.c1).slice(1), 16), c2 = parseInt(String(p.c2).slice(1), 16), d = img.data, W = p._W ?? img.width, H = p._H ?? img.height;
+      const a = -(p.angle ?? 90) * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), k = (p.scale ?? 100) / 100;
+      const half = (Math.abs(ca) * W + Math.abs(sa) * H) / 2 * k, rad = Math.hypot(W, H) / 2 * k;
+      for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+        const X = x + (p._x ?? 0) - W / 2, Y = y + (p._y ?? 0) - H / 2;
+        let t = p.radial ? Math.hypot(X, Y) / rad : ((X * ca + Y * sa) / half + 1) / 2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+        const i = (y * img.width + x) * 4;
+        d[i] = (c1 >> 16 & 255) * (1 - t) + (c2 >> 16 & 255) * t; d[i + 1] = (c1 >> 8 & 255) * (1 - t) + (c2 >> 8 & 255) * t; d[i + 2] = (c1 & 255) * (1 - t) + (c2 & 255) * t; d[i + 3] = 255;
+      }
+    } },
+  { id: 'patternfill', name: 'Motivo', group: 'relleno', fill: true,
+    params: [{ key: 'pattern', label: 'Motivo', type: 'pattern', default: 'base:Damero' }, { key: 'scale', label: 'Escala', type: 'range', min: 10, max: 1000, default: 100, unit: '%' }],
+    apply: (img, p) => {
+      const pd = patternData(p.pattern); if (!pd) return;
+      const d = img.data, k = (p.scale ?? 100) / 100;
+      for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
+        const px = Math.floor((x + (p._x ?? 0)) / k) % pd.w, py = Math.floor((y + (p._y ?? 0)) / k) % pd.h, j = (py * pd.w + px) * 4, i = (y * img.width + x) * 4;
+        d[i] = pd.data[j]; d[i + 1] = pd.data[j + 1]; d[i + 2] = pd.data[j + 2]; d[i + 3] = pd.data[j + 3];
+      }
+    } },
 ];
+
+/** Los motivos se piden a quien los tenga (la página); en el hilo de fondo no existen. */
+let patternSource: ((id: string) => { w: number; h: number; data: Uint8ClampedArray } | null) | null = null;
+export function setPatternSource(f: typeof patternSource) { patternSource = f; }
+function patternData(id: string) { return patternSource ? patternSource(id) : null; }
 
 export function defaultParams(f: FilterDef): any {
   if (f.custom === 'levels') return { inBlack: 0, inWhite: 255, gamma: 1, outBlack: 0, outWhite: 255 };

@@ -9,7 +9,8 @@ import { cloneCanvas, contentBounds, ctx2d, makeCanvas, Rect, rectUnion } from '
 import { GroupLayer, RasterLayer, SmartLayer, Matrix, matMul, isRaster, isParametric, walkLayers } from '../core/layers';
 import { selectedLayers } from '../ui/ops';
 import { rasterizeLayer } from './paint';
-import { h } from '../ui/dom';
+import { h, numberSlider } from '../ui/dom';
+import { drawMesh, drawMeshExact, meshFromQuad, meshInverse, dragSurface, styledMesh, meshPoint, WARP_STYLES } from './warpmesh';
 
 interface TState { cx: number; cy: number; sx: number; sy: number; angle: number; }
 
@@ -27,6 +28,8 @@ type P = { x: number; y: number };
 interface Session {
   /** Modo distorsionar/perspectiva: esquinas de destino (sup-izq, sup-der, inf-der, inf-izq). */
   quad?: P[] | null;
+  /** Modo deformar: 16 puntos de control del parche Bézier. */
+  mesh?: P[] | null;
   items: Item[];
   rect: Rect;                        // caja que engloba todos los elementos
   selMask: HTMLCanvasElement | null; // selección original recortada a rect
@@ -170,7 +173,8 @@ export function drawWarp(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement, 
 }
 /** Dibuja un elemento con la transformación de la sesión (afín o distorsión). */
 function drawItem(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, rect: Rect, s: Session, m0?: Matrix, exact = false) {
-  if (s.quad) (exact ? drawWarpExact : drawWarp)(ctx, src, rect.x - s.rect.x, rect.y - s.rect.y, s.rect, s.quad);
+  if (s.mesh) (exact ? drawMeshExact : drawMesh)(ctx, src, rect.x - s.rect.x, rect.y - s.rect.y, s.rect, s.mesh);
+  else if (s.quad) (exact ? drawWarpExact : drawWarp)(ctx, src, rect.x - s.rect.x, rect.y - s.rect.y, s.rect, s.quad);
   else drawTransformed(ctx, src, rect, s, m0);
 }
 
@@ -215,9 +219,11 @@ export class TransformTool implements Tool {
   private drag: Drag | null = null;
   private qdrag: { i: number | 'move'; start: P; q0: P[] } | null = null;
   /** Modo de la transformación: libre, distorsionar o perspectiva. */
-  warp: 'free' | 'distort' | 'perspective' = 'free';
+  warp: 'free' | 'distort' | 'perspective' | 'warp' = 'free';
+  private mdrag: { kind: 'pt'; i: number; start: P; m0: P[] } | { kind: 'surf'; u: number; v: number; start: P; m0: P[] } | null = null;
+  private warpStyle = 'none'; private bend = 50; private warpBox: Rect | null = null;
   /** Modo con el que debe empezar la próxima sesión (desde el menú). */
-  static startMode: 'free' | 'distort' | 'perspective' = 'free';
+  static startMode: 'free' | 'distort' | 'perspective' | 'warp' = 'free';
   private fields: Record<string, HTMLInputElement> = {};
 
   activate() {
@@ -238,9 +244,16 @@ export class TransformTool implements Tool {
       this.fields[key] = inp;
       bar.append(h('label', { class: 'opt' }, h('span', { class: 'lbl' }, label), inp, h('span', { class: 'unit' }, unit)));
     };
-    if (this.s?.quad) bar.append(h('span', { class: 'hint' }, this.warp === 'perspective' ? 'Perspectiva: arrastra una esquina (la vecina se mueve en espejo).' : 'Distorsionar: arrastra cada esquina libremente.'));
+    if (this.s?.mesh) {
+      const styleSel = h('select', { title: 'Estilo de deformación' }, ...Object.entries(WARP_STYLES).map(([k, n]) => h('option', { value: k, selected: k === this.warpStyle }, n)));
+      styleSel.onchange = () => { this.warpStyle = styleSel.value; this.applyStyle(); app.emit('tool'); };
+      bar.append(h('label', { class: 'opt' }, h('span', { class: 'lbl' }, 'Deformar'), styleSel));
+      if (this.warpStyle !== 'none') bar.append(numberSlider({ label: 'Curvatura', min: -100, max: 100, value: this.bend, unit: '%', compact: true, onInput: v => { this.bend = v; this.applyStyle(); } }).el);
+      else bar.append(h('span', { class: 'hint' }, 'Arrastra los puntos o directamente la imagen.'));
+    }
+    else if (this.s?.quad) bar.append(h('span', { class: 'hint' }, this.warp === 'perspective' ? 'Perspectiva: arrastra una esquina (la vecina se mueve en espejo).' : 'Distorsionar: arrastra cada esquina libremente.'));
     else { num('x', 'X', 'px'); num('y', 'Y', 'px'); num('w', 'An', '%'); num('h', 'Al', '%'); num('a', 'Ángulo', '°'); }
-    const modeSel = h('select', { title: 'Modo de transformación' }, h('option', { value: 'free' }, 'Libre'), h('option', { value: 'distort' }, 'Distorsionar'), h('option', { value: 'perspective' }, 'Perspectiva'));
+    const modeSel = h('select', { title: 'Modo de transformación' }, h('option', { value: 'free' }, 'Libre'), h('option', { value: 'distort' }, 'Distorsionar'), h('option', { value: 'perspective' }, 'Perspectiva'), h('option', { value: 'warp' }, 'Deformar'));
     modeSel.value = this.warp;
     modeSel.onchange = () => { if (modeSel.value === 'free') { app.toast('Para volver a la transformación libre, cancela (Esc) y empieza de nuevo', 'warn'); modeSel.value = this.warp; return; } this.enterQuad(modeSel.value as any); };
     bar.append(modeSel);
@@ -292,8 +305,9 @@ export class TransformTool implements Tool {
   private local(x: number, y: number) { const st = this.s!.st; return rot(x - st.cx, y - st.cy, -st.angle); }
 
   /** Pasa al modo de esquinas libres (distorsionar / perspectiva). */
-  enterQuad(mode: 'distort' | 'perspective') {
+  enterQuad(mode: 'distort' | 'perspective' | 'warp') {
     const s = this.s; if (!s) return;
+    if (s.mesh && mode !== 'warp') { app.toast('Para dejar de deformar, cancela (Esc) y empieza de nuevo', 'warn'); app.emit('tool'); return; }
     this.warp = mode;
     if (!s.quad) {
       const hs = this.handles(), c = (hx: number, hy: number) => { const p = hs.find(q => q.hx === hx && q.hy === hy)!; return { x: p.x, y: p.y }; };
@@ -305,6 +319,11 @@ export class TransformTool implements Tool {
         it.src = crop; it.rect = r; it.m0 = undefined; it.toRaster = true;
       }
       // La caja pasa a ser la unión en coordenadas sin transformar
+    }
+    if (mode === 'warp' && !s.mesh) {
+      s.mesh = meshFromQuad(s.quad!); this.warpStyle = 'none';
+      const xs = s.quad!.map(p => p.x), ys = s.quad!.map(p => p.y);
+      this.warpBox = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
     }
     this.preview();
     app.emit('tool');
@@ -327,8 +346,21 @@ export class TransformTool implements Tool {
     if (Math.abs(l.x) <= hw && Math.abs(l.y) <= hh) return 'move';
     return 'rotate';
   }
+  /** Estilo predefinido de deformación (Arco, Bandera…). */
+  private applyStyle() {
+    const s = this.s; if (!s?.mesh || !this.warpBox) return;
+    s.mesh = this.warpStyle === 'none' ? meshFromQuad(s.quad!) : styledMesh(this.warpStyle, this.warpBox, this.bend);
+    this.preview();
+  }
+  private meshHit(e: ToolEvent): number | 'surf' | null {
+    const m = this.s!.mesh!, vp = app.viewport;
+    // primero las esquinas (por encima de los tiradores)
+    for (const i of [0, 3, 12, 15, 1, 2, 4, 7, 8, 11, 13, 14, 5, 6, 9, 10]) { const sp = vp.toScreen(m[i].x, m[i].y); if (Math.abs(sp.x - e.sx) < 8 && Math.abs(sp.y - e.sy) < 8) return i; }
+    return meshInverse(m, e.x, e.y) ? 'surf' : null;
+  }
   hover(e: ToolEvent) {
     if (!this.s) return;
+    if (this.s.mesh) { const q = this.meshHit(e); this.cursor = q === 'surf' ? 'move' : q === null ? 'default' : 'crosshair'; return; }
     if (this.s.quad) { const q = this.quadHit(e); this.cursor = q === 'move' ? 'move' : q === null ? 'default' : 'crosshair'; return; }
     const r = this.hit(e);
     this.cursor = r === 'move' ? 'move' : r === 'rotate' ? 'alias' : 'crosshair';
@@ -336,6 +368,14 @@ export class TransformTool implements Tool {
   down(e: ToolEvent) {
     if (!this.s) return;
     if (!this.s.quad && e.ctrl) { const r0 = this.hit(e); if (typeof r0 === 'object' && r0.hx && r0.hy) this.enterQuad(e.alt && e.shift ? 'perspective' : 'distort'); }
+    if (this.s.mesh) {
+      const q = this.meshHit(e), m0 = this.s.mesh.map(p => ({ ...p }));
+      if (typeof q === 'number') this.mdrag = { kind: 'pt', i: q, start: { x: e.x, y: e.y }, m0 };
+      else if (q === 'surf') { const uv = meshInverse(this.s.mesh, e.x, e.y)!; this.mdrag = { kind: 'surf', u: uv.u, v: uv.v, start: { x: e.x, y: e.y }, m0 }; }
+      if (e.detail >= 2 && q === 'surf') { this.mdrag = null; this.commit(); app.restoreTool(); return; }
+      if (this.mdrag && this.warpStyle !== 'none') { this.warpStyle = 'none'; app.emit('tool'); }
+      return;
+    }
     if (this.s.quad) {
       const q = this.quadHit(e);
       if (q !== null) this.qdrag = { i: q, start: { x: e.x, y: e.y }, q0: this.s.quad.map(p => ({ ...p })) };
@@ -349,6 +389,18 @@ export class TransformTool implements Tool {
     if (e.detail >= 2 && r === 'move') { this.commit(); app.restoreTool(); }
   }
   move(e: ToolEvent) {
+    if (this.s?.mesh && this.mdrag) {
+      const d = this.mdrag, dx = e.x - d.start.x, dy = e.y - d.start.y;
+      if (d.kind === 'surf') this.s.mesh = dragSurface(d.m0, d.u, d.v, dx, dy);
+      else {
+        const m = d.m0.map(p => ({ ...p }));
+        // al mover una esquina la acompañan sus tiradores
+        const group = ({ 0: [0, 1, 4, 5], 3: [3, 2, 7, 6], 12: [12, 13, 8, 9], 15: [15, 14, 11, 10] } as Record<number, number[]>)[d.i] ?? [d.i];
+        for (const k of group) m[k] = { x: d.m0[k].x + dx, y: d.m0[k].y + dy };
+        this.s.mesh = m;
+      }
+      this.preview(); return;
+    }
     if (this.s?.quad && this.qdrag) {
       const { i, start, q0 } = this.qdrag, dx = e.x - start.x, dy = e.y - start.y, q = this.s.quad;
       if (i === 'move') q0.forEach((p, k) => { q[k] = { x: p.x + dx, y: p.y + dy }; });
@@ -398,7 +450,7 @@ export class TransformTool implements Tool {
     }
     this.preview();
   }
-  up() { this.drag = null; this.qdrag = null; }
+  up() { this.drag = null; this.qdrag = null; this.mdrag = null; }
 
   commit() {
     const s = this.s; if (!s) return;
@@ -407,7 +459,7 @@ export class TransformTool implements Tool {
     if (!s.quad && st.sx === 1 && st.sy === 1 && st.angle === 0 && st.cx === s.rect.x + s.rect.w / 2 && st.cy === s.rect.y + s.rect.h / 2) {
       clearOverrides(s); app.doc!.invalidate(); return;
     }
-    applySession(s, 'Transformación libre');
+    applySession(s, s.mesh ? 'Deformar' : 'Transformación libre');
   }
   cancel() {
     const s = this.s; if (!s) return;
@@ -421,6 +473,27 @@ export class TransformTool implements Tool {
   }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     if (!this.s) return;
+    if (this.s.mesh) {
+      const m = this.s.mesh, S = (p: P) => vp.toScreen(p.x, p.y);
+      ctx.save(); ctx.strokeStyle = '#3d8bfd';
+      // rejilla de la malla (bordes más marcados)
+      for (let k = 0; k <= 3; k++) for (const dir of [0, 1]) {
+        ctx.lineWidth = k === 0 || k === 3 ? 1.5 : 0.8; ctx.beginPath();
+        for (let t = 0; t <= 32; t++) { const p = S(dir ? meshPoint(m, k / 3, t / 32) : meshPoint(m, t / 32, k / 3)); t ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+        ctx.stroke();
+      }
+      // tiradores: líneas de cada esquina a sus dos vecinos
+      ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(61,139,253,0.7)';
+      for (const [a, b] of [[0, 1], [0, 4], [3, 2], [3, 7], [12, 13], [12, 8], [15, 14], [15, 11]]) { const p = S(m[a]), q = S(m[b]); ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
+      m.forEach((pt, i) => {
+        const p = S(pt);
+        ctx.fillStyle = '#fff'; ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1;
+        if ([0, 3, 12, 15].includes(i)) { ctx.fillRect(p.x - 4, p.y - 4, 8, 8); ctx.strokeRect(p.x - 4, p.y - 4, 8, 8); }
+        else { ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, 7); ctx.fill(); ctx.stroke(); }
+      });
+      ctx.restore();
+      return;
+    }
     if (this.s.quad) {
       const q = this.s.quad.map(p => vp.toScreen(p.x, p.y));
       ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1.5; ctx.beginPath(); q.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.stroke();

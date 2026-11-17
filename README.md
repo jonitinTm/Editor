@@ -113,6 +113,17 @@ Ya disponible:
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;
   *Edición › Contornear*; *Selección › Gama de colores*; botones de alinear en la herramienta Mover; cuadrícula (`Ctrl+'`).
+- **Capas de relleno** (*Capa › Nueva capa de relleno*): color sólido, degradado o motivo, no destructivas y editables
+  en *Propiedades*. Si hay una selección, se usa como máscara. Se guardan en PSD como rellenos editables (color y degradado).
+- **Modos de fusión en capas de ajuste y de relleno** (Multiplicar, Trama, Color…), igual que en Photoshop.
+- **Pegar en el mismo sitio** (`Mayús+Ctrl+V`) y **Pegar dentro de la selección** (`Alt+Mayús+Ctrl+V`, crea la capa con
+  máscara). `Ctrl+V` normal pega en el centro de lo que estás viendo.
+- **Preferencias** (`Ctrl+K`, en *Edición*): tema oscuro, gris medio o claro; tamaño de la interfaz; pasos de historial;
+  distancia de ajuste de las guías; copia de recuperación automática.
+- **Deformar** (*Edición › Transformar › Deformar*, o el modo «Deformar» con `Ctrl+T`): malla de 4×4 puntos como en
+  Photoshop; arrastra los puntos, sus tiradores o directamente la imagen. Estilos predefinidos: arco, abultamiento,
+  bandera, onda, pez, ascender, inflar, comprimir y giro, con su curvatura.
+- **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
   (el documento principal se actualiza solo). Las copias comparten contenido.

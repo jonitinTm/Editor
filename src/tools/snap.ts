@@ -1,3 +1,4 @@
+import { prefs } from '../ui/prefs';
 // Ajuste magnético (snap) y guías inteligentes: bordes y centro del lienzo,
 // guías y bordes/centros de otras capas.
 
@@ -33,7 +34,7 @@ export function snapTargets(exclude: Layer[], withLayers = true): { x: number[];
 /** Ajusta el desplazamiento (dx, dy) de una caja para que sus bordes o centro coincidan con algún objetivo. */
 export function snapRect(r: Rect, dx: number, dy: number, targets: { x: number[]; y: number[] }): { dx: number; dy: number } {
   if (!app.snapOn) { activeSnap = null; return { dx, dy }; }
-  const tol = 6 / app.viewport.zoom;
+  const tol = prefs.snapTolerance / app.viewport.zoom;
   const best = (edges: number[], list: number[]) => {
     let off = 0, dist = tol + 1, line: number[] = [];
     for (const e of edges) for (const t of list) {

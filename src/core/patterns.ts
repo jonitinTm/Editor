@@ -2,6 +2,7 @@
 // Los del usuario se guardan en el navegador para tenerlos en todas las sesiones.
 
 import { makeCanvas, ctx2d } from './canvas';
+import { setPatternSource } from '../filters/registry';
 
 export interface Pattern { id: string; name: string; canvas: HTMLCanvasElement; }
 
@@ -32,6 +33,13 @@ const KEY = 'editor.patterns';
 })();
 
 export function allPatterns(): Pattern[] { return [...user, ...BUILTIN]; }
+const dataCache = new Map<string, { w: number; h: number; data: Uint8ClampedArray }>();
+setPatternSource(id => {
+  const p = getPattern(id); if (!p) return null;
+  let c = dataCache.get(id);
+  if (!c) { c = { w: p.canvas.width, h: p.canvas.height, data: ctx2d(p.canvas).getImageData(0, 0, p.canvas.width, p.canvas.height).data }; dataCache.set(id, c); }
+  return c;
+});
 export function getPattern(id: string): Pattern | undefined { return allPatterns().find(p => p.id === id); }
 export function addPattern(name: string, canvas: HTMLCanvasElement): Pattern {
   const p = { id: 'user:' + Date.now().toString(36), name, canvas };

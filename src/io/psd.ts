@@ -149,6 +149,21 @@ function parseEffects(bytes: Uint8Array): LayerStyles | null {
   return Object.keys(st).length ? st : null;
 }
 
+/** Relleno de color o degradado simple (dos colores) → capa de relleno editable. */
+function editableFill(soco?: Uint8Array, gdfl?: Uint8Array): { id: string; params: any } | null {
+  try {
+    const b = (soco ?? gdfl)!;
+    const r = new Reader(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) as ArrayBuffer); r.pos = 4;
+    const d = readDescriptor(r);
+    if (soco) return { id: 'solidfill', params: { color: descColor(d.Clr) } };
+    const stops = (d.Grad?.Clrs ?? []) as any[], tr = (d.Grad?.Trns ?? []) as any[];
+    if (stops.length !== 2 || tr.some(t => (t.Opct ?? 100) < 100) || !(d.Type === 'Lnr' || d.Type === 'Rdl')) return null;
+    let [a, z] = stops; if ((a.Lctn ?? 0) > (z.Lctn ?? 0)) [a, z] = [z, a];
+    if (d.Rvrs) [a, z] = [z, a];
+    return { id: 'gradfill', params: { c1: descColor(a.Clr), c2: descColor(z.Clr), angle: d.Angl ?? 90, scale: d.Scl ?? 100, radial: d.Type === 'Rdl' } };
+  } catch { return null; }
+}
+
 function fillLayer(l: RasterLayer, soco?: Uint8Array, gdfl?: Uint8Array, bounds?: { x: number; y: number; w: number; h: number } | null) {
   const W = l.canvas.width, H = l.canvas.height, ctx = ctx2d(l.canvas);
   const b = (soco ?? gdfl)!;
@@ -438,6 +453,10 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
       try { adj = adjKey ? parseAdjustment(adjKey, rec.blocks[adjKey], rec.blocks.CgEd) : null; } catch { /* formato inesperado */ }
       if (adj) layer = new AdjustmentLayer(rec.name || 'Ajuste', adj.id, adj.params);
       else if (rec.keys.some(k => ADJ_OTHER.includes(k) || ADJ_KEYS.includes(k))) { skippedAdj++; continue; }
+      else if ((rec.blocks.SoCo || rec.blocks.GdFl) && !rec.blocks.vmsk && !rec.blocks.vsms && editableFill(rec.blocks.SoCo, rec.blocks.GdFl)) {
+        const ef = editableFill(rec.blocks.SoCo, rec.blocks.GdFl)!;
+        layer = new AdjustmentLayer(rec.name || 'Relleno', ef.id, ef.params);
+      }
       else if (rec.blocks.SoCo || rec.blocks.GdFl) {
         // Capa de relleno (color o degradado): se convierte en píxeles
         const l = new RasterLayer(rec.name || 'Relleno', W, H);
@@ -697,6 +716,13 @@ function adjustmentBlock(l: AdjustmentLayer): { key: string; bytes: Uint8Array }
   const done = (key: string) => { if (w.size & 1) w.u8(0); const parts = w.parts(); const out = new Uint8Array(w.size); let o = 0; for (const c of parts) { out.set(c, o); o += c.length; } return { key, bytes: out }; };
   const i16 = (v: number) => w.u16(Math.round(v) & 0xffff);
   switch (l.filterId) {
+    case 'solidfill': w.u32(16); writeDescriptor(w, 'null', { 'Clr ': rgbDV(p.color) }); return done('SoCo');
+    case 'gradfill': w.u32(16); writeDescriptor(w, 'null', {
+      Angl: ['UntF', '#Ang', p.angle], Type: ['enum', 'GrdT', p.radial ? 'Rdl ' : 'Lnr '], Algn: ['bool', false], 'Scl ': ['UntF', '#Prc', p.scale],
+      Grad: ['Objc', 'Grdn', { 'Nm  ': ['TEXT', 'Editor'], GrdF: ['enum', 'GrdF', 'CstS'], Intr: ['doub', 4096],
+        Clrs: ['VlLs', [[0, p.c1], [4096, p.c2]].map(([l, c]) => ['Objc', 'Clrt', { 'Clr ': rgbDV(c as string), Type: ['enum', 'Clry', 'UsrS'], Lctn: ['long', l as number], Mdpn: ['long', 50] }] as DV)],
+        Trns: ['VlLs', [0, 4096].map(l => ['Objc', 'TrnS', { Opct: ['UntF', '#Prc', 100], Lctn: ['long', l], Mdpn: ['long', 50] }] as DV)] }] });
+      return done('GdFl');
     case 'invert': return done('nvrt');
     case 'exposure': w.u16(1); w.f32(p.stops); w.f32(p.offset); w.f32(p.gamma); return done('expA');
     case 'posterize': w.u16(Math.round(p.levels)); w.u16(0); return done('post');

@@ -11,7 +11,7 @@ import { FONTS } from '../tools/text';
 import { actionById } from './actions';
 import { promptDialog, row as formRow } from './dialog';
 import { createPicker, SWATCHES } from './colorpicker';
-import { layerStyleDialog, levelsBody, curvesBody, filterDialog } from './dialogs';
+import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect } from './dialogs';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';
 
@@ -40,8 +40,15 @@ function thumb(owner: object, version: number, draw: (ctx: CanvasRenderingContex
   thumbCache.set(owner, { v: version, c });
   return c;
 }
+const FILTER_BY_ID = new Map(FILTERS.map(f => [f.id, f]));
+const hashStr = (s: string) => { let x = 0; for (let i = 0; i < s.length; i++) x = (x * 31 + s.charCodeAt(i)) | 0; return x; };
 function layerThumb(l: Layer) {
   if (l instanceof GroupLayer) return h('span', { class: 'thumb folder', html: icon('folder') });
+  if (l instanceof AdjustmentLayer && FILTER_BY_ID.get(l.filterId)?.fill) {
+    // Capa de relleno: miniatura con su color, degradado o motivo
+    const def = FILTER_BY_ID.get(l.filterId)!, sig = JSON.stringify(l.params);
+    return thumb(l, hashStr(sig), (ctx, w, hh) => { const img = ctx.createImageData(w, hh); const d = app.doc!; def.apply(img, { ...l.params, _x: 0, _y: 0, _W: w, _H: hh, scale: l.filterId === 'patternfill' ? (l.params.scale ?? 100) * w / d.width : l.params.scale }); ctx.putImageData(img, 0, 0); });
+  }
   if (l instanceof AdjustmentLayer) return h('span', { class: 'thumb folder adj', html: icon('adjust') });
   const r = l as any;
   return thumb(l, l.version, (ctx, w, hh) => ctx.drawImage(r.canvas, 0, 0, w, hh));
@@ -314,7 +321,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('button', { class: 'btn', onclick: () => actionById.get('imageSize')!.run() }, 'Tamaño de imagen'),
         h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
     if (!l) return;
-    const kind = l instanceof AdjustmentLayer ? 'Capa de ajuste' : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : l instanceof SmartLayer ? 'Objeto inteligente' : 'Capa de píxeles';
+    const kind = l instanceof AdjustmentLayer ? (FILTER_BY_ID.get(l.filterId)?.fill ? 'Capa de relleno' : 'Capa de ajuste') : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : l instanceof SmartLayer ? 'Objeto inteligente' : 'Capa de píxeles';
     body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · editando máscara' : '')));
     if (l instanceof TextLayer) {
       const p = l.props;
@@ -358,6 +365,8 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           const c = h('input', { type: 'color', class: 'color-input', value: l.params[pd.key] });
           c.oninput = () => { l.params[pd.key] = c.value; changed(); };
           body.append(formRow(pd.label, c));
+        } else if (pd.type === 'pattern') {
+          body.append(formRow(pd.label, patternSelect(l.params[pd.key], v => { l.params[pd.key] = v; changed(); })));
         } else body.append(formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, onInput: v => { l.params[pd.key] = v; changed(); } }).el));
       }
       if (def && !def.custom && !def.params) body.append(h('div', { class: 'hint' }, 'Este ajuste no tiene opciones.'));

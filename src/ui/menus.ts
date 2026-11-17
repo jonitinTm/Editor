@@ -17,13 +17,14 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
 
 const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Archivo', items: ['new', 'open', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', '-', 'batch', '-', 'close'] },
-  { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'clear', '-', 'fill', 'contentFill', 'stroke', '-', 'definePattern', '-', 'freeTransform',
-    { label: 'Transformar', items: ['distort', 'perspective', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }] },
+  { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fill', 'contentFill', 'stroke', '-', 'definePattern', '-', 'freeTransform',
+    { label: 'Transformar', items: ['distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'prefs'] },
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'dupDoc', '-', 'imageSize', 'canvasSize',
     { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
   { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
+    { label: 'Nueva capa de relleno', items: ['fill:solid', 'fill:gradient', 'fill:pattern'] },
     { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste' && !f.noLayer).map(f => 'adjust:' + f.id) }, 'layerStyle', 'clearStyle', 'clip',
-    { label: 'Objeto inteligente', items: ['toSmart', 'editSmart', 'rasterize'] }, '-', 'group', 'ungroup', '-',
+    { label: 'Objeto inteligente', items: ['toSmart', 'editSmart', 'replaceSmart', 'rasterize'] }, '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
   { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'colorRange', 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },

@@ -225,8 +225,19 @@ function applyAdjustment(l: AdjustmentLayer, ctx: CanvasRenderingContext2D, w: n
   let x = 0, y = 0, x1 = w, y1 = h;
   if (opts.rect) { x = Math.max(0, Math.floor(opts.rect.x)); y = Math.max(0, Math.floor(opts.rect.y)); x1 = Math.min(w, Math.ceil(opts.rect.x + opts.rect.w)); y1 = Math.min(h, Math.ceil(opts.rect.y + opts.rect.h)); }
   if (x1 <= x || y1 <= y) return;
-  const img = ctx.getImageData(x, y, x1 - x, y1 - y);
   const mc = opts.overrides?.get(l)?.mask ?? (l.mask?.enabled ? l.mask.canvas : null);
+  const params = def.fill ? { ...l.params, _x: x, _y: y, _W: w, _H: h } : l.params;
+  if (def.fill || canvasBlend(l.blendMode) !== 'source-over') {
+    // Relleno o ajuste con modo de fusión: el resultado se dibuja encima con su máscara, opacidad y modo
+    const rw = x1 - x, rh = y1 - y;
+    const img2 = def.fill ? new ImageData(rw, rh) : ctx.getImageData(x, y, rw, rh);
+    def.apply(img2, params);
+    const t = makeCanvas(rw, rh), tc = ctx2d(t); tc.putImageData(img2, 0, 0);
+    if (mc) { tc.globalCompositeOperation = 'destination-in'; tc.drawImage(mc, -x, -y); }
+    ctx.save(); ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode); ctx.drawImage(t, x, y); ctx.restore();
+    return;
+  }
+  const img = ctx.getImageData(x, y, x1 - x, y1 - y);
   const orig = mc || l.opacity < 1 ? new Uint8ClampedArray(img.data) : null;
   def.apply(img, l.params);
   if (orig) {
