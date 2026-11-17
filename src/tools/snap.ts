@@ -13,6 +13,7 @@ export let activeSnap: SnapLines | null = null;
 export function clearSnap() { activeSnap = null; }
 
 export function layerBounds(l: Layer): Rect | null {
+  const a = (l as any).artboard; if (a) return { x: a.x, y: a.y, w: a.w, h: a.h };
   if (!isRaster(l)) return null;
   const f = l.fullContent(), b = contentBoundsQuick(f.canvas, l.version);
   return b ? { x: b.x + f.x, y: b.y + f.y, w: b.w, h: b.h } : null;

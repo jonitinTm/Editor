@@ -77,7 +77,7 @@ export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith
 
 interface ProjLayer {
   id: number; type: string; name: string; visible: boolean; opacity: number; blendMode: string; locked: boolean; lockAlpha?: boolean; clip?: boolean; label?: string | null;
-  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile; filters?: any[] }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean;
+  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile; filters?: any[] }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean; artboard?: any;
 }
 interface ProjFile {
   format: 'editor-proyecto'; version: 1; name: string; width: number; height: number;
@@ -97,7 +97,7 @@ async function layerToProj(l: Layer): Promise<ProjLayer> {
   };
   if (l.styles) p.styles = l.styles;
   if (l instanceof AdjustmentLayer) p.adjust = { filterId: l.filterId, params: l.params };
-  if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; }
+  if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; if (l.artboard) p.artboard = l.artboard; }
   else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument), filters: l.filters };
   else if (isRaster(l)) { p.image = await canvasToDataURL(l.canvas); if (l instanceof TextLayer) p.text = { ...l.props }; if (l instanceof ShapeLayer) p.shape = { ...l.props }; }
   return p;
@@ -118,7 +118,7 @@ async function projectData(doc: EditorDocument): Promise<ProjFile> {
 async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
   let l: Layer;
   if (p.type === 'group') {
-    const g = new GroupLayer(p.name); g.expanded = p.expanded ?? true;
+    const g = new GroupLayer(p.name); g.expanded = p.expanded ?? true; if (p.artboard) g.artboard = { ...p.artboard };
     for (const c of p.children ?? []) g.add(await projToLayer(c, w, h));
     l = g;
   } else if (p.type === 'smart') {
@@ -184,8 +184,8 @@ export async function saveBlob(blob: Blob, filename: string, handle?: any): Prom
   return null;
 }
 
-export async function exportImage(doc: EditorDocument, type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number, scale = 1): Promise<Blob> {
-  let c = doc.flatten();
+export async function exportImage(doc: EditorDocument, type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number, scale = 1, src?: HTMLCanvasElement): Promise<Blob> {
+  let c = src ?? doc.flatten();
   if (scale !== 1) { // Cambio de tamaño en pasos de como mucho ½ para que quede nítido
     let cur = c, w = c.width, hh = c.height; const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(hh * scale));
     while (w / 2 > tw && hh / 2 > th) { w = Math.round(w / 2); hh = Math.round(hh / 2); const n = makeCanvas(w, hh), x = ctx2d(n); x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, w, hh); cur = n; }

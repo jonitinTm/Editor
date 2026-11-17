@@ -86,12 +86,16 @@ export class MoveTool implements Tool {
     } else {
       this.layers = [...new Set(sel.flatMap(l => l instanceof GroupLayer ? [l, ...walkLayers(l)] : [l]))];
       this.floating = null;
+      // mesas de trabajo: su rectángulo se mueve con ellas
+      this.boards = this.layers.filter((l): l is GroupLayer => l instanceof GroupLayer && !!l.artboard).map(g => ({ g, x: g.artboard!.x, y: g.artboard!.y }));
     }
     return true;
   }
 
+  private boards: { g: GroupLayer; x: number; y: number }[] = [];
   private update() {
     const doc = app.doc!;
+    for (const b of this.boards) { b.g.artboard!.x = b.x + this.offset.x; b.g.artboard!.y = b.y + this.offset.y; }
     if (this.floating) {
       (doc as any).selectionOffset = this.offset;
     } else {
@@ -147,7 +151,7 @@ export class MoveTool implements Tool {
         if (l.mask) { l.mask.canvas = shiftCanvas(l.mask.canvas, dx, dy, '#fff'); l.mask.touch(); }
       }
     }
-    this.floating = null; this.layers = []; this.start = null;
+    this.floating = null; this.layers = []; this.start = null; this.boards = [];
     doc.invalidate();
     if (dx || dy) doc.commit('Mover');
   }
@@ -156,6 +160,7 @@ export class MoveTool implements Tool {
   cancel() {
     const doc = app.doc!;
     for (const l of this.layers) doc.overrides.delete(l);
+    for (const b of this.boards) { b.g.artboard!.x = b.x; b.g.artboard!.y = b.y; } this.boards = [];
     (doc as any).selectionOffset = null;
     this.floating = null; this.layers = []; this.start = null; doc.invalidate();
   }

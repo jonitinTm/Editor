@@ -186,6 +186,7 @@ export class EditorDocument {
   /** Cambia el tamaño del lienzo desplazando el contenido (dx, dy). */
   resizeCanvas(w: number, h: number, dx: number, dy: number) {
     for (const l of this.allLayers()) {
+      const ab = (l as any).artboard; if (ab) { ab.x += dx; ab.y += dy; }
       if (isParametric(l)) { const old = l.canvas; l.canvas = makeCanvas(w, h); if (l.props.keepPixels) ctx2d(l.canvas).drawImage(old, 0, 0); l.translate(dx, dy); }
       else if (isRaster(l)) { const f = l.fullContent(); l.placeFull(f.canvas, f.x + dx, f.y + dy, w, h); }
       if (l.mask) {

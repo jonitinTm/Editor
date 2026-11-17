@@ -424,7 +424,7 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
       else if (key === 'iOpa') fillOpacity = r.u8();
       else if (key === 'lspf') protect = r.u32();
       else if (key === 'lclr') labelIdx = r.u16();
-      else if (ADJ_KEYS.includes(key) || ['vstk', 'lfx2', 'SoCo', 'GdFl', 'vmsk', 'vsms', 'CgEd', 'TySh', 'SoLd', 'PlLd'].includes(key)) blocks[key] = new Uint8Array(r.buf, start, len);
+      else if (ADJ_KEYS.includes(key) || ['vstk', 'lfx2', 'SoCo', 'GdFl', 'vmsk', 'vsms', 'CgEd', 'TySh', 'SoLd', 'PlLd', 'artb', 'artd'].includes(key)) blocks[key] = new Uint8Array(r.buf, start, len);
       // El relleno tras cada bloque varía según el programa: se busca la siguiente firma
       r.pos = start + len;
       for (let pad = 0; pad < 4; pad++) { r.pos = start + len + pad; if (r.pos >= extraEnd || r.isSig()) break; }
@@ -452,6 +452,14 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
     if (rec.section === 1 || rec.section === 2) {
       const g = stack.length > 1 ? stack.pop()! : new GroupLayer('');
       g.name = rec.name || 'Grupo'; g.expanded = rec.section === 1;
+      // Mesa de trabajo de Photoshop: rectángulo y color de fondo
+      const ab = rec.blocks.artb ?? rec.blocks.artd;
+      if (ab) try {
+        const rr = new Reader(ab.buffer.slice(ab.byteOffset, ab.byteOffset + ab.byteLength) as ArrayBuffer); rr.pos = 4;
+        const dd = readDescriptor(rr), R = dd.artboardRect;
+        if (R) g.artboard = { x: Math.round(R.Left ?? 0), y: Math.round(R.Top ?? 0), w: Math.round((R.Rght ?? 0) - (R.Left ?? 0)), h: Math.round((R.Btom ?? 0) - (R.Top ?? 0)), bg: dd.artboardBackgroundType === 1 || dd.artboardBackgroundType === undefined ? '#ffffff' : dd.artboardBackgroundType === 2 ? '#000000' : dd.artboardBackgroundType === 4 && dd.Clr ? descColor(dd.Clr) : null };
+        if (g.artboard && (g.artboard.w <= 0 || g.artboard.h <= 0)) g.artboard = undefined;
+      } catch { /* formato inesperado */ }
       layer = g;
     } else {
       const adjKey = ADJ_KEYS.find(k => rec.blocks[k]);

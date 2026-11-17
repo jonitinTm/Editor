@@ -8,10 +8,11 @@ import { BLEND_MODES, GroupLayer, AdjustmentLayer, SmartLayer, hasStyles, Layer,
 import { ctx2d } from '../core/canvas';
 import { renderComposite } from '../core/compositor';
 import { FONTS } from '../tools/text';
+import { WARP_STYLES } from '../tools/warpmesh';
 import { actionById } from './actions';
 import { promptDialog, row as formRow } from './dialog';
 import { createPicker, SWATCHES } from './colorpicker';
-import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect } from './dialogs';
+import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect, warpTextDialog } from './dialogs';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';
 
@@ -183,7 +184,7 @@ export function buildLayersPanel(parent: HTMLElement) {
       const n = await promptDialog('Cambiar nombre de capa', 'Nombre', l.name);
       if (n !== null) ops.renameLayer(l, n);
     });
-    const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : l instanceof SmartLayer ? h('span', { class: 'ltag', title: 'Objeto inteligente (doble clic en la miniatura para editar su contenido)' }, '▣') : null;
+    const kindTag = l instanceof GroupLayer && l.artboard ? h('span', { class: 'ltag', title: 'Mesa de trabajo' }, '▭') : l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : l instanceof SmartLayer ? h('span', { class: 'ltag', title: 'Objeto inteligente (doble clic en la miniatura para editar su contenido)' }, '▣') : null;
     const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
@@ -321,8 +322,24 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('button', { class: 'btn', onclick: () => actionById.get('imageSize')!.run() }, 'Tamaño de imagen'),
         h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
     if (!l) return;
-    const kind = l instanceof AdjustmentLayer ? (FILTER_BY_ID.get(l.filterId)?.fill ? 'Capa de relleno' : 'Capa de ajuste') : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : l instanceof SmartLayer ? 'Objeto inteligente' : 'Capa de píxeles';
+    const kind = l instanceof GroupLayer && l.artboard ? 'Mesa de trabajo' : l instanceof AdjustmentLayer ? (FILTER_BY_ID.get(l.filterId)?.fill ? 'Capa de relleno' : 'Capa de ajuste') : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : l instanceof SmartLayer ? 'Objeto inteligente' : 'Capa de píxeles';
     body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · editando máscara' : '')));
+    if (l instanceof GroupLayer && l.artboard) {
+      const a = l.artboard;
+      const num = (v: number, set: (v: number) => void) => { const i = h('input', { type: 'number', class: 'num', value: String(Math.round(v)) }); i.onchange = () => { set(Math.round(+i.value || 0)); fitBoards(); d.commit('Mesa de trabajo'); }; return i; };
+      // si la mesa se sale del lienzo, el lienzo crece (sin mover nada)
+      const fitBoards = () => { a.w = Math.max(1, a.w); a.h = Math.max(1, a.h); const dx = Math.max(0, -a.x), dy = Math.max(0, -a.y); const W = Math.max(d.width + dx, a.x + dx + a.w), H = Math.max(d.height + dy, a.y + dy + a.h); if (W !== d.width || H !== d.height || dx || dy) d.resizeCanvas(W, H, dx, dy); d.invalidate(); };
+      const bg = h('select', {}, h('option', { value: '#ffffff' }, 'Blanco'), h('option', { value: '#000000' }, 'Negro'), h('option', { value: '' }, 'Transparente'), h('option', { value: 'custom' }, 'Otro…'));
+      bg.value = a.bg === '#ffffff' || a.bg === '#000000' ? a.bg : a.bg ? 'custom' : '';
+      const col = h('input', { type: 'color', class: 'color-input', value: a.bg ?? '#ffffff' });
+      col.style.display = bg.value === 'custom' ? '' : 'none';
+      bg.onchange = () => { col.style.display = bg.value === 'custom' ? '' : 'none'; a.bg = bg.value === 'custom' ? col.value : bg.value || null; d.invalidate(); d.commit('Fondo de la mesa de trabajo'); };
+      col.onchange = () => { a.bg = col.value; d.invalidate(); d.commit('Fondo de la mesa de trabajo'); };
+      body.append(
+        h('div', { class: 'prop-row' }, h('span', {}, 'X'), num(a.x, v => a.x = v), h('span', {}, 'Y'), num(a.y, v => a.y = v)),
+        h('div', { class: 'prop-row' }, h('span', {}, 'An'), num(a.w, v => a.w = v), h('span', {}, 'Al'), num(a.h, v => a.h = v)),
+        h('div', { class: 'prop-row' }, h('span', {}, 'Fondo'), bg, col));
+    }
     if (l instanceof TextLayer) {
       const p = l.props;
       const upd = (fn: () => void) => { fn(); l.render(); d.commit('Editar texto'); };
@@ -340,6 +357,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
       const italic = h('input', { type: 'checkbox', checked: p.italic }); italic.onchange = () => upd(() => p.italic = italic.checked);
       const align = h('select', {}, h('option', { value: 'left' }, 'Izquierda'), h('option', { value: 'center' }, 'Centro'), h('option', { value: 'right' }, 'Derecha'));
       align.value = p.align; align.onchange = () => upd(() => p.align = align.value as any);
+      const warpBtn = h('button', { class: 'btn', onclick: () => warpTextDialog(l) }, p.warp ? `Deformar texto (${WARP_STYLES[p.warp.style] ?? ''})…` : 'Deformar texto…');
       body.append(ta,
         h('div', { class: 'prop-row' }, h('span', {}, 'Fuente'), font),
         h('div', { class: 'prop-row' }, h('span', {}, 'Tamaño'), size, h('span', {}, 'Color'), color),
@@ -347,6 +365,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('div', { class: 'prop-row' }, h('span', {}, 'Interletraje'), num(p.tracking ?? 0, v => p.tracking = v), h('span', {}, 'Interl.'), num(Math.round(p.lineHeight * 100), v => p.lineHeight = Math.max(0.3, v / 100)), h('span', { class: 'hint' }, '%')),
         h('div', { class: 'prop-row' }, chk('Subrayado', !!p.underline, v => p.underline = v), chk('Tachado', !!p.strike, v => p.strike = v), chk('MAYÚS', !!p.caps, v => p.caps = v)),
         h('div', { class: 'prop-row' }, h('span', {}, 'Caja'), num(Math.round(p.boxWidth ?? 0), v => p.boxWidth = v > 0 ? v : undefined), h('span', { class: 'hint' }, 'px de ancho (0 = texto de punto)')));
+      body.append(h('div', { class: 'prop-btns' }, warpBtn));
     }
     if (l instanceof AdjustmentLayer) {
       const def = FILTERS.find(f => f.id === l.filterId);

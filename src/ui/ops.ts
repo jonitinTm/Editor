@@ -177,7 +177,7 @@ export function newGroup() {
 
 function cloneLayer(l: Layer, d: EditorDocument): Layer {
   let c: Layer;
-  if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
+  if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; if (l.artboard) g.artboard = { ...l.artboard }; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
   else if (l instanceof AdjustmentLayer) { c = new AdjustmentLayer(l.name, l.filterId, JSON.parse(JSON.stringify(l.params))); }
   else if (l instanceof SmartLayer) { c = new SmartLayer(l.name, d.width, d.height, l.inner, l.props.m, l.filters); }
   else if (l instanceof TextLayer) { const t = new TextLayer(l.name, d.width, d.height, { ...l.props }); if (l.props.keepPixels) t.canvas = cloneCanvas(l.canvas); c = t; }
@@ -1063,4 +1063,55 @@ function hasTransparency(c: HTMLCanvasElement) {
   const t = makeCanvas(w, h); ctx2d(t).drawImage(c, 0, 0, w, h);
   const a = ctx2d(t).getImageData(0, 0, w, h).data; let n = 0; for (let i = 3; i < a.length; i += 4) if (a[i] < 128) n++;
   return n > w * h * 0.05;
+}
+
+// ---- Mesas de trabajo ---------------------------------------------------------------
+
+export const artboards = (d: EditorDocument) => d.root.children.filter((l): l is GroupLayer => l instanceof GroupLayer && !!l.artboard);
+
+/** Capa › Nueva mesa de trabajo: se coloca a la derecha de las que haya (el lienzo crece si hace falta). */
+export function newArtboard(w: number, h: number, bg: string | null, name?: string) {
+  const d = doc(); if (!d) return;
+  let boards = artboards(d);
+  if (!boards.length && d.root.children.length) {
+    // La primera vez, lo que ya hay pasa a ser la mesa de trabajo 1
+    const g = new GroupLayer('Mesa de trabajo 1');
+    g.artboard = { x: 0, y: 0, w: d.width, h: d.height, bg: null };
+    for (const l of [...d.root.children]) g.add(l);
+    d.root.add(g); boards = [g];
+  }
+  const gap = 100;
+  const x = boards.length ? Math.max(...boards.map(b => b.artboard!.x + b.artboard!.w)) + gap : 0;
+  const y = boards.length ? Math.min(...boards.map(b => b.artboard!.y)) : 0;
+  const W = Math.max(d.width, x + w), H = Math.max(d.height, y + h);
+  if (W !== d.width || H !== d.height) d.resizeCanvas(W, H, 0, 0);
+  const g = new GroupLayer(name || `Mesa de trabajo ${boards.length + 1}`);
+  g.artboard = { x, y, w, h, bg };
+  const l = new RasterLayer(d.nextLayerName(), d.width, d.height);
+  g.add(l);
+  d.root.add(g);
+  d.setActive(l, false);
+  d.commit('Nueva mesa de trabajo');
+  app.viewport.fit?.();
+}
+
+/** Exporta la imagen (o cada mesa de trabajo) en uno o varios tamaños; si salen varios archivos van en un ZIP. */
+export async function exportSet(d: EditorDocument, type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number, scale: number, extra: number[], perBoard: boolean, base: string) {
+  const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[type];
+  const flat = d.flatten();
+  const regions: { name: string; c: HTMLCanvasElement }[] = [];
+  const boards = artboards(d).filter(b => b.visible);
+  if (perBoard && boards.length) for (const b of boards) {
+    const a = b.artboard!, c = makeCanvas(a.w, a.h); ctx2d(c).drawImage(flat, -a.x, -a.y); regions.push({ name: b.name.replace(/[\\/:*?"<>|]/g, '_'), c });
+  } else regions.push({ name: base, c: flat });
+  const files: { name: string; data: Uint8Array }[] = [];
+  for (const r of regions) for (const k of [scale, ...extra.map(e => e * scale)]) {
+    const blob = await io.exportImage(d, type, quality, k, r.c);
+    const suffix = k === scale ? '' : '@' + String(+(k / scale).toFixed(2)).replace('.', ',') + 'x';
+    files.push({ name: r.name + suffix + (blob.type === type ? ext : '.png'), data: new Uint8Array(await blob.arrayBuffer()) });
+  }
+  if (files.length === 1) { await io.saveBlob(new Blob([files[0].data], { type }), files[0].name); return 1; }
+  const { makeZip } = await import('../io/zip');
+  await io.saveBlob(makeZip(files), base + '.zip');
+  return files.length;
 }

@@ -22,6 +22,11 @@ export class TextTool implements Tool {
     { key: 'underline', label: 'Subrayado', type: 'checkbox', default: false },
     { key: 'caps', label: 'Mayúsculas', type: 'checkbox', default: false },
   ] as any[];
+  extraOptions(bar: HTMLElement) {
+    const b = document.createElement('button'); b.className = 'btn icon-btn'; b.title = 'Deformar texto'; b.textContent = 'T͡';
+    b.onclick = () => { const l = app.doc?.active; if (l instanceof TextLayer) import('../ui/dialogs').then(m => m.warpTextDialog(l)); else app.toast('Selecciona una capa de texto', 'warn'); };
+    bar.append(b);
+  }
   /** Clic: texto de punto. Arrastrar: caja de texto de párrafo. */
   private dragStart: { x: number; y: number } | null = null;
   private dragNow: { x: number; y: number } | null = null;

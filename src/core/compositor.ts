@@ -32,6 +32,16 @@ export function compositeGroup(group: GroupLayer, ctx: CanvasRenderingContext2D,
     if (layer.clip) continue; // recortada sin base válida
     if (!layer.visible || layer.opacity <= 0) continue;
     if (layer instanceof AdjustmentLayer) applyAdjustment(layer, ctx, w, h, opts);
+    else if (layer instanceof GroupLayer && layer.artboard) {
+      // Mesa de trabajo: fondo propio y todo recortado a su rectángulo
+      const a = layer.artboard, r = borrowCanvas(w, h), rc = ctx2d(r);
+      rc.save(); clipTo(rc, opts); rc.beginPath(); rc.rect(a.x, a.y, a.w, a.h); rc.clip();
+      if (a.bg) { rc.fillStyle = a.bg; rc.fillRect(a.x, a.y, a.w, a.h); }
+      compositeGroup(layer, rc, w, h, opts);
+      rc.restore();
+      ctx.save(); ctx.globalAlpha = layer.opacity; ctx.drawImage(r, 0, 0); ctx.restore();
+      returnCanvas(r);
+    }
     else if (layer instanceof GroupLayer && layer.blendMode === 'pass-through' && !clipped.length && !hasStyles(layer.styles)) {
       // Grupo en modo «Pasar»: sus capas actúan directamente sobre lo de debajo
       const mask = opts.overrides?.get(layer)?.mask ?? (layer.mask?.enabled ? layer.mask.canvas : null);

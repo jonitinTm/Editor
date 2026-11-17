@@ -7,7 +7,8 @@ import * as ops from './ops';
 import * as io from '../io/files';
 import { FilterDef, defaultParams } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
-import { SmartLayer, type LayerStyles } from '../core/layers';
+import { SmartLayer, TextLayer, type LayerStyles } from '../core/layers';
+import { WARP_STYLES } from '../tools/warpmesh';
 import { allPatterns } from '../core/patterns';
 import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
@@ -65,12 +66,21 @@ export function exportDialog() {
   let scale = 100;
   const sc = numberSlider({ min: 1, max: 400, value: 100, unit: '%', onInput: v => { scale = v; estimate(); } });
   const scRow = row('Tamaño', sc.el);
+  // Tamaños adicionales (para pantallas de alta densidad, iconos…)
+  const extraSizes: [number, string][] = [[0.5, '@0,5x'], [2, '@2x'], [3, '@3x']];
+  const extraChecks = extraSizes.map(([k, n]) => { const c = h('input', { type: 'checkbox' }); return { k, el: h('label', { class: 'check' }, c, ' ' + n), c }; });
+  const exRow = row('Además', h('div', { class: 'check-row' }, ...extraChecks.map(e => e.el)));
+  const hasBoards = ops.artboards(d).length > 0;
+  const perBoard = h('input', { type: 'checkbox', checked: hasBoards });
+  const pbRow = row('', h('label', { class: 'check' }, perBoard, ' Cada mesa de trabajo en un archivo'));
+  if (!hasBoards) pbRow.style.display = 'none';
   const info = h('div', { class: 'hint' }, '');
   let timer = 0;
   const estimate = () => {
     clearTimeout(timer);
     qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
-    scRow.style.display = fmt.value.startsWith('image/') ? '' : 'none';
+    scRow.style.display = exRow.style.display = fmt.value.startsWith('image/') ? '' : 'none';
+    pbRow.style.display = hasBoards && fmt.value.startsWith('image/') ? '' : 'none';
     if (fmt.value === 'project') { info.textContent = 'Guarda todo (capas, texto, formas, ajustes, estilos) para seguir editando.'; return; }
     if (fmt.value === 'gif') { info.textContent = d.frames.length > 1 ? `Animación de ${d.frames.length} cuadros, 256 colores.` : 'Imagen de 256 colores. Para animar, crea cuadros en Ventana › Línea de tiempo.'; return; }
     if (fmt.value === 'psd') { info.textContent = 'Capas, grupos, máscaras, opacidad y modos de fusión. El texto y las formas van como píxeles.'; return; }
@@ -84,12 +94,18 @@ export function exportDialog() {
   estimate();
   showDialog({
     title: 'Exportar como', okLabel: 'Guardar',
-    body: [row('Nombre', name), row('Formato', fmt), qRow, scRow, info],
+    body: [row('Nombre', name), row('Formato', fmt), qRow, scRow, exRow, pbRow, info],
     onOk: async () => {
       if (fmt.value === 'project') { d.name = name.value || d.name; await ops.saveProject(true); return; }
       if (fmt.value === 'psd') { await ops.savePsd(name.value || d.name); return; }
       if (fmt.value === 'gif') { await ops.saveGif(name.value || d.name); return; }
       const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[fmt.value]!;
+      const extra = extraChecks.filter(e => e.c.checked).map(e => e.k);
+      if (extra.length || (hasBoards && perBoard.checked)) {
+        try { const n = await ops.exportSet(d, fmt.value as any, quality / 100, scale / 100, extra, hasBoards && perBoard.checked, name.value || d.name); app.toast(n > 1 ? `${n} imágenes exportadas (ZIP)` : 'Imagen exportada'); }
+        catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); }
+        return;
+      }
       try {
         const b = await io.exportImage(d, fmt.value as any, quality / 100, scale / 100);
         if (fmt.value === 'image/webp' && b.type !== 'image/webp') app.toast('Este navegador no puede crear WebP; se guardó como PNG', 'warn');
@@ -545,5 +561,48 @@ export function aboutDialog() {
       h('p', {}, 'Todo se procesa en tu equipo: tus imágenes no se envían a ningún servidor.'),
       h('p', { class: 'hint' }, 'Versión 0.1 (primera fase)'),
     ],
+  });
+}
+
+// ---- Deformar texto ------------------------------------------------------------------
+
+export function warpTextDialog(l: TextLayer) {
+  const d = app.doc; if (!d) return;
+  const before = l.props.warp ? { ...l.props.warp } : undefined;
+  const w = { style: before?.style ?? 'arc', bend: before?.bend ?? 50 };
+  const apply = () => { l.props.warp = { ...w }; l.render(); d.invalidate(); app.viewport.requestRender(); };
+  const style = h('select', {}, ...Object.entries(WARP_STYLES).map(([k, n]) => h('option', { value: k, selected: k === w.style }, k === 'none' ? 'Ninguno' : n)));
+  style.addEventListener('change', () => { w.style = style.value; apply(); });
+  const bend = numberSlider({ min: -100, max: 100, value: w.bend, unit: '%', onInput: v => { w.bend = v; apply(); } });
+  apply();
+  showDialog({
+    title: 'Deformar texto', width: 380, side: true,
+    body: [row('Estilo', style), row('Curvatura', bend.el), h('div', { class: 'hint' }, 'El texto sigue siendo editable: puedes cambiarlo o quitar la deformación cuando quieras.')],
+    onOk: () => { if (w.style === 'none') delete l.props.warp; l.render(); d.commit('Deformar texto'); },
+    onCancel: () => { if (before) l.props.warp = before; else delete l.props.warp; l.render(); d.invalidate(); app.viewport.requestRender(); },
+  });
+}
+
+// ---- Nueva mesa de trabajo --------------------------------------------------------------
+
+export function artboardDialog() {
+  const d = app.doc; if (!d) return;
+  const n = ops.artboards(d).length;
+  const name = h('input', { type: 'text', value: `Mesa de trabajo ${n ? n + 1 : 2}`, class: 'wide' });
+  const w = numInput(1080), hh = numInput(1080);
+  const preset = h('select', {}, ...PRESETS.map(([pn], i) => h('option', { value: String(i) }, pn)));
+  preset.value = '4';
+  preset.addEventListener('change', () => { const p = PRESETS[+preset.value]; if (p[1]) { w.value = String(p[1]); hh.value = String(p[2]); } });
+  [w, hh].forEach(i => i.addEventListener('input', () => preset.value = '0'));
+  const bg = h('select', {}, h('option', { value: '#ffffff' }, 'Blanco'), h('option', { value: '#000000' }, 'Negro'), h('option', { value: 'bgc' }, 'Color de fondo'), h('option', { value: '' }, 'Transparente'));
+  showDialog({
+    title: 'Nueva mesa de trabajo', okLabel: 'Crear',
+    body: [row('Nombre', name), row('Predefinido', preset), row('Anchura', w, 'px'), row('Altura', hh, 'px'), row('Fondo', bg),
+      h('div', { class: 'hint' }, n ? 'Se coloca a la derecha de las demás.' : 'Lo que ya hay en el documento pasará a ser la primera mesa de trabajo.')],
+    onOk: () => {
+      const W = Math.round(+w.value), H = Math.round(+hh.value);
+      if (!(W >= 1 && H >= 1 && W <= 20000 && H <= 20000)) { app.toast('Tamaño no válido', 'warn'); return false; }
+      ops.newArtboard(W, H, bg.value === 'bgc' ? app.bg : bg.value || null, name.value.trim() || undefined);
+    },
   });
 }

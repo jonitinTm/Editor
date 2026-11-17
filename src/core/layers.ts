@@ -4,6 +4,8 @@
 
 import { makeCanvas, ctx2d, clearCanvas, Rect } from './canvas';
 import { FILTERS } from '../filters/registry';
+import { drawMeshExact, styledMesh } from '../tools/warpmesh';
+
 
 /** 'pass-through' solo vale para grupos: sus capas se mezclan directamente con lo de debajo. */
 export type BlendMode = GlobalCompositeOperation | 'pass-through';
@@ -79,6 +81,8 @@ export interface TextProps {
   keepPixels?: boolean;
   /** Datos originales del texto de Photoshop (base64), para devolverlos intactos al guardar en PSD. */
   psdTySh?: string;
+  /** Deformar texto (Arco, Bandera…): el texto sigue siendo editable. */
+  warp?: { style: string; bend: number };
 }
 
 export interface LayerStyles {
@@ -223,7 +227,10 @@ export class TextLayer extends RasterLayer {
     clearCanvas(this.canvas);
     const p = this.props;
     p.keepPixels = false; delete p.psdTySh;
-    const ctx = ctx2d(this.canvas);
+    const warped = p.warp && p.warp.style !== 'none' && p.warp.bend !== 0;
+    // Con deformación, el texto se dibuja aparte y luego se pasa por la malla
+    const target = warped ? makeCanvas(this.canvas.width, this.canvas.height) : this.canvas;
+    const ctx = ctx2d(target);
     const L = this.layout(), lh = L.lh;
     ctx.save();
     this.setupCtx(ctx);
@@ -240,6 +247,12 @@ export class TextLayer extends RasterLayer {
       if (p.strike) ctx.fillRect(lx, ty + p.size * 0.52, line.w, thick);
     });
     ctx.restore();
+    if (warped) {
+      const b = this.bounds(), pad = Math.ceil(p.size * 0.25);
+      const box = { x: Math.floor(b.x) - pad, y: Math.floor(b.y) - pad, w: Math.ceil(b.w) + pad * 2, h: Math.ceil(b.h) + pad * 2 };
+      const crop = makeCanvas(box.w, box.h); ctx2d(crop).drawImage(target, -box.x, -box.y);
+      drawMeshExact(ctx2d(this.canvas), crop, 0, 0, box, styledMesh(p.warp!.style, box, p.warp!.bend), 40);
+    }
     this.touch();
   }
 }
@@ -410,6 +423,8 @@ export class GroupLayer extends Layer {
   /** Hijos de abajo (índice 0) hacia arriba. */
   children: Layer[] = [];
   expanded = true;
+  /** Mesa de trabajo: el grupo se recorta a este rectángulo y tiene fondo propio. */
+  artboard?: { x: number; y: number; w: number; h: number; bg: string | null };
   add(layer: Layer, index = this.children.length) {
     layer.parent?.remove(layer);
     layer.parent = this;

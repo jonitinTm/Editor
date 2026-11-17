@@ -421,3 +421,4 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 /* La lista de pinceles no debe agrandar el grupo de color: se desplaza dentro */
 .tab-group[data-group=color] .brush-panel { height: 172px; }
 .brush-item { padding: 1px 6px; }
+.check-row { display: flex; gap: 14px; flex-wrap: wrap; }

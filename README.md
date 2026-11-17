@@ -135,6 +135,12 @@ Ya disponible:
   *Ecualizar*.
 - **Más filtros**: desenfoque de superficie (suaviza la piel sin perder bordes), inclinación-desplazamiento (efecto
   miniatura), enfoque suavizado, polvo y rascaduras, coordenadas polares, rizo, cristalizar, pintura al óleo y nubes.
+- **Mesas de trabajo** (*Capa › Nueva mesa de trabajo…*): varios lienzos en un mismo documento (por ejemplo, el mismo
+  diseño para Instagram, historia y web). Cada una recorta su contenido y tiene su fondo; se mueven con Mover y se
+  seleccionan haciendo clic en su nombre. Al exportar, cada mesa sale en su propio archivo. Se leen de los PSD.
+- **Deformar texto** (*Capa › Texto › Deformar texto…*, botón en la barra del texto o en *Propiedades*): arco,
+  bandera, onda… y el texto sigue siendo editable.
+- **Exportar en varios tamaños a la vez**: en *Exportar como*, marca @0,5x, @2x o @3x y se descarga un ZIP.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

@@ -5,6 +5,7 @@ import { app } from './app';
 import type { ToolEvent } from '../tools/tool';
 import { h } from './dom';
 import { drawSnap } from '../tools/snap';
+import { GroupLayer } from '../core/layers';
 
 const RULER = 20;
 
@@ -89,10 +90,19 @@ export class Viewport {
     app.emit('view'); this.requestRender();
   }
   /** Polígono del documento en pantalla. */
-  private docPath(ctx: CanvasRenderingContext2D) {
-    const d = this.doc!, q = [this.toScreen(0, 0), this.toScreen(d.width, 0), this.toScreen(d.width, d.height), this.toScreen(0, d.height)];
-    ctx.beginPath(); q.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
+  private docPath(ctx: CanvasRenderingContext2D, x = 0, y = 0, w = this.doc!.width, h = this.doc!.height, begin = true) {
+    const q = [this.toScreen(x, y), this.toScreen(x + w, y), this.toScreen(x + w, y + h), this.toScreen(x, y + h)];
+    if (begin) ctx.beginPath();
+    q.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
   }
+  /** Zona visible del documento: el lienzo entero o, con mesas de trabajo, solo ellas. */
+  private areaPath(ctx: CanvasRenderingContext2D) {
+    const boards = this.doc!.root.children.filter(g => (g as any).artboard && g.visible).map(g => (g as any).artboard);
+    if (!boards.length) { this.docPath(ctx); return; }
+    ctx.beginPath(); for (const a of boards) this.docPath(ctx, a.x, a.y, a.w, a.h, false);
+  }
+  /** Rectángulos de los nombres de las mesas de trabajo (en pantalla). */
+  private boardLabels: { g: GroupLayer; x: number; y: number; w: number; h: number }[] = [];
   /** Línea entre dos puntos del documento; sin giro se alinea al píxel para que sea nítida. */
   private docLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) {
     const a = this.toScreen(x0, y0), b = this.toScreen(x1, y1);
@@ -181,16 +191,17 @@ export class Viewport {
     // Sombra + cuadrícula de transparencia (en el polígono del documento, que puede estar girado)
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 12;
-    ctx.fillStyle = '#fff'; this.docPath(ctx); ctx.fill();
+    ctx.fillStyle = '#fff'; this.areaPath(ctx); ctx.fill();
     ctx.restore();
     ctx.save();
-    this.docPath(ctx); ctx.clip();
+    this.areaPath(ctx); ctx.clip();
     ctx.fillStyle = this.checkerPattern(); ctx.fillRect(0, 0, this.width, this.height);
     ctx.restore();
 
     // Imagen combinada
     const comp = d.getComposite();
     ctx.save();
+    this.areaPath(ctx); ctx.clip();
     ctx.imageSmoothingEnabled = zoom < 1 || (rot !== 0 && zoom < 4);
     ctx.imageSmoothingQuality = 'high';
     this.docImage(ctx, comp);
@@ -256,6 +267,19 @@ export class Viewport {
       if (this.guideDrag) list.push([this.guideDrag.axis, this.guideDrag.pos]);
       for (const [axis, g] of list) axis === 'v' ? this.docLine(ctx, g, -far, g, far) : this.docLine(ctx, -far, g, far, g);
       ctx.stroke(); ctx.restore();
+    }
+
+    // Nombres de las mesas de trabajo (clic para seleccionarla)
+    this.boardLabels = [];
+    for (const g of d.root.children) {
+      const a = (g as any).artboard; if (!a || !g.visible) continue;
+      const p0 = this.toScreen(a.x, a.y), act = d.active === g || (d.active && g instanceof GroupLayer && g.children.includes(d.active));
+      ctx.save(); ctx.font = '12px system-ui, sans-serif'; ctx.textBaseline = 'bottom';
+      ctx.fillStyle = act ? '#5aa0ff' : getComputedStyle(document.body).getPropertyValue('--muted') || '#999';
+      const tw = ctx.measureText(g.name).width; ctx.fillText(g.name, p0.x, p0.y - 4);
+      this.boardLabels.push({ g: g as GroupLayer, x: p0.x, y: p0.y - 18, w: tw, h: 16 });
+      if (act) { ctx.strokeStyle = '#5aa0ff'; ctx.lineWidth = 1; ctx.beginPath(); this.docPath(ctx, a.x, a.y, a.w, a.h); ctx.stroke(); }
+      ctx.restore();
     }
 
     // Capa superpuesta de la herramienta
@@ -370,6 +394,9 @@ export class Viewport {
         this.startPinch(); return;
       }
       const te = this.makeEvent(e);
+      // clic en el nombre de una mesa de trabajo: la selecciona
+      const lab = e.button === 0 && this.boardLabels.find(b => te.sx >= b.x && te.sx <= b.x + b.w && te.sy >= b.y && te.sy <= b.y + b.h);
+      if (lab) { this.doc.setActive(lab.g); app.emit('doc'); this.requestRender(); return; }
       // Los eventos de puntero no indican doble clic: se detecta por tiempo y distancia
       const now = performance.now(), lc = this.lastClick;
       te.detail = lc && now - lc.t < 400 && Math.hypot(te.sx - lc.x, te.sy - lc.y) < 6 ? lc.n + 1 : 1;
