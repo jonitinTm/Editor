@@ -11,13 +11,15 @@ export interface DialogOptions {
   onCancel?: () => void;
   width?: number;
   extraButtons?: HTMLElement[];
+  /** Ventana a un lado y sin oscurecer la imagen (para ajustes con vista previa). */
+  side?: boolean;
 }
 
 let open = 0;
 export function dialogOpen() { return open > 0; }
 
 export function showDialog(o: DialogOptions) {
-  const overlay = h('div', { class: 'modal-overlay' });
+  const overlay = h('div', { class: 'modal-overlay' + (o.side ? ' at-side' : '') });
   const okBtn = h('button', { class: 'btn primary', type: 'submit' }, o.okLabel ?? 'Aceptar');
   const cancelBtn = o.cancelLabel === null ? null : h('button', { class: 'btn', type: 'button' }, o.cancelLabel ?? 'Cancelar');
   const header = h('div', { class: 'modal-title' }, o.title);

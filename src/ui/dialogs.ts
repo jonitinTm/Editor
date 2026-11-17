@@ -251,7 +251,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
   reset.onclick = () => { showDialogClose(); filterDialog(def, edit); };
   let showDialogClose = () => {};
   const dlg = showDialog({
-    title: def.name.replace('…', '') + (session instanceof ops.SmartFilterSession ? ' (filtro inteligente)' : ''), width: def.custom ? 420 : 400,
+    title: def.name.replace('…', '') + (session instanceof ops.SmartFilterSession ? ' (filtro inteligente)' : ''), width: def.custom ? 420 : 400, side: true,
     body: [...body, h('label', { class: 'check preview-check' }, prev, ' Vista previa')],
     extraButtons: [reset],
     onOk: () => { clearTimeout(timer); session.commit(params); ops.setLastFilter(def, params); },
@@ -416,7 +416,7 @@ export function layerStyleDialog() {
     return els;
   };
   showDialog({
-    title: `Estilo de capa: ${l.name}`, width: 400,
+    title: `Estilo de capa: ${l.name}`, width: 400, side: true,
     body: [
       ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
       ...section('Trazo (exterior)', st.stroke, [['size', 'Grosor', 1, 60, 'px']]),

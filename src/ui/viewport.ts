@@ -174,6 +174,20 @@ export class Viewport {
       ctx.stroke(); ctx.restore();
     }
 
+    // Vista previa de refinar selección
+    if (d.refinePreview) {
+      const rp = d.refinePreview, ov = this.quickCanvas ??= document.createElement('canvas');
+      if (ov.width !== d.width || ov.height !== d.height) { ov.width = d.width; ov.height = d.height; }
+      const oc = ov.getContext('2d')!;
+      oc.globalCompositeOperation = 'copy';
+      if (rp.mode === 'overlay') { oc.fillStyle = 'rgba(255,0,0,.5)'; oc.fillRect(0, 0, d.width, d.height); oc.globalCompositeOperation = 'destination-out'; oc.drawImage(rp.mask, 0, 0); }
+      else {
+        oc.drawImage(comp, 0, 0); oc.globalCompositeOperation = 'destination-in'; oc.drawImage(rp.mask, 0, 0);
+        if (rp.mode !== 'transparent') { oc.globalCompositeOperation = 'destination-over'; oc.fillStyle = rp.mode === 'black' ? '#000' : '#fff'; oc.fillRect(0, 0, d.width, d.height); }
+        else { ctx.save(); ctx.translate(panX, panY); ctx.fillStyle = this.checkerPattern(); ctx.fillRect(0, 0, dw, dh); ctx.restore(); }
+      }
+      ctx.save(); ctx.imageSmoothingEnabled = zoom < 1; ctx.drawImage(ov, panX, panY, dw, dh); ctx.restore();
+    }
     // Máscara rápida: lo no seleccionado se tiñe de rojo
     if (d.quickMask) {
       const qm = d.quickPreview ?? d.selection.mask;
@@ -186,7 +200,7 @@ export class Viewport {
     }
 
     // Selección
-    const outline = d.quickMask ? null : d.selection.getOutline();
+    const outline = d.quickMask || d.refinePreview ? null : d.selection.getOutline();
     if (outline) this.drawAnts(outline, (d as any).selectionOffset);
 
     // Guías

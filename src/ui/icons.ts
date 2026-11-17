@@ -39,6 +39,7 @@ export const ICONS: Record<string, string> = {
   spotHeal: S('<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><circle cx="18.5" cy="18.5" r="2.5" stroke-dasharray="1.5 1.5"/>'),
   quickMask: S('<rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="12" cy="12" r="4" stroke-dasharray="2 1.6"/>'),
   lockAlpha: S('<rect x="4" y="4" width="16" height="16"/><path d="M4 12h16M12 4v16" stroke-opacity=".5"/><rect x="4" y="4" width="8" height="8" fill="currentColor" fill-opacity=".45"/><rect x="12" y="12" width="8" height="8" fill="currentColor" fill-opacity=".45"/>'),
+  quickSel: S('<path d="M14 4c3 0 6 3 5 6-1 2-4 2-6 4l-3 3-2.5-2.5 3-3c2-2 2-5 4-6z"/><circle cx="6" cy="18" r="2.6" stroke-dasharray="1.6 1.4"/>'),
   adjust: S('<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 010 16z" fill="currentColor"/>'),
   duplicate: S('<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0014.5 4h-9A1.5 1.5 0 004 5.5v9A1.5 1.5 0 005.5 16H8"/>'),
   chevronRight: S('<path d="M9 6l6 6-6 6"/>'),

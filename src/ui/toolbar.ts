@@ -9,7 +9,7 @@ import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
-  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso'], ['wand'], ['crop'], ['eyedropper'],
+  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso'], ['quickSel', 'wand'], ['crop'], ['eyedropper'],
   ['spotHeal', 'heal'], ['clone'], ['brush', 'pencil'], ['eraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn'], ['text'], ['pen', 'node'], ['shape'], ['hand'], ['zoom'],
 ];
 

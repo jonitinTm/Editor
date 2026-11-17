@@ -22,6 +22,7 @@ import { readPsd, writePsd } from './io/psd';
 import { MoveTool } from './tools/move';
 import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool } from './tools/select';
 import { retouchTools } from './tools/retouch';
+import { QuickSelectTool } from './tools/quicksel';
 import { CropTool } from './tools/crop';
 import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool } from './tools/brush';
 import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool } from './tools/misc';
@@ -31,7 +32,7 @@ import { TransformTool } from './tools/transform';
 import { PenTool, NodeTool } from './tools/pen';
 
 // ---- Herramientas ----------------------------------------------------------------
-for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, WandTool, CropTool, EyedropperTool, CloneTool,
+for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSelectTool, WandTool, CropTool, EyedropperTool, CloneTool,
   BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, ZoomTool, TransformTool]) {
   app.registerTool(new T());
 }

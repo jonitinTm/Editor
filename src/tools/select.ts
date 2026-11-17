@@ -213,7 +213,7 @@ export class PolyLassoTool implements Tool {
 }
 
 export class WandTool implements Tool {
-  id = 'wand'; name = 'Varita mágica'; icon = icon('wand'); key = 'W'; cursor = 'crosshair';
+  id = 'wand'; name = 'Varita mágica'; icon = icon('wand'); key = 'W'; group = 'wand'; cursor = 'crosshair';
   options = [MODE_OPT,
     { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 0, max: 255, default: 32 },
     { key: 'contiguous', label: 'Contiguo', type: 'checkbox', default: true },

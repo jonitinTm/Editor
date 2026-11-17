@@ -90,6 +90,13 @@ Ya disponible:
   pintura con motivo; incluye varios motivos de serie.
 - **Panel Capas**: búsqueda por nombre y etiquetas de color (clic derecho; también se leen y guardan en PSD).
 - **Historial**: instantáneas para volver a un estado guardado.
+- **Selección rápida** (`W`): pinta sobre lo que quieres seleccionar y la selección se ajusta sola a los bordes
+  (Alt para restar). **Seleccionar y aplicar máscara** (`Alt+Ctrl+R`): suavizar, calar, contraste y desplazar borde con
+  vista previa sobre rojo, negro, blanco o transparente; salida a selección, máscara o capa nueva.
+- **Ajuste magnético y guías inteligentes**: al mover capas, selecciones o el recorte se enganchan a los bordes y el
+  centro del lienzo, a las guías y a otras capas (Ctrl mientras arrastras lo desactiva; *Vista › Ajustar*).
+- **Fluidez**: deshacer, empezar a pintar y mover capas son mucho más rápidos en documentos grandes; los diálogos con
+  vista previa se colocan a un lado sin oscurecer la imagen.
 - **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;

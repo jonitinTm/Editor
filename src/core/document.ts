@@ -31,6 +31,8 @@ export class EditorDocument {
   /** Máscara rápida: el pincel edita la selección, que se ve como una capa roja. */
   quickMask = false;
   quickPreview: HTMLCanvasElement | null = null;
+  /** Vista previa de «Seleccionar y aplicar máscara». */
+  refinePreview: { mask: HTMLCanvasElement; mode: 'overlay' | 'black' | 'white' | 'transparent' } | null = null;
   /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
   frames: { delay: number; visible: number[] }[] = [];
   frameIndex = 0;
