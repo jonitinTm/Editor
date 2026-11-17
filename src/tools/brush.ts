@@ -4,7 +4,9 @@ import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import { Stroke, getPaintTarget, brushTip, strokeSetup, PaintTarget } from './paint';
-import { ctx2d, makeCanvas, cloneCanvas } from '../core/canvas';
+import { ctx2d, makeCanvas, cloneCanvas, getPixels, putPixels } from '../core/canvas';
+import { heal } from '../filters/heal';
+import { healHole } from '../ui/ops';
 import type { Viewport } from '../ui/viewport';
 
 const SIZE = { key: 'size', label: 'Tamaño', type: 'range' as const, min: 1, max: 1000, default: 20, unit: 'px' };
@@ -12,6 +14,18 @@ const HARD = { key: 'hardness', label: 'Dureza', type: 'range' as const, min: 0,
 const OPAC = { key: 'opacity', label: 'Opacidad', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
 const FLOW = { key: 'flow', label: 'Flujo', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
 const PRESS = { key: 'pressure', label: 'Presión = tamaño', type: 'checkbox' as const, default: true };
+const SMOOTH = { key: 'smoothing', label: 'Suavizar', type: 'range' as const, min: 0, max: 100, default: 10, unit: '%' };
+const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
+
+/** Toma el color de la imagen combinada en (x, y) como color frontal (Alt mientras se pinta). */
+export function pickColorAt(x: number, y: number) {
+  const d = app.doc; if (!d) return;
+  const px = Math.floor(x), py = Math.floor(y);
+  if (px < 0 || py < 0 || px >= d.width || py >= d.height) return;
+  const c = ctx2d(d.getComposite()).getImageData(px, py, 1, 1).data;
+  if (c[3] === 0) return;
+  app.setColors('#' + [c[0], c[1], c[2]].map(v => v.toString(16).padStart(2, '0')).join(''), app.bg);
+}
 
 /** Círculo del tamaño del pincel que sigue al ratón. */
 export function drawBrushCursor(ctx: CanvasRenderingContext2D, vp: Viewport, size: number) {
@@ -30,8 +44,11 @@ export function drawBrushCursor(ctx: CanvasRenderingContext2D, vp: Viewport, siz
 abstract class StrokeTool implements Tool {
   abstract id: string; abstract name: string; abstract icon: string;
   cursor = 'none';
-  options = [SIZE, HARD, OPAC, FLOW, PRESS] as any[];
+  options = [SIZE, HARD, OPAC, FLOW, SMOOTH, SPACING, PRESS] as any[];
   protected stroke: Stroke | null = null;
+  private picking = false;
+  /** Posición suavizada (el trazo sigue al ratón con algo de retraso para eliminar temblores). */
+  private sm: { x: number; y: number; p: number } | null = null;
   protected target: PaintTarget | null = null;
   protected lastPoint: { x: number; y: number } | null = null;
   protected erase = false;
@@ -60,14 +77,20 @@ abstract class StrokeTool implements Tool {
 
   private dab: ((x: number, y: number, p: number) => any) | null = null;
 
+  protected spacing(p: number) {
+    const k = (app.opt<number>('spacing', this.id) ?? (this.aliased ? 25 : 12)) / 100;
+    return Math.max(this.aliased ? 1 : 0.5, this.size(p) * k);
+  }
   down(e: ToolEvent) {
+    if (e.alt && !this.erase) { this.picking = true; pickColorAt(e.x, e.y); return; }
     const t = getPaintTarget();
     if (!t) return;
     this.target = t;
     const s = strokeSetup(t, this.erase);
     this.stroke = new Stroke(t, s.mode, app.opt<number>('opacity', this.id) / 100, s.maskValue);
     this.dab = this.makeDab(s.color);
-    const sp = Math.max(1, this.size(e.pressure) * (this.aliased ? 0.25 : 0.12));
+    this.sm = { x: e.x, y: e.y, p: e.pressure };
+    const sp = this.spacing(e.pressure);
     if (e.shift && this.lastPoint) {
       // Mayús + clic: línea recta desde el punto anterior
       this.stroke.lineTo(this.lastPoint.x, this.lastPoint.y, e.pressure, sp, this.dab);
@@ -77,14 +100,21 @@ abstract class StrokeTool implements Tool {
     this.lastPoint = { x: e.x, y: e.y };
   }
   move(e: ToolEvent) {
+    if (this.picking) { pickColorAt(e.x, e.y); return; }
     if (!this.stroke || !this.dab) return;
-    const sp = Math.max(1, this.size(e.pressure) * (this.aliased ? 0.25 : 0.12));
-    this.stroke.lineTo(e.x, e.y, e.pressure, sp, this.dab);
+    let { x, y, pressure: p } = e;
+    const k = Math.min(0.95, (app.opt<number>('smoothing', this.id) ?? 0) / 100 * 0.93);
+    if (k > 0 && this.sm) { this.sm.x += (x - this.sm.x) * (1 - k); this.sm.y += (y - this.sm.y) * (1 - k); this.sm.p += (p - this.sm.p) * (1 - k); x = this.sm.x; y = this.sm.y; p = this.sm.p; }
+    this.stroke.lineTo(x, y, p, this.spacing(p), this.dab);
     this.stroke.update();
-    this.lastPoint = { x: e.x, y: e.y };
+    this.lastPoint = { x, y };
   }
-  up() {
+  up(e?: ToolEvent) {
+    if (this.picking) { this.picking = false; return; }
     if (!this.stroke) return;
+    // Con suavizado, el trazo termina en el punto real donde se soltó
+    if (e && this.sm && this.dab && (app.opt<number>('smoothing', this.id) ?? 0) > 0) { this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(e.pressure), this.dab); this.lastPoint = { x: e.x, y: e.y }; }
+    this.sm = null;
     const changed = this.stroke.finish();
     this.stroke = null;
     if (changed) app.doc!.commit(this.historyName);
@@ -102,7 +132,7 @@ export class BrushTool extends StrokeTool {
 export class PencilTool extends StrokeTool {
   id = 'pencil'; name = 'Lápiz'; icon = icon('pencil'); key = 'B'; group = 'brush'; historyName = 'Lápiz';
   aliased = true;
-  options = [{ ...SIZE, default: 1 }, OPAC, { ...PRESS, default: false }] as any[];
+  options = [{ ...SIZE, default: 1 }, OPAC, SMOOTH, { ...PRESS, default: false }] as any[];
 }
 
 export class EraserTool extends StrokeTool {
@@ -118,8 +148,8 @@ export class CloneTool extends StrokeTool {
     { key: 'sample', label: 'Muestra', type: 'select', default: 'layer', choices: [{ value: 'layer', label: 'Capa actual' }, { value: 'all', label: 'Todas las capas' }] },
   ] as any[];
   private source: { x: number; y: number } | null = null;
-  private offset: { x: number; y: number } | null = null;
-  private srcCanvas: HTMLCanvasElement | null = null;
+  protected offset: { x: number; y: number } | null = null;
+  protected srcCanvas: HTMLCanvasElement | null = null;
   private current: { x: number; y: number } | null = null;
 
   down(e: ToolEvent) {
@@ -140,7 +170,7 @@ export class CloneTool extends StrokeTool {
     this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(), (this as any).dabFn);
     this.stroke.update();
   }
-  private spacing() { return Math.max(1, app.opt<number>('size', this.id) * 0.12); }
+  protected spacing() { return Math.max(1, app.opt<number>('size', this.id) * 0.12); }
   private makeCloneDab() {
     const hard = app.opt<number>('hardness', this.id) / 100;
     const flow = app.opt<number>('flow', this.id) / 100;
@@ -168,7 +198,7 @@ export class CloneTool extends StrokeTool {
     this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(), (this as any).dabFn);
     this.stroke.update();
   }
-  up() { super.up(); this.srcCanvas = null; }
+  up(e?: ToolEvent) { super.up(e); this.srcCanvas = null; }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     super.drawOverlay(ctx, vp);
     // Marca del punto de origen
@@ -180,5 +210,80 @@ export class CloneTool extends StrokeTool {
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(s.x - 7, s.y); ctx.lineTo(s.x + 7, s.y); ctx.moveTo(s.x, s.y - 7); ctx.lineTo(s.x, s.y + 7); ctx.stroke();
     ctx.strokeStyle = '#000'; ctx.lineWidth = .7; ctx.stroke();
+  }
+}
+
+/** Pincel corrector: como el tampón (Alt+clic marca el origen) pero adapta color y luz al entorno. */
+export class HealTool extends CloneTool {
+  id = 'heal'; name = 'Pincel corrector'; icon = icon('heal'); key = 'J'; group = 'heal'; historyName = 'Pincel corrector';
+  up(e?: ToolEvent) {
+    const s = this.stroke;
+    if (s && !s.target.isMask) {
+      s.update();
+      const b = s.bounds;
+      if (b) {
+        const d = app.doc!, m = Math.max(6, Math.round(app.opt<number>('size', this.id) * 0.6));
+        const reg = { x: Math.max(0, b.x - m), y: Math.max(0, b.y - m), w: 0, h: 0 };
+        reg.w = Math.min(d.width, b.x + b.w + m) - reg.x; reg.h = Math.min(d.height, b.y + b.h + m) - reg.y;
+        const ba = getPixels(s.buffer, reg).data, hole = new Float32Array(reg.w * reg.h);
+        const sel = d.selection.mask ? getPixels(d.selection.mask, reg).data : null;
+        const op = app.opt<number>('opacity', this.id) / 100;
+        for (let i = 0; i < hole.length; i++) hole[i] = ba[i * 4 + 3] / 255 * op * (sel ? sel[i * 4 + 3] / 255 : 1);
+        // C = la zona de origen completa (también alrededor del trazo, para medir la diferencia de color)
+        const cc = makeCanvas(reg.w, reg.h), off = this.offset!;
+        ctx2d(cc).drawImage(this.srcCanvas!, -(reg.x + off.x), -(reg.y + off.y));
+        const C = ctx2d(cc).getImageData(0, 0, reg.w, reg.h), O = getPixels(s.original, reg);
+        // donde el origen cae fuera de la imagen no hay dato: se usa el original
+        for (let i = 0; i < hole.length; i++) if (C.data[i * 4 + 3] === 0 && O.data[i * 4 + 3] > 0) for (let c = 0; c < 4; c++) C.data[i * 4 + c] = O.data[i * 4 + c];
+        putPixels(s.preview, heal(O, C, hole), reg.x, reg.y);
+      }
+    }
+    super.up(e);
+  }
+}
+
+/** Pincel corrector puntual: pinta sobre la imperfección y se corrige sola, sin elegir origen. */
+export class SpotHealTool implements Tool {
+  id = 'spotHeal'; name = 'Pincel corrector puntual'; icon = icon('spotHeal'); key = 'J'; group = 'heal'; cursor = 'none';
+  options = [{ ...SIZE, default: 30 }] as any[];
+  private hole: HTMLCanvasElement | null = null;
+  private box: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  private last: { x: number; y: number } | null = null;
+  private t: PaintTarget | null = null;
+  down(e: ToolEvent) {
+    const t = getPaintTarget(); if (!t) return;
+    if (t.isMask) { app.toast('El corrector trabaja sobre los píxeles de la capa, no sobre la máscara', 'warn'); return; }
+    const d = app.doc!;
+    this.t = t; this.hole = makeCanvas(d.width, d.height); this.box = null; this.last = null;
+    this.dab(e.x, e.y);
+  }
+  private dab(x: number, y: number) {
+    const size = app.opt<number>('size', this.id), tip = brushTip(size, 0.7, '#202020');
+    const steps = this.last ? Math.max(1, Math.ceil(Math.hypot(x - this.last.x, y - this.last.y) / Math.max(1, size * 0.15))) : 1;
+    const c = ctx2d(this.hole!);
+    for (let i = 1; i <= steps; i++) {
+      const px = this.last ? this.last.x + (x - this.last.x) * i / steps : x, py = this.last ? this.last.y + (y - this.last.y) * i / steps : y;
+      c.drawImage(tip, px - tip.width / 2, py - tip.height / 2);
+      const b = this.box, r = tip.width / 2 + 1;
+      this.box = b ? { x0: Math.min(b.x0, px - r), y0: Math.min(b.y0, py - r), x1: Math.max(b.x1, px + r), y1: Math.max(b.y1, py + r) } : { x0: px - r, y0: py - r, x1: px + r, y1: py + r };
+    }
+    this.last = { x, y };
+  }
+  move(e: ToolEvent) { if (this.hole) this.dab(e.x, e.y); }
+  up() {
+    const t = this.t, hole = this.hole, b = this.box;
+    this.t = null; this.hole = null; this.box = null; this.last = null;
+    if (!t || !hole || !b) return;
+    const d = app.doc!;
+    if (d.selection.mask) { const c = ctx2d(hole); c.globalCompositeOperation = 'destination-in'; c.drawImage(d.selection.mask, 0, 0); }
+    const x = Math.max(0, Math.floor(b.x0)), y = Math.max(0, Math.floor(b.y0));
+    const box = { x, y, w: Math.min(d.width, Math.ceil(b.x1)) - x, h: Math.min(d.height, Math.ceil(b.y1)) - y };
+    if (box.w < 1 || box.h < 1) return;
+    healHole(t, hole, box, 'Pincel corrector puntual');
+  }
+  cancel() { this.t = null; this.hole = null; this.box = null; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (this.hole) { const v = vp.doc!.view; ctx.save(); ctx.globalAlpha = 0.45; ctx.imageSmoothingEnabled = v.zoom < 1; ctx.drawImage(this.hole, v.panX, v.panY, vp.doc!.width * v.zoom, vp.doc!.height * v.zoom); ctx.restore(); }
+    drawBrushCursor(ctx, vp, app.opt<number>('size', this.id));
   }
 }

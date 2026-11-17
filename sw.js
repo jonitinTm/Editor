@@ -1,6 +1,6 @@
 // Service worker: permite usar Editor sin conexión una vez abierto.
 // Siempre intenta primero la red (para tener la última versión) y, si falla, usa la copia guardada.
-const CACHE = 'editor-2026-11-16T10:43:27.490Z';
+const CACHE = 'editor-2026-11-17T16:41:27.447Z';
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './manifest.webmanifest', './icon.svg']).catch(() => {}))); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

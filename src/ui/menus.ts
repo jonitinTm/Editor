@@ -17,7 +17,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
 
 const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Archivo', items: ['new', 'open', 'place', '-', 'save', 'saveAs', 'export', '-', 'close'] },
-  { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'clear', '-', 'fill', 'stroke', '-', 'freeTransform',
+  { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'clear', '-', 'fill', 'contentFill', 'stroke', '-', 'freeTransform',
     { label: 'Transformar', items: ['flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }] },
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'imageSize', 'canvasSize',
     { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
@@ -26,7 +26,7 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Objeto inteligente', items: ['toSmart', 'editSmart', 'rasterize'] }, '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
-  { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'colorRange', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
+  { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'colorRange', '-', 'quickMask', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
   { label: 'Filtro', items: ['lastFilter', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', '-', 'rulers', 'grid', 'guides', 'newGuide', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'win:all'] },

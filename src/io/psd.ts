@@ -269,7 +269,7 @@ const BIG_KEYS = new Set(['LMsk', 'Lr16', 'Lr32', 'Layr', 'Mt16', 'Mt32', 'Mtrn'
 interface Rec {
   top: number; left: number; bottom: number; right: number;
   channels: { id: number; len: number }[];
-  blend: string; opacity: number; flags: number; name: string; clip: boolean; fillOpacity: number;
+  blend: string; opacity: number; flags: number; name: string; clip: boolean; fillOpacity: number; protect: number;
   mask: { top: number; left: number; bottom: number; right: number; def: number; flags: number; real?: { top: number; left: number; bottom: number; right: number; def: number; flags: number }; density?: number; vdensity?: number } | null;
   section: number; keys: string[]; blocks: Record<string, Uint8Array>;
 }
@@ -392,20 +392,21 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
     r.pos = mEnd;
     r.skipBlock(); // rangos de fusión
     const nl = r.u8(); let lname = r.str(nl); r.pos += (4 - ((nl + 1) % 4)) % 4;
-    let section = 0, fillOpacity = 255, sectionBlend = ''; const keys: string[] = []; const blocks: Rec['blocks'] = {};
+    let section = 0, fillOpacity = 255, sectionBlend = '', protect = 0; const keys: string[] = []; const blocks: Rec['blocks'] = {};
     while (r.pos + 12 <= extraEnd && r.isSig()) {
       r.pos += 4; const key = r.str(4); const len = r.big && BIG_KEYS.has(key) ? r.u64() : r.u32(); const start = r.pos;
       keys.push(key);
       if (key === 'luni') lname = r.ustr();
       else if (key === 'lsct' || key === 'lsdk') { section = r.u32(); if (len >= 12) { r.pos += 4; sectionBlend = r.str(4); } }
       else if (key === 'iOpa') fillOpacity = r.u8();
+      else if (key === 'lspf') protect = r.u32();
       else if (ADJ_KEYS.includes(key) || ['vstk', 'lfx2', 'SoCo', 'GdFl', 'vmsk', 'vsms', 'CgEd', 'TySh', 'SoLd', 'PlLd'].includes(key)) blocks[key] = new Uint8Array(r.buf, start, len);
       // El relleno tras cada bloque varía según el programa: se busca la siguiente firma
       r.pos = start + len;
       for (let pad = 0; pad < 4; pad++) { r.pos = start + len + pad; if (r.pos >= extraEnd || r.isSig()) break; }
     }
     r.pos = extraEnd;
-    recs.push({ fillOpacity, top, left, bottom, right, channels, blend: sectionBlend || blend, opacity, flags, clip, name: lname, mask, section, keys, blocks });
+    recs.push({ protect, fillOpacity, top, left, bottom, right, channels, blend: sectionBlend || blend, opacity, flags, clip, name: lname, mask, section, keys, blocks });
   }
   const stack: GroupLayer[] = [doc.root];
   let skippedAdj = 0, textAsPixels = 0;
@@ -464,6 +465,8 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
     layer.visible = !(rec.flags & 2);
     layer.blendMode = keyToBlend.get(rec.blend) ?? 'source-over';
     layer.clip = rec.clip;
+    if (rec.protect & 0x80000000 || rec.protect & 2) layer.locked = true;
+    if (rec.protect & 1) layer.lockAlpha = true;
     if (rec.blocks.lfx2 && layer.kind !== 'adjust') {
       try { layer.styles = parseEffects(rec.blocks.lfx2); } catch { /* efecto no reconocido */ }
     }
@@ -864,6 +867,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
     ex.u32(rc.name.length); for (let k = 0; k < rc.name.length; k++) ex.u16(rc.name.charCodeAt(k)); if (ul % 4 === 2) ex.u16(0);
     if (rc.section === 3) { ex.str('8BIM'); ex.str('lsct'); ex.u32(4); ex.u32(3); }
     if (rc.section > 0 && rc.section < 3) { ex.str('8BIM'); ex.str('lsct'); ex.u32(12); ex.u32(rc.section); ex.str('8BIM'); ex.str(blendToKey.get(l!.blendMode) ?? 'norm'); }
+    if (l && (l.locked || l.lockAlpha)) { ex.str('8BIM'); ex.str('lspf'); ex.u32(4); ex.u32((l.locked ? 0x80000000 : 0) | (l.lockAlpha ? 1 : 0)); }
     for (const [k, bytes] of rc.extra ?? []) { ex.str('8BIM'); ex.str(k); ex.u32(bytes.length); ex.bytes(bytes); }
     if (rc.section === -1) { const ab = adjustmentBlock(l as AdjustmentLayer)!; ex.str('8BIM'); ex.str(ab.key); ex.u32(ab.bytes.length); ex.bytes(ab.bytes); }
     li.u32(ex.size); li.writer(ex);

@@ -76,7 +76,7 @@ export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith
 // PNG en base64. Lleva un número de versión para poder ampliarlo en el futuro.
 
 interface ProjLayer {
-  id: number; type: string; name: string; visible: boolean; opacity: number; blendMode: string; locked: boolean; clip?: boolean;
+  id: number; type: string; name: string; visible: boolean; opacity: number; blendMode: string; locked: boolean; lockAlpha?: boolean; clip?: boolean;
   image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean;
 }
 interface ProjFile {
@@ -91,7 +91,7 @@ async function canvasToDataURL(c: HTMLCanvasElement) {
 
 async function layerToProj(l: Layer): Promise<ProjLayer> {
   const p: ProjLayer = {
-    id: l.id, type: l.kind, name: l.name, visible: l.visible, opacity: l.opacity, blendMode: l.blendMode, locked: l.locked, clip: l.clip,
+    id: l.id, type: l.kind, name: l.name, visible: l.visible, opacity: l.opacity, blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, clip: l.clip,
     mask: l.mask ? { image: await canvasToDataURL(l.mask.canvas), enabled: l.mask.enabled } : null,
   };
   if (l.styles) p.styles = l.styles;
@@ -131,7 +131,7 @@ async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
   }
   l.id = p.id; bumpLayerId(p.id);
   l.styles = p.styles ?? null; l.clip = !!p.clip;
-  l.visible = p.visible; l.opacity = p.opacity; l.blendMode = p.blendMode as any; l.locked = p.locked;
+  l.visible = p.visible; l.opacity = p.opacity; l.blendMode = p.blendMode as any; l.locked = p.locked; l.lockAlpha = !!p.lockAlpha;
   if (p.mask) {
     const m = new LayerMask(w, h, 'black');
     ctx2d(m.canvas).drawImage(await loadImage(p.mask.image), 0, 0);

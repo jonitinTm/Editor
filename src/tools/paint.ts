@@ -9,7 +9,14 @@ export interface PaintTarget {
   layer: Layer;
   isMask: boolean;
   canvas: HTMLCanvasElement;
+  /** Máscara rápida: el "lienzo" es la propia selección. */
+  quick?: boolean;
+  /** La capa tiene la transparencia bloqueada. */
+  lockAlpha?: boolean;
 }
+
+/** Selección que limita la pintura (no aplica en máscara rápida, donde se pinta la selección misma). */
+export function clipMask(t: PaintTarget): HTMLCanvasElement | null { return t.quick ? null : app.doc!.selection.mask; }
 
 /** Convierte una capa de texto en una capa normal de píxeles. */
 export function rasterizeLayer(l: RasterLayer): RasterLayer {
@@ -31,6 +38,10 @@ export function rasterizeLayer(l: RasterLayer): RasterLayer {
 export function getPaintTarget(opts: { allowText?: boolean } = {}): PaintTarget | null {
   const doc = app.doc;
   if (!doc) return null;
+  if (doc.quickMask) {
+    if (!doc.selection.mask) { doc.selection.selectAll(); }
+    return { layer: doc.active ?? doc.root, isMask: true, canvas: doc.selection.mask!, quick: true };
+  }
   let layer = doc.active;
   if (!layer) { app.toast('No hay ninguna capa seleccionada', 'warn'); return null; }
   if (layer.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return null; }
@@ -41,16 +52,18 @@ export function getPaintTarget(opts: { allowText?: boolean } = {}): PaintTarget 
     app.toast(layer.kind === 'text' ? 'Capa de texto rasterizada para poder editarla' : layer.kind === 'smart' ? 'Objeto inteligente rasterizado para poder pintar en él (para conservarlo, edita su contenido con doble clic)' : 'Forma rasterizada para poder editarla');
     layer = rasterizeLayer(layer);
   }
-  return { layer, isMask: false, canvas: (layer as RasterLayer).canvas };
+  return { layer, isMask: false, canvas: (layer as RasterLayer).canvas, lockAlpha: layer.lockAlpha };
 }
 
 /** Marca el objetivo como modificado (para el historial). */
 export function touchTarget(t: PaintTarget) {
+  if (t.quick) return;
   if (t.isMask) t.layer.mask!.touch(); else t.layer.touch();
 }
 
 /** Sustituye el contenido del objetivo por un lienzo nuevo. */
 export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement) {
+  if (t.quick) { app.doc!.selection.setMask(c); t.canvas = app.doc!.selection.mask ?? c; return; }
   if (t.isMask) t.layer.mask!.canvas = c; else (t.layer as RasterLayer).canvas = c;
   t.canvas = c;
   touchTarget(t);
@@ -59,6 +72,7 @@ export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement) {
 /** Aplica la previsualización temporal al compositor. */
 export function setPreview(t: PaintTarget, c: HTMLCanvasElement | null) {
   const doc = app.doc!;
+  if (t.quick) { doc.quickPreview = c; return; }
   const ov = doc.overrides.get(t.layer) ?? {};
   if (t.isMask) ov.mask = c ?? undefined; else ov.canvas = c ?? undefined;
   if (!ov.mask && !ov.canvas && !ov.extra && !ov.offset) doc.overrides.delete(t.layer);
@@ -133,7 +147,7 @@ export class Stroke {
     this.buffer = makeCanvas(w, h);
     this.original = cloneCanvas(target.canvas);
     this.preview = cloneCanvas(target.canvas);
-    this.sel = app.doc!.selection.mask;
+    this.sel = clipMask(target);
     setPreview(target, this.preview);
   }
 
@@ -194,7 +208,7 @@ export class Stroke {
     }
     ctx.globalAlpha = this.opacity;
     if (this.mode === 'paint') {
-      ctx.globalCompositeOperation = 'source-over'; ctx.drawImage(src, 0, 0);
+      ctx.globalCompositeOperation = this.target.lockAlpha ? 'source-atop' : 'source-over'; ctx.drawImage(src, 0, 0);
     } else if (this.mode === 'erase') {
       ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(src, 0, 0);
     } else {
@@ -226,5 +240,7 @@ export function strokeSetup(t: PaintTarget, erase: boolean): { mode: StrokeMode;
     const col = erase ? app.bg : app.fg;
     return { mode: 'mask', color: '#ffffff', maskValue: luminance(col) };
   }
+  // Con la transparencia bloqueada, el borrador pinta con el color de fondo
+  if (erase && t.lockAlpha) return { mode: 'paint', color: app.bg, maskValue: 1 };
   return { mode: erase ? 'erase' : 'paint', color: app.fg, maskValue: 1 };
 }

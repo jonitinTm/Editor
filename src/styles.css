@@ -310,3 +310,9 @@ body.hide-panels .side, body.hide-panels .toolbar, body.hide-panels .optionsbar,
 .recover { margin-top: 16px; padding: 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--accent-soft); display: flex; flex-direction: column; gap: 8px; text-align: left; }
 .recover-row { display: flex; align-items: center; gap: 8px; }
 .recover-row span { flex: 1; }
+.qm-btn { margin-top: 6px; flex-shrink: 0; }
+.layer-controls { flex-direction: column; align-items: stretch; gap: 4px; }
+.lc-row { display: flex; align-items: center; gap: 6px; }
+.lc-row .blend { flex: 1; min-width: 0; }
+.lc-row .btn.icon-btn { padding: 2px 4px; }
+.lc-row .btn.icon-btn svg { width: 15px; height: 15px; }

@@ -9,7 +9,7 @@ import type { EditorDocument } from './document';
 interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
-  blendMode: BlendMode; locked: boolean; clip: boolean;
+  blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; clip: boolean;
   canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
   children?: LayerSnap[]; expanded?: boolean;
@@ -17,6 +17,7 @@ export interface LayerSnap {
 export interface DocSnap {
   width: number; height: number; root: LayerSnap; activeId: number | null;
   selection: HTMLCanvasElement | null;
+  quickMask?: boolean;
 }
 export interface HistoryStep { name: string; icon?: string; snap: DocSnap; }
 
@@ -33,7 +34,7 @@ function freeze(owner: object, version: number, canvas: HTMLCanvasElement): HTML
 function snapLayer(l: Layer): LayerSnap {
   const s: LayerSnap = {
     id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,
-    blendMode: l.blendMode, locked: l.locked, clip: l.clip,
+    blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, clip: l.clip,
     mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled } : null,
   };
   s.styles = l.styles ? JSON.stringify(l.styles) : null;
@@ -59,7 +60,7 @@ export function snapshot(doc: EditorDocument): DocSnap {
   }
   return {
     width: doc.width, height: doc.height, root: snapLayer(doc.root),
-    activeId: doc.active?.id ?? null, selection: selCanvas,
+    activeId: doc.active?.id ?? null, selection: selCanvas, quickMask: doc.quickMask,
   };
 }
 
@@ -80,7 +81,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
     if (s.kind !== 'smart') frozen.set(r, { version: r.version, canvas: s.canvas! });
     l = r;
   }
-  l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.clip = s.clip;
+  l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.clip = s.clip;
   l.styles = s.styles ? JSON.parse(s.styles) : null;
   if (s.mask) {
     const m = new LayerMask(w, h, 'black');
@@ -97,6 +98,7 @@ export function restore(doc: EditorDocument, snap: DocSnap) {
   doc.root = root;
   doc.selection.width = snap.width; doc.selection.height = snap.height;
   doc.selection.setMask(snap.selection);
+  doc.quickMask = !!snap.quickMask; doc.quickPreview = null;
   if (snap.selection) selFrozen = { version: doc.selection.version, canvas: snap.selection, owner: doc.selection };
   // Se mantiene la capa que el usuario tenía seleccionada si sigue existiendo.
   const keepId = doc.active?.id ?? -1;

@@ -4,14 +4,14 @@ import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
-import { getPaintTarget, setPreview, setTargetCanvas, strokeSetup, PaintTarget } from './paint';
+import { getPaintTarget, setPreview, setTargetCanvas, strokeSetup, PaintTarget, clipMask } from './paint';
 import { floodMask } from './floodfill';
 import { cloneCanvas, ctx2d, getPixels, makeCanvas, rgbToHex, hexToRgb } from '../core/canvas';
 
 /** Dibuja `src` sobre el objetivo respetando selección, opacidad y modo (capa/máscara). */
 export function applyOnTarget(t: PaintTarget, base: HTMLCanvasElement, src: HTMLCanvasElement, opacity: number, maskValue: number): HTMLCanvasElement {
   const out = cloneCanvas(base);
-  const sel = app.doc!.selection.mask;
+  const sel = clipMask(t);
   let s = src;
   if (sel) {
     s = cloneCanvas(src);
@@ -22,7 +22,7 @@ export function applyOnTarget(t: PaintTarget, base: HTMLCanvasElement, src: HTML
   if (t.isMask) {
     ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(s, 0, 0);
     ctx.globalAlpha = opacity * maskValue; ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(s, 0, 0);
-  } else ctx.drawImage(s, 0, 0);
+  } else { if (t.lockAlpha) ctx.globalCompositeOperation = 'source-atop'; ctx.drawImage(s, 0, 0); }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   return out;
 }
@@ -99,7 +99,7 @@ export class GradientTool implements Tool {
     if (t.isMask) {
       // Sustituye el valor de la máscara por el del degradado dentro de la selección
       const out = cloneCanvas(this.base!);
-      const sel = doc.selection.mask;
+      const sel = clipMask(t);
       const oc = ctx2d(out);
       let s = g;
       if (sel) { s = cloneCanvas(g); const sc = ctx2d(s); sc.globalCompositeOperation = 'destination-in'; sc.drawImage(sel, 0, 0); }

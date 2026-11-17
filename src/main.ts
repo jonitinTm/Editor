@@ -22,7 +22,7 @@ import { MoveTool } from './tools/move';
 import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool } from './tools/select';
 import { retouchTools } from './tools/retouch';
 import { CropTool } from './tools/crop';
-import { BrushTool, PencilTool, EraserTool, CloneTool } from './tools/brush';
+import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool } from './tools/brush';
 import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool } from './tools/misc';
 import { TextTool } from './tools/text';
 import { ShapeTool } from './tools/shape';
@@ -35,6 +35,8 @@ for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, WandToo
   app.registerTool(new T());
 }
 app.registerTool(new PolyLassoTool());
+app.registerTool(new SpotHealTool());
+app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
 
 // ---- Estructura de la página ----------------------------------------------------------

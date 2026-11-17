@@ -4,12 +4,13 @@ import { app } from './app';
 import { h } from './dom';
 import { icon } from './icons';
 import { colorDialog } from './colorpicker';
+import { actionById } from './actions';
 import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
   ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso'], ['wand'], ['crop'], ['eyedropper'],
-  ['clone'], ['brush', 'pencil'], ['eraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn'], ['text'], ['pen', 'node'], ['shape'], ['hand'], ['zoom'],
+  ['spotHeal', 'heal'], ['clone'], ['brush', 'pencil'], ['eraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn'], ['text'], ['pen', 'node'], ['shape'], ['hand'], ['zoom'],
 ];
 
 export function buildToolbar(parent: HTMLElement) {
@@ -53,6 +54,11 @@ export function buildToolbar(parent: HTMLElement) {
   swap.onclick = () => app.setColors(app.bg, app.fg);
   reset.onclick = () => app.setColors('#000000', '#ffffff');
   bar.append(h('div', { class: 'colors' }, bgSw, fgSw, swap, reset));
+  const qm = h('button', { class: 'tool-btn qm-btn', title: 'Editar en modo máscara rápida (Q)', html: icon('quickMask') });
+  qm.onclick = () => actionById.get('quickMask')!.run();
+  bar.append(qm);
+  const upQ = () => qm.classList.toggle('active', !!app.doc?.quickMask);
+  app.on('doc', upQ); app.on('docs', upQ);
 
   const update = () => {
     for (const b of buttons) {

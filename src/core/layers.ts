@@ -93,6 +93,8 @@ export abstract class Layer {
   opacity = 1;
   blendMode: BlendMode = 'source-over';
   locked = false;
+  /** Bloquear transparencia: solo se puede pintar donde ya hay píxeles. */
+  lockAlpha = false;
   /** Máscara de recorte: la capa solo se ve donde la capa de debajo tiene píxeles. */
   clip = false;
   mask: LayerMask | null = null;

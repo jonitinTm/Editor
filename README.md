@@ -67,6 +67,11 @@ Ya disponible:
   Todavía no se revelan los datos en bruto del sensor.
 - **Interfaz**: selector de color propio, paneles *Color* y *Muestras*, paneles agrupados en pestañas, menú *Ventana*,
   menú contextual en las capas, teclas numéricas para la opacidad, `Tab` para ocultar paneles y `F` para pantalla completa.
+- **Retoque profesional**: pincel corrector puntual (`J`: pinta sobre la imperfección y desaparece), pincel corrector
+  (`Mayús+J`, con origen elegido con Alt+clic) y *Edición › Rellenar según contenido* (`Mayús+Retroceso`).
+- **Máscara rápida** (`Q`): la selección se ve como una capa roja y se edita con cualquier herramienta de pintura.
+- **Motor de pincel**: suavizado del trazo, espaciado y Alt para tomar color mientras se pinta.
+- **Bloquear transparencia** (panel Capas): solo se pinta donde ya hay píxeles; se conserva en proyecto y en PSD.
 - **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;
@@ -83,7 +88,7 @@ Pendiente: revelado real de RAW, y en PSD los efectos y ajustes que aún no exis
 ### Atajos principales
 
 `V` mover · `M` marcos (Mayús+M alterna) · `L` lazo · `W` varita · `C` recortar · `I` cuentagotas · `S` tampón ·
-`B` pincel/lápiz · `E` borrador · `G` degradado/bote · `T` texto · `P` pluma · `A` selección directa · `U` formas · `H` mano · `Z` zoom ·
+`B` pincel/lápiz · `J` correctores · `Q` máscara rápida · `E` borrador · `G` degradado/bote · `T` texto · `P` pluma · `A` selección directa · `U` formas · `H` mano · `Z` zoom ·
 `D` colores por defecto · `X` intercambiar colores · `[` `]` tamaño del pincel · Espacio (mantener) para desplazar.
 
 `Ctrl+Z` deshacer · `Mayús+Ctrl+Z` rehacer · `Ctrl+S` guardar proyecto · `Mayús+Ctrl+S` exportar ·

@@ -7,10 +7,11 @@ import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer,
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, composeStyled } from '../core/compositor';
 import { hasStyles, canvasBlend, tracePath } from '../core/layers';
-import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer } from '../tools/paint';
+import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer, clipMask } from '../tools/paint';
 import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
 import { readPsd, writePsd } from '../io/psd';
+import { heal, findSource } from '../filters/heal';
 import { forget } from '../io/autosave';
 import { encodeGif } from '../io/gif';
 import { renderFrames } from './timeline';
@@ -145,7 +146,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
-  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip;
+  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip; c.lockAlpha = l.lockAlpha;
   if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
   return c;
 }
@@ -241,11 +242,11 @@ export function moveLayerTo(layer: Layer, parent: GroupLayer, index: number) {
   d.commit('Mover capa');
 }
 
-export function setLayerProp(l: Layer, prop: 'opacity' | 'blendMode' | 'visible' | 'locked', value: any, record = true) {
+export function setLayerProp(l: Layer, prop: 'opacity' | 'blendMode' | 'visible' | 'locked' | 'lockAlpha', value: any, record = true) {
   const d = doc(); if (!d) return;
   (l as any)[prop] = value;
   d.invalidate();
-  if (record) d.commit({ opacity: 'Opacidad de capa', blendMode: 'Modo de fusión', visible: value ? 'Mostrar capa' : 'Ocultar capa', locked: value ? 'Bloquear capa' : 'Desbloquear capa' }[prop]);
+  if (record) d.commit({ opacity: 'Opacidad de capa', blendMode: 'Modo de fusión', visible: value ? 'Mostrar capa' : 'Ocultar capa', locked: value ? 'Bloquear capa' : 'Desbloquear capa', lockAlpha: value ? 'Bloquear transparencia' : 'Desbloquear transparencia' }[prop]);
   else d.changed();
 }
 
@@ -493,6 +494,52 @@ export function alignLayer(mode: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter
 }
 
 /** Convierte el trazado de la capa activa en selección. */
+/**
+ * Corrige un hueco (máscara `holeCanvas`, alfa = cuánto) copiando textura de una
+ * zona cercana y adaptando su color. Lo usan el corrector puntual y "Rellenar según contenido".
+ */
+export function healHole(t: PaintTarget, holeCanvas: HTMLCanvasElement, box: Rect, name: string) {
+  const d = doc()!;
+  const W = d.width, H = d.height;
+  const m = Math.max(6, Math.round(Math.max(box.w, box.h) * 0.35));
+  const reg = { x: Math.max(0, box.x - m), y: Math.max(0, box.y - m), w: 0, h: 0 };
+  reg.w = Math.min(W, box.x + box.w + m) - reg.x; reg.h = Math.min(H, box.y + box.h + m) - reg.y;
+  if (reg.w < 2 || reg.h < 2) return;
+  const ha = getPixels(holeCanvas, reg).data, hole = new Float32Array(reg.w * reg.h);
+  for (let i = 0; i < hole.length; i++) hole[i] = ha[i * 4 + 3] / 255;
+  const full = getPixels(t.canvas);
+  const { dx, dy } = findSource(full, reg, hole, { x: box.x - reg.x, y: box.y - reg.y, w: box.w, h: box.h });
+  const O = getPixels(t.canvas, reg);
+  const sx = Math.max(0, Math.min(W - reg.w, reg.x + dx)), sy = Math.max(0, Math.min(H - reg.h, reg.y + dy));
+  const C = getPixels(t.canvas, { x: sx, y: sy, w: reg.w, h: reg.h });
+  const out = cloneCanvas(t.canvas);
+  putPixels(out, heal(O, C, hole), reg.x, reg.y);
+  setTargetCanvas(t, out);
+  d.commit(name);
+}
+
+/** Edición › Rellenar según contenido: rellena la selección con textura del entorno. */
+export function contentAwareFill() {
+  const d = doc(); if (!d || !d.selection.mask || !d.selection.bounds) { app.toast('Haz primero una selección', 'warn'); return; }
+  const t = getPaintTarget(); if (!t) return;
+  if (t.isMask) { app.toast('Rellenar según contenido trabaja sobre los píxeles de la capa', 'warn'); return; }
+  // Se amplía un poco la selección para que el borde también se corrija
+  const hole = cloneCanvas(d.selection.mask), b = d.selection.bounds;
+  const g = ctx2d(hole); g.filter = 'blur(2px)'; g.drawImage(d.selection.mask, 0, 0); g.filter = 'none';
+  healHole(t, hole, { x: Math.max(0, b.x - 3), y: Math.max(0, b.y - 3), w: b.w + 6, h: b.h + 6 }, 'Rellenar según contenido');
+}
+
+/** Entra o sale de la máscara rápida (Q). */
+export function toggleQuickMask() {
+  const d = doc(); if (!d) return;
+  app.tool?.cancel?.();
+  if (!d.quickMask) { d.quickMask = true; d.commit('Entrar en máscara rápida'); app.toast('Máscara rápida: pinta en negro para quitar de la selección y en blanco para añadir. Q para salir.'); return; }
+  d.quickMask = false; d.quickPreview = null;
+  const m = d.selection.mask;
+  if (m) { const a = getPixels(m).data; let full = true; for (let i = 3; i < a.length; i += 4) if (a[i] < 255) { full = false; break; } if (full) d.selection.clear(); }
+  d.commit('Salir de máscara rápida');
+}
+
 export function pathToSelection() {
   const d = doc(); const l = d?.active;
   if (!d || !(l instanceof ShapeLayer) || l.props.shape !== 'path' || !l.props.path) { app.toast('Selecciona una capa de trazado (creada con la pluma)', 'warn'); return; }
@@ -580,8 +627,10 @@ export function fill(color: string, opacity = 1, name = 'Rellenar') {
   const out = cloneCanvas(t.canvas); const c = ctx2d(out);
   const area = makeCanvas(d.width, d.height); const ac = ctx2d(area);
   ac.fillStyle = t.isMask ? '#fff' : color; ac.fillRect(0, 0, d.width, d.height);
-  if (d.selection.mask) { ac.globalCompositeOperation = 'destination-in'; ac.drawImage(d.selection.mask, 0, 0); }
+  const sm = clipMask(t);
+  if (sm) { ac.globalCompositeOperation = 'destination-in'; ac.drawImage(sm, 0, 0); }
   c.globalAlpha = opacity;
+  if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
   if (t.isMask) {
     c.globalCompositeOperation = 'destination-out'; c.drawImage(area, 0, 0);
     c.globalAlpha = opacity * luminanceOf(color); c.globalCompositeOperation = 'lighter'; c.drawImage(area, 0, 0);
@@ -694,13 +743,13 @@ export class FilterSession {
   constructor(t: PaintTarget, public def: FilterDef) {
     const d = doc()!;
     this.t = t;
-    this.region = d.selection.bounds ?? { x: 0, y: 0, w: d.width, h: d.height };
+    this.region = (!t.quick && d.selection.bounds) || { x: 0, y: 0, w: d.width, h: d.height };
     this.orig = getPixels(t.canvas, this.region);
     if (t.isMask) { // máscara -> imagen en grises
       const a = this.orig.data;
       for (let i = 0; i < a.length; i += 4) { a[i] = a[i + 1] = a[i + 2] = a[i + 3]; a[i + 3] = 255; }
     }
-    this.sel = d.selection.mask ? getPixels(d.selection.mask, this.region) : null;
+    this.sel = d.selection.mask && !t.quick ? getPixels(d.selection.mask, this.region) : null;
     this.preview = cloneCanvas(t.canvas);
   }
   static start(def: FilterDef): FilterSession | null {
@@ -722,6 +771,7 @@ export class FilterSession {
       }
     }
     if (this.t.isMask) for (let i = 0; i < n.length; i += 4) { n[i + 3] = n[i]; n[i] = n[i + 1] = n[i + 2] = 255; }
+    else if (this.t.lockAlpha) for (let i = 3; i < n.length; i += 4) n[i] = o[i];
     return img;
   }
   render(params: any) {

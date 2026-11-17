@@ -24,6 +24,9 @@ export class EditorDocument {
   view: ViewState = { zoom: 1, panX: 0, panY: 0 };
   viewInitialized = false;
   overrides = new Map<Layer, LayerOverride>();
+  /** Máscara rápida: el pincel edita la selección, que se ve como una capa roja. */
+  quickMask = false;
+  quickPreview: HTMLCanvasElement | null = null;
   /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
   frames: { delay: number; visible: number[] }[] = [];
   frameIndex = 0;

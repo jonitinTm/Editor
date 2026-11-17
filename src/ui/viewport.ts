@@ -28,6 +28,7 @@ export class Viewport {
   /** Guía que se está arrastrando. */
   private guideDrag: { axis: 'h' | 'v'; index: number; pos: number } | null = null;
   private checker: CanvasPattern | null = null;
+  private quickCanvas: HTMLCanvasElement | null = null;
   private lastClick: { t: number; x: number; y: number; n: number } | null = null;
 
   constructor(parent: HTMLElement) {
@@ -172,8 +173,19 @@ export class Viewport {
       ctx.stroke(); ctx.restore();
     }
 
+    // Máscara rápida: lo no seleccionado se tiñe de rojo
+    if (d.quickMask) {
+      const qm = d.quickPreview ?? d.selection.mask;
+      const ov = this.quickCanvas ??= document.createElement('canvas');
+      if (ov.width !== d.width || ov.height !== d.height) { ov.width = d.width; ov.height = d.height; }
+      const oc = ov.getContext('2d')!;
+      oc.globalCompositeOperation = 'copy'; oc.fillStyle = 'rgba(255,0,0,.5)'; oc.fillRect(0, 0, d.width, d.height);
+      if (qm) { oc.globalCompositeOperation = 'destination-out'; oc.drawImage(qm, 0, 0); }
+      ctx.save(); ctx.imageSmoothingEnabled = zoom < 1; ctx.drawImage(ov, panX, panY, dw, dh); ctx.restore();
+    }
+
     // Selección
-    const outline = d.selection.getOutline();
+    const outline = d.quickMask ? null : d.selection.getOutline();
     if (outline) this.drawAnts(outline, (d as any).selectionOffset);
 
     // Guías

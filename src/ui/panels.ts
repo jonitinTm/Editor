@@ -124,7 +124,9 @@ export function buildLayersPanel(parent: HTMLElement) {
     footBtn('newLayer', 'Nueva capa', ops.newLayer),
     footBtn('duplicate', 'Duplicar capa', ops.duplicateLayer),
     footBtn('trash', 'Eliminar capa', ops.deleteLayers));
-  const top = h('div', { class: 'layer-controls' }, blend, opacity.el, lockBtn);
+  const lockA = h('button', { class: 'btn icon-btn', title: 'Bloquear transparencia (solo se pinta donde ya hay píxeles)', html: icon('lockAlpha') });
+  lockA.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockAlpha', !l.lockAlpha); };
+  const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint' }, 'Bloquear:'), lockA, lockBtn));
   const body = h('div', { class: 'panel-body layers' }, top, list, foot);
   parent.append(panel('Capas', body));
 
@@ -173,7 +175,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const kindTag = l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : l instanceof SmartLayer ? h('span', { class: 'ltag', title: 'Objeto inteligente (doble clic en la miniatura para editar su contenido)' }, '▣') : null;
     const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
-    const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : null;
+    const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
       draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
@@ -242,6 +244,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     blend.value = l?.blendMode ?? 'source-over';
     if (!opacityChanging) opacity.set(Math.round((l?.opacity ?? 1) * 100));
     lockBtn.classList.toggle('on', !!l?.locked);
+    lockA.classList.toggle('on', !!l?.lockAlpha);
   };
   app.on('doc', render); app.on('docs', render);
   render();

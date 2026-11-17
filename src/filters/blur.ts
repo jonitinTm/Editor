@@ -41,7 +41,7 @@ function boxBlurV(src: Float32Array, dst: Float32Array, w: number, h: number, r:
   }
 }
 
-function blurChannel(ch: Float32Array, tmp: Float32Array, w: number, h: number, sigma: number) {
+export function blurChannel(ch: Float32Array, tmp: Float32Array, w: number, h: number, sigma: number) {
   for (const s of boxSizes(sigma, 3)) {
     const r = (s - 1) / 2;
     boxBlurH(ch, tmp, w, h, r);
