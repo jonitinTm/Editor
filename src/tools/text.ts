@@ -17,7 +17,14 @@ export class TextTool implements Tool {
     { key: 'italic', label: 'Cursiva', type: 'checkbox', default: false },
     { key: 'align', label: 'Alinear', type: 'select', default: 'left', choices: [
       { value: 'left', label: 'Izquierda' }, { value: 'center', label: 'Centro' }, { value: 'right', label: 'Derecha' }] },
+    { key: 'tracking', label: 'Interletraje', type: 'range', min: -200, max: 1000, default: 0 },
+    { key: 'leading', label: 'Interlineado', type: 'range', min: 50, max: 400, default: 120, unit: '%' },
+    { key: 'underline', label: 'Subrayado', type: 'checkbox', default: false },
+    { key: 'caps', label: 'Mayúsculas', type: 'checkbox', default: false },
   ] as any[];
+  /** Clic: texto de punto. Arrastrar: caja de texto de párrafo. */
+  private dragStart: { x: number; y: number } | null = null;
+  private dragNow: { x: number; y: number } | null = null;
   private editing: { layer: TextLayer; isNew: boolean; before: string; area: HTMLTextAreaElement } | null = null;
 
   constructor() {
@@ -30,6 +37,7 @@ export class TextTool implements Tool {
     const p = this.editing.layer.props;
     p.font = app.opt('font', this.id); p.size = app.opt('size', this.id);
     p.bold = app.opt('bold', this.id); p.italic = app.opt('italic', this.id); p.align = app.opt('align', this.id);
+    p.tracking = app.opt('tracking', this.id); p.lineHeight = app.opt<number>('leading', this.id) / 100; p.underline = app.opt('underline', this.id); p.caps = app.opt('caps', this.id);
     p.color = app.fg;
     this.editing.layer.render();
     app.touchDoc();
@@ -60,15 +68,27 @@ export class TextTool implements Tool {
       const p = hit.props;
       app.setOpt(this.id, 'font', p.font); app.setOpt(this.id, 'size', p.size);
       app.setOpt(this.id, 'bold', p.bold); app.setOpt(this.id, 'italic', p.italic); app.setOpt(this.id, 'align', p.align);
+      app.setOpt(this.id, 'tracking', p.tracking ?? 0); app.setOpt(this.id, 'leading', Math.round(p.lineHeight * 100)); app.setOpt(this.id, 'underline', !!p.underline); app.setOpt(this.id, 'caps', !!p.caps);
       app.setColors(p.color, app.bg);
       this.startEditing(hit, false);
       return;
     }
+    this.dragStart = { x: e.x, y: e.y }; this.dragNow = { x: e.x, y: e.y };
+  }
+  move(e: ToolEvent) { if (this.dragStart) this.dragNow = { x: e.x, y: e.y }; }
+  up() {
+    const a = this.dragStart, b = this.dragNow; this.dragStart = this.dragNow = null;
+    if (!a || !b) return;
+    const doc = app.doc!;
     const size = app.opt<number>('size', this.id);
+    const box = Math.abs(b.x - a.x) * app.viewport.zoom > 10 ? Math.abs(b.x - a.x) : 0;
     const layer = new TextLayer('Texto', doc.width, doc.height, {
       text: '', font: app.opt('font', this.id), size, color: app.fg,
       bold: app.opt('bold', this.id), italic: app.opt('italic', this.id), align: app.opt('align', this.id),
-      lineHeight: 1.2, x: Math.round(e.x), y: Math.round(e.y - size * 0.6),
+      lineHeight: (app.opt<number>('leading', this.id) ?? 120) / 100, tracking: app.opt('tracking', this.id) ?? 0,
+      underline: app.opt('underline', this.id), caps: app.opt('caps', this.id),
+      x: Math.round(box ? Math.min(a.x, b.x) : a.x), y: Math.round(box ? Math.min(a.y, b.y) : a.y - size * 0.6),
+      boxWidth: box ? Math.round(box) : undefined,
     });
     doc.insertAboveActive(layer);
     this.startEditing(layer, true);
@@ -105,7 +125,13 @@ export class TextTool implements Tool {
     const s = ed.area.style;
     s.left = (p.x - 3) + 'px'; s.top = (p.y - 3) + 'px';
     s.width = Math.max(40, b.w * z + 30) + 'px'; s.height = Math.max(20, b.h * z + 8) + 'px';
-    s.fontSize = ed.layer.props.size * z + 'px';
+    const tp = ed.layer.props;
+    s.fontSize = tp.size * z + 'px';
+    // El cuadro de edición imita la tipografía para que el cursor caiga en su sitio
+    s.fontFamily = JSON.stringify(tp.font) + ', sans-serif'; s.fontWeight = tp.bold ? 'bold' : 'normal'; s.fontStyle = tp.italic ? 'italic' : 'normal';
+    s.letterSpacing = (tp.tracking ?? 0) / 1000 * tp.size * z + 'px'; s.lineHeight = String(tp.lineHeight); s.textTransform = tp.caps ? 'uppercase' : 'none';
+    s.textAlign = tp.align; s.whiteSpace = tp.boxWidth ? 'pre-wrap' : 'pre';
+    if (tp.boxWidth) s.width = tp.boxWidth * z + 6 + 'px';
   }
 
   commit() {
@@ -128,6 +154,11 @@ export class TextTool implements Tool {
   cancel() { this.commit(); }
   docChanged() { if (this.editing) { this.editing.area.remove(); this.editing = null; } }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (this.dragStart && this.dragNow) {
+      const p = vp.toScreen(Math.min(this.dragStart.x, this.dragNow.x), Math.min(this.dragStart.y, this.dragNow.y));
+      ctx.strokeStyle = 'rgba(80,160,255,.9)'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1;
+      ctx.strokeRect(p.x, p.y, Math.abs(this.dragNow.x - this.dragStart.x) * vp.zoom, Math.abs(this.dragNow.y - this.dragStart.y) * vp.zoom); ctx.setLineDash([]);
+    }
     const ed = this.editing; if (!ed) return;
     this.position();
     const b = ed.layer.bounds();

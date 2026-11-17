@@ -58,32 +58,36 @@ export function exportDialog() {
   let quality = 90;
   const q = numberSlider({ label: '', min: 1, max: 100, value: quality, unit: '%', onInput: v => { quality = v; estimate(); } });
   const qRow = row('Calidad', q.el);
+  let scale = 100;
+  const sc = numberSlider({ min: 1, max: 400, value: 100, unit: '%', onInput: v => { scale = v; estimate(); } });
+  const scRow = row('Tamaño', sc.el);
   const info = h('div', { class: 'hint' }, '');
   let timer = 0;
   const estimate = () => {
     clearTimeout(timer);
     qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
+    scRow.style.display = fmt.value.startsWith('image/') ? '' : 'none';
     if (fmt.value === 'project') { info.textContent = 'Guarda todo (capas, texto, formas, ajustes, estilos) para seguir editando.'; return; }
     if (fmt.value === 'gif') { info.textContent = d.frames.length > 1 ? `Animación de ${d.frames.length} cuadros, 256 colores.` : 'Imagen de 256 colores. Para animar, crea cuadros en Ventana › Línea de tiempo.'; return; }
     if (fmt.value === 'psd') { info.textContent = 'Capas, grupos, máscaras, opacidad y modos de fusión. El texto y las formas van como píxeles.'; return; }
     info.textContent = 'Calculando tamaño…';
     timer = window.setTimeout(async () => {
-      const b = await io.exportImage(d, fmt.value as any, quality / 100);
-      info.textContent = `${d.width} × ${d.height} px · tamaño aproximado: ${(b.size / 1024).toFixed(b.size > 1e6 ? 0 : 1)} KB`;
+      const b = await io.exportImage(d, fmt.value as any, quality / 100, scale / 100);
+      info.textContent = `${Math.round(d.width * scale / 100)} × ${Math.round(d.height * scale / 100)} px · tamaño aproximado: ${(b.size / 1024).toFixed(b.size > 1e6 ? 0 : 1)} KB`;
     }, 200);
   };
   fmt.addEventListener('change', estimate);
   estimate();
   showDialog({
     title: 'Exportar como', okLabel: 'Guardar',
-    body: [row('Nombre', name), row('Formato', fmt), qRow, info],
+    body: [row('Nombre', name), row('Formato', fmt), qRow, scRow, info],
     onOk: async () => {
       if (fmt.value === 'project') { d.name = name.value || d.name; await ops.saveProject(true); return; }
       if (fmt.value === 'psd') { await ops.savePsd(name.value || d.name); return; }
       if (fmt.value === 'gif') { await ops.saveGif(name.value || d.name); return; }
       const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[fmt.value]!;
       try {
-        const b = await io.exportImage(d, fmt.value as any, quality / 100);
+        const b = await io.exportImage(d, fmt.value as any, quality / 100, scale / 100);
         if (fmt.value === 'image/webp' && b.type !== 'image/webp') app.toast('Este navegador no puede crear WebP; se guardó como PNG', 'warn');
         await io.saveBlob(b, (name.value || d.name) + (b.type === 'image/webp' || fmt.value !== 'image/webp' ? ext : '.png'));
         app.toast('Imagen exportada');
@@ -407,6 +411,12 @@ export function layerStyleDialog() {
     onOk: () => { const any = Object.values(st).some((x: any) => x.enabled); l.styles = before; ops.setLayerStyles(l, any || before ? JSON.parse(JSON.stringify(st)) : null, true); },
     onCancel: () => ops.setLayerStyles(l, before, false),
   });
+}
+
+export function exportLayersDialog() {
+  if (!app.doc) return;
+  const trim = h('input', { type: 'checkbox', checked: true }), vis = h('input', { type: 'checkbox', checked: false });
+  showDialog({ title: 'Exportar capas a archivos', okLabel: 'Exportar', body: [h('p', {}, 'Cada capa se guarda como un PNG independiente, todas juntas en un archivo ZIP.'), h('label', { class: 'check' }, trim, ' Recortar cada capa a su contenido'), h('label', { class: 'check' }, vis, ' Solo capas visibles')], onOk: () => { ops.exportLayers(trim.checked, vis.checked); } });
 }
 
 // ---- Ayuda ----------------------------------------------------------------------------

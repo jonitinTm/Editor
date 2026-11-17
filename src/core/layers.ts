@@ -66,6 +66,14 @@ export interface TextProps {
   lineHeight: number;
   x: number;
   y: number;
+  /** Interletraje en milésimas de em (como en los editores profesionales). */
+  tracking?: number;
+  underline?: boolean;
+  strike?: boolean;
+  /** Todo en mayúsculas. */
+  caps?: boolean;
+  /** Texto de párrafo: ancho de la caja (las líneas se ajustan solas). Sin valor = texto de punto. */
+  boxWidth?: number;
   /** true = se muestran los píxeles originales (p. ej. de un PSD) hasta que se edite el texto. */
   keepPixels?: boolean;
   /** Datos originales del texto de Photoshop (base64), para devolverlos intactos al guardar en PSD. */
@@ -166,16 +174,38 @@ export class TextLayer extends RasterLayer {
     const p = this.props;
     return `${p.italic ? 'italic ' : ''}${p.bold ? 'bold ' : ''}${p.size}px ${JSON.stringify(p.font)}, sans-serif`;
   }
-  /** Caja aproximada que ocupa el texto (coordenadas del documento). */
-  bounds() {
+  private setupCtx(ctx: CanvasRenderingContext2D) {
     const p = this.props;
-    const ctx = ctx2d(this.canvas);
     ctx.font = this.fontString();
-    const lines = p.text.split('\n');
-    const w = Math.max(1, ...lines.map(l => ctx.measureText(l).width));
-    const lh = p.size * p.lineHeight;
-    const x = p.align === 'left' ? p.x : p.align === 'center' ? p.x - w / 2 : p.x - w;
-    return { x, y: p.y, w, h: lh * lines.length };
+    if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${(p.tracking ?? 0) / 1000 * p.size}px`;
+  }
+  /** Reparte el texto en líneas (ajustando al ancho de la caja si es texto de párrafo). */
+  layout(): { lines: { text: string; w: number }[]; lh: number; width: number } {
+    const p = this.props, ctx = ctx2d(this.canvas);
+    ctx.save(); this.setupCtx(ctx);
+    const txt = p.caps ? p.text.toUpperCase() : p.text, lines: { text: string; w: number }[] = [];
+    const m = (t: string) => ctx.measureText(t).width;
+    for (const para of txt.split('\n')) {
+      if (!p.boxWidth) { lines.push({ text: para, w: m(para) }); continue; }
+      let cur = '';
+      for (const word of para.split(/(\s+)/)) {
+        const next = cur + word;
+        if (cur.trim() && m(next.trimEnd()) > p.boxWidth) { lines.push({ text: cur.trimEnd(), w: m(cur.trimEnd()) }); cur = word.trimStart(); }
+        else cur = next;
+        // palabras más largas que la caja: se cortan por letras
+        while (m(cur) > p.boxWidth && cur.length > 1) { let k = cur.length - 1; while (k > 1 && m(cur.slice(0, k)) > p.boxWidth) k--; lines.push({ text: cur.slice(0, k), w: m(cur.slice(0, k)) }); cur = cur.slice(k); }
+      }
+      lines.push({ text: cur.trimEnd(), w: m(cur.trimEnd()) });
+    }
+    ctx.restore();
+    const width = p.boxWidth ?? Math.max(1, ...lines.map(l => l.w));
+    return { lines, lh: p.size * p.lineHeight, width };
+  }
+  /** Caja que ocupa el texto (coordenadas del documento). */
+  bounds() {
+    const p = this.props, L = this.layout();
+    const x = p.boxWidth ? p.x : p.align === 'left' ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.x - L.width;
+    return { x, y: p.y, w: L.width, h: L.lh * Math.max(1, L.lines.length) };
   }
   translate(dx: number, dy: number) {
     this.props.x += dx; this.props.y += dy;
@@ -191,13 +221,21 @@ export class TextLayer extends RasterLayer {
     const p = this.props;
     p.keepPixels = false; delete p.psdTySh;
     const ctx = ctx2d(this.canvas);
+    const L = this.layout(), lh = L.lh;
     ctx.save();
-    ctx.font = this.fontString();
-    ctx.fillStyle = p.color;
-    ctx.textAlign = p.align;
+    this.setupCtx(ctx);
+    ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
     ctx.textBaseline = 'top';
-    const lh = p.size * p.lineHeight;
-    p.text.split('\n').forEach((line, i) => ctx.fillText(line, p.x, p.y + i * lh + (lh - p.size) / 2));
+    const left = p.boxWidth ? p.x : p.align === 'left' ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.x - L.width;
+    L.lines.forEach((line, i) => {
+      const lx = p.align === 'left' ? left : p.align === 'center' ? left + (L.width - line.w) / 2 : left + L.width - line.w;
+      const ty = p.y + i * lh + (lh - p.size) / 2;
+      ctx.textAlign = 'left';
+      ctx.fillText(line.text, lx, ty);
+      const thick = Math.max(1, p.size / 16);
+      if (p.underline) ctx.fillRect(lx, ty + p.size * 0.92, line.w, thick);
+      if (p.strike) ctx.fillRect(lx, ty + p.size * 0.52, line.w, thick);
+    });
     ctx.restore();
     this.touch();
   }

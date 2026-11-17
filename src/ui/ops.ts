@@ -115,6 +115,36 @@ export async function saveGif(name: string) {
   } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
 }
 
+/** Imagen › Duplicar: copia completa del documento en una pestaña nueva. */
+export async function duplicateDocument() {
+  const d = doc(); if (!d) return;
+  const copy = await io.openProject(await io.serializeProject(d));
+  copy.name = d.name + ' copia';
+  app.addDocument(copy, 'Duplicar');
+}
+
+/** Archivo › Exportar › Capas a archivos: un PNG por capa, dentro de un ZIP. */
+export async function exportLayers(trim: boolean, onlyVisible: boolean) {
+  const d = doc(); if (!d) return;
+  const layers = d.allLayers().filter(l => isRaster(l) && (!onlyVisible || l.isVisibleInTree()));
+  if (!layers.length) { app.toast('No hay capas que exportar', 'warn'); return; }
+  const files: { name: string; data: Uint8Array }[] = [], used = new Set<string>();
+  for (const l of layers) {
+    const c = makeCanvas(d.width, d.height), ctx = ctx2d(c);
+    const r = l as RasterLayer;
+    if (hasStyles(l.styles)) composeStyled(ctx, r.canvas, l.styles, 0, 0, d.width, d.height); else ctx.drawImage(r.canvas, 0, 0);
+    if (l.mask?.enabled) { ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(l.mask.canvas, 0, 0); }
+    let out = c;
+    if (trim) { const b = contentBounds(c); if (!b) continue; out = makeCanvas(b.w, b.h); ctx2d(out).drawImage(c, -b.x, -b.y); }
+    let name = (l.name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'capa');
+    let n = name, k = 2; while (used.has(n)) n = `${name} (${k++})`; used.add(n);
+    files.push({ name: n + '.png', data: new Uint8Array(await (await canvasToBlob(out, 'image/png')).arrayBuffer()) });
+  }
+  const { makeZip } = await import('../io/zip');
+  await io.saveBlob(makeZip(files), d.name + ' - capas.zip');
+  app.toast(`${files.length} capas exportadas`);
+}
+
 export async function savePsd(name: string) {
   const d = doc(); if (!d) return;
   try {

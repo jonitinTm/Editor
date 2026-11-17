@@ -72,6 +72,14 @@ Ya disponible:
 - **Máscara rápida** (`Q`): la selección se ve como una capa roja y se edita con cualquier herramienta de pintura.
 - **Motor de pincel**: suavizado del trazo, espaciado y Alt para tomar color mientras se pinta.
 - **Bloquear transparencia** (panel Capas): solo se pinta donde ya hay píxeles; se conserva en proyecto y en PSD.
+- **Transformación avanzada**: *Edición › Transformar › Distorsionar / Perspectiva*, o Ctrl+arrastrar una esquina en la
+  transformación libre.
+- **Filtro › Licuar** (`Mayús+Ctrl+X`): deformar, reconstruir, suavizar, molinete, inflar y desinflar.
+- **Paneles Navegador, Histograma e Información** (pestañas junto a Propiedades e Historial).
+- **Texto avanzado**: texto de párrafo (arrastra una caja con la herramienta Texto y las líneas se ajustan solas),
+  interletraje, interlineado, subrayado, tachado y mayúsculas.
+- **Archivo**: *Imagen › Duplicar*, *Archivo › Exportar capas a archivos* (ZIP con un PNG por capa) y cambio de tamaño
+  al exportar.
 - **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;

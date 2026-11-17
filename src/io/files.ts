@@ -181,8 +181,13 @@ export async function saveBlob(blob: Blob, filename: string, handle?: any): Prom
   return null;
 }
 
-export async function exportImage(doc: EditorDocument, type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number): Promise<Blob> {
+export async function exportImage(doc: EditorDocument, type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number, scale = 1): Promise<Blob> {
   let c = doc.flatten();
+  if (scale !== 1) { // Cambio de tamaño en pasos de como mucho ½ para que quede nítido
+    let cur = c, w = c.width, hh = c.height; const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(hh * scale));
+    while (w / 2 > tw && hh / 2 > th) { w = Math.round(w / 2); hh = Math.round(hh / 2); const n = makeCanvas(w, hh), x = ctx2d(n); x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, w, hh); cur = n; }
+    const n = makeCanvas(tw, th), x = ctx2d(n); x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, tw, th); c = n;
+  }
   if (type === 'image/jpeg') {
     // JPG no admite transparencia: se pone fondo blanco
     const bg = makeCanvas(c.width, c.height); const x = ctx2d(bg);

@@ -34,6 +34,7 @@ export const ACTIONS: Action[] = [
   { id: 'save', label: 'Guardar proyecto (.edp)', keys: ['Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(false) },
   { id: 'saveAs', label: 'Guardar proyecto como…', keys: ['Alt+Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(true) },
   { id: 'export', label: 'Exportar como (PNG, JPG, WebP, PSD)…', keys: ['Shift+Ctrl+S', 'Alt+Shift+Ctrl+W'], enabled: hasDoc, run: dlg.exportDialog },
+  { id: 'exportLayers', label: 'Exportar capas a archivos…', enabled: hasDoc, run: dlg.exportLayersDialog },
   { id: 'close', label: 'Cerrar', keys: ['Alt+Ctrl+W'], enabled: hasDoc, run: () => ops.closeDocument() },
 
   // Edición
@@ -58,6 +59,7 @@ export const ACTIONS: Action[] = [
   { id: 'rot180', label: 'Rotar 180°', enabled: hasLayer, run: () => quickTransform('rot180') },
 
   // Imagen
+  { id: 'dupDoc', label: 'Duplicar…', enabled: hasDoc, run: () => ops.duplicateDocument() },
   { id: 'imageSize', label: 'Tamaño de imagen…', keys: ['Alt+Ctrl+I'], enabled: hasDoc, run: dlg.imageSizeDialog },
   { id: 'canvasSize', label: 'Tamaño de lienzo…', keys: ['Alt+Ctrl+C'], enabled: hasDoc, run: dlg.canvasSizeDialog },
   { id: 'imgRot90', label: 'Rotar lienzo 90° horario', enabled: hasDoc, run: () => ops.transformImage('rot90') },

@@ -302,6 +302,8 @@ export function buildPropertiesPanel(parent: HTMLElement) {
     if (l instanceof TextLayer) {
       const p = l.props;
       const upd = (fn: () => void) => { fn(); l.render(); d.commit('Editar texto'); };
+      const num = (v: number, set: (v: number) => void) => { const i = h('input', { type: 'number', class: 'num', value: String(v) }); i.onchange = () => upd(() => set(+i.value || 0)); return i; };
+      const chk = (label: string, v: boolean, set: (v: boolean) => void) => { const c = h('input', { type: 'checkbox', checked: v }); c.onchange = () => upd(() => set(c.checked)); return h('label', { class: 'check' }, c, ' ' + label); };
       const ta = h('textarea', { class: 'prop-text', rows: 3 }, p.text);
       ta.addEventListener('change', () => upd(() => { p.text = ta.value; l.name = ta.value.split('\n')[0].slice(0, 30) || l.name; }));
       const font = h('select', {}, ...FONTS.map(f => h('option', { value: f }, f)));
@@ -317,7 +319,10 @@ export function buildPropertiesPanel(parent: HTMLElement) {
       body.append(ta,
         h('div', { class: 'prop-row' }, h('span', {}, 'Fuente'), font),
         h('div', { class: 'prop-row' }, h('span', {}, 'Tamaño'), size, h('span', {}, 'Color'), color),
-        h('div', { class: 'prop-row' }, h('label', { class: 'check' }, bold, ' Negrita'), h('label', { class: 'check' }, italic, ' Cursiva'), align));
+        h('div', { class: 'prop-row' }, h('label', { class: 'check' }, bold, ' Negrita'), h('label', { class: 'check' }, italic, ' Cursiva'), align),
+        h('div', { class: 'prop-row' }, h('span', {}, 'Interletraje'), num(p.tracking ?? 0, v => p.tracking = v), h('span', {}, 'Interl.'), num(Math.round(p.lineHeight * 100), v => p.lineHeight = Math.max(0.3, v / 100)), h('span', { class: 'hint' }, '%')),
+        h('div', { class: 'prop-row' }, chk('Subrayado', !!p.underline, v => p.underline = v), chk('Tachado', !!p.strike, v => p.strike = v), chk('MAYÚS', !!p.caps, v => p.caps = v)),
+        h('div', { class: 'prop-row' }, h('span', {}, 'Caja'), num(Math.round(p.boxWidth ?? 0), v => p.boxWidth = v > 0 ? v : undefined), h('span', { class: 'hint' }, 'px de ancho (0 = texto de punto)')));
     }
     if (l instanceof AdjustmentLayer) {
       const def = FILTERS.find(f => f.id === l.filterId);
