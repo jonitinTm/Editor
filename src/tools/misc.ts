@@ -7,6 +7,7 @@ import type { Viewport } from '../ui/viewport';
 import { getPaintTarget, setPreview, setTargetCanvas, strokeSetup, PaintTarget, clipMask } from './paint';
 import { floodMask } from './floodfill';
 import { cloneCanvas, ctx2d, getPixels, makeCanvas, rgbToHex, hexToRgb } from '../core/canvas';
+import { gradientEditor, GradStop } from '../ui/gradienteditor';
 
 /** Dibuja `src` sobre el objetivo respetando selección, opacidad y modo (capa/máscara). */
 export function applyOnTarget(t: PaintTarget, base: HTMLCanvasElement, src: HTMLCanvasElement, opacity: number, maskValue: number): HTMLCanvasElement {
@@ -54,13 +55,30 @@ export class GradientTool implements Tool {
   id = 'gradient'; name = 'Degradado'; icon = icon('gradient'); key = 'G'; group = 'fill'; cursor = 'crosshair';
   options = [
     { key: 'type', label: 'Tipo', type: 'select', default: 'linear', choices: [
-      { value: 'linear', label: 'Lineal' }, { value: 'radial', label: 'Radial' },
-      { value: 'reflected', label: 'Reflejado' }] },
+      { value: 'linear', label: 'Lineal' }, { value: 'radial', label: 'Radial' }, { value: 'angle', label: 'Angular' },
+      { value: 'reflected', label: 'Reflejado' }, { value: 'diamond', label: 'Diamante' }] },
     { key: 'colors', label: 'Colores', type: 'select', default: 'fgbg', choices: [
-      { value: 'fgbg', label: 'Frontal → Fondo' }, { value: 'fgtrans', label: 'Frontal → Transparente' }] },
+      { value: 'fgbg', label: 'Frontal → Fondo' }, { value: 'fgtrans', label: 'Frontal → Transparente' }, { value: 'custom', label: 'Personalizado' }] },
     { key: 'opacity', label: 'Opacidad', type: 'range', min: 1, max: 100, default: 100, unit: '%' },
     { key: 'reverse', label: 'Invertir', type: 'checkbox', default: false },
   ] as any[];
+  extraOptions(bar: HTMLElement) {
+    const prev = document.createElement('canvas'); prev.width = 120; prev.height = 18; prev.className = 'grad-prev';
+    const paint = () => { const c = prev.getContext('2d')!; c.clearRect(0, 0, 120, 18); const g = c.createLinearGradient(0, 0, 120, 0); for (const st of this.stops(false)) g.addColorStop(st.t, `rgba(${hexToRgb(st.color).join(',')},${st.a})`); c.fillStyle = g; c.fillRect(0, 0, 120, 18); };
+    paint(); app.on('colors', paint); app.on('options', paint);
+    prev.title = 'Editar degradado'; prev.onclick = () => gradientEditor(this.stops(false), st => { app.setOpt(this.id, 'stops', st); app.setOpt(this.id, 'colors', 'custom'); });
+    const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Editar…'; b.onclick = () => prev.click();
+    bar.append(prev, b);
+  }
+  /** Paradas del degradado actual (posición 0-1, color, opacidad 0-1). */
+  stops(forMask: boolean): GradStop[] {
+    const mode = app.opt('colors', this.id);
+    let st: GradStop[] = mode === 'custom' && Array.isArray(app.opt('stops', this.id)) ? app.opt<GradStop[]>('stops', this.id).map(x => ({ ...x }))
+      : mode === 'fgtrans' ? [{ t: 0, color: app.fg, a: 1 }, { t: 1, color: app.fg, a: 0 }] : [{ t: 0, color: app.fg, a: 1 }, { t: 1, color: app.bg, a: 1 }];
+    if (forMask) st = st.map(x => { const [r, g, b] = hexToRgb(x.color); return { t: x.t, color: '#ffffff', a: x.a * (0.299 * r + 0.587 * g + 0.114 * b) / 255 }; });
+    if (app.opt('reverse', this.id)) st = st.map(x => ({ ...x, t: 1 - x.t }));
+    return st.sort((p, q) => p.t - q.t);
+  }
   private a: { x: number; y: number } | null = null;
   private b: { x: number; y: number } | null = null;
   private t: PaintTarget | null = null;
@@ -77,24 +95,33 @@ export class GradientTool implements Tool {
     const t = this.t!, a = this.a!, b = this.b!;
     const doc = app.doc!;
     const g = makeCanvas(doc.width, doc.height), ctx = ctx2d(g);
-    let c1 = t.isMask ? '#ffffff' : app.fg, c2 = t.isMask ? '#ffffff' : app.bg;
-    let a1 = 1, a2 = app.opt('colors', this.id) === 'fgtrans' ? 0 : 1;
-    if (t.isMask) {
-      // En máscaras: degradado de grises entre el valor frontal y el de fondo
-      const lum = (h: string) => { const [r, gg, bb] = hexToRgb(h); return (0.299 * r + 0.587 * gg + 0.114 * bb) / 255; };
-      a1 = lum(app.fg); a2 = app.opt('colors', this.id) === 'fgtrans' ? 0 : lum(app.bg);
-    }
-    if (app.opt('reverse', this.id)) { [c1, c2] = [c2, c1]; [a1, a2] = [a2, a1]; }
-    const rgba = (hex: string, al: number) => { const [r, gg, bb] = hexToRgb(hex); return `rgba(${r},${gg},${bb},${al})`; };
+    const stops = this.stops(t.isMask);
+    const rgba = (st: GradStop) => `rgba(${hexToRgb(st.color).join(',')},${st.a})`;
     const type = app.opt('type', this.id);
-    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-    let grad: CanvasGradient;
-    if (type === 'radial') grad = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, len);
-    else if (type === 'reflected') grad = ctx.createLinearGradient(2 * a.x - b.x, 2 * a.y - b.y, b.x, b.y);
-    else grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-    if (type === 'reflected') { grad.addColorStop(0, rgba(c2, a2)); grad.addColorStop(.5, rgba(c1, a1)); grad.addColorStop(1, rgba(c2, a2)); }
-    else { grad.addColorStop(0, rgba(c1, a1)); grad.addColorStop(1, rgba(c2, a2)); }
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, doc.width, doc.height);
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1, ang = Math.atan2(b.y - a.y, b.x - a.x);
+    if (type === 'diamond' || (type === 'angle' && !(ctx as any).createConicGradient)) {
+      // Se calcula píxel a píxel con una tabla de 256 colores
+      const lut = makeCanvas(256, 1), lc = ctx2d(lut), lg = lc.createLinearGradient(0, 0, 256, 0);
+      for (const st of stops) lg.addColorStop(st.t, rgba(st)); lc.fillStyle = lg; lc.fillRect(0, 0, 256, 1);
+      const L = lc.getImageData(0, 0, 256, 1).data, img = ctx.createImageData(doc.width, doc.height), o = img.data;
+      const cs = Math.cos(-ang), sn = Math.sin(-ang);
+      for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
+        const dx = x - a.x, dy = y - a.y;
+        let tt = type === 'diamond' ? (Math.abs(dx * cs - dy * sn) + Math.abs(dx * sn + dy * cs)) / len : (((Math.atan2(dy, dx) - ang) / (Math.PI * 2)) % 1 + 1) % 1;
+        const k = Math.min(255, Math.max(0, Math.round(tt * 255))) * 4, i = (y * doc.width + x) * 4;
+        o[i] = L[k]; o[i + 1] = L[k + 1]; o[i + 2] = L[k + 2]; o[i + 3] = L[k + 3];
+      }
+      ctx.putImageData(img, 0, 0);
+    } else {
+      let grad: CanvasGradient;
+      if (type === 'radial') grad = ctx.createRadialGradient(a.x, a.y, 0, a.x, a.y, len);
+      else if (type === 'angle') grad = (ctx as any).createConicGradient(ang, a.x, a.y);
+      else if (type === 'reflected') grad = ctx.createLinearGradient(2 * a.x - b.x, 2 * a.y - b.y, b.x, b.y);
+      else grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
+      if (type === 'reflected') for (const st of stops) { grad.addColorStop(0.5 + st.t / 2, rgba(st)); grad.addColorStop(0.5 - st.t / 2, rgba(st)); }
+      else for (const st of stops) grad.addColorStop(st.t, rgba(st));
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, doc.width, doc.height);
+    }
     const op = app.opt<number>('opacity', this.id) / 100;
     if (t.isMask) {
       // Sustituye el valor de la máscara por el del degradado dentro de la selección

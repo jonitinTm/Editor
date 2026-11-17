@@ -413,6 +413,15 @@ export function layerStyleDialog() {
   });
 }
 
+export function loadSelectionDialog() {
+  const d = app.doc; if (!d) return;
+  if (!d.channels.length) { app.toast('No hay selecciones guardadas', 'warn'); return; }
+  const ch = h('select', {}, ...d.channels.map(c => h('option', { value: String(c.id) }, c.name)));
+  const mode = h('select', {}, h('option', { value: 'new' }, 'Nueva selección'), h('option', { value: 'add' }, 'Añadir a la selección'), h('option', { value: 'subtract' }, 'Restar de la selección'), h('option', { value: 'intersect' }, 'Intersecar con la selección'));
+  const inv = h('input', { type: 'checkbox' });
+  showDialog({ title: 'Cargar selección', body: [row('Canal', ch), row('Operación', mode), h('label', { class: 'check' }, inv, ' Invertir')], onOk: () => ops.loadChannel(+ch.value, mode.value as any, inv.checked) });
+}
+
 export function exportLayersDialog() {
   if (!app.doc) return;
   const trim = h('input', { type: 'checkbox', checked: true }), vis = h('input', { type: 'checkbox', checked: false });

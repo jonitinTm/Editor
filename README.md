@@ -80,6 +80,10 @@ Ya disponible:
   interletraje, interlineado, subrayado, tachado y mayúsculas.
 - **Archivo**: *Imagen › Duplicar*, *Archivo › Exportar capas a archivos* (ZIP con un PNG por capa) y cambio de tamaño
   al exportar.
+- **Punta del pincel**: ángulo, redondez y dispersión (para pinceles caligráficos o de textura).
+- **Degradados**: editor con varias paradas de color y opacidad, predefinidos, y tipos lineal, radial, angular,
+  reflejado y diamante.
+- **Canales alfa**: *Selección › Guardar / Cargar selección* y panel *Canales* (junto a Capas).
 - **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;

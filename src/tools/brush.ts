@@ -15,6 +15,9 @@ const OPAC = { key: 'opacity', label: 'Opacidad', type: 'range' as const, min: 1
 const FLOW = { key: 'flow', label: 'Flujo', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
 const PRESS = { key: 'pressure', label: 'Presión = tamaño', type: 'checkbox' as const, default: true };
 const SMOOTH = { key: 'smoothing', label: 'Suavizar', type: 'range' as const, min: 0, max: 100, default: 10, unit: '%' };
+const ANGLE = { key: 'angle', label: 'Ángulo', type: 'range' as const, min: -180, max: 180, default: 0, unit: '°' };
+const ROUND = { key: 'roundness', label: 'Redondez', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
+const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, min: 0, max: 500, default: 0, unit: '%' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
 /** Toma el color de la imagen combinada en (x, y) como color frontal (Alt mientras se pinta). */
@@ -44,7 +47,7 @@ export function drawBrushCursor(ctx: CanvasRenderingContext2D, vp: Viewport, siz
 abstract class StrokeTool implements Tool {
   abstract id: string; abstract name: string; abstract icon: string;
   cursor = 'none';
-  options = [SIZE, HARD, OPAC, FLOW, SMOOTH, SPACING, PRESS] as any[];
+  options = [SIZE, HARD, OPAC, FLOW, SMOOTH, SPACING, ANGLE, ROUND, SCATTER, PRESS] as any[];
   protected stroke: Stroke | null = null;
   private picking = false;
   /** Posición suavizada (el trazo sigue al ratón con algo de retraso para eliminar temblores). */
@@ -64,9 +67,11 @@ abstract class StrokeTool implements Tool {
     const hard = (app.opt<number>('hardness', this.id) ?? 100) / 100;
     const flow = (app.opt<number>('flow', this.id) ?? 100) / 100;
     const ctx = ctx2d(this.stroke!.buffer);
+    const round = (app.opt<number>('roundness', this.id) ?? 100) / 100, angle = app.opt<number>('angle', this.id) ?? 0, scatter = (app.opt<number>('scatter', this.id) ?? 0) / 100;
     return (x, y, p) => {
       const size = this.size(p);
-      const tip = brushTip(size, hard, color, this.aliased);
+      const tip = brushTip(size, hard, color, this.aliased, round, angle);
+      if (scatter > 0) { x += (Math.random() * 2 - 1) * scatter * size; y += (Math.random() * 2 - 1) * scatter * size; }
       let dx = x - tip.width / 2, dy = y - tip.height / 2;
       if (this.aliased) { dx = Math.round(dx); dy = Math.round(dy); }
       ctx.globalAlpha = flow;

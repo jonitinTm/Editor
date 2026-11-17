@@ -82,7 +82,18 @@ export function setPreview(t: PaintTarget, c: HTMLCanvasElement | null) {
 // ---- Puntas de pincel ---------------------------------------------------
 
 const tipCache = new Map<string, HTMLCanvasElement>();
-export function brushTip(size: number, hardness: number, color: string, aliased = false): HTMLCanvasElement {
+export function brushTip(size: number, hardness: number, color: string, aliased = false, roundness = 1, angle = 0): HTMLCanvasElement {
+  if (!aliased && (roundness < 0.999 || (angle % 180) !== 0) && roundness < 0.999) {
+    // Punta elíptica: la redonda, aplastada y girada
+    const key = `e|${size}|${hardness}|${color}|${roundness}|${angle}`;
+    let e = tipCache.get(key);
+    if (e) return e;
+    const base = brushTip(size, hardness, color), d = base.width;
+    e = makeCanvas(d, d); const c = ctx2d(e);
+    c.translate(d / 2, d / 2); c.rotate(-angle * Math.PI / 180); c.scale(1, Math.max(0.01, roundness)); c.drawImage(base, -d / 2, -d / 2);
+    tipCache.set(key, e);
+    return e;
+  }
   const d = Math.max(1, Math.ceil(size));
   const key = `${d}|${hardness}|${color}|${aliased}|${size}`;
   let c = tipCache.get(key);

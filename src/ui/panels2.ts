@@ -3,6 +3,8 @@
 import { app } from './app';
 import { h } from './dom';
 import { ctx2d } from '../core/canvas';
+import * as ops from './ops';
+import { promptDialog } from './dialog';
 
 const visible = (el: HTMLElement) => el.offsetParent !== null;
 
@@ -107,5 +109,48 @@ export function buildInfoPanel(parent: HTMLElement) {
     body.append(h('div', { class: 'info-sep' }), row('Documento', `${d.width} × ${d.height} px`), row('Selección', b ? `${b.w} × ${b.h} px en (${b.x}, ${b.y})` : '—'), row('Capa', d.active?.name ?? '—'));
   };
   app.on('view', render); app.on('doc', render); app.on('docs', render);
+  new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}
+
+// ---- Canales ----------------------------------------------------------------------------
+
+export function buildChannelsPanel(parent: HTMLElement) {
+  const list = h('div', { class: 'layer-list' });
+  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn }, label);
+  const foot = h('div', { class: 'panel-foot' },
+    btn('Cargar el canal seleccionado como selección', '◌', () => { if (selId) ops.loadChannel(selId); }),
+    btn('Guardar la selección como canal nuevo', '＋', () => ops.saveSelectionAsChannel()),
+    btn('Eliminar el canal seleccionado', '🗑', () => { if (selId) { ops.deleteChannel(selId); selId = 0; } }));
+  const body = h('div', { class: 'panel-body layers' }, list, foot);
+  parent.append(body);
+  let selId = 0;
+  const thumb = (draw: (c: CanvasRenderingContext2D, w: number, h: number) => void) => {
+    const d = app.doc!, k = Math.min(36 / d.width, 36 / d.height);
+    const c = h('canvas', { class: 'thumb', width: Math.max(1, Math.round(d.width * k)), height: Math.max(1, Math.round(d.height * k)) });
+    draw(c.getContext('2d')!, c.width, c.height); return c;
+  };
+  const render = () => {
+    const d = app.doc; list.innerHTML = ''; if (!d || !visible(body)) return;
+    const comp = d.getComposite();
+    const chan = (name: string, idx: number) => h('div', { class: 'layer-row ch-row' }, h('span', { class: 'eye' }), thumb((c, w, hh) => {
+      c.drawImage(comp, 0, 0, w, hh);
+      if (idx < 0) return;
+      const img = c.getImageData(0, 0, w, hh), dd = img.data;
+      for (let i = 0; i < dd.length; i += 4) { const v = dd[i + idx]; dd[i] = dd[i + 1] = dd[i + 2] = v; dd[i + 3] = 255; }
+      c.putImageData(img, 0, 0);
+    }), h('span', { class: 'lname' }, name));
+    list.append(chan('RGB', -1), chan('Rojo', 0), chan('Verde', 1), chan('Azul', 2));
+    for (const c of d.channels) {
+      const row = h('div', { class: 'layer-row' + (c.id === selId ? ' active' : ''), title: 'Clic: seleccionar · Ctrl+clic o doble clic en la miniatura: cargar como selección · Doble clic en el nombre: renombrar' },
+        h('span', { class: 'eye' }), thumb((x, w, hh) => { x.fillStyle = '#000'; x.fillRect(0, 0, w, hh); x.drawImage(c.canvas, 0, 0, w, hh); }), h('span', { class: 'lname' }, c.name));
+      row.onclick = e => { selId = c.id; if (e.ctrlKey || e.metaKey) ops.loadChannel(c.id); else render(); };
+      row.querySelector('canvas')!.addEventListener('dblclick', () => ops.loadChannel(c.id));
+      row.querySelector('.lname')!.addEventListener('dblclick', async () => { const n = await promptDialog('Cambiar nombre de canal', 'Nombre', c.name); if (n !== null) ops.renameChannel(c.id, n); });
+      list.append(row);
+    }
+    if (!d.channels.length) list.append(h('div', { class: 'hint ch-empty' }, 'Guarda una selección (Selección › Guardar selección) para crear un canal alfa.'));
+  };
+  let t = 0;
+  app.on('doc', () => { clearTimeout(t); t = window.setTimeout(render, 200); }); app.on('docs', render);
   new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
 }

@@ -559,6 +559,30 @@ export function contentAwareFill() {
   healHole(t, hole, { x: Math.max(0, b.x - 3), y: Math.max(0, b.y - 3), w: b.w + 6, h: b.h + 6 }, 'Rellenar según contenido');
 }
 
+// ---- Canales alfa -----------------------------------------------------------------------
+
+export function saveSelectionAsChannel(name?: string) {
+  const d = doc(); if (!d || !d.selection.mask) { app.toast('Haz primero una selección', 'warn'); return; }
+  const id = Math.max(0, ...d.channels.map(c => c.id)) + 1;
+  d.channels = [...d.channels, { id, name: name || `Alfa ${id}`, canvas: cloneCanvas(d.selection.mask) }];
+  d.commit('Guardar selección');
+}
+export function loadChannel(id: number, mode: 'new' | 'add' | 'subtract' | 'intersect' = 'new', invert = false) {
+  const d = doc(); const c = d?.channels.find(x => x.id === id); if (!d || !c) return;
+  let m = c.canvas;
+  if (invert) { m = makeCanvas(d.width, d.height); const x = ctx2d(m); x.fillStyle = '#fff'; x.fillRect(0, 0, d.width, d.height); x.globalCompositeOperation = 'destination-out'; x.drawImage(c.canvas, 0, 0); }
+  d.selection.combineCanvas(mode, cloneCanvas(m));
+  d.commit('Cargar selección');
+}
+export function deleteChannel(id: number) {
+  const d = doc(); if (!d) return;
+  d.channels = d.channels.filter(c => c.id !== id); d.commit('Eliminar canal');
+}
+export function renameChannel(id: number, name: string) {
+  const d = doc(); if (!d || !name.trim()) return;
+  d.channels = d.channels.map(c => c.id === id ? { ...c, name: name.trim() } : c); d.commit('Cambiar nombre de canal');
+}
+
 /** Entra o sale de la máscara rápida (Q). */
 export function toggleQuickMask() {
   const d = doc(); if (!d) return;
@@ -612,8 +636,10 @@ export async function copy(merged = false) {
 }
 export async function cut() {
   const d = doc(); if (!d) return;
-  await copy(false);
+  // La copia interna es inmediata; el portapapeles del sistema se escribe en segundo plano
+  const pending = copy(false);
   if (clipboard) clearSelection('Cortar');
+  await pending;
 }
 
 /** Se llama desde el evento "paste" del navegador. */
@@ -750,6 +776,7 @@ export function transformImage(kind: 'rot90' | 'rot-90' | 'rot180' | 'flipH' | '
     if (l.mask) { l.mask.canvas = tf(l.mask.canvas); l.mask.touch(); }
   }
   const sel = d.selection.mask ? tf(d.selection.mask) : null;
+  d.channels = d.channels.map(c => ({ ...c, canvas: tf(c.canvas) }));
   d.width = nw; d.height = nh;
   d.selection.width = nw; d.selection.height = nh;
   d.selection.setMask(sel);

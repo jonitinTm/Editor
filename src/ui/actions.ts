@@ -109,6 +109,8 @@ export const ACTIONS: Action[] = [
   { id: 'invertSel', label: 'Invertir', keys: ['Shift+Ctrl+I'], enabled: hasDoc, run: ops.invertSelection },
   { id: 'selFromLayer', label: 'Cargar selección desde la capa', enabled: hasLayer, run: () => ops.selectionFromLayer(app.doc!.active!) },
   { id: 'pathToSel', label: 'Trazado a selección', keys: ['Ctrl+Enter'], enabled: () => app.doc?.active?.kind === 'shape', run: ops.pathToSelection },
+  { id: 'saveSel', label: 'Guardar selección…', enabled: hasSel, run: async () => { const n = await promptDialog('Guardar selección', 'Nombre del canal', `Alfa ${(app.doc!.channels.length + 1)}`); if (n !== null) ops.saveSelectionAsChannel(n); } },
+  { id: 'loadSel', label: 'Cargar selección…', enabled: () => !!app.doc?.channels.length, run: dlg.loadSelectionDialog },
   { id: 'quickMask', label: 'Editar en modo máscara rápida', keys: ['Q'], enabled: hasDoc, checked: () => !!app.doc?.quickMask, run: ops.toggleQuickMask },
   { id: 'contentFill', label: 'Rellenar según contenido', keys: ['Shift+Backspace', 'Shift+Delete'], enabled: hasSel, run: () => ops.contentAwareFill() },
   { id: 'colorRange', label: 'Gama de colores…', enabled: hasDoc, run: dlg.colorRangeDialog },

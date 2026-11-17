@@ -24,6 +24,8 @@ export class EditorDocument {
   view: ViewState = { zoom: 1, panX: 0, panY: 0 };
   viewInitialized = false;
   overrides = new Map<Layer, LayerOverride>();
+  /** Canales alfa: selecciones guardadas (lienzos inmutables: se sustituyen, no se editan). */
+  channels: { id: number; name: string; canvas: HTMLCanvasElement }[] = [];
   /** Máscara rápida: el pincel edita la selección, que se ve como una capa roja. */
   quickMask = false;
   quickPreview: HTMLCanvasElement | null = null;
@@ -142,6 +144,7 @@ export class EditorDocument {
         l.mask.canvas = m; l.mask.touch();
       }
     }
+    this.channels = this.channels.map(c => { const m = makeCanvas(w, h); ctx2d(m).drawImage(c.canvas, dx, dy); return { ...c, canvas: m }; });
     this.width = w; this.height = h;
     this.selection.resize(w, h, dx, dy);
     this.guides.v = this.guides.v.map(g => g + dx);
@@ -162,6 +165,7 @@ export class EditorDocument {
       if (l.mask) { l.mask.canvas = scale(l.mask.canvas); l.mask.touch(); }
     }
     if (this.selection.mask) this.selection.setMask(scale(this.selection.mask));
+    this.channels = this.channels.map(c => ({ ...c, canvas: scale(c.canvas) }));
     this.width = w; this.height = h;
     this.selection.resize(w, h);
     this.guides.v = this.guides.v.map(g => g * sx);
