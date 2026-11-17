@@ -7,7 +7,7 @@ import * as ops from './ops';
 import * as io from '../io/files';
 import { FilterDef, defaultParams } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
-import type { LayerStyles } from '../core/layers';
+import { SmartLayer, type LayerStyles } from '../core/layers';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
 
@@ -200,11 +200,14 @@ export function modifySelectionDialog(kind: 'feather' | 'expand' | 'contract') {
 
 // ---- Filtros genéricos ----------------------------------------------------------------
 
-export function filterDialog(def: FilterDef) {
+export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: number }) {
   if (!def.params && !def.custom) { ops.applyFilterDirect(def); return; }
-  const session = ops.FilterSession.start(def);
+  const active = app.doc?.active;
+  // En objetos inteligentes el filtro queda como filtro inteligente (editable)
+  const session = edit ? new ops.SmartFilterSession(edit.layer, def, edit.index)
+    : active instanceof SmartLayer && !app.doc!.editMask ? new ops.SmartFilterSession(active, def) : ops.FilterSession.start(def);
   if (!session) return;
-  const params = defaultParams(def);
+  const params = edit ? JSON.parse(JSON.stringify(edit.layer.filters[edit.index].params)) : defaultParams(def);
   let previewOn = true;
   let timer = 0;
   const update = () => {
@@ -216,24 +219,24 @@ export function filterDialog(def: FilterDef) {
   else if (def.custom === 'curves') body = curvesBody(session.source(), params, update);
   else body = (def.params ?? []).map(p => {
     if (p.type === 'checkbox') {
-      const c = h('input', { type: 'checkbox', checked: p.default });
+      const c = h('input', { type: 'checkbox', checked: !!params[p.key] });
       c.addEventListener('change', () => { params[p.key] = c.checked; update(); });
       return row('', h('label', { class: 'check' }, c, ' ' + p.label));
     }
     if (p.type === 'color') {
-      const c = h('input', { type: 'color', class: 'color-input', value: p.default });
+      const c = h('input', { type: 'color', class: 'color-input', value: params[p.key] });
       c.addEventListener('input', () => { params[p.key] = c.value; update(); });
       return row(p.label, c);
     }
-    return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: p.default, unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el);
+    return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el);
   });
   const prev = h('input', { type: 'checkbox', checked: true });
   prev.addEventListener('change', () => { previewOn = prev.checked; update(); });
   const reset = h('button', { class: 'btn', type: 'button' }, 'Restablecer');
-  reset.onclick = () => { showDialogClose(); filterDialog(def); };
+  reset.onclick = () => { showDialogClose(); filterDialog(def, edit); };
   let showDialogClose = () => {};
   const dlg = showDialog({
-    title: def.name.replace('…', ''), width: def.custom ? 420 : 400,
+    title: def.name.replace('…', '') + (session instanceof ops.SmartFilterSession ? ' (filtro inteligente)' : ''), width: def.custom ? 420 : 400,
     body: [...body, h('label', { class: 'check preview-check' }, prev, ' Vista previa')],
     extraButtons: [reset],
     onOk: () => { clearTimeout(timer); session.commit(params); ops.setLastFilter(def, params); },

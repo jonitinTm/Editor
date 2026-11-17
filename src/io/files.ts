@@ -77,7 +77,7 @@ export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith
 
 interface ProjLayer {
   id: number; type: string; name: string; visible: boolean; opacity: number; blendMode: string; locked: boolean; lockAlpha?: boolean; clip?: boolean;
-  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean;
+  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile; filters?: any[] }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean;
 }
 interface ProjFile {
   format: 'editor-proyecto'; version: 1; name: string; width: number; height: number;
@@ -98,7 +98,7 @@ async function layerToProj(l: Layer): Promise<ProjLayer> {
   if (l.styles) p.styles = l.styles;
   if (l instanceof AdjustmentLayer) p.adjust = { filterId: l.filterId, params: l.params };
   if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; }
-  else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument) };
+  else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument), filters: l.filters };
   else if (isRaster(l)) { p.image = await canvasToDataURL(l.canvas); if (l instanceof TextLayer) p.text = { ...l.props }; if (l instanceof ShapeLayer) p.shape = { ...l.props }; }
   return p;
 }
@@ -123,7 +123,7 @@ async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
     l = g;
   } else if (p.type === 'smart') {
     const inner = await docFromData(p.smart!.doc); inner.embedded = true;
-    l = new SmartLayer(p.name, w, h, inner, p.smart!.m as any);
+    l = new SmartLayer(p.name, w, h, inner, p.smart!.m as any, p.smart!.filters ?? []);
   } else if (p.type === 'adjust') {
     l = new AdjustmentLayer(p.name, p.adjust!.filterId, p.adjust!.params);
   } else {

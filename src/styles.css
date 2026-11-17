@@ -361,3 +361,4 @@ body.hide-panels .side, body.hide-panels .toolbar, body.hide-panels .optionsbar,
 .ge-color { width: 40px; height: 22px; border: 1px solid #111; cursor: pointer; }
 .ch-row { opacity: .85; }
 .ch-empty { padding: 12px; }
+.sf-row .sf-name { flex: 1; cursor: default; }

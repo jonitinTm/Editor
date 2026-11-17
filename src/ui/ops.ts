@@ -3,7 +3,7 @@
 
 import { app } from './app';
 import { EditorDocument } from '../core/document';
-import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
+import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, SmartFilter, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, composeStyled } from '../core/compositor';
 import { hasStyles, canvasBlend, tracePath } from '../core/layers';
@@ -171,7 +171,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   let c: Layer;
   if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
   else if (l instanceof AdjustmentLayer) { c = new AdjustmentLayer(l.name, l.filterId, JSON.parse(JSON.stringify(l.params))); }
-  else if (l instanceof SmartLayer) { c = new SmartLayer(l.name, d.width, d.height, l.inner, l.props.m); }
+  else if (l instanceof SmartLayer) { c = new SmartLayer(l.name, d.width, d.height, l.inner, l.props.m, l.filters); }
   else if (l instanceof TextLayer) { const t = new TextLayer(l.name, d.width, d.height, { ...l.props }); if (l.props.keepPixels) t.canvas = cloneCanvas(l.canvas); c = t; }
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
@@ -851,10 +851,39 @@ export class FilterSession {
   }
 }
 
+/** Sesión de filtro sobre un objeto inteligente: el filtro se añade como filtro inteligente editable. */
+export class SmartFilterSession {
+  private before: SmartFilter[];
+  constructor(public layer: SmartLayer, public def: FilterDef, public index = -1) {
+    this.before = JSON.parse(JSON.stringify(layer.filters));
+  }
+  source() { const d = doc()!; return getPixels(d.getComposite()); }
+  private set(params: any) {
+    const list: SmartFilter[] = JSON.parse(JSON.stringify(this.before));
+    const f = { id: this.def.id, params: JSON.parse(JSON.stringify(params)), enabled: true };
+    if (this.index >= 0) list[this.index] = { ...f, enabled: list[this.index].enabled }; else list.push(f);
+    this.layer.props = { ...this.layer.props, filters: list };
+    this.layer.render(); doc()!.invalidate(); app.viewport.requestRender();
+  }
+  render(params: any) { this.set(params); }
+  clearPreview() { this.layer.props = { ...this.layer.props, filters: JSON.parse(JSON.stringify(this.before)) }; this.layer.render(); doc()!.invalidate(); app.viewport.requestRender(); }
+  commit(params: any) { this.set(params); doc()!.commit((this.index >= 0 ? 'Editar filtro inteligente: ' : 'Filtro inteligente: ') + this.def.name.replace('…', '')); }
+}
+export function toggleSmartFilter(l: SmartLayer, i: number) {
+  const list = JSON.parse(JSON.stringify(l.filters)); list[i].enabled = !list[i].enabled;
+  l.props = { ...l.props, filters: list }; l.render(); doc()!.commit(list[i].enabled ? 'Mostrar filtro inteligente' : 'Ocultar filtro inteligente');
+}
+export function removeSmartFilter(l: SmartLayer, i: number) {
+  const list = JSON.parse(JSON.stringify(l.filters)); list.splice(i, 1);
+  l.props = { ...l.props, filters: list }; l.render(); doc()!.commit('Eliminar filtro inteligente');
+}
+
 export let lastFilter: { def: FilterDef; params: any } | null = null;
 export function setLastFilter(def: FilterDef, params: any) { if (def.group === 'filtro') lastFilter = { def, params }; }
 
 export function applyFilterDirect(def: FilterDef, params: any = {}) {
+  const a = doc()?.active;
+  if (a instanceof SmartLayer && !doc()!.editMask) { new SmartFilterSession(a, def).commit(params); setLastFilter(def, params); return; }
   const s = FilterSession.start(def); if (!s) return;
   s.commit(params);
   setLastFilter(def, params);

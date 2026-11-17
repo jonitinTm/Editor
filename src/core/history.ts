@@ -76,7 +76,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number): Layer {
     const a = JSON.parse(s.adjust!);
     l = new AdjustmentLayer(s.name, a.filterId, a.params);
   } else {
-    const r = s.kind === 'smart' ? new SmartLayer(s.name, w, h, s.smart!, s.props.m) : s.kind === 'text' ? new TextLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : new RasterLayer(s.name, w, h);
+    const r = s.kind === 'smart' ? new SmartLayer(s.name, w, h, s.smart!, s.props.m, s.props.filters ?? []) : s.kind === 'text' ? new TextLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : new RasterLayer(s.name, w, h);
     if (s.kind !== 'smart') r.canvas = cloneCanvas(s.canvas!); // el objeto inteligente se redibuja desde su contenido actual
     if (s.full) r.full = { ...s.full, version: r.version };
     if (s.kind !== 'smart') frozen.set(r, { version: r.version, canvas: s.canvas! });

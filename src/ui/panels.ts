@@ -11,7 +11,7 @@ import { FONTS } from '../tools/text';
 import { actionById } from './actions';
 import { promptDialog, row as formRow } from './dialog';
 import { createPicker, SWATCHES } from './colorpicker';
-import { layerStyleDialog, levelsBody, curvesBody } from './dialogs';
+import { layerStyleDialog, levelsBody, curvesBody, filterDialog } from './dialogs';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';
 
@@ -285,7 +285,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
   const render = () => {
     const d = app.doc;
     const l = d?.active;
-    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}${l instanceof SmartLayer ? l.inner.width + 'x' + l.inner.height : ''}${l instanceof AdjustmentLayer ? l.filterId + JSON.stringify(l.params) : ''}` : '';
+    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}${l instanceof SmartLayer ? l.inner.width + 'x' + l.inner.height + JSON.stringify(l.filters) : ''}${l instanceof AdjustmentLayer ? l.filterId + JSON.stringify(l.params) : ''}` : '';
     if (skipRender) { skipRender = false; lastKey = key; return; }
     if (key === lastKey && body.contains(document.activeElement)) return;
     lastKey = key;
@@ -353,7 +353,19 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('div', { class: 'prop-btns' },
           h('button', { class: 'btn primary', onclick: () => ops.editSmartContents(l) }, 'Editar contenido'),
           h('button', { class: 'btn', onclick: () => ops.rasterize() }, 'Rasterizar')),
-        h('div', { class: 'hint' }, 'Se puede escalar y girar las veces que quieras sin perder calidad.'));
+        h('div', { class: 'hint' }, 'Se puede escalar y girar las veces que quieras sin perder calidad. Los filtros que le apliques quedan como filtros inteligentes.'));
+      if (l.filters.length) {
+        body.append(h('div', { class: 'prop-title' }, 'Filtros inteligentes'));
+        l.filters.forEach((f, i) => {
+          const def = FILTERS.find(x => x.id === f.id);
+          const on = h('input', { type: 'checkbox', checked: f.enabled, title: 'Mostrar u ocultar' }); on.onchange = () => ops.toggleSmartFilter(l, i);
+          const name = h('span', { class: 'sf-name', title: def?.params || def?.custom ? 'Doble clic para editar' : '' }, (def?.name ?? f.id).replace('…', ''));
+          if (def && (def.params || def.custom)) name.ondblclick = () => filterDialog(def, { layer: l, index: i });
+          const edit = h('button', { class: 'btn icon-btn', title: 'Editar', disabled: !(def?.params || def?.custom) }, '✎'); edit.onclick = () => def && filterDialog(def, { layer: l, index: i });
+          const del = h('button', { class: 'btn icon-btn', title: 'Eliminar' }, '✕'); del.onclick = () => ops.removeSmartFilter(l, i);
+          body.append(h('div', { class: 'prop-row sf-row' }, on, name, edit, del));
+        });
+      }
     }
     if (l instanceof ShapeLayer) {
       const p = l.props;

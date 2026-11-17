@@ -2,7 +2,8 @@
 // (capas de ajuste, objetos inteligentes, formas vectoriales…) consiste en
 // crear otra subclase con su propio `kind` y enseñarle al compositor a pintarla.
 
-import { makeCanvas, ctx2d, clearCanvas } from './canvas';
+import { makeCanvas, ctx2d, clearCanvas, Rect } from './canvas';
+import { FILTERS } from '../filters/registry';
 
 /** 'pass-through' solo vale para grupos: sus capas se mezclan directamente con lo de debajo. */
 export type BlendMode = GlobalCompositeOperation | 'pass-through';
@@ -317,21 +318,25 @@ export interface SmartSource { name: string; width: number; height: number; flat
  * muestra transformado. Escalar o girar no pierde calidad porque siempre se
  * redibuja desde el original, y su contenido se puede editar aparte.
  */
+/** Filtro inteligente: un filtro o ajuste aplicado a un objeto inteligente que se puede editar o quitar. */
+export interface SmartFilter { id: string; params: any; enabled: boolean; }
+
 export class SmartLayer extends RasterLayer {
   readonly kind = 'smart' as const;
-  props: { m: Matrix };
+  props: { m: Matrix; filters?: SmartFilter[] };
   /** Imagen combinada del documento interno. */
   src!: HTMLCanvasElement;
-  constructor(name: string, w: number, h: number, public inner: SmartSource, m: Matrix) {
+  constructor(name: string, w: number, h: number, public inner: SmartSource, m: Matrix, filters: SmartFilter[] = []) {
     super(name, w, h);
-    this.props = { m: [...m] as Matrix };
+    this.props = { m: [...m] as Matrix, filters: filters.map(f => ({ ...f, params: JSON.parse(JSON.stringify(f.params)) })) };
     this.refresh();
   }
+  get filters(): SmartFilter[] { return (this.props.filters ??= []); }
   /** Vuelve a leer el contenido (tras editarlo) y redibuja. */
   refresh() { this.src = this.inner.flatten(); this.render(); }
   translate(dx: number, dy: number) { this.applyMatrix([1, 0, 0, 1, dx, dy]); }
   scale(sx: number, sy: number) { this.applyMatrix([sx, 0, 0, sy, 0, 0]); }
-  applyMatrix(D: Matrix) { this.props = { m: matMul(D, this.props.m) }; this.render(); }
+  applyMatrix(D: Matrix) { this.props = { ...this.props, m: matMul(D, this.props.m) }; this.render(); }
   render() {
     clearCanvas(this.canvas);
     const ctx = ctx2d(this.canvas);
@@ -340,7 +345,22 @@ export class SmartLayer extends RasterLayer {
     ctx.setTransform(...this.props.m);
     ctx.drawImage(this.src, 0, 0);
     ctx.restore();
+    this.applyFilters();
     this.touch();
+  }
+  /** Aplica los filtros inteligentes activos sobre la zona que ocupa el objeto (y un margen). */
+  private applyFilters() {
+    const list = this.filters.filter(f => f.enabled);
+    if (!list.length) return;
+    const m = this.props.m, w = this.src.width, h = this.src.height;
+    const xs = [0, w, 0, w].map((x, i) => m[0] * x + m[2] * (i < 2 ? 0 : h) + m[4]), ys = [0, w, 0, w].map((x, i) => m[1] * x + m[3] * (i < 2 ? 0 : h) + m[5]);
+    const pad = 64, W = this.canvas.width, H = this.canvas.height;
+    const r: Rect = { x: Math.max(0, Math.floor(Math.min(...xs)) - pad), y: Math.max(0, Math.floor(Math.min(...ys)) - pad), w: 0, h: 0 };
+    r.w = Math.min(W, Math.ceil(Math.max(...xs)) + pad) - r.x; r.h = Math.min(H, Math.ceil(Math.max(...ys)) + pad) - r.y;
+    if (r.w < 1 || r.h < 1) return;
+    const ctx = ctx2d(this.canvas), img = ctx.getImageData(r.x, r.y, r.w, r.h);
+    for (const f of list) FILTERS.find(d => d.id === f.id)?.apply(img, f.params);
+    ctx.putImageData(img, r.x, r.y);
   }
 }
 
