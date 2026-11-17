@@ -12,6 +12,7 @@ import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
 import { readPsd, writePsd } from '../io/psd';
 import { heal, findSource } from '../filters/heal';
+import { record } from './macros';
 import { snapshot, restore } from '../core/history';
 import { addPattern, getPattern, patternFill } from '../core/patterns';
 import { applyOnTarget } from '../tools/misc';
@@ -925,6 +926,7 @@ export let lastFilter: { def: FilterDef; params: any } | null = null;
 export function setLastFilter(def: FilterDef, params: any) { if (def.group === 'filtro') lastFilter = { def, params }; }
 
 export function applyFilterDirect(def: FilterDef, params: any = {}) {
+  record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') });
   const a = doc()?.active;
   if (a instanceof SmartLayer && !doc()!.editMask) { new SmartFilterSession(a, def).commit(params); setLastFilter(def, params); return; }
   const s = FilterSession.start(def); if (!s) return;

@@ -91,17 +91,19 @@ export class CropTool implements Tool {
   }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     const r = this.rect; if (!r || !app.doc) return;
-    const a = vp.toScreen(r.x, r.y), b = vp.toScreen(r.x + r.w, r.y + r.h);
+    const q = [vp.toScreen(r.x, r.y), vp.toScreen(r.x + r.w, r.y), vp.toScreen(r.x + r.w, r.y + r.h), vp.toScreen(r.x, r.y + r.h)];
+    const poly = () => { q.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); };
+    const a = q[0];
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,.55)';
-    ctx.beginPath(); ctx.rect(0, 0, vp.width, vp.height); ctx.rect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.fill('evenodd');
+    ctx.beginPath(); ctx.rect(0, 0, vp.width, vp.height); poly(); ctx.fill('evenodd');
     ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.beginPath();
     for (const k of [1 / 3, 2 / 3]) {
-      ctx.moveTo(a.x + (b.x - a.x) * k, a.y); ctx.lineTo(a.x + (b.x - a.x) * k, b.y);
-      ctx.moveTo(a.x, a.y + (b.y - a.y) * k); ctx.lineTo(b.x, a.y + (b.y - a.y) * k);
+      const t1 = vp.toScreen(r.x + r.w * k, r.y), t2 = vp.toScreen(r.x + r.w * k, r.y + r.h), l1 = vp.toScreen(r.x, r.y + r.h * k), l2 = vp.toScreen(r.x + r.w, r.y + r.h * k);
+      ctx.moveTo(t1.x, t1.y); ctx.lineTo(t2.x, t2.y); ctx.moveTo(l1.x, l1.y); ctx.lineTo(l2.x, l2.y);
     }
     ctx.stroke();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); poly(); ctx.stroke();
     for (const [, x, y] of handlePoints(r)) {
       const s = vp.toScreen(x, y);
       ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 4, s.y - 4, 8, 8);

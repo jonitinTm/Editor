@@ -97,6 +97,11 @@ Ya disponible:
   centro del lienzo, a las guías y a otras capas (Ctrl mientras arrastras lo desactiva; *Vista › Ajustar*).
 - **Fluidez**: deshacer, empezar a pintar y mover capas son mucho más rápidos en documentos grandes; los diálogos con
   vista previa se colocan a un lado sin oscurecer la imagen.
+- **Girar vista** (`R`): gira el lienzo en pantalla para dibujar cómodo, sin cambiar la imagen (Esc la endereza).
+- **Formas**: además de rectángulo, redondeado, elipse y línea: polígono, estrella, flecha y corazón.
+- **Acciones** (panel junto a Capas): graba filtros, ajustes, tamaños, giros y operaciones de capa y repítelos con un
+  clic. Incluye tres acciones de serie. *Archivo › Automatizar › Lote* aplica una acción a muchas imágenes y las
+  descarga en un ZIP.
 - **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;
@@ -113,7 +118,7 @@ Pendiente: revelado real de RAW, y en PSD los efectos y ajustes que aún no exis
 ### Atajos principales
 
 `V` mover · `M` marcos (Mayús+M alterna) · `L` lazo · `W` varita · `C` recortar · `I` cuentagotas · `S` tampón ·
-`B` pincel/lápiz · `J` correctores · `Q` máscara rápida · `E` borrador · `G` degradado/bote · `T` texto · `P` pluma · `A` selección directa · `U` formas · `H` mano · `Z` zoom ·
+`B` pincel/lápiz · `J` correctores · `Q` máscara rápida · `E` borrador · `G` degradado/bote · `T` texto · `P` pluma · `A` selección directa · `U` formas · `H` mano · `R` girar vista · `Z` zoom ·
 `D` colores por defecto · `X` intercambiar colores · `[` `]` tamaño del pincel · Espacio (mantener) para desplazar.
 
 `Ctrl+Z` deshacer · `Mayús+Ctrl+Z` rehacer · `Ctrl+S` guardar proyecto · `Mayús+Ctrl+S` exportar ·

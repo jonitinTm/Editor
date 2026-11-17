@@ -766,7 +766,7 @@ function effectsBlock(st: LayerStyles): Uint8Array {
 /** Forma del editor → relleno de color + máscara vectorial de Photoshop (null si lleva trazo o es una línea). */
 function shapeBlocks(l: ShapeLayer, W: number, H: number): { soco: Uint8Array; vmsk: Uint8Array } | null {
   const p = l.props;
-  if (p.shape === 'line' || p.stroke || !p.fill) return null;
+  if (p.shape === 'line' || p.stroke || !p.fill || ['polygon', 'star', 'arrow', 'heart'].includes(p.shape)) return null;
   const x = Math.min(p.x0, p.x1), y = Math.min(p.y0, p.y1), w = Math.abs(p.x1 - p.x0), h = Math.abs(p.y1 - p.y0);
   type P = [number, number];
   const knots: [P, P, P][] = []; // [control anterior, ancla, control siguiente]

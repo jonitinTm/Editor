@@ -9,6 +9,7 @@ import { quickTransform, TransformTool } from '../tools/transform';
 import * as io from '../io/files';
 import { promptDialog } from './dialog';
 import { liquifyDialog } from './liquify';
+import { recordAction } from './macros';
 import { refineDialog } from './refine';
 import { isParametric } from '../core/layers';
 
@@ -36,6 +37,7 @@ export const ACTIONS: Action[] = [
   { id: 'saveAs', label: 'Guardar proyecto como…', keys: ['Alt+Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(true) },
   { id: 'export', label: 'Exportar como (PNG, JPG, WebP, PSD)…', keys: ['Shift+Ctrl+S', 'Alt+Shift+Ctrl+W'], enabled: hasDoc, run: dlg.exportDialog },
   { id: 'exportLayers', label: 'Exportar capas a archivos…', enabled: hasDoc, run: dlg.exportLayersDialog },
+  { id: 'batch', label: 'Automatizar › Lote…', enabled: () => true, run: dlg.batchDialog },
   { id: 'close', label: 'Cerrar', keys: ['Alt+Ctrl+W'], enabled: hasDoc, run: () => ops.closeDocument() },
 
   // Edición
@@ -139,6 +141,7 @@ export const ACTIONS: Action[] = [
   { id: 'zoomOut', label: 'Alejar', keys: ['Ctrl+-', 'Ctrl+NumpadSubtract'], enabled: hasDoc, run: () => app.viewport.zoomStep(-1) },
   { id: 'fit', label: 'Ajustar a la pantalla', keys: ['Ctrl+0'], enabled: hasDoc, run: () => app.viewport.fit() },
   { id: 'actual', label: 'Píxeles reales (100 %)', keys: ['Ctrl+1'], enabled: hasDoc, run: () => app.viewport.setZoom(1, null) },
+  { id: 'resetRot', label: 'Restablecer giro de la vista', enabled: () => !!app.doc?.view.rot, run: () => app.viewport.setRotation(0) },
   { id: 'rulers', label: 'Reglas', keys: ['Ctrl+R'], checked: () => app.showRulers, run: () => app.viewport.setRulers(!app.showRulers) },
   { id: 'guides', label: 'Mostrar guías', keys: ['Ctrl+;'], checked: () => app.showGuides, run: () => { app.showGuides = !app.showGuides; app.viewport.requestRender(); } },
   { id: 'snap', label: 'Ajustar (magnético)', keys: ['Shift+Ctrl+;'], checked: () => app.snapOn, run: () => { app.snapOn = !app.snapOn; app.toast(app.snapOn ? 'Ajuste magnético activado' : 'Ajuste magnético desactivado'); } },
@@ -169,6 +172,9 @@ for (const f of FILTERS) {
 for (const f of FILTERS) if (f.group === 'ajuste' && !f.noLayer) {
   ACTIONS.push({ id: 'adjust:' + f.id, label: f.name.replace('…', ''), enabled: hasDoc, run: () => ops.newAdjustmentLayer(f) });
 }
+
+// Las acciones que se pueden repetir quedan grabadas si hay una grabación en curso
+for (const a of ACTIONS) { const run = a.run; a.run = () => { recordAction(a.id, a.label.replace('…', '')); return run(); }; }
 
 export const actionById = new Map(ACTIONS.map(a => [a.id, a]));
 

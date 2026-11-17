@@ -12,7 +12,7 @@ import { h } from '../ui/dom';
 function drawPathOverlay(ctx: CanvasRenderingContext2D, vp: Viewport, pts: PathPoint[], closed: boolean, active = -1) {
   const z = vp.zoom, v = vp.doc!.view;
   ctx.save();
-  ctx.translate(v.panX, v.panY); ctx.scale(z, z);
+  vp.docTransform(ctx); void v;
   ctx.beginPath(); tracePath(ctx, pts, closed);
   ctx.lineWidth = 1.5 / z; ctx.strokeStyle = '#3d8bfd'; ctx.stroke();
   ctx.restore();

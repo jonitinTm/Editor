@@ -9,6 +9,7 @@ import { FilterDef, defaultParams } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
 import { SmartLayer, type LayerStyles } from '../core/layers';
 import { allPatterns } from '../core/patterns';
+import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
@@ -115,7 +116,7 @@ export function imageSizeDialog() {
       const W = Math.round(+w.value), H = Math.round(+hh.value);
       if (!(W >= 1 && H >= 1 && W <= 30000 && H <= 30000)) return false;
       if (W === d.width && H === d.height) return;
-      d.resample(W, H); d.commit('Tamaño de imagen'); app.viewport.fit(true);
+      d.resample(W, H); d.commit('Tamaño de imagen'); record({ kind: 'imageSize', w: W, h: H, label: `Tamaño de imagen: ${W} × ${H}` }); app.viewport.fit(true);
     },
   });
 }
@@ -139,7 +140,7 @@ export function canvasSizeDialog() {
       if (!(W >= 1 && H >= 1 && W <= 30000 && H <= 30000)) return false;
       const ax = anchor % 3, ay = Math.floor(anchor / 3);
       const dx = Math.round((W - d.width) * ax / 2), dy = Math.round((H - d.height) * ay / 2);
-      d.resizeCanvas(W, H, dx, dy); d.commit('Tamaño de lienzo'); app.viewport.fit(true);
+      d.resizeCanvas(W, H, dx, dy); d.commit('Tamaño de lienzo'); record({ kind: 'canvasSize', w: W, h: H, anchor, label: `Tamaño de lienzo: ${W} × ${H}` }); app.viewport.fit(true);
     },
   });
 }
@@ -254,7 +255,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
     title: def.name.replace('…', '') + (session instanceof ops.SmartFilterSession ? ' (filtro inteligente)' : ''), width: def.custom ? 420 : 400, side: true,
     body: [...body, h('label', { class: 'check preview-check' }, prev, ' Vista previa')],
     extraButtons: [reset],
-    onOk: () => { clearTimeout(timer); session.commit(params); ops.setLastFilter(def, params); },
+    onOk: () => { clearTimeout(timer); session.commit(params); ops.setLastFilter(def, params); if (!edit) record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') }); },
     onCancel: () => { clearTimeout(timer); session.clearPreview(); },
   });
   showDialogClose = () => { clearTimeout(timer); session.clearPreview(); dlg.close(); };
@@ -444,6 +445,43 @@ export function exportLayersDialog() {
   if (!app.doc) return;
   const trim = h('input', { type: 'checkbox', checked: true }), vis = h('input', { type: 'checkbox', checked: false });
   showDialog({ title: 'Exportar capas a archivos', okLabel: 'Exportar', body: [h('p', {}, 'Cada capa se guarda como un PNG independiente, todas juntas en un archivo ZIP.'), h('label', { class: 'check' }, trim, ' Recortar cada capa a su contenido'), h('label', { class: 'check' }, vis, ' Solo capas visibles')], onOk: () => { ops.exportLayers(trim.checked, vis.checked); } });
+}
+
+// ---- Lote -------------------------------------------------------------------------------
+
+/** Archivo › Automatizar › Lote: aplica una acción a muchas imágenes y las descarga en un ZIP. */
+export function batchDialog() {
+  const list = macros();
+  const act = h('select', {}, ...list.map((m, i) => h('option', { value: String(i) }, m.name)));
+  const fmt = h('select', {}, h('option', { value: 'image/jpeg' }, 'JPG'), h('option', { value: 'image/png' }, 'PNG'), h('option', { value: 'image/webp' }, 'WebP'));
+  let q = 90; const qs = numberSlider({ min: 1, max: 100, value: 90, unit: '%', onInput: v => q = v });
+  const info = h('div', { class: 'hint' }, 'Elige las imágenes al pulsar «Elegir imágenes y procesar». Todo ocurre en tu equipo.');
+  showDialog({
+    title: 'Procesar por lotes', okLabel: 'Elegir imágenes y procesar',
+    body: [row('Acción', act), row('Guardar como', fmt), row('Calidad', qs.el), info],
+    onOk: async () => {
+      const files = (await io.pickFiles('image/*,.psd')).filter(f => !io.isProjectFile(f));
+      if (!files.length) return;
+      const m = list[+act.value], out: { name: string; data: Uint8Array }[] = [], ext = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' }[fmt.value]!;
+      const prev = app.doc;
+      for (const [i, f] of files.entries()) {
+        app.toast(`Procesando ${i + 1} de ${files.length}: ${f.name}`);
+        try {
+          const doc = io.isPsdFile(f) ? (await (await import('../io/psd')).readPsd(await f.arrayBuffer(), io.baseName(f.name))).doc : await io.documentFromImage(f, f.name);
+          app.addDocument(doc);
+          await play(m);
+          const b = await io.exportImage(doc, fmt.value as any, q / 100);
+          out.push({ name: io.baseName(f.name) + ext, data: new Uint8Array(await b.arrayBuffer()) });
+          app.closeDocument(doc);
+        } catch (e: any) { app.toast(`No se pudo procesar ${f.name}: ${e?.message ?? e}`, 'warn'); }
+      }
+      if (prev && app.docs.includes(prev)) app.setDocument(prev);
+      if (!out.length) return;
+      const { makeZip } = await import('../io/zip');
+      await io.saveBlob(makeZip(out), `${m.name} - lote.zip`);
+      app.toast(`${out.length} imágenes procesadas`);
+    },
+  });
 }
 
 // ---- Ayuda ----------------------------------------------------------------------------

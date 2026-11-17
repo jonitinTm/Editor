@@ -210,7 +210,7 @@ export class EyedropperTool implements Tool {
 }
 
 export class HandTool implements Tool {
-  id = 'hand'; name = 'Mano'; icon = icon('hand'); key = 'H'; cursor = 'grab';
+  id = 'hand'; name = 'Mano'; icon = icon('hand'); key = 'H'; group = 'hand'; cursor = 'grab';
   extraOptions(bar: HTMLElement) {
     const b = (label: string, fn: () => void) => { const el = document.createElement('button'); el.className = 'btn'; el.textContent = label; el.onclick = fn; bar.append(el); };
     b('100 %', () => app.viewport.setZoom(1, null));
@@ -233,5 +233,41 @@ export class ZoomTool implements Tool {
   up(e: ToolEvent) {
     if (this.start && !this.moved) app.viewport.zoomStep(e.alt || this.start.alt ? -1 : 1, { x: e.sx, y: e.sy });
     this.start = null;
+  }
+}
+
+/** Girar vista: gira el lienzo en pantalla para dibujar con comodidad (no cambia la imagen). */
+export class RotateViewTool implements Tool {
+  id = 'rotateView'; name = 'Girar vista'; icon = icon('rotateView'); key = 'R'; group = 'hand'; cursor = 'grab';
+  private start: { a: number; rot: number } | null = null;
+  extraOptions(bar: HTMLElement) {
+    const inp = document.createElement('input'); inp.type = 'number'; inp.className = 'num'; inp.step = '1';
+    const sync = () => { inp.value = String(Math.round((app.doc?.view.rot ?? 0) * 180 / Math.PI)); };
+    inp.onchange = () => app.viewport.setRotation((+inp.value || 0) * Math.PI / 180);
+    const lbl = document.createElement('span'); lbl.className = 'lbl hint'; lbl.textContent = 'Ángulo';
+    const deg = document.createElement('span'); deg.className = 'unit'; deg.textContent = '°';
+    const reset = document.createElement('button'); reset.className = 'btn'; reset.textContent = 'Restablecer vista'; reset.onclick = () => app.viewport.setRotation(0);
+    const hint = document.createElement('span'); hint.className = 'hint'; hint.textContent = 'Arrastra para girar · Mayús: de 15° en 15° · Esc: restablecer';
+    bar.append(lbl, inp, deg, reset, hint); sync(); app.on('view', sync);
+  }
+  private angle(e: ToolEvent) { const vp = app.viewport; return Math.atan2(e.sy - vp.height / 2, e.sx - vp.width / 2); }
+  down(e: ToolEvent) { this.start = { a: this.angle(e), rot: app.doc!.view.rot ?? 0 }; this.cursor = 'grabbing'; }
+  move(e: ToolEvent) {
+    if (!this.start) return;
+    let r = this.start.rot + this.angle(e) - this.start.a;
+    if (e.shift) r = Math.round(r / (Math.PI / 12)) * Math.PI / 12;
+    app.viewport.setRotation(r);
+  }
+  up() { this.start = null; this.cursor = 'grab'; }
+  key_(e: KeyboardEvent) { if (e.key === 'Escape') { app.viewport.setRotation(0); return true; } return false; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (!this.start) return;
+    // brújula: la flecha roja señala el "arriba" de la imagen
+    const r = vp.rot, cx = vp.width / 2, cy = vp.height / 2;
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.beginPath(); ctx.arc(0, 0, 46, 0, 7); ctx.fill();
+    ctx.rotate(r); ctx.fillStyle = '#ff3b30'; ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(8, 0); ctx.lineTo(-8, 0); ctx.fill();
+    ctx.fillStyle = '#ddd'; ctx.beginPath(); ctx.moveTo(0, 40); ctx.lineTo(8, 0); ctx.lineTo(-8, 0); ctx.fill();
+    ctx.restore();
   }
 }

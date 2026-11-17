@@ -57,7 +57,8 @@ export function snapPoint(x: number, y: number, withLayers = false): { x: number
 export function drawSnap(ctx: CanvasRenderingContext2D, vp: Viewport) {
   if (!activeSnap || !app.doc) return;
   ctx.save(); ctx.strokeStyle = '#ff2ea6'; ctx.lineWidth = 1; ctx.beginPath();
-  for (const x of activeSnap.x) { const s = vp.toScreen(x, 0).x; ctx.moveTo(Math.round(s) + .5, 0); ctx.lineTo(Math.round(s) + .5, vp.height); }
-  for (const y of activeSnap.y) { const s = vp.toScreen(0, y).y; ctx.moveTo(0, Math.round(s) + .5); ctx.lineTo(vp.width, Math.round(s) + .5); }
+  const far = 1e6, line = (x0: number, y0: number, x1: number, y1: number) => { const a = vp.toScreen(x0, y0), b = vp.toScreen(x1, y1); if (!vp.rot) { if (x0 === x1) a.x = b.x = Math.round(a.x) + .5; else a.y = b.y = Math.round(a.y) + .5; } ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); };
+  for (const x of activeSnap.x) line(x, -far, x, far);
+  for (const y of activeSnap.y) line(-far, y, far, y);
   ctx.stroke(); ctx.restore();
 }

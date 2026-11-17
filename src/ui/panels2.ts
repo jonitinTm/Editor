@@ -4,6 +4,9 @@ import { app } from './app';
 import { h } from './dom';
 import { ctx2d } from '../core/canvas';
 import * as ops from './ops';
+import * as M from './macros';
+import { icon } from './icons';
+import { actionById } from './actions';
 import { promptDialog } from './dialog';
 
 const visible = (el: HTMLElement) => el.offsetParent !== null;
@@ -33,16 +36,16 @@ export function buildNavigatorPanel(parent: HTMLElement) {
     ctx.clearRect(0, 0, cv.width, cv.height);
     if (!d || !thumb) return;
     ctx.fillStyle = '#fff'; ctx.fillRect(ox, oy, thumb.width, thumb.height); ctx.drawImage(thumb, ox, oy);
-    const vp = app.viewport, a = vp.toDoc(0, 0), b = vp.toDoc(vp.width, vp.height);
-    ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = 2;
-    ctx.strokeRect(ox + a.x * k, oy + a.y * k, (b.x - a.x) * k, (b.y - a.y) * k);
+    const vp = app.viewport, q = [vp.toDoc(0, 0), vp.toDoc(vp.width, 0), vp.toDoc(vp.width, vp.height), vp.toDoc(0, vp.height)];
+    ctx.strokeStyle = '#ff3b30'; ctx.lineWidth = 2; ctx.beginPath();
+    q.forEach((p, i) => i ? ctx.lineTo(ox + p.x * k, oy + p.y * k) : ctx.moveTo(ox + p.x * k, oy + p.y * k)); ctx.closePath(); ctx.stroke();
     zoom.value = String(Math.round(Math.log2(d.view.zoom) * 100)); pct.textContent = Math.round(d.view.zoom * 1000) / 10 + ' %';
   };
   // Arrastrar en la miniatura mueve la vista
   const go = (e: PointerEvent) => {
     const d = app.doc; if (!d) return;
     const x = (e.offsetX - ox) / k, y = (e.offsetY - oy) / k, vp = app.viewport;
-    d.view.panX = vp.width / 2 - x * d.view.zoom; d.view.panY = vp.height / 2 - y * d.view.zoom;
+    vp.placeDocPoint(x, y, { x: vp.width / 2, y: vp.height / 2 });
     vp.requestRender(); app.emit('view');
   };
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); go(e); });
@@ -152,5 +155,43 @@ export function buildChannelsPanel(parent: HTMLElement) {
   };
   let t = 0;
   app.on('doc', () => { clearTimeout(t); t = window.setTimeout(render, 200); }); app.on('docs', render);
+  new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}
+
+// ---- Acciones ----------------------------------------------------------------------------
+
+export function buildActionsPanel(parent: HTMLElement) {
+  const list = h('div', { class: 'layer-list act-list' });
+  let sel = 0;
+  const open = new Set<string>();
+  const recBtn = h('button', { class: 'btn icon-btn rec', title: 'Grabar una acción nueva' }, '●');
+  const stopBtn = h('button', { class: 'btn icon-btn', title: 'Detener la grabación' }, '■');
+  const playBtn = h('button', { class: 'btn icon-btn', title: 'Reproducir la acción seleccionada' }, '▶');
+  const delBtn = h('button', { class: 'btn icon-btn', title: 'Eliminar la acción seleccionada' }, '🗑');
+  const batchBtn = h('button', { class: 'btn', title: 'Aplicar a muchas imágenes' }, 'Lote…');
+  recBtn.onclick = async () => { const n = await promptDialog('Nueva acción', 'Nombre', 'Acción ' + (M.macros().filter(m => !m.builtin).length + 1)); if (n !== null) { M.startRecording(n || 'Acción'); sel = 0; app.toast('Grabando: lo que hagas ahora (filtros, ajustes, tamaño, giros, capas…) se añadirá a la acción'); } };
+  stopBtn.onclick = () => M.stopRecording();
+  playBtn.onclick = () => { const m = M.macros()[sel]; if (m) M.play(m); };
+  delBtn.onclick = () => { const m = M.macros()[sel]; if (m && !m.builtin) { M.deleteMacro(m); sel = 0; } else app.toast('Las acciones incluidas no se pueden eliminar', 'warn'); };
+  batchBtn.onclick = () => actionById.get('batch')!.run();
+  const foot = h('div', { class: 'panel-foot' }, batchBtn, h('span', { style: { flex: '1' } }), stopBtn, recBtn, playBtn, delBtn);
+  const body = h('div', { class: 'panel-body layers' }, list, foot);
+  parent.append(body);
+  const render = () => {
+    if (!visible(body)) return;
+    list.innerHTML = '';
+    M.macros().forEach((m, i) => {
+      const isRec = M.recording === m;
+      const arrow = h('button', { class: 'arrow', html: icon(open.has(m.name) ? 'chevronDown' : 'chevronRight') });
+      arrow.onclick = e => { e.stopPropagation(); open.has(m.name) ? open.delete(m.name) : open.add(m.name); render(); };
+      const row = h('div', { class: 'layer-row act-row' + (i === sel ? ' active' : '') }, arrow, h('span', { class: 'lname' }, m.name), isRec ? h('span', { class: 'rec-dot', title: 'Grabando' }, '●') : null, m.builtin ? h('span', { class: 'hint' }, 'incluida') : null);
+      row.onclick = () => { sel = i; render(); };
+      row.ondblclick = () => M.play(m);
+      list.append(row);
+      if (open.has(m.name) || isRec) for (const s of m.steps) list.append(h('div', { class: 'act-step' }, s.label));
+    });
+    recBtn.classList.toggle('on', !!M.recording); stopBtn.disabled = !M.recording;
+  };
+  app.on('doc', render); app.on('docs', render);
   new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
 }

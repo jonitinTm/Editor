@@ -6,7 +6,7 @@ import { Selection } from './selection';
 import { History } from './history';
 import { renderComposite, compositeGroup, LayerOverride } from './compositor';
 
-export interface ViewState { zoom: number; panX: number; panY: number; }
+export interface ViewState { zoom: number; panX: number; panY: number; /** Giro de la vista en radianes (no afecta a la imagen). */ rot?: number; }
 
 export class EditorDocument {
   name: string;

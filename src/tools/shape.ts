@@ -11,7 +11,10 @@ export class ShapeTool implements Tool {
   options = [
     { key: 'shape', label: 'Forma', type: 'select', default: 'rect', choices: [
       { value: 'rect', label: 'Rectángulo' }, { value: 'round', label: 'Rect. redondeado' },
-      { value: 'ellipse', label: 'Elipse' }, { value: 'line', label: 'Línea' }] },
+      { value: 'ellipse', label: 'Elipse' }, { value: 'polygon', label: 'Polígono' }, { value: 'star', label: 'Estrella' },
+      { value: 'line', label: 'Línea' }, { value: 'arrow', label: 'Flecha' }, { value: 'heart', label: 'Corazón' }] },
+    { key: 'sides', label: 'Lados', type: 'range', min: 3, max: 40, default: 5 },
+    { key: 'inner', label: 'Sangría', type: 'range', min: 5, max: 95, default: 45, unit: '%' },
     { key: 'fill', label: 'Relleno (color frontal)', type: 'checkbox', default: true },
     { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
     { key: 'strokeColor', type: 'color', default: '#000000' },
@@ -30,6 +33,7 @@ export class ShapeTool implements Tool {
       fill: shape === 'line' ? null : app.opt('fill', this.id) ? app.fg : null,
       stroke: shape === 'line' ? app.fg : app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : null,
       strokeWidth: app.opt('strokeWidth', this.id), radius: app.opt('radius', this.id),
+      sides: app.opt('sides', this.id), inner: app.opt<number>('inner', this.id) / 100,
     });
     let n = 1; const names = new Set(doc.allLayers().map(l => l.name));
     while (names.has(`Forma ${n}`)) n++;
@@ -41,12 +45,12 @@ export class ShapeTool implements Tool {
     const p = this.layer.props;
     let x0 = this.a.x, y0 = this.a.y, x1 = e.x, y1 = e.y;
     if (e.shift) {
-      if (p.shape === 'line') {
+      if (p.shape === 'line' || p.shape === 'arrow') {
         const ang = Math.round(Math.atan2(y1 - y0, x1 - x0) / (Math.PI / 4)) * Math.PI / 4, d = Math.hypot(x1 - x0, y1 - y0);
         x1 = x0 + Math.cos(ang) * d; y1 = y0 + Math.sin(ang) * d;
       } else { const s = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)); x1 = x0 + Math.sign(x1 - x0 || 1) * s; y1 = y0 + Math.sign(y1 - y0 || 1) * s; }
     }
-    if (e.alt && p.shape !== 'line') { x0 = 2 * this.a.x - x1; y0 = 2 * this.a.y - y1; }
+    if (e.alt && p.shape !== 'line' && p.shape !== 'arrow') { x0 = 2 * this.a.x - x1; y0 = 2 * this.a.y - y1; }
     Object.assign(p, { x0, y0, x1, y1 });
     this.layer.render();
     app.doc!.invalidate();

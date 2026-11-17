@@ -52,13 +52,54 @@ export class Viewport {
   get zoom() { return this.doc?.view.zoom ?? 1; }
 
   // ---- Coordenadas ----------------------------------------------------
+  // pantalla = giro(rot) · (documento · zoom) + pan
   toDoc(sx: number, sy: number) {
-    const v = this.doc!.view;
-    return { x: (sx - v.panX) / v.zoom, y: (sy - v.panY) / v.zoom };
+    const v = this.doc!.view, r = v.rot ?? 0;
+    const dx = sx - v.panX, dy = sy - v.panY;
+    if (!r) return { x: dx / v.zoom, y: dy / v.zoom };
+    const c = Math.cos(-r), s = Math.sin(-r);
+    return { x: (dx * c - dy * s) / v.zoom, y: (dx * s + dy * c) / v.zoom };
   }
   toScreen(x: number, y: number) {
-    const v = this.doc!.view;
-    return { x: x * v.zoom + v.panX, y: y * v.zoom + v.panY };
+    const v = this.doc!.view, r = v.rot ?? 0;
+    if (!r) return { x: x * v.zoom + v.panX, y: y * v.zoom + v.panY };
+    const c = Math.cos(r), s = Math.sin(r), X = x * v.zoom, Y = y * v.zoom;
+    return { x: X * c - Y * s + v.panX, y: X * s + Y * c + v.panY };
+  }
+  get rot() { return this.doc?.view.rot ?? 0; }
+  /** Aplica al contexto la transformación documento → pantalla (para dibujar en coordenadas del documento). */
+  docTransform(ctx: CanvasRenderingContext2D) {
+    const v = this.doc!.view, r = v.rot ?? 0, c = Math.cos(r) * v.zoom, s = Math.sin(r) * v.zoom;
+    ctx.transform(c, s, -s, c, v.panX, v.panY);
+  }
+  /** Coloca el punto del documento (x, y) en el punto de pantalla p. */
+  placeDocPoint(x: number, y: number, p: { x: number; y: number }) {
+    const v = this.doc!.view, r = v.rot ?? 0, c = Math.cos(r), s = Math.sin(r), X = x * v.zoom, Y = y * v.zoom;
+    v.panX = p.x - (X * c - Y * s); v.panY = p.y - (X * s + Y * c);
+  }
+  /** Gira la vista alrededor del centro de la pantalla (no cambia la imagen). */
+  setRotation(rad: number) {
+    const d = this.doc; if (!d) return;
+    const c = { x: this.width / 2, y: this.height / 2 }, dc = this.toDoc(c.x, c.y);
+    let r = rad % (Math.PI * 2); if (r > Math.PI) r -= Math.PI * 2; if (r < -Math.PI) r += Math.PI * 2;
+    d.view.rot = Math.abs(r) < 1e-6 ? 0 : r;
+    this.placeDocPoint(dc.x, dc.y, c);
+    app.emit('view'); this.requestRender();
+  }
+  /** Polígono del documento en pantalla. */
+  private docPath(ctx: CanvasRenderingContext2D) {
+    const d = this.doc!, q = [this.toScreen(0, 0), this.toScreen(d.width, 0), this.toScreen(d.width, d.height), this.toScreen(0, d.height)];
+    ctx.beginPath(); q.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath();
+  }
+  /** Línea entre dos puntos del documento; sin giro se alinea al píxel para que sea nítida. */
+  private docLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) {
+    const a = this.toScreen(x0, y0), b = this.toScreen(x1, y1);
+    if (!this.rot) { if (x0 === x1) { a.x = b.x = Math.round(a.x) + .5; } if (y0 === y1) { a.y = b.y = Math.round(a.y) + .5; } }
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
+  }
+  /** Dibuja una imagen del tamaño del documento en su sitio. */
+  private docImage(ctx: CanvasRenderingContext2D, img: CanvasImageSource) {
+    ctx.save(); this.docTransform(ctx); ctx.drawImage(img, 0, 0); ctx.restore();
   }
 
   resize() {
@@ -91,13 +132,13 @@ export class Viewport {
     z = Math.min(64, Math.max(0.01, z));
     if (center) {
       d.view.zoom = z;
-      d.view.panX = Math.round((this.width - d.width * z) / 2);
-      d.view.panY = Math.round((this.height - d.height * z) / 2);
+      this.placeDocPoint(d.width / 2, d.height / 2, { x: this.width / 2, y: this.height / 2 });
+      if (!this.rot) { d.view.panX = Math.round(d.view.panX); d.view.panY = Math.round(d.view.panY); }
     } else {
       const p = at ?? { x: this.width / 2, y: this.height / 2 };
       const dp = this.toDoc(p.x, p.y);
       d.view.zoom = z;
-      d.view.panX = p.x - dp.x * z; d.view.panY = p.y - dp.y * z;
+      this.placeDocPoint(dp.x, dp.y, p);
     }
     app.emit('view');
     this.requestRender();
@@ -132,45 +173,47 @@ export class Viewport {
     ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--canvas-bg') || '#1b1c1f';
     ctx.fillRect(0, 0, this.width, this.height);
     if (!d) { this.renderRulers(); return; }
-    const { zoom, panX, panY } = d.view;
-    const dw = d.width * zoom, dh = d.height * zoom;
+    const { zoom } = d.view;
+    const rot = this.rot;
 
-    // Sombra + cuadrícula de transparencia
+    // Sombra + cuadrícula de transparencia (en el polígono del documento, que puede estar girado)
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 12;
-    ctx.fillStyle = '#fff'; ctx.fillRect(panX, panY, dw, dh);
+    ctx.fillStyle = '#fff'; this.docPath(ctx); ctx.fill();
     ctx.restore();
     ctx.save();
-    ctx.translate(panX, panY);
-    ctx.fillStyle = this.checkerPattern();
-    ctx.fillRect(0, 0, dw, dh);
+    this.docPath(ctx); ctx.clip();
+    ctx.fillStyle = this.checkerPattern(); ctx.fillRect(0, 0, this.width, this.height);
     ctx.restore();
 
     // Imagen combinada
     const comp = d.getComposite();
     ctx.save();
-    ctx.imageSmoothingEnabled = zoom < 1;
+    ctx.imageSmoothingEnabled = zoom < 1 || (rot !== 0 && zoom < 4);
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(comp, panX, panY, dw, dh);
+    this.docImage(ctx, comp);
     ctx.restore();
+
+    // Zona visible en coordenadas del documento
+    const corners = [this.toDoc(0, 0), this.toDoc(this.width, 0), this.toDoc(this.width, this.height), this.toDoc(0, this.height)];
+    const vx0 = Math.max(0, Math.floor(Math.min(...corners.map(c => c.x)))), vx1 = Math.min(d.width, Math.ceil(Math.max(...corners.map(c => c.x))));
+    const vy0 = Math.max(0, Math.floor(Math.min(...corners.map(c => c.y)))), vy1 = Math.min(d.height, Math.ceil(Math.max(...corners.map(c => c.y))));
 
     // Cuadrícula de píxeles a mucho zoom
     if (zoom >= 12) {
       ctx.save(); ctx.strokeStyle = 'rgba(128,128,128,.25)'; ctx.lineWidth = 1; ctx.beginPath();
-      const x0 = Math.max(0, Math.floor(-panX / zoom)), x1 = Math.min(d.width, Math.ceil((this.width - panX) / zoom));
-      const y0 = Math.max(0, Math.floor(-panY / zoom)), y1 = Math.min(d.height, Math.ceil((this.height - panY) / zoom));
-      for (let x = x0; x <= x1; x++) { const sx = Math.round(panX + x * zoom) + .5; ctx.moveTo(sx, panY + y0 * zoom); ctx.lineTo(sx, panY + y1 * zoom); }
-      for (let y = y0; y <= y1; y++) { const sy = Math.round(panY + y * zoom) + .5; ctx.moveTo(panX + x0 * zoom, sy); ctx.lineTo(panX + x1 * zoom, sy); }
+      for (let x = vx0; x <= vx1; x++) this.docLine(ctx, x, vy0, x, vy1);
+      for (let y = vy0; y <= vy1; y++) this.docLine(ctx, vx0, y, vx1, y);
       ctx.stroke(); ctx.restore();
     }
 
     // Cuadrícula
     if (app.showGrid && app.gridSize * zoom >= 6) {
       const g = app.gridSize;
-      ctx.save(); ctx.beginPath(); ctx.rect(panX, panY, dw, dh); ctx.clip();
+      ctx.save(); this.docPath(ctx); ctx.clip();
       ctx.strokeStyle = 'rgba(120,120,120,.55)'; ctx.lineWidth = 1; ctx.beginPath();
-      for (let x = 0; x <= d.width; x += g) { const sx = Math.round(panX + x * zoom) + .5; ctx.moveTo(sx, panY); ctx.lineTo(sx, panY + dh); }
-      for (let y = 0; y <= d.height; y += g) { const sy = Math.round(panY + y * zoom) + .5; ctx.moveTo(panX, sy); ctx.lineTo(panX + dw, sy); }
+      for (let x = Math.ceil(vx0 / g) * g; x <= vx1; x += g) this.docLine(ctx, x, vy0, x, vy1);
+      for (let y = Math.ceil(vy0 / g) * g; y <= vy1; y += g) this.docLine(ctx, vx0, y, vx1, y);
       ctx.stroke(); ctx.restore();
     }
 
@@ -184,9 +227,9 @@ export class Viewport {
       else {
         oc.drawImage(comp, 0, 0); oc.globalCompositeOperation = 'destination-in'; oc.drawImage(rp.mask, 0, 0);
         if (rp.mode !== 'transparent') { oc.globalCompositeOperation = 'destination-over'; oc.fillStyle = rp.mode === 'black' ? '#000' : '#fff'; oc.fillRect(0, 0, d.width, d.height); }
-        else { ctx.save(); ctx.translate(panX, panY); ctx.fillStyle = this.checkerPattern(); ctx.fillRect(0, 0, dw, dh); ctx.restore(); }
+        else { ctx.save(); this.docPath(ctx); ctx.clip(); ctx.fillStyle = this.checkerPattern(); ctx.fillRect(0, 0, this.width, this.height); ctx.restore(); }
       }
-      ctx.save(); ctx.imageSmoothingEnabled = zoom < 1; ctx.drawImage(ov, panX, panY, dw, dh); ctx.restore();
+      ctx.save(); ctx.imageSmoothingEnabled = zoom < 1; this.docImage(ctx, ov); ctx.restore();
     }
     // Máscara rápida: lo no seleccionado se tiñe de rojo
     if (d.quickMask) {
@@ -196,7 +239,7 @@ export class Viewport {
       const oc = ov.getContext('2d')!;
       oc.globalCompositeOperation = 'copy'; oc.fillStyle = 'rgba(255,0,0,.5)'; oc.fillRect(0, 0, d.width, d.height);
       if (qm) { oc.globalCompositeOperation = 'destination-out'; oc.drawImage(qm, 0, 0); }
-      ctx.save(); ctx.imageSmoothingEnabled = zoom < 1; ctx.drawImage(ov, panX, panY, dw, dh); ctx.restore();
+      ctx.save(); ctx.imageSmoothingEnabled = zoom < 1; this.docImage(ctx, ov); ctx.restore();
     }
 
     // Selección
@@ -206,13 +249,10 @@ export class Viewport {
     // Guías
     if (app.showGuides) {
       ctx.save(); ctx.strokeStyle = '#19d3f0'; ctx.lineWidth = 1; ctx.beginPath();
-      for (const g of d.guides.v) { const x = Math.round(panX + g * zoom) + .5; ctx.moveTo(x, 0); ctx.lineTo(x, this.height); }
-      for (const g of d.guides.h) { const y = Math.round(panY + g * zoom) + .5; ctx.moveTo(0, y); ctx.lineTo(this.width, y); }
-      if (this.guideDrag) {
-        const g = this.guideDrag;
-        if (g.axis === 'v') { const x = Math.round(panX + g.pos * zoom) + .5; ctx.moveTo(x, 0); ctx.lineTo(x, this.height); }
-        else { const y = Math.round(panY + g.pos * zoom) + .5; ctx.moveTo(0, y); ctx.lineTo(this.width, y); }
-      }
+      const far = 1e6;
+      const list = [...d.guides.v.map(g => ['v', g] as const), ...d.guides.h.map(g => ['h', g] as const)];
+      if (this.guideDrag) list.push([this.guideDrag.axis, this.guideDrag.pos]);
+      for (const [axis, g] of list) axis === 'v' ? this.docLine(ctx, g, -far, g, far) : this.docLine(ctx, -far, g, far, g);
       ctx.stroke(); ctx.restore();
     }
 
@@ -228,8 +268,8 @@ export class Viewport {
   drawAnts(path: Path2D, offset?: { x: number; y: number }) {
     const ctx = this.ctx, v = this.doc!.view;
     ctx.save();
-    ctx.translate(v.panX + (offset?.x ?? 0) * v.zoom, v.panY + (offset?.y ?? 0) * v.zoom);
-    ctx.scale(v.zoom, v.zoom);
+    this.docTransform(ctx);
+    if (offset) ctx.translate(offset.x, offset.y);
     ctx.lineWidth = 1 / v.zoom;
     ctx.strokeStyle = '#fff'; ctx.setLineDash([]); ctx.stroke(path);
     ctx.strokeStyle = '#000'; ctx.setLineDash([4 / v.zoom, 4 / v.zoom]); ctx.lineDashOffset = -this.antsOffset / v.zoom;
@@ -247,7 +287,7 @@ export class Viewport {
       const len = horiz ? this.width : this.height;
       ctx.fillStyle = '#2b2d31'; ctx.fillRect(0, 0, horiz ? len : RULER, horiz ? RULER : len);
       ctx.fillStyle = '#3a3c42'; horiz ? ctx.fillRect(0, RULER - 1, len, 1) : ctx.fillRect(RULER - 1, 0, 1, len);
-      if (!d) continue;
+      if (!d || this.rot) continue;
       const zoom = d.view.zoom, pan = horiz ? d.view.panX : d.view.panY;
       const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000];
       const step = nice.find(s => s * zoom >= 60) ?? 10000;
@@ -293,8 +333,9 @@ export class Viewport {
   private guideAt(sx: number, sy: number): { axis: 'h' | 'v'; index: number } | null {
     const d = this.doc; if (!d || !app.showGuides) return null;
     const v = d.view;
-    for (let i = 0; i < d.guides.v.length; i++) if (Math.abs(v.panX + d.guides.v[i] * v.zoom - sx) < 4) return { axis: 'v', index: i };
-    for (let i = 0; i < d.guides.h.length; i++) if (Math.abs(v.panY + d.guides.h[i] * v.zoom - sy) < 4) return { axis: 'h', index: i };
+    const p = this.toDoc(sx, sy);
+    for (let i = 0; i < d.guides.v.length; i++) if (Math.abs(d.guides.v[i] - p.x) * v.zoom < 4) return { axis: 'v', index: i };
+    for (let i = 0; i < d.guides.h.length; i++) if (Math.abs(d.guides.h[i] - p.y) * v.zoom < 4) return { axis: 'h', index: i };
     return null;
   }
 
@@ -443,18 +484,15 @@ export class Viewport {
 
   private startPinch() {
     const [a, b] = [...this.pointers.values()];
-    this.pinch = {
-      dist: Math.hypot(a.x - b.x, a.y - b.y), cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2,
-      zoom: this.zoom, px: this.doc!.view.panX, py: this.doc!.view.panY,
-    };
+    const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, dp = this.toDoc(cx, cy);
+    this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: dp.x, cy: dp.y, zoom: this.zoom, px: 0, py: 0 };
   }
   private updatePinch() {
     const p = this.pinch!, d = this.doc!;
     const [a, b] = [...this.pointers.values()];
     const dist = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
     const z = Math.min(64, Math.max(0.01, p.zoom * dist / p.dist));
-    const docX = (p.cx - p.px) / p.zoom, docY = (p.cy - p.py) / p.zoom;
-    d.view.zoom = z; d.view.panX = cx - docX * z; d.view.panY = cy - docY * z;
+    d.view.zoom = z; this.placeDocPoint(p.cx, p.cy, { x: cx, y: cy });
     app.emit('view'); this.requestRender();
   }
 }

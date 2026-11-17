@@ -255,7 +255,11 @@ export function tracePath(ctx: { moveTo(x: number, y: number): void; bezierCurve
 }
 
 export interface ShapeProps {
-  shape: 'rect' | 'round' | 'ellipse' | 'line' | 'path';
+  shape: 'rect' | 'round' | 'ellipse' | 'line' | 'path' | 'polygon' | 'star' | 'arrow' | 'heart';
+  /** Lados del polígono o puntas de la estrella. */
+  sides?: number;
+  /** Estrella: radio interior respecto al exterior (0-1). */
+  inner?: number;
   /** Solo para shape = 'path' (dibujado con la pluma). */
   path?: { closed: boolean; pts: PathPoint[] };
   x0: number; y0: number; x1: number; y1: number;
@@ -293,6 +297,31 @@ export class ShapeLayer extends RasterLayer {
     if (p.shape === 'path') { if (p.path) tracePath(ctx, p.path.pts, p.path.closed); ctx.lineCap = 'round'; }
     else if (p.shape === 'line') { ctx.moveTo(p.x0, p.y0); ctx.lineTo(p.x1, p.y1); }
     else if (p.shape === 'ellipse') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+    else if (p.shape === 'polygon' || p.shape === 'star') {
+      const n = Math.max(3, Math.round(p.sides ?? (p.shape === 'star' ? 5 : 6))), star = p.shape === 'star', k = p.inner ?? 0.45;
+      const pts = star ? n * 2 : n;
+      for (let i = 0; i < pts; i++) {
+        const a = -Math.PI / 2 + i * Math.PI * 2 / pts, rr = star && i % 2 ? k : 1;
+        const px = x + w / 2 + Math.cos(a) * w / 2 * rr, py = y + h / 2 + Math.sin(a) * h / 2 * rr;
+        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+      }
+      ctx.closePath();
+    } else if (p.shape === 'arrow') {
+      // flecha que apunta del primer punto al segundo
+      const dx = p.x1 - p.x0, dy = p.y1 - p.y0, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
+      const t = Math.max(2, Math.min(L * 0.12, p.strokeWidth * 2 + L * 0.06)), head = Math.min(L * 0.45, t * 3.2), hw = t * 2.4;
+      const P = (a: number, b: number) => [p.x0 + ux * a + nx * b, p.y0 + uy * a + ny * b];
+      const poly = [P(0, -t / 2), P(L - head, -t / 2), P(L - head, -hw / 2), P(L, 0), P(L - head, hw / 2), P(L - head, t / 2), P(0, t / 2)];
+      poly.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath();
+    } else if (p.shape === 'heart') {
+      const cx = x + w / 2;
+      ctx.moveTo(cx, y + h * 0.3);
+      ctx.bezierCurveTo(cx, y, x, y, x, y + h * 0.32);
+      ctx.bezierCurveTo(x, y + h * 0.62, cx - w * 0.1, y + h * 0.78, cx, y + h);
+      ctx.bezierCurveTo(cx + w * 0.1, y + h * 0.78, x + w, y + h * 0.62, x + w, y + h * 0.32);
+      ctx.bezierCurveTo(x + w, y, cx, y, cx, y + h * 0.3);
+      ctx.closePath();
+    }
     else if (p.shape === 'round' && (ctx as any).roundRect) (ctx as any).roundRect(x, y, w, h, Math.min(p.radius, w / 2, h / 2));
     else ctx.rect(x, y, w, h);
     if (p.shape === 'line') { ctx.strokeStyle = p.stroke ?? p.fill ?? '#000'; ctx.lineWidth = p.strokeWidth; ctx.lineCap = 'round'; ctx.stroke(); }

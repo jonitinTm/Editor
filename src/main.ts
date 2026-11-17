@@ -15,7 +15,7 @@ import { dialogOpen } from './ui/dialog';
 import { newDocumentDialog } from './ui/dialogs';
 import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
-import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel } from './ui/panels2';
+import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
@@ -25,7 +25,7 @@ import { retouchTools } from './tools/retouch';
 import { QuickSelectTool } from './tools/quicksel';
 import { CropTool } from './tools/crop';
 import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool } from './tools/brush';
-import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool } from './tools/misc';
+import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool, RotateViewTool } from './tools/misc';
 import { TextTool } from './tools/text';
 import { ShapeTool } from './tools/shape';
 import { TransformTool } from './tools/transform';
@@ -33,7 +33,7 @@ import { PenTool, NodeTool } from './tools/pen';
 
 // ---- Herramientas ----------------------------------------------------------------
 for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSelectTool, WandTool, CropTool, EyedropperTool, CloneTool,
-  BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, ZoomTool, TransformTool]) {
+  BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, RotateViewTool, ZoomTool, TransformTool]) {
   app.registerTool(new T());
 }
 app.registerTool(new PolyLassoTool());
@@ -82,7 +82,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
 }
 tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel]]);
 tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel]]);
-tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel]]);
+tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Acciones', buildActionsPanel]]);
 root.append(h('div', { id: 'toasts' }));
 
 // Separador ajustable entre paneles

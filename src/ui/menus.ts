@@ -16,7 +16,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
 };
 
 const MENUS: { label: string; items: Item[] }[] = [
-  { label: 'Archivo', items: ['new', 'open', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', '-', 'close'] },
+  { label: 'Archivo', items: ['new', 'open', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', '-', 'batch', '-', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'clear', '-', 'fill', 'contentFill', 'stroke', '-', 'definePattern', '-', 'freeTransform',
     { label: 'Transformar', items: ['distort', 'perspective', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }] },
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'dupDoc', '-', 'imageSize', 'canvasSize',
@@ -28,7 +28,7 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
   { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'colorRange', 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
   { label: 'Filtro', items: ['lastFilter', '-', 'liquify', '-', ...filterItems('filtro')] },
-  { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', '-', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'clearGuides'] },
+  { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'win:all'] },
   { label: 'Ayuda', items: ['shortcuts', 'about'] },
 ];

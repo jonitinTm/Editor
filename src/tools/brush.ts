@@ -289,7 +289,7 @@ export class SpotHealTool implements Tool {
   }
   cancel() { this.t = null; this.hole = null; this.box = null; }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
-    if (this.hole) { const v = vp.doc!.view; ctx.save(); ctx.globalAlpha = 0.45; ctx.imageSmoothingEnabled = v.zoom < 1; ctx.drawImage(this.hole, v.panX, v.panY, vp.doc!.width * v.zoom, vp.doc!.height * v.zoom); ctx.restore(); }
+    if (this.hole) { const v = vp.doc!.view; ctx.save(); ctx.globalAlpha = 0.45; ctx.imageSmoothingEnabled = v.zoom < 1; vp.docTransform(ctx); ctx.drawImage(this.hole, 0, 0); ctx.restore(); }
     drawBrushCursor(ctx, vp, app.opt<number>('size', this.id));
   }
 }
