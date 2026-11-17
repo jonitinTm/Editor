@@ -61,7 +61,7 @@ export async function play(m: Macro) {
     for (const s of m.steps) {
       const doc = app.doc!;
       if (s.kind === 'action') { const a = actionById.get(s.id); if (a && (!a.enabled || a.enabled())) await a.run(); }
-      else if (s.kind === 'filter') { const def = FILTERS.find(f => f.id === s.id); if (def) ops.applyFilterDirect(def, s.params); }
+      else if (s.kind === 'filter') { const def = FILTERS.find(f => f.id === s.id); if (def) await ops.applyFilterDirect(def, s.params); }
       else if (s.kind === 'imageSize') {
         let w = s.w ?? doc.width, h = s.h ?? doc.height;
         if (s.fit) { const k = Math.min(1, s.fit / Math.max(doc.width, doc.height)); w = Math.round(doc.width * k); h = Math.round(doc.height * k); }

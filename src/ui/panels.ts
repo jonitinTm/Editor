@@ -74,14 +74,14 @@ export function buildSwatchesPanel(parent: HTMLElement) {
 }
 
 /** Menú contextual con acciones del catálogo. */
-function contextMenu(x: number, y: number, ids: string[]) {
+export function contextMenu(x: number, y: number, ids: string[], extra?: HTMLElement) {
   document.querySelector('.flyout.ctx')?.remove();
   const fly = h('div', { class: 'flyout ctx', style: { left: Math.min(x, window.innerWidth - 260) + 'px', top: Math.min(y, window.innerHeight - ids.length * 24 - 20) + 'px' } },
     ...ids.map(id => {
       if (id === '-') return h('div', { class: 'menu-sep' });
       const a = actionById.get(id)!; const off = a.enabled ? !a.enabled() : false;
       return h('div', { class: 'fly-item' + (off ? ' disabled' : ''), onclick: () => { fly.remove(); if (!off) a.run(); } }, a.label);
-    }));
+    }), extra ?? null);
   document.body.append(fly);
   setTimeout(() => document.addEventListener('pointerdown', function off(e) { if (!fly.contains(e.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', off); } }), 0);
 }

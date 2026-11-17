@@ -12,6 +12,8 @@ import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
 import { readPsd, writePsd } from '../io/psd';
 import { heal, findSource } from '../filters/heal';
+import { computeFilter } from '../filters/compute';
+import FilterWorker from '../filters/worker?worker&inline';
 import { record } from './macros';
 import { snapshot, restore } from '../core/history';
 import { addPattern, getPattern, patternFill } from '../core/patterns';
@@ -834,6 +836,14 @@ export function transformImage(kind: 'rot90' | 'rot-90' | 'rot180' | 'flipH' | '
 // ---- Filtros --------------------------------------------------------------------
 
 /** Aplica un filtro con vista previa; respeta la selección y funciona también sobre máscaras. */
+let filterWorker: Worker | null | undefined;
+function getFilterWorker(): Worker | null {
+  if (filterWorker !== undefined) return filterWorker;
+  try { filterWorker = new FilterWorker(); } catch { filterWorker = null; }
+  return filterWorker;
+}
+let sessionSeq = 0;
+
 export class FilterSession {
   t: PaintTarget;
   region: Rect;
@@ -841,7 +851,13 @@ export class FilterSession {
   private sel: ImageData | null;
   private preview: HTMLCanvasElement;
   private seed = (Math.random() * 1e9) | 0;
-  constructor(t: PaintTarget, public def: FilterDef) {
+  /** En imágenes grandes el cálculo va a un hilo de fondo. */
+  private worker: Worker | null = null;
+  private id = ++sessionSeq;
+  private job = 0;
+  private waiting = new Map<number, (img: ImageData) => void>();
+  private last: { key: string; img: ImageData } | null = null;
+  constructor(t: PaintTarget, public def: FilterDef, useWorker = true) {
     const d = doc()!;
     this.t = t;
     this.region = (!t.quick && d.selection.bounds) || { x: 0, y: 0, w: d.width, h: d.height };
@@ -852,43 +868,67 @@ export class FilterSession {
     }
     this.sel = d.selection.mask && !t.quick ? getPixels(d.selection.mask, this.region) : null;
     this.preview = cloneCanvas(t.canvas);
+    if (useWorker && this.region.w * this.region.h > 400_000) {
+      this.worker = getFilterWorker();
+      if (this.worker) {
+        this.worker.postMessage({ type: 'init', session: this.id, w: this.orig.width, h: this.orig.height, data: this.orig.data.buffer.slice(0), sel: this.sel ? this.sel.data.buffer.slice(0) : null, filterId: def.id, isMask: !!t.isMask, lockAlpha: !!t.lockAlpha });
+        this.worker.addEventListener('message', this.onMsg);
+      }
+    }
   }
-  static start(def: FilterDef): FilterSession | null {
+  private onMsg = (e: MessageEvent) => {
+    const m = e.data; if (m.session !== this.id) return;
+    const done = this.waiting.get(m.job); this.waiting.delete(m.job);
+    done?.(new ImageData(new Uint8ClampedArray(m.data), this.orig.width, this.orig.height));
+  };
+  static start(def: FilterDef, useWorker = true): FilterSession | null {
     const t = getPaintTarget(); if (!t) return null;
-    return new FilterSession(t, def);
+    return new FilterSession(t, def, useWorker);
   }
   /** Imagen original de la zona (para histogramas). */
   source() { return this.orig; }
-  private compute(params: any): ImageData {
-    const img = new ImageData(new Uint8ClampedArray(this.orig.data), this.orig.width, this.orig.height);
-    this.def.apply(img, { ...params, seed: this.seed });
-    const o = this.orig.data, n = img.data;
-    if (this.sel) {
-      const s = this.sel.data;
-      for (let i = 0; i < n.length; i += 4) {
-        const k = s[i + 3] / 255;
-        if (k >= 1) continue;
-        for (let c = 0; c < 4; c++) n[i + c] = o[i + c] + (n[i + c] - o[i + c]) * k;
-      }
+  private compute(params: any): Promise<ImageData> | ImageData {
+    const p = { ...params, seed: this.seed }, key = JSON.stringify(p);
+    if (this.last?.key === key) return this.last.img;
+    if (!this.worker) {
+      const img = computeFilter(this.orig, this.sel?.data ?? null, this.def.apply, p, !!this.t.isMask, !!this.t.lockAlpha);
+      this.last = { key, img }; return img;
     }
-    if (this.t.isMask) for (let i = 0; i < n.length; i += 4) { n[i + 3] = n[i]; n[i] = n[i + 1] = n[i + 2] = 255; }
-    else if (this.t.lockAlpha) for (let i = 3; i < n.length; i += 4) n[i] = o[i];
-    return img;
+    const job = ++this.job;
+    return new Promise(res => {
+      this.waiting.set(job, img => { this.last = { key, img }; res(img); });
+      this.worker!.postMessage({ type: 'run', session: this.id, job, params: p });
+    });
   }
   render(params: any) {
-    putPixels(this.preview, this.compute(params), this.region.x, this.region.y);
-    setPreview(this.t, this.preview);
-    doc()!.invalidate(this.region);
-    app.viewport.requestRender();
+    const show = (img: ImageData) => {
+      putPixels(this.preview, img, this.region.x, this.region.y);
+      setPreview(this.t, this.preview);
+      doc()!.invalidate(this.region);
+      app.viewport.requestRender();
+    };
+    const r = this.compute(params);
+    if (r instanceof ImageData) show(r);
+    else { const job = this.job; r.then(img => { if (job === this.job && !this.ended) show(img); }); }
+  }
+  private ended = false;
+  private end() {
+    this.ended = true;
+    if (this.worker) { this.worker.removeEventListener('message', this.onMsg); this.worker.postMessage({ type: 'end', session: this.id }); }
   }
   clearPreview() {
+    this.end();
     setPreview(this.t, null);
     doc()!.invalidate(this.region);
     app.viewport.requestRender();
   }
-  commit(params: any) {
+  async commit(params: any) {
+    // Si la vista previa ya calculó estos valores se reutilizan; si no, se calcula aquí mismo
+    const p = { ...params, seed: this.seed }, key = JSON.stringify(p);
+    const r = this.last?.key === key ? this.last.img : computeFilter(this.orig, this.sel?.data ?? null, this.def.apply, p, !!this.t.isMask, !!this.t.lockAlpha);
+    this.end();
     const out = cloneCanvas(this.t.canvas);
-    putPixels(out, this.compute(params), this.region.x, this.region.y);
+    putPixels(out, r, this.region.x, this.region.y);
     setPreview(this.t, null);
     setTargetCanvas(this.t, out);
     doc()!.commit(this.def.name.replace('…', ''));
@@ -925,12 +965,13 @@ export function removeSmartFilter(l: SmartLayer, i: number) {
 export let lastFilter: { def: FilterDef; params: any } | null = null;
 export function setLastFilter(def: FilterDef, params: any) { if (def.group === 'filtro') lastFilter = { def, params }; }
 
-export function applyFilterDirect(def: FilterDef, params: any = {}) {
+export async function applyFilterDirect(def: FilterDef, params: any = {}) {
   record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') });
   const a = doc()?.active;
   if (a instanceof SmartLayer && !doc()!.editMask) { new SmartFilterSession(a, def).commit(params); setLastFilter(def, params); return; }
-  const s = FilterSession.start(def); if (!s) return;
-  s.commit(params);
+  // Sin ventana: se aplica al momento (así un Ctrl+Z inmediato deshace justo esto)
+  const s = FilterSession.start(def, false); if (!s) return;
+  await s.commit(params);
   setLastFilter(def, params);
 }
 export function repeatLastFilter() {

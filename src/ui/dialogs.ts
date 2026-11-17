@@ -233,7 +233,8 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
   let body: HTMLElement[];
   if (def.custom === 'levels') body = levelsBody(session.source(), params, update);
   else if (def.custom === 'curves') body = curvesBody(session.source(), params, update);
-  else body = (def.params ?? []).map(p => {
+  else body = (def.params ?? []).flatMap(p => [...((p as any).section ? [h('div', { class: 'dlg-section' }, (p as any).section)] : []), paramRow(p)]);
+  function paramRow(p: any): HTMLElement {
     if (p.type === 'checkbox') {
       const c = h('input', { type: 'checkbox', checked: !!params[p.key] });
       c.addEventListener('change', () => { params[p.key] = c.checked; update(); });
@@ -245,7 +246,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
       return row(p.label, c);
     }
     return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el);
-  });
+  }
   const prev = h('input', { type: 'checkbox', checked: true });
   prev.addEventListener('change', () => { previewOn = prev.checked; update(); });
   const reset = h('button', { class: 'btn', type: 'button' }, 'Restablecer');
@@ -255,7 +256,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
     title: def.name.replace('…', '') + (session instanceof ops.SmartFilterSession ? ' (filtro inteligente)' : ''), width: def.custom ? 420 : 400, side: true,
     body: [...body, h('label', { class: 'check preview-check' }, prev, ' Vista previa')],
     extraButtons: [reset],
-    onOk: () => { clearTimeout(timer); session.commit(params); ops.setLastFilter(def, params); if (!edit) record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') }); },
+    onOk: async () => { clearTimeout(timer); await session.commit(params); ops.setLastFilter(def, params); if (!edit) record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') }); },
     onCancel: () => { clearTimeout(timer); session.clearPreview(); },
   });
   showDialogClose = () => { clearTimeout(timer); session.clearPreview(); dlg.close(); };

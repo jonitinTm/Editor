@@ -10,7 +10,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
   const list = FILTERS.filter(f => f.group === group);
   if (group === 'ajuste') return list.map(f => 'filter:' + f.id);
   const subs = new Map<string, Item[]>();
-  for (const f of list) { const k = f.submenu ?? 'Otros'; if (!subs.has(k)) subs.set(k, []); subs.get(k)!.push('filter:' + f.id); }
+  for (const f of list) { if (!f.submenu) continue; const k = f.submenu; if (!subs.has(k)) subs.set(k, []); subs.get(k)!.push('filter:' + f.id); }
   const order = ['Desenfocar', 'Distorsionar', 'Enfocar', 'Estilizar', 'Pixelizar', 'Ruido', 'Otro'];
   return [...subs].sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0])).map(([label, items]) => ({ label, items }));
 };
@@ -27,7 +27,7 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
   { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'colorRange', 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
-  { label: 'Filtro', items: ['lastFilter', '-', 'liquify', '-', ...filterItems('filtro')] },
+  { label: 'Filtro', items: ['lastFilter', '-', 'filter:develop', 'liquify', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'win:all'] },
   { label: 'Ayuda', items: ['shortcuts', 'about'] },

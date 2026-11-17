@@ -53,7 +53,8 @@ export class MoveTool implements Tool {
 
   down(e: ToolEvent) {
     const doc = app.doc!;
-    if (app.opt('autoSelect', this.id) && !e.ctrl) {
+    // Ctrl invierte la opción «Selección automática de capa» (como en los editores profesionales)
+    if (!!app.opt('autoSelect', this.id) !== e.ctrl) {
       const l = layerAt(e.x, e.y);
       if (l && l !== doc.active) { doc.setActive(l); }
     }

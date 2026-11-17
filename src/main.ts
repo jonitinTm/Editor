@@ -189,6 +189,14 @@ function keyString(e: KeyboardEvent) {
 const keymap = new Map<string, (typeof ACTIONS)[number]>();
 for (const a of ACTIONS) for (const k of a.keys ?? []) keymap.set(k, a);
 
+/** Tecla de herramienta mantenida: al soltarla se vuelve a la herramienta anterior. */
+let held: { key: string; prev: string; t: number } | null = null;
+window.addEventListener('keyup', e => {
+  if (!held || e.key.toUpperCase() !== held.key) return;
+  const h0 = held; held = null;
+  if (performance.now() - h0.t > 400 && app.tool.id !== h0.prev && !app.viewport.isSpaceDown() && !app.viewport.isBusy()) app.setTool(h0.prev);
+});
+
 window.addEventListener('keydown', e => {
   if (dialogOpen()) return;
   if (e.key === 'Alt') e.preventDefault(); // evita que el navegador active su menú
@@ -235,6 +243,8 @@ window.addEventListener('keydown', e => {
   const tools = [...app.tools.values()].filter(t => t.key === key);
   if (tools.length) {
     e.preventDefault();
+    if (e.repeat) return;
+    held = { key, prev: app.tool.id, t: performance.now() };
     if (e.shiftKey && tools.length > 1) {
       let i = tools.findIndex(t => t.id === app.tool.id);
       if (i < 0) i = Math.max(0, tools.findIndex(t => t.id === app.groupChoice[t.group ?? '']));

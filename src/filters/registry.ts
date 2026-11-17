@@ -4,9 +4,10 @@
 
 import * as A from './adjustments';
 import * as F from './advanced';
+import { develop, DEVELOP_DEFAULTS } from './develop';
 
 export type ParamDef =
-  | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string }
+  | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string }
   | { key: string; label: string; type: 'checkbox'; default: boolean }
   | { key: string; label: string; type: 'color'; default: string };
 
@@ -175,6 +176,9 @@ export const FILTERS: FilterDef[] = [
   { id: 'offset', name: 'Desplazamiento…', group: 'filtro', submenu: 'Otro', params: [{ key: 'dx', label: 'Horizontal', type: 'range', min: -2000, max: 2000, default: 50, unit: 'px' }, { key: 'dy', label: 'Vertical', type: 'range', min: -2000, max: 2000, default: 50, unit: 'px' }], apply: (img, p) => F.offset(img, p.dx, p.dy) },
   { id: 'maximum', name: 'Máximo…', group: 'filtro', submenu: 'Otro', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 50, default: 2, unit: 'px' }], apply: (img, p) => F.minMax(img, p.radius, true) },
   { id: 'minimum', name: 'Mínimo…', group: 'filtro', submenu: 'Otro', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 50, default: 2, unit: 'px' }], apply: (img, p) => F.minMax(img, p.radius, false) },
+  { id: 'develop', name: 'Revelado (tipo Camera Raw)…', group: 'filtro', shortcut: 'Shift+Ctrl+A', params: [{ key: 'temp', label: 'Temperatura', type: 'range', min: -100, max: 100, default: 0, section: 'Balance de blancos' }, { key: 'tint', label: 'Matiz', type: 'range', min: -100, max: 100, default: 0 }, { key: 'exposure', label: 'Exposición', type: 'range', min: -5, max: 5, default: 0, step: 0.05, section: 'Tono' }, { key: 'contrast', label: 'Contraste', type: 'range', min: -100, max: 100, default: 0 }, { key: 'highlights', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0 }, { key: 'shadows', label: 'Sombras', type: 'range', min: -100, max: 100, default: 0 }, { key: 'whites', label: 'Blancos', type: 'range', min: -100, max: 100, default: 0 }, { key: 'blacks', label: 'Negros', type: 'range', min: -100, max: 100, default: 0 }, { key: 'clarity', label: 'Claridad', type: 'range', min: -100, max: 100, default: 0, section: 'Presencia' }, { key: 'dehaze', label: 'Neblina', type: 'range', min: -100, max: 100, default: 0 }, { key: 'vibrance', label: 'Intensidad', type: 'range', min: -100, max: 100, default: 0 }, { key: 'saturation', label: 'Saturación', type: 'range', min: -100, max: 100, default: 0 }, { key: 'vignette', label: 'Viñeta', type: 'range', min: -100, max: 100, default: 0, section: 'Efectos' }, { key: 'sharpen', label: 'Enfoque', type: 'range', min: 0, max: 150, default: 0, section: 'Detalle' }, { key: 'noise', label: 'Reducción de ruido', type: 'range', min: 0, max: 100, default: 0 }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, ...p }) },
+  { id: 'shadowsHighlights', name: 'Sombras/Iluminaciones…', group: 'ajuste', params: [{ key: 'shadows', label: 'Sombras', type: 'range', min: -100, max: 100, default: 35, unit: '%' }, { key: 'highlights', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0, unit: '%' }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, ...p }) },
+  { id: 'denoise', name: 'Reducir ruido…', group: 'filtro', submenu: 'Ruido', params: [{ key: 'strength', label: 'Intensidad', type: 'range', min: 1, max: 100, default: 40, unit: '%' }, { key: 'detail', label: 'Conservar detalles', type: 'range', min: 0, max: 100, default: 10, unit: '%' }], apply: (img, p) => develop(img, { ...DEVELOP_DEFAULTS, noise: p.strength, sharpen: p.detail }) },
 ];
 
 export function defaultParams(f: FilterDef): any {

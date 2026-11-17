@@ -31,6 +31,8 @@ export class Viewport {
   private checker: CanvasPattern | null = null;
   private quickCanvas: HTMLCanvasElement | null = null;
   private lastClick: { t: number; x: number; y: number; n: number } | null = null;
+  private springMove = false;
+  private brushResize: { sx: number; sy: number; size: number; hard: number | null } | null = null;
 
   constructor(parent: HTMLElement) {
     this.canvas = h('canvas', { class: 'view-canvas' });
@@ -329,6 +331,8 @@ export class Viewport {
   }
 
   isSpaceDown() { return this.spaceDown; }
+  /** ¿Hay una operación con el ratón en curso? */
+  isBusy() { return this.toolActive; }
 
   private guideAt(sx: number, sy: number): { axis: 'h' | 'v'; index: number } | null {
     const d = this.doc; if (!d || !app.showGuides) return null;
@@ -383,7 +387,18 @@ export class Viewport {
           return;
         }
       }
-      if (e.button === 2) return;
+      if (e.button === 2) {
+        // Alt + clic derecho y arrastrar: tamaño (horizontal) y dureza (vertical) del pincel
+        const t = app.tool;
+        if (e.altKey && typeof app.opt('size', t.id) === 'number') {
+          this.brushResize = { sx: te.sx, sy: te.sy, size: app.opt<number>('size', t.id), hard: app.opt<number>('hardness', t.id) ?? null };
+          return;
+        }
+        this.openContextMenu(e.clientX, e.clientY);
+        return;
+      }
+      // Ctrl + arrastrar con casi cualquier herramienta: mover (y elegir la capa bajo el ratón)
+      if (te.ctrl && !['move', 'transform', 'pen', 'node', 'text', 'hand', 'zoom', 'rotateView', 'crop'].includes(app.tool?.id)) { this.springMove = true; app.setTool('move', true); }
       this.toolActive = true;
       app.tool?.down?.(te);
       this.requestRender();
@@ -400,6 +415,13 @@ export class Viewport {
       if (this.panning) {
         this.doc.view.panX = this.panning.px + te.sx - this.panning.x;
         this.doc.view.panY = this.panning.py + te.sy - this.panning.y;
+        this.requestRender(); return;
+      }
+      if (this.brushResize) {
+        const b = this.brushResize, t = app.tool;
+        app.setOpt(t.id, 'size', Math.max(1, Math.min(1000, Math.round(b.size + (te.sx - b.sx) * 2 / this.zoom))));
+        if (b.hard !== null) app.setOpt(t.id, 'hardness', Math.max(0, Math.min(100, Math.round(b.hard - (te.sy - b.sy) * 0.5))));
+        this.mouseScreen = { x: b.sx, y: b.sy };
         this.requestRender(); return;
       }
       if (this.guideDrag) {
@@ -420,6 +442,7 @@ export class Viewport {
       if (this.pinch) { if (this.pointers.size < 2) this.pinch = null; return; }
       if (!this.doc) return;
       if (this.panning) { this.panning = null; this.updateCursor(); return; }
+      if (this.brushResize) { this.brushResize = null; app.saveOpts(); return; }
       if (this.guideDrag) {
         const g = this.guideDrag; this.guideDrag = null;
         const te = this.makeEvent(e);
@@ -430,6 +453,7 @@ export class Viewport {
       if (this.toolActive) {
         this.toolActive = false;
         app.tool?.up?.(this.makeEvent(e));
+        if (this.springMove) { this.springMove = false; app.restoreTool(); }
         this.requestRender();
       }
     };
@@ -480,6 +504,25 @@ export class Viewport {
     });
     window.addEventListener('keyup', e => { if (e.code === 'Space') { this.spaceDown = false; this.updateCursor(); } });
     window.addEventListener('blur', () => { this.spaceDown = false; });
+  }
+
+  /** Menú del clic derecho: lo útil según haya selección y la herramienta activa. */
+  private openContextMenu(x: number, y: number) {
+    const d = this.doc!, t = app.tool;
+    let extra: HTMLElement | undefined;
+    if (typeof app.opt('size', t.id) === 'number') {
+      // Ajustes rápidos del pincel, como en los editores profesionales
+      const mk = (label: string, key: string, min: number, max: number) => {
+        const v = h('input', { type: 'range', min: String(min), max: String(max), value: String(app.opt(key, t.id)) }), n = h('span', { class: 'cm-val' }, String(app.opt(key, t.id)));
+        v.oninput = () => { app.setOpt(t.id, key, +v.value); n.textContent = v.value; };
+        return h('div', { class: 'cm-slider' }, h('span', {}, label), v, n);
+      };
+      extra = h('div', { class: 'cm-brush' }, mk('Tamaño', 'size', 1, 500), app.opt('hardness', t.id) !== undefined ? mk('Dureza', 'hardness', 0, 100) : null);
+    }
+    const ids = d.selection.active
+      ? ['deselect', 'invertSel', 'feather', 'refine', '-', 'layerViaCopy', 'layerViaCut', '-', 'freeTransform', 'fill', 'stroke', 'contentFill', '-', 'saveSel']
+      : ['selectAll', '-', 'freeTransform', 'newLayer', 'dupLayer', 'mergeDown', '-', 'undo', 'redo'];
+    import('./panels').then(m => m.contextMenu(x, y, ids, extra));
   }
 
   private startPinch() {

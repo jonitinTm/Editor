@@ -102,6 +102,13 @@ Ya disponible:
 - **Acciones** (panel junto a Capas): graba filtros, ajustes, tamaños, giros y operaciones de capa y repítelos con un
   clic. Incluye tres acciones de serie. *Archivo › Automatizar › Lote* aplica una acción a muchas imágenes y las
   descarga en un ZIP.
+- **Filtro › Revelado (tipo Camera Raw)** (`Mayús+Ctrl+A`): temperatura, matiz, exposición, contraste, iluminaciones,
+  sombras, blancos, negros, claridad, neblina, intensidad, saturación, viñeta, enfoque y reducción de ruido.
+  También *Imagen › Ajustes › Sombras/Iluminaciones* y *Filtro › Ruido › Reducir ruido*.
+- **Uso más ágil**: los filtros pesados calculan la vista previa en segundo plano (la ventana no se congela);
+  clic derecho en el lienzo abre un menú con lo útil en ese momento; Alt + clic derecho y arrastrar cambia tamaño y
+  dureza del pincel; mantener la letra de una herramienta la activa solo mientras la mantienes; Ctrl + arrastrar
+  mueve la capa desde casi cualquier herramienta.
 - **Recuperación automática**: el trabajo se copia cada pocos segundos en el propio navegador; si cierras la pestaña
   por accidente, al volver aparece «Recuperar» en la pantalla de inicio.
 - **Más ajustes y edición**: tono, contraste y color automáticos; mapa de degradado y filtro de fotografía;

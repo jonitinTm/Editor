@@ -381,3 +381,12 @@ body.hide-panels .side, body.hide-panels .toolbar, body.hide-panels .optionsbar,
 .act-row { height: 30px; }
 .rec-dot, .btn.rec { color: #ff4d4d; }
 .btn.rec.on { background: rgba(255,77,77,.2); border-color: #ff4d4d; }
+body.busy, body.busy * { cursor: progress !important; }
+
+.cm-brush { padding: 6px 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+.cm-slider { display: flex; align-items: center; gap: 8px; }
+.cm-slider span:first-child { width: 52px; color: var(--muted); }
+.cm-slider input { flex: 1; }
+.cm-val { width: 30px; text-align: right; }
+.dlg-section { font-weight: 600; color: #b6b9bf; text-transform: uppercase; font-size: 10.5px; letter-spacing: .6px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.dlg-section:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
