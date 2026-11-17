@@ -4,6 +4,7 @@
 import { app } from './app';
 import type { ToolEvent } from '../tools/tool';
 import { h } from './dom';
+import { drawSnap } from '../tools/snap';
 
 const RULER = 20;
 
@@ -205,6 +206,7 @@ export class Viewport {
     ctx.save();
     app.tool?.drawOverlay?.(ctx, this);
     ctx.restore();
+    drawSnap(ctx, this);
     this.renderRulers();
   }
 

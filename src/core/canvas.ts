@@ -113,3 +113,40 @@ export function luminance(hex: string): number {
   const [r, g, b] = hexToRgb(hex);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
 }
+
+const boundsCache = new WeakMap<HTMLCanvasElement, { key: number; rect: Rect | null }>();
+/**
+ * Caja del contenido, rápida incluso en lienzos enormes: primero una pasada a
+ * baja resolución y luego se afinan los bordes a resolución completa.
+ * `key` permite reutilizar el resultado mientras el contenido no cambie.
+ */
+export function contentBoundsQuick(c: HTMLCanvasElement, key = 0): Rect | null {
+  const cached = boundsCache.get(c);
+  if (cached && cached.key === key) return cached.rect;
+  const W = c.width, H = c.height, k = Math.max(1, Math.ceil(Math.max(W, H) / 512));
+  let rect: Rect | null;
+  if (k === 1) rect = contentBounds(c);
+  else {
+    const sw = Math.ceil(W / k), sh = Math.ceil(H / k), s = makeCanvas(sw, sh), sc = ctx2d(s);
+    sc.imageSmoothingEnabled = true; sc.drawImage(c, 0, 0, sw * k, sh * k, 0, 0, sw, sh);
+    const coarse = contentBounds(s);
+    if (!coarse) rect = null;
+    else {
+      // zona aproximada, ampliada un bloque por cada lado, y búsqueda exacta en las franjas de los bordes
+      const x0 = Math.max(0, (coarse.x - 1) * k), y0 = Math.max(0, (coarse.y - 1) * k);
+      const x1 = Math.min(W, (coarse.x + coarse.w + 1) * k), y1 = Math.min(H, (coarse.y + coarse.h + 1) * k);
+      const ctx = ctx2d(c), band = 3 * k;
+      const scan = (x: number, y: number, w: number, h: number, pick: (d: Uint8ClampedArray, w: number, h: number) => number) => {
+        w = Math.max(1, Math.min(W - x, w)); h = Math.max(1, Math.min(H - y, h));
+        return pick(ctx.getImageData(x, y, w, h).data, w, h);
+      };
+      const left = scan(x0, y0, band, y1 - y0, (d, w, h) => { for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) if (d[(y * w + x) * 4 + 3]) return x0 + x; return x0; });
+      const right = scan(Math.max(x0, x1 - band), y0, band, y1 - y0, (d, w, h) => { for (let x = w - 1; x >= 0; x--) for (let y = 0; y < h; y++) if (d[(y * w + x) * 4 + 3]) return Math.max(x0, x1 - band) + x + 1; return x1; });
+      const top = scan(x0, y0, x1 - x0, band, (d, w, h) => { for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) return y0 + y; return y0; });
+      const bottom = scan(x0, Math.max(y0, y1 - band), x1 - x0, band, (d, w, h) => { for (let y = h - 1; y >= 0; y--) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3]) return Math.max(y0, y1 - band) + y + 1; return y1; });
+      rect = { x: left, y: top, w: right - left, h: bottom - top };
+    }
+  }
+  boundsCache.set(c, { key, rect });
+  return rect;
+}

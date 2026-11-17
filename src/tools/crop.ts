@@ -6,6 +6,7 @@ import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
 import { h } from '../ui/dom';
 import { Rect } from '../core/canvas';
+import { snapPoint, clearSnap } from './snap';
 
 type Handle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'move' | 'new';
 
@@ -55,7 +56,8 @@ export class CropTool implements Tool {
   move(e: ToolEvent) {
     if (!this.drag) return;
     const { h: hnd, start, orig } = this.drag;
-    const dx = Math.round(e.x - start.x), dy = Math.round(e.y - start.y);
+    const sp = hnd === 'move' ? { x: e.x, y: e.y } : snapPoint(e.x, e.y, true);
+    const dx = Math.round(sp.x - start.x), dy = Math.round(sp.y - start.y);
     let { x, y, w, h: hh } = orig;
     if (hnd === 'new') { x = Math.round(start.x); y = Math.round(start.y); w = dx; hh = dy; if (e.shift) { const s = Math.max(Math.abs(w), Math.abs(hh)); w = Math.sign(w || 1) * s; hh = Math.sign(hh || 1) * s; } }
     else if (hnd === 'move') { x += dx; y += dy; }
@@ -69,6 +71,7 @@ export class CropTool implements Tool {
     this.rect = { x, y, w, h: hh };
   }
   up() {
+    clearSnap();
     this.drag = null;
     if (this.rect && (this.rect.w < 1 || this.rect.h < 1)) this.reset();
   }

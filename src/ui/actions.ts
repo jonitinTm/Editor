@@ -139,6 +139,7 @@ export const ACTIONS: Action[] = [
   { id: 'actual', label: 'Píxeles reales (100 %)', keys: ['Ctrl+1'], enabled: hasDoc, run: () => app.viewport.setZoom(1, null) },
   { id: 'rulers', label: 'Reglas', keys: ['Ctrl+R'], checked: () => app.showRulers, run: () => app.viewport.setRulers(!app.showRulers) },
   { id: 'guides', label: 'Mostrar guías', keys: ['Ctrl+;'], checked: () => app.showGuides, run: () => { app.showGuides = !app.showGuides; app.viewport.requestRender(); } },
+  { id: 'snap', label: 'Ajustar (magnético)', keys: ['Shift+Ctrl+;'], checked: () => app.snapOn, run: () => { app.snapOn = !app.snapOn; app.toast(app.snapOn ? 'Ajuste magnético activado' : 'Ajuste magnético desactivado'); } },
   { id: 'grid', label: 'Cuadrícula', keys: ["Ctrl+'"], checked: () => app.showGrid, run: () => { app.showGrid = !app.showGrid; app.viewport.requestRender(); } },
   { id: 'newGuide', label: 'Nueva guía…', enabled: hasDoc, run: newGuideDialog },
   { id: 'clearGuides', label: 'Borrar guías', enabled: () => !!app.doc && (app.doc.guides.h.length + app.doc.guides.v.length > 0), run: () => { app.doc!.guides = { h: [], v: [] }; app.viewport.requestRender(); } },

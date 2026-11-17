@@ -8,6 +8,7 @@ import { SelMode } from '../core/selection';
 import { floodMask } from './floodfill';
 import { getPixels, makeCanvas, ctx2d } from '../core/canvas';
 import { isRaster } from '../core/layers';
+import { snapPoint, clearSnap } from './snap';
 
 /** Modo según la opción y las teclas (Mayús = añadir, Alt = restar, ambas = intersecar). */
 function selMode(toolId: string, e: ToolEvent): SelMode {
@@ -68,12 +69,14 @@ abstract class DragSelectTool implements Tool {
   down(e: ToolEvent) {
     this.mode = selMode(this.id, e);
     if (this.mode === 'new' && !e.shift && !e.alt && this.mover.begin(e)) return;
-    this.a = { x: Math.round(e.x), y: Math.round(e.y) }; this.b = { ...this.a };
+    const p = snapPoint(e.x, e.y);
+    this.a = { x: Math.round(p.x), y: Math.round(p.y) }; this.b = { ...this.a };
   }
   move(e: ToolEvent) {
     if (this.mover.start) { this.mover.move(e); return; }
     if (!this.a) return;
-    this.b = { x: Math.round(e.x), y: Math.round(e.y) };
+    const p = snapPoint(e.x, e.y);
+    this.b = { x: Math.round(p.x), y: Math.round(p.y) };
     // Tras empezar, Mayús fuerza proporción y Alt dibuja desde el centro
     this.square = e.shift && this.mode !== 'add' ? true : e.shift && this.mode === 'add' && false;
     this.square = e.shift; this.fromCenter = e.alt && this.mode !== 'subtract';
@@ -89,6 +92,7 @@ abstract class DragSelectTool implements Tool {
   }
   protected abstract apply(r: { x: number; y: number; w: number; h: number }): void;
   up() {
+    clearSnap();
     if (this.mover.start) { this.mover.end(); return; }
     if (!this.a) return;
     const doc = app.doc!;

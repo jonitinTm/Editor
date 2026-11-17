@@ -21,6 +21,8 @@ class App {
   showRulers = true;
   showGuides = true;
   showGrid = false;
+  /** Ajuste magnético a guías, lienzo y capas. */
+  snapOn = true;
   /** Separación de la cuadrícula en píxeles. */
   gridSize = 50;
   /** Herramienta a la que volver al terminar un modo temporal (p. ej. transformar). */

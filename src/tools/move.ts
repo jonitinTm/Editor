@@ -6,6 +6,8 @@ import { icon } from '../ui/icons';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import { GroupLayer, Layer, RasterLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { selectedLayers, alignLayer } from '../ui/ops';
+import { snapRect, snapTargets, layerBounds, clearSnap } from './snap';
+import type { Rect } from '../core/canvas';
 import { rasterizeLayer } from './paint';
 
 /** Desplaza el contenido de un lienzo (los bordes que quedan vacíos se rellenan con `fill`). */
@@ -45,6 +47,9 @@ export class MoveTool implements Tool {
   private offset = { x: 0, y: 0 };
   private layers: Layer[] = [];
   private floating: { layer: RasterLayer; hole: HTMLCanvasElement; pixels: HTMLCanvasElement } | null = null;
+  /** Caja de lo que se mueve y objetivos de ajuste, calculados al empezar. */
+  private snapBox: Rect | null = null;
+  private targets: { x: number[]; y: number[] } | null = null;
 
   down(e: ToolEvent) {
     const doc = app.doc!;
@@ -54,6 +59,7 @@ export class MoveTool implements Tool {
     }
     if (!this.begin()) return;
     this.start = { x: e.x, y: e.y };
+    this.prepareSnap();
   }
 
   /** Prepara el movimiento. Devuelve false si no se puede mover nada. */
@@ -99,10 +105,22 @@ export class MoveTool implements Tool {
     doc.invalidate();
   }
 
+  private prepareSnap() {
+    const doc = app.doc!;
+    let box: Rect | null = null;
+    if (this.floating) box = doc.selection.bounds;
+    else for (const l of this.layers) { const b = layerBounds(l); if (b) box = box ? { x: Math.min(box.x, b.x), y: Math.min(box.y, b.y), w: Math.max(box.x + box.w, b.x + b.w) - Math.min(box.x, b.x), h: Math.max(box.y + box.h, b.y + b.h) - Math.min(box.y, b.y) } : b; }
+    this.snapBox = box;
+    this.targets = box ? snapTargets(this.layers) : null;
+  }
   move(e: ToolEvent) {
     if (!this.start) return;
     let dx = Math.round(e.x - this.start.x), dy = Math.round(e.y - this.start.y);
     if (e.shift) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+    if (this.snapBox && this.targets && !e.ctrl) {
+      const s = snapRect(this.snapBox, dx, dy, e.shift ? { x: dy === 0 ? this.targets.x : [], y: dx === 0 ? this.targets.y : [] } : this.targets);
+      dx = Math.round(s.dx); dy = Math.round(s.dy);
+    } else clearSnap();
     this.offset = { x: dx, y: dy };
     this.update();
   }
@@ -133,7 +151,7 @@ export class MoveTool implements Tool {
     if (dx || dy) doc.commit('Mover');
   }
 
-  up() { if (this.start) this.finish(); }
+  up() { clearSnap(); if (this.start) this.finish(); }
   cancel() {
     const doc = app.doc!;
     for (const l of this.layers) doc.overrides.delete(l);

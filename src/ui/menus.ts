@@ -28,7 +28,7 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
   { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'colorRange', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
   { label: 'Filtro', items: ['lastFilter', '-', 'liquify', '-', ...filterItems('filtro')] },
-  { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', '-', 'rulers', 'grid', 'guides', 'newGuide', 'clearGuides'] },
+  { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', '-', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'win:all'] },
   { label: 'Ayuda', items: ['shortcuts', 'about'] },
 ];
