@@ -8,6 +8,7 @@ import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
 import * as io from '../io/files';
 import { promptDialog } from './dialog';
+import { liquifyDialog } from './liquify';
 import { isParametric } from '../core/layers';
 
 export interface Action {
@@ -114,6 +115,7 @@ export const ACTIONS: Action[] = [
   { id: 'contract', label: 'Contraer…', enabled: hasSel, run: () => dlg.modifySelectionDialog('contract') },
 
   // Filtro
+  { id: 'liquify', label: 'Licuar…', keys: ['Shift+Ctrl+X'], enabled: hasLayer, run: liquifyDialog },
   { id: 'lastFilter', label: 'Repetir último filtro', keys: ['Alt+Ctrl+F'], enabled: () => !!ops.lastFilter && hasLayer(), run: ops.repeatLastFilter },
 
   // Vista

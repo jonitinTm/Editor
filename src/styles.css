@@ -316,3 +316,14 @@ body.hide-panels .side, body.hide-panels .toolbar, body.hide-panels .optionsbar,
 .lc-row .blend { flex: 1; min-width: 0; }
 .lc-row .btn.icon-btn { padding: 2px 4px; }
 .lc-row .btn.icon-btn svg { width: 15px; height: 15px; }
+
+/* Licuar */
+.lq { display: flex; gap: 12px; }
+.lq-side { width: 220px; display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+.lq-tool { text-align: left; display: flex; align-items: center; gap: 8px; }
+.lq-glyph { width: 18px; text-align: center; font-size: 14px; }
+.lq-opts { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+.lq-opts .form-row > .lbl { width: 56px; }
+.lq-opts .num-slider input[type=range] { width: 80px; }
+.lq-stage { background: repeating-conic-gradient(#cfcfcf 0 25%, #fff 0 50%) 0 0 / 16px 16px; align-self: flex-start; line-height: 0; }
+.lq-view { cursor: none; touch-action: none; display: block; }
