@@ -5,7 +5,7 @@ import { app } from './app';
 import * as ops from './ops';
 import * as dlg from './dialogs';
 import { FILTERS } from '../filters/registry';
-import { quickTransform } from '../tools/transform';
+import { quickTransform, TransformTool } from '../tools/transform';
 import * as io from '../io/files';
 import { promptDialog } from './dialog';
 import { isParametric } from '../core/layers';
@@ -48,6 +48,8 @@ export const ACTIONS: Action[] = [
   { id: 'fillFg', label: 'Rellenar con color frontal', keys: ['Alt+Backspace', 'Alt+Delete'], enabled: hasLayer, run: () => ops.fill(app.fg) },
   { id: 'fillBg', label: 'Rellenar con color de fondo', keys: ['Ctrl+Backspace', 'Ctrl+Delete'], enabled: hasLayer, run: () => ops.fill(app.bg) },
   { id: 'freeTransform', label: 'Transformación libre', keys: ['Alt+Ctrl+T', 'Ctrl+T'], enabled: hasLayer, run: () => app.setTool('transform', true) },
+  { id: 'distort', label: 'Distorsionar', enabled: hasLayer, run: () => { TransformTool.startMode = 'distort'; app.setTool('transform', true); } },
+  { id: 'perspective', label: 'Perspectiva', enabled: hasLayer, run: () => { TransformTool.startMode = 'perspective'; app.setTool('transform', true); } },
   { id: 'flipH', label: 'Voltear horizontal', enabled: hasLayer, run: () => quickTransform('flipH') },
   { id: 'flipV', label: 'Voltear vertical', enabled: hasLayer, run: () => quickTransform('flipV') },
   { id: 'rot90', label: 'Rotar 90° horario', enabled: hasLayer, run: () => quickTransform('rot90') },
