@@ -11,7 +11,7 @@ import { gradientEditor, GradStop } from '../ui/gradienteditor';
 import { allPatterns, getPattern } from '../core/patterns';
 
 /** Dibuja `src` sobre el objetivo respetando selección, opacidad y modo (capa/máscara). */
-export function applyOnTarget(t: PaintTarget, base: HTMLCanvasElement, src: HTMLCanvasElement, opacity: number, maskValue: number): HTMLCanvasElement {
+export function applyOnTarget(t: PaintTarget, base: HTMLCanvasElement, src: HTMLCanvasElement, opacity: number, maskValue: number, blend: GlobalCompositeOperation = 'source-over'): HTMLCanvasElement {
   const out = cloneCanvas(base);
   const sel = clipMask(t);
   let s = src;
@@ -24,6 +24,9 @@ export function applyOnTarget(t: PaintTarget, base: HTMLCanvasElement, src: HTML
   if (t.isMask) {
     ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(s, 0, 0);
     ctx.globalAlpha = opacity * maskValue; ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(s, 0, 0);
+  } else if (blend !== 'source-over') {
+    ctx.globalCompositeOperation = blend; ctx.drawImage(s, 0, 0);
+    if (t.lockAlpha) { ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(base, 0, 0); }
   } else { if (t.lockAlpha) ctx.globalCompositeOperation = 'source-atop'; ctx.drawImage(s, 0, 0); }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   return out;
@@ -69,6 +72,7 @@ export class GradientTool implements Tool {
       { value: 'reflected', label: 'Reflejado' }, { value: 'diamond', label: 'Diamante' }] },
     { key: 'colors', label: 'Colores', type: 'select', default: 'fgbg', choices: [
       { value: 'fgbg', label: 'Frontal → Fondo' }, { value: 'fgtrans', label: 'Frontal → Transparente' }, { value: 'custom', label: 'Personalizado' }] },
+    { key: 'blendMode', label: 'Modo', type: 'select', default: 'source-over', choices: [{ value: 'source-over', label: 'Normal' }, { value: 'destination-over', label: 'Detrás' }, { value: 'multiply', label: 'Multiplicar' }, { value: 'screen', label: 'Trama' }, { value: 'overlay', label: 'Superponer' }, { value: 'soft-light', label: 'Luz suave' }, { value: 'color', label: 'Color' }, { value: 'luminosity', label: 'Luminosidad' }, { value: 'difference', label: 'Diferencia' }] },
     { key: 'opacity', label: 'Opacidad', type: 'range', min: 1, max: 100, default: 100, unit: '%' },
     { key: 'reverse', label: 'Invertir', type: 'checkbox', default: false },
   ] as any[];
@@ -147,7 +151,7 @@ export class GradientTool implements Tool {
       oc.globalCompositeOperation = 'lighter'; oc.drawImage(s, 0, 0);
       return out;
     }
-    return applyOnTarget(t, this.base!, g, op, 1);
+    return applyOnTarget(t, this.base!, g, op, 1, (app.opt<string>('blendMode', this.id) || 'source-over') as GlobalCompositeOperation);
   }
   move(e: ToolEvent) {
     if (!this.a) return;
