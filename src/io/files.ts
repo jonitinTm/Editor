@@ -8,7 +8,7 @@ import { decodeGifFrames } from './gif';
 
 export const PROJECT_EXT = '.edp';
 /** Lo que se ofrece en «Abrir». */
-export const OPEN_ACCEPT = 'image/*,.tif,.tiff,.tga,.abr,.pat,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,.edp';
+export const OPEN_ACCEPT = 'image/*,.tif,.tiff,.tga,.abr,.pat,.aco,.ase,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,.edp';
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/svg+xml'];
 
 export function loadImage(src: Blob | string): Promise<HTMLImageElement> {

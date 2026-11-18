@@ -527,3 +527,5 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
   .menu-item.has-sub > .submenu { position: static !important; box-shadow: none; border: none; border-left: 2px solid var(--border); margin: 6px 0 0 14px; width: 100%; min-width: 0; }
   .menu-item.has-sub.sub-open > .submenu { display: block; }
 }
+
+.sw-sep { grid-column: 1 / -1; height: 1px; background: var(--border); margin: 2px 0; }

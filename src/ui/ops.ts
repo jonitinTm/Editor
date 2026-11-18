@@ -95,6 +95,7 @@ export async function openFiles(files: File[], asLayers = false, remember = true
         continue;
       }
       if (/\.(abr|pat)$/i.test(f.name)) { await importPresets(f); continue; }
+      if (/\.(aco|ase)$/i.test(f.name)) { const { importSwatches } = await import('./panels'); await importSwatches(f); continue; }
       if (io.isTiffTga(f)) {
         const r = await import('../io/raster'), bytes = new Uint8Array(await f.arrayBuffer());
         const pages = /\.tiff?$/i.test(f.name) || r.isTiff(bytes) ? await r.decodeTiff(bytes) : [{ name: 'Fondo', img: r.decodeTga(bytes) }];

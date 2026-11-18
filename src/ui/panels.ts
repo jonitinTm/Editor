@@ -73,13 +73,42 @@ export function buildColorPanel(parent: HTMLElement) {
   const upd = () => { fg.style.background = app.fg; bg.style.background = app.bg; if (!body.contains(document.activeElement) || document.activeElement === document.body) picker.set(target === 'fg' ? app.fg : app.bg); };
   app.on('colors', upd); upd();
 }
+const SW_KEY = 'editor.swatches';
+export function userSwatches(): { name: string; color: string }[] { try { const v = JSON.parse(localStorage.getItem(SW_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+export function saveUserSwatches(l: { name: string; color: string }[]) { try { localStorage.setItem(SW_KEY, JSON.stringify(l.slice(0, 600))); } catch { /* sin almacenamiento */ } window.dispatchEvent(new Event('editor-swatches')); }
+
 export function buildSwatchesPanel(parent: HTMLElement) {
-  const grid = h('div', { class: 'swatch-grid' }, ...SWATCHES.map(c => {
-    const b = h('button', { class: 'sw', style: { background: c }, title: c + ' (Alt+clic: color de fondo)' });
-    b.onclick = e => e.altKey ? app.setColors(app.fg, c) : app.setColors(c, app.bg);
-    return b;
-  }));
-  parent.append(panel('Muestras', h('div', { class: 'panel-body' }, grid)));
+  const grid = h('div', { class: 'swatch-grid' });
+  const render = () => {
+    grid.innerHTML = '';
+    const mine = userSwatches();
+    mine.forEach((s, i) => {
+      const b = h('button', { class: 'sw', style: { background: s.color }, title: `${s.name ? s.name + ' · ' : ''}${s.color} (Alt+clic: color de fondo · clic derecho: quitar)` });
+      b.onclick = e => e.altKey ? app.setColors(app.fg, s.color) : app.setColors(s.color, app.bg);
+      b.oncontextmenu = e => { e.preventDefault(); const l = userSwatches(); l.splice(i, 1); saveUserSwatches(l); };
+      grid.append(b);
+    });
+    if (mine.length) grid.append(h('div', { class: 'sw-sep' }));
+    for (const c of SWATCHES) {
+      const b = h('button', { class: 'sw', style: { background: c }, title: c + ' (Alt+clic: color de fondo)' });
+      b.onclick = e => e.altKey ? app.setColors(app.fg, c) : app.setColors(c, app.bg);
+      grid.append(b);
+    }
+  };
+  const foot = h('div', { class: 'panel-foot' },
+    h('button', { class: 'btn', title: 'Importar muestras de Adobe (.aco, .ase)', onclick: async () => { const io = await import('../io/files'); for (const f of await io.pickFiles('.aco,.ase')) await importSwatches(f); } }, 'Importar…'),
+    h('button', { class: 'btn icon-btn', title: 'Vaciar mis muestras', onclick: () => { if (userSwatches().length) saveUserSwatches([]); } }, '🗑'),
+    h('button', { class: 'btn icon-btn', title: 'Añadir el color frontal a las muestras', onclick: () => saveUserSwatches([{ name: '', color: app.fg }, ...userSwatches()]) }, '＋'));
+  render(); window.addEventListener('editor-swatches', render);
+  parent.append(panel('Muestras', h('div', { class: 'brush-panel' }, h('div', { class: 'panel-body' }, grid), foot)));
+}
+export async function importSwatches(f: File) {
+  const { readSwatches } = await import('../io/swatches');
+  try {
+    const list = readSwatches(await f.arrayBuffer());
+    if (!list.length) { app.toast('El archivo no tiene colores', 'warn'); return; }
+    saveUserSwatches([...list, ...userSwatches()]); app.toast(`${list.length} colores importados`);
+  } catch (e: any) { app.toast('No se pudieron leer las muestras: ' + (e?.message ?? e), 'warn'); }
 }
 
 /** Menú contextual con acciones del catálogo. */

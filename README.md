@@ -257,6 +257,8 @@ Ya disponible:
 - **Importar pinceles y motivos de Photoshop** (*Edición › Importar pinceles o motivos…*, o abriéndolos/arrastrándolos):
   pinceles `.abr` (versiones 1, 2 y 6 a 10, las puntas con imagen) y motivos `.pat`. Comprobado con archivos de prueba
   creados según el formato; falta probarlo con paquetes reales descargados.
+- **Muestras propias** (panel Muestras): «＋» guarda el color frontal, clic derecho la quita, e «Importar…» lee paletas de
+  Adobe `.aco` y `.ase` (RGB, CMYK, gris, HSB y Lab). Se guardan en este navegador.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
