@@ -76,7 +76,20 @@ export function developBayer(sens: Uint16Array, W: number, crop: { x: number; y:
     const vals = [at(x, y), at(x + 1, y), at(x, y + 1), at(x + 1, y + 1)], cols = [c0, col(x + 1, y), col(x, y + 1), col(x + 1, y + 1)];
     for (let k = 0; k < 4; k++) { sum[ch[cols[k]]] += vals[k]; cnt[ch[cols[k]]]++; }
   }
-  const mean = sum.map((s, i) => s / Math.max(1, cnt[i])), wb = camWb ?? mean.map(m => (mean[1] || 1) / (m || 1));
+  // balance automático: mediana del color de los tonos medios (robusta frente a zonas de color intenso)
+  let wb = camWb;
+  if (!wb) {
+    const rg: number[] = [], bg: number[] = [];
+    for (let y = 0; y < h - 1; y += 4) for (let x = 0; x < w - 1; x += 4) {
+      const v = [at(x, y), at(x + 1, y), at(x, y + 1), at(x + 1, y + 1)], c = [col(x, y), col(x + 1, y), col(x, y + 1), col(x + 1, y + 1)];
+      let r = 0, g = 0, bb = 0; for (let k = 0; k < 4; k++) { const cc = ch[c[k]]; if (cc === 0) r = v[k]; else if (cc === 2) bb = v[k]; else g += v[k] / 2; }
+      const mx = Math.max(r, g, bb); if (mx < 0.05 || mx > 0.9 || g <= 0) continue;
+      rg.push(r / g); bg.push(bb / g);
+    }
+    const med = (a: number[]) => { a.sort((p, q) => p - q); return a.length ? a[a.length >> 1] : 1; };
+    const mr = med(rg), mb = med(bg);
+    wb = rg.length > 50 ? [1 / (mr || 1), 1, 1 / (mb || 1)] : sum.map((s, i) => (sum[1] / Math.max(1, cnt[1])) / ((s / Math.max(1, cnt[i])) || 1));
+  }
   // reconstrucción del color (bilineal) con el balance aplicado
   const rgb = new Float32Array(w * h * 3);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {

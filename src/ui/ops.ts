@@ -61,16 +61,18 @@ export async function openFiles(files: File[], asLayers = false) {
         const bytes = new Uint8Array(await f.arrayBuffer());
         const { isDng, decodeDng } = await import('../io/dng');
         const { isCr2, decodeCr2 } = await import('../io/cr2');
-        if (isCr2(bytes)) {
+        const { isArw, decodeArw } = await import('../io/arw');
+        const cam = isCr2(bytes) ? 'Canon' : isArw(bytes) && !isDng(bytes) ? 'Sony' : null;
+        if (cam) {
           try {
-            app.toast('Revelando el RAW de Canon…'); await new Promise(r => setTimeout(r, 30));
-            const img = decodeCr2(bytes);
+            app.toast(`Revelando el RAW de ${cam}…`); await new Promise(r => setTimeout(r, 30));
+            const img = cam === 'Canon' ? decodeCr2(bytes) : decodeArw(bytes);
             const rd = new EditorDocument(io.baseName(f.name), img.width, img.height);
             const rl = new RasterLayer('Fondo', img.width, img.height); ctx2d(rl.canvas).putImageData(img, 0, 0); rd.root.add(rl); rd.setActive(rl, false);
             app.addDocument(rd);
             app.toast('RAW revelado. Ajusta exposición, blancos y color con Filtro › Revelado (Mayús+Ctrl+A)');
             continue;
-          } catch (er: any) { app.toast('No se pudo revelar este CR2 (' + (er?.message ?? er) + '); se abre su vista previa', 'warn'); }
+          } catch (er: any) { app.toast('No se pudo revelar este RAW (' + (er?.message ?? er) + '); se abre su vista previa', 'warn'); }
         }
         if (isDng(bytes)) {
           try {
