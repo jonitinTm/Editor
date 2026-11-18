@@ -230,6 +230,8 @@ Ya disponible:
   vectorial (relleno de color con máscara vectorial, editable con la Selección directa) o a un trazado del panel Trazados.
 - **Imagen › Aplicar imagen…**: combina con la capa activa otra capa, el documento combinado u otro documento abierto (o
   uno de sus canales: rojo, verde, azul, gris o transparencia, invertido si quieres) con un modo de fusión y opacidad.
+- **Filtro › Interpretar › Efectos de iluminación…**: foco, luz omnidireccional o direccional, con color, alcance, luz
+  ambiente y relieve a partir de la propia imagen.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

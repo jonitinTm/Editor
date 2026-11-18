@@ -216,3 +216,27 @@ export function glass(img: ImageData, distortion: number, smoothness: number) {
   const at = (g: Float32Array, x: number, y: number) => { const X = x / gs, Y = y / gs, x0 = Math.floor(X), y0 = Math.floor(Y), fx = X - x0, fy = Y - y0, a = g[y0 * gw + x0], b = g[y0 * gw + x0 + 1], c = g[(y0 + 1) * gw + x0], e = g[(y0 + 1) * gw + x0 + 1]; return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + e * fx) * fy; };
   displace(img, (x, y, o) => { o[0] = x + at(gx, x, y) * distortion * 2; o[1] = y + at(gy, x, y) * distortion * 2; });
 }
+
+// ---- Efectos de iluminación: una luz (omnidireccional, foco o direccional) con relieve opcional ----
+export function lighting(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img;
+  const [lr, lg, lb] = hex(p.color ?? '#ffffff').map(v => v / 255);
+  const lx = (p.x ?? 50) / 100 * w, ly = (p.y ?? 35) / 100 * h, R = Math.max(1, (p.radius ?? 60) / 100 * Math.hypot(w, h) / 2);
+  const inten = (p.intensity ?? 100) / 100, amb = (p.ambient ?? 20) / 100, type = p.type ?? 'spot', height = (p.height ?? 0) / 100 * 8;
+  const ang = (p.angle ?? 60) * Math.PI / 180, dirX = Math.cos(ang), dirY = Math.sin(ang);
+  // relieve: normal a partir de la luminosidad
+  let L: Float32Array | null = null;
+  if (height) { L = new Float32Array(w * h); for (let i = 0; i < w * h; i++) L[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255; }
+  const zL = R * 0.6;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, o = i * 4;
+    let nx = 0, ny = 0, nz = 1;
+    if (L) { const xl = L[y * w + Math.max(0, x - 1)], xr = L[y * w + Math.min(w - 1, x + 1)], yu = L[Math.max(0, y - 1) * w + x], yd = L[Math.min(h - 1, y + 1) * w + x]; nx = (xl - xr) * height; ny = (yu - yd) * height; const n = Math.hypot(nx, ny, 1); nx /= n; ny /= n; nz = 1 / n; }
+    let vx: number, vy: number, vz: number, fall = 1;
+    if (type === 'directional') { vx = -dirX; vy = -dirY; vz = 1; }
+    else { vx = lx - x; vy = ly - y; vz = zL; const dist = Math.hypot(vx, vy); fall = type === 'spot' ? Math.max(0, 1 - (dist / R) ** 2) : 1 / (1 + (dist / R) ** 2 * 2); }
+    const vl = Math.hypot(vx, vy, vz); const diff = Math.max(0, (nx * vx + ny * vy + nz * vz) / vl);
+    const k = diff * fall * inten * 1.4;
+    d[o] = clamp(d[o] * (amb + k * lr)); d[o + 1] = clamp(d[o + 1] * (amb + k * lg)); d[o + 2] = clamp(d[o + 2] * (amb + k * lb));
+  }
+}
