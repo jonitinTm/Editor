@@ -27,7 +27,7 @@ import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool }
 import { retouchTools } from './tools/retouch';
 import { QuickSelectTool } from './tools/quicksel';
 import { CropTool, PerspectiveCropTool, SliceTool } from './tools/crop';
-import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool, PatternStampTool } from './tools/brush';
+import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool, PatternStampTool, MixerBrushTool } from './tools/brush';
 import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool, RotateViewTool } from './tools/misc';
 import { TextTool } from './tools/text';
 import { ShapeTool } from './tools/shape';
@@ -53,7 +53,7 @@ app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
 // Las herramientas añadidas después van al final: la tecla de cada grupo sigue eligiendo la de siempre
-for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool]) app.registerTool(new T());
+for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool, MixerBrushTool]) app.registerTool(new T());
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;

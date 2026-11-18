@@ -393,3 +393,55 @@ export class PatternStampTool extends CloneTool {
   }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) { drawBrushCursor(ctx, vp, app.opt<number>('size', this.id)); }
 }
+
+/** Pincel mezclador: el color del pincel se mezcla con el de la imagen al pintar (como pintura húmeda). */
+export class MixerBrushTool extends StrokeTool {
+  id = 'mixer'; name = 'Pincel mezclador'; icon = icon('mixer'); key = 'B'; group = 'brush'; historyName = 'Pincel mezclador';
+  options = [SIZE, { ...HARD, default: 60 },
+    { key: 'wet', label: 'Humedad', type: 'range', min: 0, max: 100, default: 50, unit: '%' },
+    { key: 'load', label: 'Carga', type: 'range', min: 1, max: 100, default: 60, unit: '%' },
+    { key: 'mix', label: 'Mezcla', type: 'range', min: 0, max: 100, default: 50, unit: '%' },
+    { ...FLOW, default: 60 }, OPAC,
+    { key: 'clean', label: 'Limpiar tras cada trazo', type: 'checkbox', default: true },
+    { key: 'dry', label: 'Solo mezclar (sin pintura)', type: 'checkbox', default: false },
+  ] as any[];
+  private reservoir: number[] | null = null;
+  protected makeDab(color: string): (x: number, y: number, p: number) => any {
+    const hard = app.opt<number>('hardness', this.id) / 100, flow = app.opt<number>('flow', this.id) / 100;
+    const wet = app.opt<number>('wet', this.id) / 100, mix = app.opt<number>('mix', this.id) / 100, load = app.opt<number>('load', this.id) / 100;
+    const dry = !!app.opt('dry', this.id);
+    const fg = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+    if (!this.reservoir || app.opt('clean', this.id)) this.reservoir = [...fg];
+    const R = this.reservoir, ctx = ctx2d(this.stroke!.buffer), t = this.target!;
+    const src = t.canvas, sctx = ctx2d(src), buf = this.stroke!.buffer, bctx = ctx2d(buf);
+    const scratch = makeCanvas(4, 4); let dabs = 0, paintLeft = 1;
+    return (x, y, p) => {
+      const size = this.size(p), tip = brushTip(size, hard, '#ffffff'), w = tip.width, hh = tip.height;
+      const dx = Math.round(x - w / 2), dy = Math.round(y - hh / 2);
+      // color medio bajo el pincel (lo que ya hay en la capa y lo pintado en este trazo)
+      const sx = Math.max(0, dx), sy = Math.max(0, dy), sw = Math.min(src.width, dx + w) - sx, sh = Math.min(src.height, dy + hh) - sy;
+      let cr = R[0], cg = R[1], cb = R[2], any = false;
+      if (sw > 0 && sh > 0) {
+        const a = sctx.getImageData(sx, sy, sw, sh).data, b = bctx.getImageData(sx, sy, sw, sh).data;
+        let n = 0, r0 = 0, g0 = 0, b0 = 0; const step = Math.max(1, Math.floor(Math.sqrt(sw * sh / 400))) * 4;
+        for (let i = 0; i < a.length; i += step) {
+          const ba = b[i + 3] / 255, aa = a[i + 3] / 255 * (1 - ba) + ba; if (aa < 0.05) continue;
+          r0 += (a[i] * (1 - ba) + b[i] * ba); g0 += (a[i + 1] * (1 - ba) + b[i + 1] * ba); b0 += (a[i + 2] * (1 - ba) + b[i + 2] * ba); n++;
+        }
+        if (n) { cr = r0 / n; cg = g0 / n; cb = b0 / n; any = true; }
+      }
+      // el depósito se ensucia con lo que toca y la carga se va gastando
+      if (any) { const k = wet * 0.06; R[0] += (cr - R[0]) * k; R[1] += (cg - R[1]) * k; R[2] += (cb - R[2]) * k; }
+      dabs++; paintLeft = load >= 0.999 ? 1 : Math.max(0, 1 - dabs / (20 + load * 400));
+      const m = dry ? 1 : any ? Math.min(1, mix * 0.6 + (1 - paintLeft) * 0.4) : 0;
+      const col = [R[0] + (cr - R[0]) * m, R[1] + (cg - R[1]) * m, R[2] + (cb - R[2]) * m];
+      if (scratch.width !== w || scratch.height !== hh) { scratch.width = w; scratch.height = hh; }
+      const sc = ctx2d(scratch); sc.globalCompositeOperation = 'copy'; sc.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`; sc.fillRect(0, 0, w, hh);
+      sc.globalCompositeOperation = 'destination-in'; sc.drawImage(tip, 0, 0);
+      ctx.globalAlpha = flow * (dry ? wet : 0.4 + 0.6 * paintLeft);
+      ctx.drawImage(scratch, dx, dy);
+      return { x: dx, y: dy, w, h: hh };
+    };
+  }
+  protected spacing(p: number) { return Math.max(1, this.size(p) * 0.1); }
+}

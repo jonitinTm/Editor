@@ -222,6 +222,8 @@ Ya disponible:
   mueve/transforma o no se pinta, respectivamente. Se guardan en el proyecto y en PSD.
 - **Pluma de forma libre** (con la Pluma, `P`): dibuja a mano alzada y se convierte en una forma o trazado de curvas
   suaves con pocos puntos, editable con la Selección directa.
+- **Pincel mezclador** (con el pincel, `B`): la pintura se mezcla con los colores de la imagen y los arrastra, como
+  pintura húmeda (humedad, carga, mezcla, limpiar tras cada trazo y «solo mezclar»).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
