@@ -268,7 +268,7 @@ export class Viewport {
     }
 
     // Cuadrícula
-    if (app.showGrid && (prefs.gridSize || app.gridSize) * zoom >= 6) {
+    if (app.showGrid && !app.hideExtras && (prefs.gridSize || app.gridSize) * zoom >= 6) {
       const g = prefs.gridSize || app.gridSize;
       ctx.save(); this.docPath(ctx); ctx.clip();
       ctx.strokeStyle = prefs.gridColor || '#787878'; ctx.globalAlpha = 0.6; ctx.lineWidth = 1; ctx.beginPath();
@@ -303,11 +303,11 @@ export class Viewport {
     }
 
     // Selección
-    const outline = d.quickMask || d.refinePreview ? null : d.selection.getOutline();
+    const outline = d.quickMask || d.refinePreview || app.hideExtras ? null : d.selection.getOutline();
     if (outline) this.drawAnts(outline, (d as any).selectionOffset);
 
     // Guías
-    if (app.showGuides) {
+    if (app.showGuides && !app.hideExtras) {
       ctx.save(); ctx.strokeStyle = prefs.guideColor || '#19d3f0'; ctx.lineWidth = 1; ctx.beginPath();
       const far = 1e6;
       const list = [...d.guides.v.map(g => ['v', g] as const), ...d.guides.h.map(g => ['h', g] as const)];
@@ -338,7 +338,7 @@ export class Viewport {
 
     // Capa superpuesta de la herramienta
     ctx.save();
-    if (app.tool?.id !== 'colorSampler') (app as any).drawSamplers?.(ctx, this);
+    if (app.tool?.id !== 'colorSampler' && !app.hideExtras) (app as any).drawSamplers?.(ctx, this);
     app.tool?.drawOverlay?.(ctx, this);
     ctx.restore();
     drawSnap(ctx, this);

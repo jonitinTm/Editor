@@ -21,6 +21,8 @@ class App {
   showRulers = true;
   showGuides = true;
   showGrid = false;
+  /** Vista › Extras desactivado: no se dibujan selección, guías, cuadrícula ni muestras. */
+  hideExtras = false;
   /** Ajuste magnético a guías, lienzo y capas. */
   snapOn = true;
   /** Separación de la cuadrícula en píxeles. */

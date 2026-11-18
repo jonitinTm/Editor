@@ -208,6 +208,7 @@ export const ACTIONS: Action[] = [
   { id: 'rulers', label: 'Reglas', keys: ['Ctrl+R'], checked: () => app.showRulers, run: () => app.viewport.setRulers(!app.showRulers) },
   { id: 'guides', label: 'Mostrar guías', keys: ['Ctrl+;'], checked: () => app.showGuides, run: () => { app.showGuides = !app.showGuides; app.viewport.requestRender(); } },
   { id: 'snap', label: 'Ajustar (magnético)', keys: ['Shift+Ctrl+;'], checked: () => app.snapOn, run: () => { app.snapOn = !app.snapOn; app.toast(app.snapOn ? 'Ajuste magnético activado' : 'Ajuste magnético desactivado'); } },
+  { id: 'extras', label: 'Extras (selección, guías, cuadrícula)', keys: ['Ctrl+H'], checked: () => !app.hideExtras, run: () => { app.hideExtras = !app.hideExtras; app.viewport.requestRender(); if (app.hideExtras) app.toast('Extras ocultos (Ctrl+H para volver a verlos)'); } },
   { id: 'grid', label: 'Cuadrícula', keys: ["Ctrl+'"], checked: () => app.showGrid, run: () => { app.showGrid = !app.showGrid; app.viewport.requestRender(); } },
   { id: 'guideLayout', label: 'Nueva disposición de guías…', enabled: hasDoc, run: () => dlg.guideLayoutDialog() },
   { id: 'newGuide', label: 'Nueva guía…', enabled: hasDoc, run: newGuideDialog },

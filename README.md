@@ -247,6 +247,8 @@ Ya disponible:
 - **Móvil**: en pantallas estrechas los paneles se abren como un cajón con el botón «Paneles» (arriba a la derecha), los
   menús y submenús se abren tocándolos y la pantalla de inicio se adapta. Se pinta y se mueve con el dedo, y se hace
   zoom con dos dedos.
+- **Vista › Extras** (`Ctrl+H`): oculta por un momento la selección, las guías, la cuadrícula y las muestras para ver la
+  imagen limpia (la selección sigue activa).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
