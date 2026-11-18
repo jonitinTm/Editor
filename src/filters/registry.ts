@@ -7,6 +7,7 @@ import * as F from './advanced';
 import { develop, DEVELOP_DEFAULTS } from './develop';
 import * as M from './more';
 import * as L from './lut';
+import * as N from './more2';
 
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string; showIf?: [string, string] }
@@ -217,6 +218,28 @@ export const FILTERS: FilterDef[] = [
   { id: 'crystallize', name: 'Cristalizar…', group: 'filtro', submenu: 'Pixelizar', params: [{ key: 'cell', label: 'Tamaño de celda', type: 'range', min: 3, max: 300, default: 10, unit: 'px' }], apply: (img, p) => M.crystallize(img, p.cell) },
   { id: 'oilpaint', name: 'Pintura al óleo…', group: 'filtro', submenu: 'Estilizar', params: [{ key: 'radius', label: 'Pincelada', type: 'range', min: 1, max: 20, default: 4, unit: 'px' }], apply: (img, p) => M.oilPaint(img, p.radius) },
   { id: 'clouds', name: 'Nubes', group: 'filtro', submenu: 'Interpretar', params: [{ key: 'c1', label: 'Color 1', type: 'color', default: '#000000' }, { key: 'c2', label: 'Color 2', type: 'color', default: '#ffffff' }, { key: 'scale', label: 'Escala', type: 'range', min: 8, max: 1000, default: 120, unit: 'px' }], apply: (img, p) => M.clouds(img, p.c1, p.c2, p.scale) },
+  { id: 'lenscorr', name: 'Corrección de lente…', group: 'filtro', submenu: 'Distorsionar',
+    params: [{ key: 'distortion', label: 'Distorsión (barril ↔ cojín)', type: 'range', min: -100, max: 100, default: 0 }, { key: 'chroma', label: 'Aberración cromática', type: 'range', min: -100, max: 100, default: 0 }, { key: 'vignette', label: 'Viñeta', type: 'range', min: -100, max: 100, default: 0 }],
+    apply: (img, p) => N.lensCorrection(img, p) },
+  { id: 'lensflare', name: 'Destello de lente…', group: 'filtro', submenu: 'Interpretar',
+    params: [{ key: 'x', label: 'Posición horizontal', type: 'range', min: 0, max: 100, default: 30, unit: '%' }, { key: 'y', label: 'Posición vertical', type: 'range', min: 0, max: 100, default: 30, unit: '%' }, { key: 'brightness', label: 'Brillo', type: 'range', min: 10, max: 300, default: 100, unit: '%' }],
+    apply: (img, p) => N.lensFlare(img, p) },
+  { id: 'lensblur', name: 'Desenfoque de lente…', group: 'filtro', submenu: 'Desenfocar', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 60, default: 10, unit: 'px' }, { key: 'highlights', label: 'Brillo de las luces', type: 'range', min: 0, max: 100, default: 50, unit: '%' }], apply: (img, p) => N.lensBlur(img, p.radius, p.highlights) },
+  { id: 'boxblur', name: 'Desenfoque de caja…', group: 'filtro', submenu: 'Desenfocar', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 200, default: 8, unit: 'px' }], apply: (img, p) => N.boxBlur(img, p.radius) },
+  { id: 'average', name: 'Promediar', group: 'filtro', submenu: 'Desenfocar', apply: img => N.average(img) },
+  { id: 'solarize', name: 'Solarizar', group: 'filtro', submenu: 'Estilizar', apply: img => N.solarize(img) },
+  { id: 'wind', name: 'Viento…', group: 'filtro', submenu: 'Estilizar', params: [{ key: 'strength', label: 'Intensidad', type: 'range', min: 2, max: 200, default: 30, unit: 'px' }, { key: 'left', label: 'Desde la izquierda', type: 'checkbox', default: true }], apply: (img, p) => N.wind(img, p.strength, p.left) },
+  { id: 'diffuse', name: 'Difusión…', group: 'filtro', submenu: 'Estilizar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: 1, max: 20, default: 3, unit: 'px' }], apply: (img, p) => N.diffuse(img, p.amount) },
+  { id: 'tiles', name: 'Azulejos…', group: 'filtro', submenu: 'Estilizar', params: [{ key: 'n', label: 'Número de azulejos', type: 'range', min: 1, max: 99, default: 10 }, { key: 'offset', label: 'Desplazamiento máx.', type: 'range', min: 1, max: 99, default: 10, unit: '%' }], apply: (img, p) => N.tiles(img, p.n, p.offset) },
+  { id: 'tracecontour', name: 'Trazar contorno…', group: 'filtro', submenu: 'Estilizar', params: [{ key: 'level', label: 'Nivel', type: 'range', min: 1, max: 254, default: 128 }], apply: (img, p) => N.traceContour(img, p.level) },
+  { id: 'cutout', name: 'Recortes…', group: 'filtro', submenu: 'Artístico', params: [{ key: 'levels', label: 'Número de niveles', type: 'range', min: 2, max: 8, default: 4 }, { key: 'simplicity', label: 'Simplicidad', type: 'range', min: 0, max: 10, default: 3 }], apply: (img, p) => N.cutout(img, p.levels, p.simplicity) },
+  { id: 'halftone', name: 'Semitono de color…', group: 'filtro', submenu: 'Pixelizar', params: [{ key: 'radius', label: 'Radio máximo', type: 'range', min: 2, max: 60, default: 6, unit: 'px' }], apply: (img, p) => N.colorHalftone(img, p.radius) },
+  { id: 'pointillize', name: 'Puntillista…', group: 'filtro', submenu: 'Pixelizar', params: [{ key: 'cell', label: 'Tamaño de celda', type: 'range', min: 3, max: 100, default: 6, unit: 'px' }, { key: 'bg', label: 'Fondo', type: 'color', default: '#ffffff' }], apply: (img, p) => N.pointillize(img, p.cell, p.bg) },
+  { id: 'fragment', name: 'Fragmentar', group: 'filtro', submenu: 'Pixelizar', apply: img => N.fragment(img) },
+  { id: 'diffclouds', name: 'Nubes de diferencia', group: 'filtro', submenu: 'Interpretar', params: [{ key: 'c1', label: 'Color 1', type: 'color', default: '#000000' }, { key: 'c2', label: 'Color 2', type: 'color', default: '#ffffff' }, { key: 'scale', label: 'Escala', type: 'range', min: 8, max: 1000, default: 120, unit: 'px' }], apply: (img, p) => N.differenceClouds(img, p.c1, p.c2, p.scale) },
+  { id: 'fibers', name: 'Fibras…', group: 'filtro', submenu: 'Interpretar', params: [{ key: 'c1', label: 'Color 1', type: 'color', default: '#5a3a1a' }, { key: 'c2', label: 'Color 2', type: 'color', default: '#d9b07a' }, { key: 'variance', label: 'Varianza', type: 'range', min: 1, max: 64, default: 16 }, { key: 'strength', label: 'Intensidad', type: 'range', min: 1, max: 60, default: 4 }], apply: (img, p) => N.fibers(img, p.c1, p.c2, p.variance, p.strength) },
+  { id: 'zigzag', name: 'Zigzag…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: -100, max: 100, default: 20 }, { key: 'ridges', label: 'Ondulaciones', type: 'range', min: 1, max: 20, default: 5 }], apply: (img, p) => N.zigzag(img, p.amount, p.ridges) },
+  { id: 'glass', name: 'Vidrio…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'distortion', label: 'Distorsión', type: 'range', min: 0, max: 20, default: 5 }, { key: 'smoothness', label: 'Suavidad', type: 'range', min: 1, max: 15, default: 3 }], apply: (img, p) => N.glass(img, p.distortion, p.smoothness) },
   { id: 'solidfill', name: 'Color sólido', group: 'relleno', fill: true, params: [{ key: 'color', label: 'Color', type: 'color', default: '#3d8bfd' }],
     apply: (img, p) => { const n = parseInt(String(p.color).slice(1), 16), d = img.data; for (let i = 0; i < d.length; i += 4) { d[i] = n >> 16 & 255; d[i + 1] = n >> 8 & 255; d[i + 2] = n & 255; d[i + 3] = 255; } } },
   { id: 'gradfill', name: 'Degradado', group: 'relleno', fill: true,

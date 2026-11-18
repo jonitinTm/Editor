@@ -178,6 +178,9 @@ Ya disponible:
 - **Más opciones de estilo de capa**: trazo exterior, interior o centrado con opacidad; extensión en la sombra y el
   resplandor; *Satinado*. Todo se guarda en PSD.
 - **Objetos inteligentes**: *Nuevo objeto inteligente mediante copia* (contenido independiente) y *Exportar contenido*.
+- **18 filtros más**: corrección de lente (barril/cojín, aberración cromática, viñeta), destello de lente, desenfoque de
+  lente (bokeh), de caja y promediar, solarizar, viento, difusión, azulejos, trazar contorno, recortes, semitono de
+  color, puntillista, fragmentar, nubes de diferencia, fibras, zigzag y vidrio.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
