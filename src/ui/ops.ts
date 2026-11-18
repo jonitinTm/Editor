@@ -361,8 +361,27 @@ function bakeLayer(l: Layer, d: EditorDocument): HTMLCanvasElement {
   return c;
 }
 
+/** Combina en una sola capa las capas seleccionadas (tal como se ven juntas). */
+export function mergeSelected() {
+  const d = doc(); if (!d) return;
+  const sel = selectedLayers().filter(l => l.visible);
+  if (sel.length < 2) return;
+  // en el orden del documento (de abajo arriba)
+  const order = d.allLayers(), list = sel.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  const out = new RasterLayer(list[list.length - 1].name, d.width, d.height);
+  compositeGroup({ children: list } as unknown as GroupLayer, ctx2d(out.canvas), d.width, d.height, {});
+  out.touch();
+  const top = list[list.length - 1], parent = top.parent!;
+  parent.add(out, parent.children.indexOf(top) + 1);
+  for (const l of list) l.parent?.remove(l);
+  for (const l of selectedLayers()) if (!l.visible) l.parent?.remove(l);
+  d.setActive(out, false); d.selectedIds = new Set([out.id]);
+  d.invalidate(); d.commit('Combinar capas');
+}
+
 export function mergeDown() {
   const d = doc(); const l = d?.active; if (!d || !l || !l.parent) return;
+  if (selectedLayers().length > 1) { mergeSelected(); return; }
   const p = l.parent; const i = p.children.indexOf(l);
   const below = p.children[i - 1];
   if (!below) { app.toast('No hay ninguna capa debajo', 'warn'); return; }

@@ -243,6 +243,7 @@ Ya disponible:
   (contorno, sombra, resplandor); por ejemplo, un texto con solo el contorno. Se lee y se guarda en PSD.
 - **Propiedades del documento**: ancho y alto del lienzo editables (crece o se recorta desde el centro), resolución, modo de
   color y casillas para reglas, cuadrícula y guías.
+- **Combinar capas seleccionadas** (`Ctrl+E` con varias capas seleccionadas): las une en una sola tal como se ven.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

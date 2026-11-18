@@ -164,7 +164,7 @@ export const ACTIONS: Action[] = [
   { id: 'toSmart', label: 'Convertir en objeto inteligente', enabled: hasLayer, run: ops.convertToSmart },
   { id: 'editSmart', label: 'Editar contenido', enabled: () => app.doc?.active?.kind === 'smart', run: () => ops.editSmartContents() },
   { id: 'rasterize', label: 'Rasterizar capa (texto, forma u objeto inteligente)', enabled: () => isParametric(app.doc?.active), run: ops.rasterize },
-  { id: 'mergeDown', label: 'Combinar hacia abajo', keys: ['Ctrl+E'], enabled: hasLayer, run: ops.mergeDown },
+  { id: 'mergeDown', label: 'Combinar hacia abajo (o las seleccionadas)', keys: ['Ctrl+E'], enabled: hasLayer, run: ops.mergeDown },
   { id: 'mergeVisible', label: 'Combinar visibles', keys: ['Shift+Ctrl+E'], enabled: hasDoc, run: ops.mergeVisible },
   { id: 'stamp', label: 'Estampar visibles en una capa nueva', keys: ['Alt+Shift+Ctrl+E'], enabled: hasDoc, run: () => { const d = app.doc!; d.setActive(d.root.children[d.root.children.length - 1] ?? null, false); ops.placeImage(d.flatten(), 'Estampado', { x: 0, y: 0 }); } },
   { id: 'flatten', label: 'Acoplar imagen', enabled: hasDoc, run: ops.flattenImage },
