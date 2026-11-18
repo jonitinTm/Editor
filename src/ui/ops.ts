@@ -1665,3 +1665,34 @@ export async function exportSlices(type: 'image/png' | 'image/jpeg' | 'image/web
   await io.saveBlob(makeZip(files), (d.name || 'sectores') + '-sectores.zip');
   return files.length;
 }
+
+/** Contornos (en coordenadas del documento) de lo opaco de una capa, calculados a 3× para más precisión. */
+async function layerOutlines(l: Layer): Promise<{ closed: boolean; pts: import('../core/layers').PathPoint[] }[]> {
+  const d = doc()!, S = 3, src = (l as RasterLayer).canvas;
+  const big = makeCanvas(d.width * S, d.height * S), bx = ctx2d(big);
+  bx.imageSmoothingEnabled = true; bx.imageSmoothingQuality = 'high'; bx.drawImage(src, 0, 0, big.width, big.height);
+  const { maskContours } = await import('../core/contour');
+  const loops = maskContours(big, 1.2);
+  return loops.filter(lp => lp.length >= 3).map(lp => ({ closed: true, pts: lp.map(q => { const x = q.x / S, y = q.y / S; return { x, y, ix: x, iy: y, ox: x, oy: y }; }) }));
+}
+
+/** Capa › Texto › Convertir en forma: una capa de relleno de color con una máscara vectorial con la forma de las letras. */
+export async function textToShape() {
+  const d = doc(); const l = d?.active; if (!d || !l || !isRaster(l)) return;
+  const subpaths = await layerOutlines(l);
+  if (!subpaths.length) { app.toast('La capa está vacía', 'warn'); return; }
+  const color = l instanceof TextLayer ? l.props.color : app.fg;
+  const def = FILTERS_BY_ID.get('solidfill')!, p = defaultParams(def); p.color = color;
+  const f = new AdjustmentLayer(l.name, 'solidfill', p);
+  f.vmask = { subpaths, enabled: true };
+  f.opacity = l.opacity; f.blendMode = l.blendMode; f.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; f.visible = l.visible;
+  const parent = l.parent!; parent.add(f, parent.children.indexOf(l)); parent.remove(l);
+  d.setActive(f, false); d.invalidate(); d.commit('Convertir en forma');
+}
+/** Capa › Texto › Crear trazado de trabajo: el contorno de la capa como trazado (panel Trazados). */
+export async function layerToPath() {
+  const d = doc(); const l = d?.active; if (!d || !l || !isRaster(l)) return;
+  const subpaths = await layerOutlines(l);
+  if (!subpaths.length) { app.toast('La capa está vacía', 'warn'); return; }
+  newDocPath(subpaths);
+}

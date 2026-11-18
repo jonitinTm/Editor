@@ -66,6 +66,8 @@ export const ACTIONS: Action[] = [
   { id: 'freeTransform', label: 'Transformación libre', keys: ['Alt+Ctrl+T', 'Ctrl+T'], enabled: hasLayer, run: () => app.setTool('transform', true) },
   { id: 'distort', label: 'Distorsionar', enabled: hasLayer, run: () => { TransformTool.startMode = 'distort'; app.setTool('transform', true); } },
   { id: 'textOnPath', label: 'Texto sobre trazado', enabled: () => app.doc?.active?.kind === 'text', run: ops.textOnPath },
+  { id: 'textToShape', label: 'Convertir en forma', enabled: () => app.doc?.active?.kind === 'text' || app.doc?.active?.kind === 'raster', run: () => ops.textToShape() },
+  { id: 'textToPath', label: 'Crear trazado de trabajo', enabled: () => app.doc?.active?.kind === 'text' || app.doc?.active?.kind === 'raster', run: () => ops.layerToPath() },
   { id: 'textVertical', label: 'Texto vertical', enabled: () => app.doc?.active?.kind === 'text', checked: () => !!(app.doc?.active as any)?.props?.vertical, run: ops.toggleVerticalText },
   { id: 'warpText', label: 'Deformar texto…', enabled: () => app.doc?.active?.kind === 'text', run: () => dlg.warpTextDialog(app.doc!.active as any) },
   { id: 'skew', label: 'Sesgar', enabled: hasLayer, run: () => { TransformTool.startMode = 'skew'; app.setTool('transform', true); } },

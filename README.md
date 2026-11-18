@@ -226,6 +226,8 @@ Ya disponible:
   pintura húmeda (humedad, carga, mezcla, limpiar tras cada trazo y «solo mezclar»).
 - **Marco** (`K`): dibuja huecos rectangulares o elípticos; con el marco seleccionado, arrastra una foto o usa *Colocar* y
   se mete dentro, cubriéndolo (como objeto inteligente, se puede mover y escalar dentro del marco). Ideal para plantillas.
+- **Capa › Texto › Convertir en forma** y **Crear trazado de trabajo**: el texto (o lo opaco de una capa) pasa a forma
+  vectorial (relleno de color con máscara vectorial, editable con la Selección directa) o a un trazado del panel Trazados.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
