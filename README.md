@@ -267,6 +267,8 @@ Ya disponible:
   automáticamente* (corrige desplazamientos; no giros ni cambios de perspectiva).
 - **Archivo › Recortar y enderezar fotos escaneadas**: si escaneas varias fotos a la vez, cada una sale enderezada en su
   propia pestaña (el fondo del escáner tiene que ser liso y las fotos no deben tocarse).
+- **Fusión de exposiciones (HDR)** (*Capa › Combinar en pila*): con varias fotos del mismo sitio a distinta exposición (una
+  oscura, una normal y una clara), junta el detalle de las sombras y de las luces en una sola, sin halos.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

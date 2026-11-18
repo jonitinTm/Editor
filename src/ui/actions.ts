@@ -172,6 +172,7 @@ export const ACTIONS: Action[] = [
   { id: 'stack:median', label: 'Mediana (quita lo que se mueve)', enabled: hasDoc, run: () => ops.stackLayers('median') },
   { id: 'stack:mean', label: 'Media (reduce el ruido)', enabled: hasDoc, run: () => ops.stackLayers('mean') },
   { id: 'stack:max', label: 'Máximo (estelas de luz)', enabled: hasDoc, run: () => ops.stackLayers('max') },
+  { id: 'stack:hdr', label: 'Fusión de exposiciones (HDR)', enabled: hasDoc, run: () => ops.fuseExposures() },
   { id: 'stack:min', label: 'Mínimo', enabled: hasDoc, run: () => ops.stackLayers('min') },
   { id: 'mergeDown', label: 'Combinar hacia abajo (o las seleccionadas)', keys: ['Ctrl+E'], enabled: hasLayer, run: ops.mergeDown },
   { id: 'mergeVisible', label: 'Combinar visibles', keys: ['Shift+Ctrl+E'], enabled: hasDoc, run: ops.mergeVisible },

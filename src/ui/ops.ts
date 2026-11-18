@@ -1863,3 +1863,17 @@ export async function cropScannedPhotos() {
   });
   app.toast(`${list.length} foto${list.length === 1 ? '' : 's'} separada${list.length === 1 ? '' : 's'}, cada una en su pestaña`);
 }
+
+/** Capa › Combinar en pila › Fusión de exposiciones: junta fotos con distinta exposición (horquillado) en una. */
+export async function fuseExposures() {
+  const d = doc(); if (!d) return;
+  const order = d.allLayers();
+  const list = selectedLayers().filter(l => isRaster(l) && l.visible).sort((a, b) => order.indexOf(a) - order.indexOf(b)) as RasterLayer[];
+  if (list.length < 2) { app.toast('Selecciona las fotos (al menos dos capas) de distinta exposición', 'warn'); return; }
+  app.toast('Fusionando exposiciones…'); await new Promise(r => setTimeout(r, 30));
+  const { exposureFusion } = await import('../filters/expfusion');
+  const res = exposureFusion(list.map(l => ctx2d(l.canvas).getImageData(0, 0, d.width, d.height)));
+  const l = new RasterLayer('Fusión de exposiciones', d.width, d.height); ctx2d(l.canvas).putImageData(res, 0, 0); l.touch();
+  const top = list[list.length - 1]; top.parent!.add(l, top.parent!.children.indexOf(top) + 1);
+  d.setActive(l, false); d.selectedIds = new Set([l.id]); d.invalidate(); d.commit('Fusión de exposiciones');
+}
