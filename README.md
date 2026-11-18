@@ -281,6 +281,9 @@ Ya disponible:
 - **Recortar con «Rellenar según contenido»** (casilla en la barra de Recortar): si el marco sale fuera de la foto, los
   bordes nuevos se inventan a partir de ella (cielo, suelo, texturas…). Lo mismo al girar el lienzo un ángulo o enderezar
   con la Regla (opción «Esquinas: según el contenido»).
+- **Ajustes predefinidos** en los diálogos de filtros y ajustes («Predefinido», abajo): guarda tus valores con un nombre y
+  recupéralos con un clic. Curvas, Niveles y Tono/Saturación traen algunos de serie (más contraste, aclarar, película,
+  tono cálido o frío, proceso cruzado, sepia…).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

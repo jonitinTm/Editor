@@ -2,7 +2,7 @@
 
 import { app } from './app';
 import { h, numberSlider } from './dom';
-import { showDialog, row } from './dialog';
+import { showDialog, row, promptDialog } from './dialog';
 import * as ops from './ops';
 import * as io from '../io/files';
 import { FilterDef, defaultParams } from '../filters/registry';
@@ -325,14 +325,14 @@ export function modifySelectionDialog(kind: 'feather' | 'expand' | 'contract' | 
 
 // ---- Filtros genéricos ----------------------------------------------------------------
 
-export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: number }) {
+export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: number }, initial?: any) {
   if (!def.params && !def.custom) { ops.applyFilterDirect(def); return; }
   const active = app.doc?.active;
   // En objetos inteligentes el filtro queda como filtro inteligente (editable)
   const session = edit ? new ops.SmartFilterSession(edit.layer, def, edit.index)
     : active instanceof SmartLayer && !app.doc!.editMask ? new ops.SmartFilterSession(active, def) : ops.FilterSession.start(def);
   if (!session) return;
-  const params = edit ? JSON.parse(JSON.stringify(edit.layer.filters[edit.index].params)) : defaultParams(def);
+  const params = initial ? { ...defaultParams(def), ...JSON.parse(JSON.stringify(initial)) } : edit ? JSON.parse(JSON.stringify(edit.layer.filters[edit.index].params)) : defaultParams(def);
   let previewOn = true;
   let timer = 0;
   const update = () => {
@@ -382,9 +382,28 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
   const reset = h('button', { class: 'btn', type: 'button' }, 'Restablecer');
   reset.onclick = () => { showDialogClose(); filterDialog(def, edit); };
   let showDialogClose = () => {};
+  // Ajustes predefinidos: de serie (Curvas) y los que guarda el usuario
+  const presetSel = h('select', { title: 'Ajustes predefinidos' }) as HTMLSelectElement;
+  const fillPresets = () => {
+    presetSel.innerHTML = '';
+    presetSel.append(h('option', { value: '' }, 'Predefinido…'));
+    const builtin = BUILTIN_PRESETS[def.id] ?? [], mine = userPresets(def.id);
+    if (builtin.length) presetSel.append(h('optgroup', { label: 'De serie' }, ...builtin.map((p, i) => h('option', { value: 'b' + i }, p.name))));
+    if (mine.length) presetSel.append(h('optgroup', { label: 'Míos' }, ...mine.map((p, i) => h('option', { value: 'u' + i }, p.name))));
+    presetSel.append(h('option', { value: 'save' }, '＋ Guardar los valores actuales…'));
+    if (mine.length) presetSel.append(h('option', { value: 'del' }, '🗑 Borrar uno de los míos…'));
+  };
+  fillPresets();
+  presetSel.addEventListener('change', async () => {
+    const v = presetSel.value; presetSel.value = '';
+    if (v === 'save') { const n = await promptDialog('Guardar ajuste predefinido', 'Nombre', ''); if (n?.trim()) { saveUserPresets(def.id, [...userPresets(def.id), { name: n.trim(), params: JSON.parse(JSON.stringify(params)) }]); fillPresets(); app.toast('Guardado'); } return; }
+    if (v === 'del') { const mine = userPresets(def.id); const n = await promptDialog('Borrar ajuste predefinido', 'Nombre exacto (' + mine.map(m => m.name).join(', ') + ')', ''); const i = mine.findIndex(m => m.name === n); if (i >= 0) { mine.splice(i, 1); saveUserPresets(def.id, mine); fillPresets(); } return; }
+    const p = v[0] === 'b' ? (BUILTIN_PRESETS[def.id] ?? [])[+v.slice(1)] : userPresets(def.id)[+v.slice(1)];
+    if (p) { showDialogClose(); filterDialog(def, edit, p.params); }
+  });
   const dlg = showDialog({
     title: def.name.replace('…', '') + (session instanceof ops.SmartFilterSession ? ' (filtro inteligente)' : ''), width: def.custom ? 420 : 400, side: true,
-    body: [...body, h('label', { class: 'check preview-check' }, prev, ' Vista previa')],
+    body: [...body, row('Predefinido', presetSel), h('label', { class: 'check preview-check' }, prev, ' Vista previa')],
     extraButtons: [reset],
     onOk: async () => { clearTimeout(timer); await session.commit(params); ops.setLastFilter(def, params); if (!edit) record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') }); },
     onCancel: () => { clearTimeout(timer); session.clearPreview(); },
@@ -1132,3 +1151,34 @@ export async function applyImageDialog() {
     onCancel: () => { setPreview(t, null); d.invalidate(); },
   });
 }
+
+// ---- Ajustes predefinidos de los filtros ------------------------------------------------------
+
+const PRESET_KEY = 'editor.filterPresets';
+type Preset = { name: string; params: any };
+function userPresets(id: string): Preset[] { try { const all = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); return Array.isArray(all[id]) ? all[id] : []; } catch { return []; } }
+function saveUserPresets(id: string, list: Preset[]) { try { const all = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); all[id] = list; localStorage.setItem(PRESET_KEY, JSON.stringify(all)); } catch { /* sin almacenamiento */ } }
+const curve = (rgb: number[][], r?: number[][], g?: number[][], b?: number[][]) => ({ rgb, r: r ?? [[0, 0], [255, 255]], g: g ?? [[0, 0], [255, 255]], b: b ?? [[0, 0], [255, 255]] });
+const BUILTIN_PRESETS: Record<string, Preset[]> = {
+  curves: [
+    { name: 'Más contraste', params: curve([[0, 0], [64, 48], [192, 208], [255, 255]]) },
+    { name: 'Contraste suave', params: curve([[0, 0], [64, 58], [192, 198], [255, 255]]) },
+    { name: 'Aclarar', params: curve([[0, 0], [128, 160], [255, 255]]) },
+    { name: 'Oscurecer', params: curve([[0, 0], [128, 96], [255, 255]]) },
+    { name: 'Negros lavados (película)', params: curve([[0, 28], [64, 70], [192, 200], [255, 245]]) },
+    { name: 'Negativo', params: curve([[0, 255], [255, 0]]) },
+    { name: 'Tono cálido', params: curve([[0, 0], [255, 255]], [[0, 0], [128, 140], [255, 255]], undefined, [[0, 0], [128, 116], [255, 255]]) },
+    { name: 'Tono frío', params: curve([[0, 0], [255, 255]], [[0, 0], [128, 116], [255, 255]], undefined, [[0, 0], [128, 142], [255, 255]]) },
+    { name: 'Proceso cruzado', params: curve([[0, 0], [255, 255]], [[0, 0], [64, 40], [192, 220], [255, 255]], [[0, 0], [64, 50], [192, 210], [255, 255]], [[0, 40], [255, 215]]) },
+  ],
+  levels: [
+    { name: 'Más contraste', params: { inBlack: 20, inWhite: 235, gamma: 1, outBlack: 0, outWhite: 255 } },
+    { name: 'Aclarar sombras', params: { inBlack: 0, inWhite: 255, gamma: 1.4, outBlack: 0, outWhite: 255 } },
+    { name: 'Oscurecer medios tonos', params: { inBlack: 0, inWhite: 255, gamma: 0.75, outBlack: 0, outWhite: 255 } },
+  ],
+  huesat: [
+    { name: 'Más saturación', params: { hue: 0, sat: 30, light: 0 } },
+    { name: 'Sepia', params: { hue: 35, sat: 25, light: 0, colorize: true } },
+    { name: 'Desaturar a medias', params: { hue: 0, sat: -50, light: 0 } },
+  ],
+};
