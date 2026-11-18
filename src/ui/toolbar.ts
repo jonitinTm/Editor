@@ -9,8 +9,8 @@ import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
-  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso'], ['quickSel', 'wand'], ['crop'], ['eyedropper'],
-  ['spotHeal', 'heal'], ['clone'], ['brush', 'pencil'], ['eraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn'], ['text'], ['pen', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
+  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso', 'magLasso'], ['quickSel', 'wand'], ['crop'], ['eyedropper', 'ruler'],
+  ['spotHeal', 'heal', 'redEye'], ['clone'], ['brush', 'pencil'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text'], ['pen', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
 ];
 
 export function buildToolbar(parent: HTMLElement) {

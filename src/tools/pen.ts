@@ -32,6 +32,7 @@ function drawPathOverlay(ctx: CanvasRenderingContext2D, vp: Viewport, pts: PathP
 export class PenTool implements Tool {
   id = 'pen'; name = 'Pluma'; icon = icon('pen'); key = 'P'; group = 'pen'; cursor = 'crosshair';
   options = [
+    { key: 'mode', label: 'Crear', type: 'select', default: 'shape', choices: [{ value: 'shape', label: 'Forma' }, { value: 'path', label: 'Trazado' }] },
     { key: 'fill', label: 'Relleno (color frontal)', type: 'checkbox', default: true },
     { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
     { key: 'strokeColor', type: 'color', default: '#000000' },
@@ -39,6 +40,9 @@ export class PenTool implements Tool {
   ] as any[];
   private pts: PathPoint[] = [];
   private dragging = false;
+  /** Los siguientes subtrazados se añaden al trazado recién creado (hasta cambiar de herramienta). */
+  private appendToActive = false;
+  activate() { this.appendToActive = false; }
 
   extraOptions(bar: HTMLElement) {
     bar.append(h('span', { class: 'hint' }, 'Clic: punto recto · Arrastrar: curva · Clic en el primer punto: cerrar · Intro: terminar · Retroceso: quitar punto'));
@@ -62,6 +66,13 @@ export class PenTool implements Tool {
   finish(closed: boolean) {
     const doc = app.doc, pts = this.pts; this.pts = []; this.dragging = false;
     if (!doc || pts.length < 2) { app.viewport.requestRender(); return; }
+    if (app.opt('mode', this.id) === 'path') {
+      // modo Trazado: se añade al trazado activo del panel Trazados (o se crea uno nuevo)
+      if (doc.activePath >= 0 && doc.paths[doc.activePath] && this.appendToActive) { doc.paths[doc.activePath].subpaths.push({ closed, pts }); doc.commit('Añadir subtrazado'); }
+      else import('../ui/ops').then(o => o.newDocPath([{ closed, pts }]));
+      this.appendToActive = true;
+      return;
+    }
     const fill = closed && app.opt('fill', this.id), stroke = app.opt('stroke', this.id) || !fill;
     let n = 1; const names = new Set(doc.allLayers().map(l => l.name));
     while (names.has(`Trazado ${n}`)) n++;
@@ -104,11 +115,18 @@ export class NodeTool implements Tool {
   extraOptions(bar: HTMLElement) {
     bar.append(h('span', { class: 'hint' }, 'Arrastra los puntos o sus tiradores (Alt: tirador independiente) · Doble clic: esquina ↔ curva · Supr: borrar punto'));
   }
-  private layer(): ShapeLayer | null {
-    const l = app.doc?.active;
-    return l instanceof ShapeLayer && l.props.shape === 'path' && l.props.path ? l : null;
+  /** Lo que se edita: una capa de trazado o el trazado activo del panel Trazados. */
+  private layer(): { props: { path: { closed: boolean; pts: PathPoint[] } }; render(): void; isLocked(): boolean; subs?: { closed: boolean; pts: PathPoint[] }[] } | null {
+    const d = app.doc, l = d?.active;
+    if (l instanceof ShapeLayer && l.props.shape === 'path' && l.props.path) return l as any;
+    if (d && d.activePath >= 0 && d.paths[d.activePath]) {
+      // todos los subtrazados se tratan como una lista de puntos única
+      const subs = d.paths[d.activePath].subpaths, pts = subs.flatMap(sp => sp.pts);
+      return { props: { path: { closed: true, pts } }, render: () => d.invalidate(), isLocked: () => false, subs };
+    }
+    return null;
   }
-  activate() { this.active = -1; if (app.doc && !this.layer()) app.toast('Selecciona una capa de trazado (creada con la pluma)'); }
+  activate() { this.active = -1; if (app.doc && !this.layer()) app.toast('Selecciona una capa de trazado o un trazado del panel Trazados'); }
   docChanged() { this.active = -1; this.drag = null; }
   private hit(e: ToolEvent): { i: number; part: 'a' | 'i' | 'o' } | null {
     const l = this.layer(); if (!l) return null;
@@ -154,12 +172,16 @@ export class NodeTool implements Tool {
     if (!l || this.active < 0 || (e.key !== 'Delete' && e.key !== 'Backspace')) return false;
     const pts = l.props.path!.pts;
     if (pts.length <= 2) { app.toast('Un trazado necesita al menos dos puntos', 'warn'); return true; }
-    pts.splice(this.active, 1); this.active = -1;
+    if (l.subs) { let k = this.active; for (const sp of l.subs) { if (k < sp.pts.length) { if (sp.pts.length <= 2) { app.toast('Un trazado necesita al menos dos puntos', 'warn'); return true; } sp.pts.splice(k, 1); break; } k -= sp.pts.length; } }
+    else pts.splice(this.active, 1);
+    this.active = -1;
     l.render(); app.doc!.commit('Borrar punto');
     return true;
   }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     const l = this.layer(); if (!l) return;
-    drawPathOverlay(ctx, vp, l.props.path!.pts, l.props.path!.closed, this.active);
+    if (l.subs) { let off = 0; for (const sp of l.subs) { drawPathOverlay(ctx, vp, sp.pts, sp.closed, this.active - off); off += sp.pts.length; } }
+    else drawPathOverlay(ctx, vp, l.props.path!.pts, l.props.path!.closed, this.active);
   }
 }
+export { drawPathOverlay };

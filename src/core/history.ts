@@ -19,6 +19,7 @@ export interface DocSnap {
   selection: HTMLCanvasElement | null;
   quickMask?: boolean;
   channels?: { id: number; name: string; canvas: HTMLCanvasElement }[];
+  paths?: string; activePath?: number;
 }
 export interface HistoryStep { name: string; icon?: string; snap: DocSnap; }
 
@@ -61,7 +62,7 @@ export function snapshot(doc: EditorDocument): DocSnap {
   }
   return {
     width: doc.width, height: doc.height, root: snapLayer(doc.root),
-    activeId: doc.active?.id ?? null, selection: selCanvas, quickMask: doc.quickMask, channels: doc.channels.slice(),
+    activeId: doc.active?.id ?? null, selection: selCanvas, quickMask: doc.quickMask, channels: doc.channels.slice(), paths: JSON.stringify(doc.paths), activePath: doc.activePath,
   };
 }
 
@@ -122,6 +123,7 @@ export function restore(doc: EditorDocument, snap: DocSnap) {
   doc.selection.setMask(snap.selection);
   doc.quickMask = !!snap.quickMask; doc.quickPreview = null;
   doc.channels = (snap.channels ?? []).slice();
+  doc.paths = snap.paths ? JSON.parse(snap.paths) : []; doc.activePath = Math.min(snap.activePath ?? -1, doc.paths.length - 1);
   if (snap.selection) selFrozen = { version: doc.selection.version, canvas: snap.selection, owner: doc.selection };
   // Se mantiene la capa que el usuario tenía seleccionada si sigue existiendo.
   const keepId = doc.active?.id ?? -1;

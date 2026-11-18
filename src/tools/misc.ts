@@ -183,7 +183,7 @@ export class GradientTool implements Tool {
 }
 
 export class EyedropperTool implements Tool {
-  id = 'eyedropper'; name = 'Cuentagotas'; icon = icon('eyedropper'); key = 'I'; cursor = 'crosshair';
+  id = 'eyedropper'; name = 'Cuentagotas'; icon = icon('eyedropper'); key = 'I'; group = 'eyedropper'; cursor = 'crosshair';
   options = [
     { key: 'sampleSize', label: 'Muestra', type: 'select', default: '1', choices: [
       { value: '1', label: 'Punto' }, { value: '3', label: 'Media 3×3' }, { value: '5', label: 'Media 5×5' }, { value: '11', label: 'Media 11×11' }] },

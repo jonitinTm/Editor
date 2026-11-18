@@ -9,13 +9,14 @@ import { cloneCanvas, ctx2d } from '../core/canvas';
 import { getPaintTarget, setPreview, setTargetCanvas, PaintTarget } from './paint';
 import { drawBrushCursor } from './brush';
 
-type Mode = 'blur' | 'sharpen' | 'smudge' | 'dodge' | 'burn';
+type Mode = 'blur' | 'sharpen' | 'smudge' | 'dodge' | 'burn' | 'sponge';
 
 class RetouchTool implements Tool {
   cursor = 'none';
   options = [
     { key: 'size', label: 'Tamaño', type: 'range', min: 1, max: 500, default: 40, unit: 'px' },
-    { key: 'strength', label: this.mode === 'dodge' || this.mode === 'burn' ? 'Exposición' : 'Intensidad', type: 'range', min: 1, max: 100, default: 50, unit: '%' },
+    { key: 'strength', label: this.mode === 'dodge' || this.mode === 'burn' ? 'Exposición' : this.mode === 'sponge' ? 'Flujo' : 'Intensidad', type: 'range', min: 1, max: 100, default: 50, unit: '%' },
+    ...(this.mode === 'sponge' ? [{ key: 'spongeMode', label: 'Modo', type: 'select', default: 'desat', choices: [{ value: 'desat', label: 'Reducir saturación' }, { value: 'sat', label: 'Saturar' }] }] : []),
   ] as any[];
   private t: PaintTarget | null = null;
   private work: HTMLCanvasElement | null = null;
@@ -61,6 +62,11 @@ class RetouchTool implements Tool {
       } else if (mode === 'dodge' || mode === 'burn') {
         f *= 0.25;
         for (let ch = 0; ch < 3; ch++) d[i + ch] = mode === 'dodge' ? src[i + ch] + (255 - src[i + ch]) * f * (0.4 + src[i + ch] / 255) : src[i + ch] * (1 - f);
+      } else if (mode === 'sponge') {
+        // Esponja: acerca (o aleja) cada canal de la luminosidad del píxel
+        const l = src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11, sat = app.opt('spongeMode', this.id) === 'sat';
+        f *= 0.3;
+        for (let ch = 0; ch < 3; ch++) d[i + ch] = sat ? src[i + ch] + (src[i + ch] - l) * f : src[i + ch] + (l - src[i + ch]) * f;
       } else if (carry) {
         f = Math.min(0.95, f * 1.6);
         for (let ch = 0; ch < 4; ch++) { const v = src[i + ch] + (carry[i + ch] - src[i + ch]) * f; carry[i + ch] = carry[i + ch] * 0.75 + src[i + ch] * 0.25; d[i + ch] = v; }
@@ -86,4 +92,5 @@ export const retouchTools = () => [
   new RetouchTool('smudge', 'Dedo', icon('finger'), 'smudge', 'focus'),
   new RetouchTool('dodge', 'Sobreexponer', icon('dodge'), 'dodge', 'tone', 'O'),
   new RetouchTool('burn', 'Subexponer', icon('burn'), 'burn', 'tone', 'O'),
+  new RetouchTool('sponge', 'Esponja', icon('sponge'), 'sponge', 'tone', 'O'),
 ];

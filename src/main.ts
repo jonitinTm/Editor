@@ -17,7 +17,7 @@ import { dialogOpen } from './ui/dialog';
 import { newDocumentDialog } from './ui/dialogs';
 import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
-import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildActionsPanel } from './ui/panels2';
+import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
@@ -33,6 +33,7 @@ import { ShapeTool } from './tools/shape';
 import { TransformTool } from './tools/transform';
 import { PenTool, NodeTool } from './tools/pen';
 import { MagneticLassoTool } from './tools/maglasso';
+import { MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool } from './tools/extra';
 import { buildBrushesPanel } from './ui/brushes';
 
 // ---- Herramientas ----------------------------------------------------------------
@@ -42,6 +43,7 @@ for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSe
 }
 app.registerTool(new PolyLassoTool());
 app.registerTool(new MagneticLassoTool());
+for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool]) app.registerTool(new T());
 app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
@@ -87,7 +89,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
 }
 tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel]]);
 tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel]]);
-tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Acciones', buildActionsPanel]]);
+tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Trazados', buildPathsPanel], ['Acciones', buildActionsPanel]]);
 root.append(h('div', { id: 'toasts' }));
 
 // Separador ajustable entre paneles

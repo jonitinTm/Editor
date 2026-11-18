@@ -54,6 +54,8 @@ export function borrowCanvas(w: number, h: number, only?: Rect | null): HTMLCanv
   if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
   else if (only) { const x = ctx2d(c); x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(only.x, only.y, only.w, only.h); x.restore(); }
   else clearCanvas(c);
+  // el lienzo se reutiliza: se deja su estado de dibujo como nuevo
+  const x = ctx2d(c); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; x.shadowColor = 'transparent'; x.shadowBlur = 0; x.shadowOffsetX = 0; x.shadowOffsetY = 0; x.setTransform(1, 0, 0, 1, 0, 0);
   return c;
 }
 export function returnCanvas(c: HTMLCanvasElement) {

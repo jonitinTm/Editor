@@ -4,6 +4,8 @@ import { borrowCanvas, returnCanvas, ctx2d, Rect } from './canvas';
 import { canvasBlend, GroupLayer, Layer, AdjustmentLayer, LayerStyles, hasStyles, isRaster } from './layers';
 import { FILTERS } from '../filters/registry';
 import { hexToRgb, makeCanvas } from './canvas';
+import { bevelLayers } from './bevel';
+import { getPattern } from './patterns';
 
 /** Sustituciones temporales usadas por las herramientas para previsualizar. */
 export interface LayerOverride {
@@ -142,7 +144,7 @@ const styleCache = new WeakMap<Layer, { key: string; canvas: HTMLCanvasElement }
 const rgba = (hex: string, a: number) => { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; };
 
 /** Dibuja los efectos de estilo de `src` (sin la propia capa). Sirve también para exportar. */
-export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number) {
+export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null) {
   const FAR = w + 4096; // la imagen se dibuja fuera y solo su "sombra" cae dentro del lienzo
   const cast = (color: string, blur: number, dx: number, dy: number, times = 1) => {
     ctx.save();
@@ -166,11 +168,20 @@ export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasEleme
     ctx.drawImage(t, 0, 0);
     returnCanvas(t);
   }
+  // Parte exterior del bisel (exterior, relieve, almohadillado): fuera de la forma de la capa
+  if (bl && st.bevel!.style !== 'inner') {
+    for (const [c, mode] of [[bl.hi, 'screen'], [bl.sh, 'multiply']] as const) {
+      const t = borrowCanvas(w, h), tc = ctx2d(t);
+      tc.drawImage(c, 0, 0); tc.globalCompositeOperation = 'destination-out'; tc.drawImage(src, ox, oy);
+      ctx.save(); ctx.globalCompositeOperation = mode; ctx.drawImage(t, 0, 0); ctx.restore();
+      returnCanvas(t);
+    }
+  }
 }
 
 /** Efectos que van por encima de la capa, recortados a su forma (superposiciones, sombra y resplandor interiores). */
-function innerStyled(src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number): HTMLCanvasElement | null {
-  if (!(st.innerShadow?.enabled || st.innerGlow?.enabled || st.colorOverlay?.enabled || st.gradientOverlay?.enabled)) return null;
+function innerStyled(src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null): HTMLCanvasElement | null {
+  if (!(st.innerShadow?.enabled || st.innerGlow?.enabled || st.colorOverlay?.enabled || st.gradientOverlay?.enabled || st.patternOverlay?.enabled || (bl && st.bevel!.style !== 'outer'))) return null;
   const o = borrowCanvas(w, h), c = ctx2d(o);
   c.drawImage(src, ox, oy);
   c.globalCompositeOperation = 'source-atop';
@@ -182,6 +193,11 @@ function innerStyled(src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: nu
     const g = c.createLinearGradient(cx - Math.cos(a) * half, cy - Math.sin(a) * half, cx + Math.cos(a) * half, cy + Math.sin(a) * half);
     for (const [t, col] of go.stops) g.addColorStop(Math.max(0, Math.min(1, t)), col);
     c.globalAlpha = go.opacity / 100; c.fillStyle = g; c.fillRect(0, 0, w, h); c.globalAlpha = 1;
+  }
+  const po = st.patternOverlay;
+  if (po?.enabled) {
+    const pat = getPattern(po.pattern);
+    if (pat) { const p = c.createPattern(pat.canvas, 'repeat')!; p.setTransform(new DOMMatrix().scale(po.scale / 100)); c.globalAlpha = po.opacity / 100; c.fillStyle = p; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
   }
   if (st.colorOverlay?.enabled) { c.globalAlpha = st.colorOverlay.opacity / 100; c.fillStyle = st.colorOverlay.color; c.fillRect(0, 0, w, h); c.globalAlpha = 1; }
   if (st.innerGlow?.enabled || st.innerShadow?.enabled) {
@@ -200,6 +216,15 @@ function innerStyled(src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: nu
     if (st.innerShadow?.enabled) { const s = st.innerShadow, a = s.angle * Math.PI / 180; cast(rgba(s.color, s.opacity / 100), s.blur, -Math.cos(a) * s.distance, Math.sin(a) * s.distance, 1); }
     returnCanvas(inv);
   }
+  // Parte interior del bisel: luces en Trama y sombras en Multiplicar, dentro de la forma
+  if (bl && st.bevel!.style !== 'outer') {
+    for (const [bc, mode] of [[bl.hi, 'screen'], [bl.sh, 'multiply']] as const) {
+      const t = borrowCanvas(w, h), tc = ctx2d(t);
+      tc.drawImage(bc, 0, 0); tc.globalCompositeOperation = 'destination-in'; tc.drawImage(src, ox, oy);
+      c.globalCompositeOperation = mode; c.drawImage(t, 0, 0);
+      returnCanvas(t);
+    }
+  }
   c.globalCompositeOperation = 'source-over';
   return o;
 }
@@ -216,12 +241,13 @@ function contentBoundsFast(src: HTMLCanvasElement, ox: number, oy: number, w: nu
 
 /** Capa con todos sus estilos: efectos de fondo, la capa (o `body`) y efectos interiores. */
 export function composeStyled(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, body?: HTMLCanvasElement) {
-  renderStyles(ctx, src, st, ox, oy, w, h);
-  const top = body ? null : innerStyled(src, st, ox, oy, w, h);
+  const bl = st.bevel?.enabled ? bevelLayers(src, ox, oy, w, h, st.bevel) : null;
+  renderStyles(ctx, src, st, ox, oy, w, h, bl);
+  const top = body ? null : innerStyled(src, st, ox, oy, w, h, bl);
   if (top) { ctx.drawImage(top, 0, 0); returnCanvas(top); }
   else if (body) {
     // Grupo de recorte: los efectos interiores se aplican sobre el conjunto ya recortado
-    const t2 = innerStyled(body, st, 0, 0, w, h);
+    const t2 = innerStyled(body, st, 0, 0, w, h, bl);
     ctx.drawImage(t2 ?? body, 0, 0); if (t2) returnCanvas(t2);
   } else ctx.drawImage(src, ox, oy);
 }

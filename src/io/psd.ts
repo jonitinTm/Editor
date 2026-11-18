@@ -146,6 +146,13 @@ function parseEffects(bytes: Uint8Array): LayerStyles | null {
     if (gr.Rvrs) stops.forEach(x => x[0] = 1 - x[0]);
     st.gradientOverlay = { enabled: true, opacity: Math.round(gr.Opct ?? 100), angle: Math.round(gr.Angl ?? 90), stops: stops.sort((p, q) => p[0] - q[0]) };
   }
+  const bv = d.ebbl;
+  if (bv?.enab) {
+    const styleMap: Record<string, any> = { InrB: 'inner', OtrB: 'outer', Embs: 'emboss', PlEb: 'pillow' };
+    st.bevel = { enabled: true, style: styleMap[String(bv.bvlS ?? 'InrB').trim()] ?? 'inner', depth: Math.round(bv.srgR ?? 100), size: Math.round(bv.blur ?? 5), soften: Math.round(bv.Sftn ?? 0),
+      angle: Math.round(bv.lagl ?? 120), altitude: Math.round(bv.Lald ?? 30), up: String(bv.bvlD ?? 'In').trim() !== 'Out',
+      highlight: descColor(bv.hglC ?? { Rd: 255, Grn: 255, Bl: 255 }), highlightOpacity: Math.round(bv.hglO ?? 75), shadowColor: descColor(bv.sdwC), shadowOpacity: Math.round(bv.sdwO ?? 75) };
+  }
   return Object.keys(st).length ? st : null;
 }
 
@@ -799,6 +806,13 @@ function effectsBlock(st: LayerStyles): Uint8Array {
       Clrs: ['VlLs', g.stops.map(([t, c]) => ['Objc', 'Clrt', { 'Clr ': rgbDV(c), Type: ['enum', 'Clry', 'UsrS'], Lctn: ['long', Math.round(t * 4096)], Mdpn: ['long', 50] }] as DV)],
       Trns: ['VlLs', [0, 4096].map(l => ['Objc', 'TrnS', { Opct: pc(100), Lctn: ['long', l], Mdpn: ['long', 50] }] as DV)],
     }], Angl: ang(g.angle), Type: ['enum', 'GrdT', 'Lnr '], Rvrs: ['bool', false], Algn: ['bool', true], 'Scl ': pc(100), Ofst: ['Objc', 'Pnt ', { Hrzn: pc(0), Vrtc: pc(0) }] }];
+  }
+  if (st.bevel?.enabled) {
+    const b = st.bevel, style = { inner: 'InrB', outer: 'OtrB', emboss: 'Embs', pillow: 'PlEb' }[b.style];
+    items.ebbl = ['Objc', 'ebbl', { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true],
+      hglM: md('Scrn'), hglC: rgbDV(b.highlight), hglO: pc(b.highlightOpacity), sdwM: md('Mltp'), sdwC: rgbDV(b.shadowColor), sdwO: pc(b.shadowOpacity),
+      bvlT: ['enum', 'bvlT', 'SfBL'], bvlS: ['enum', 'BESl', style], uglg: ['bool', false], lagl: ang(b.angle), Lald: ang(b.altitude),
+      srgR: pc(b.depth), blur: px(b.size), bvlD: ['enum', 'BESs', b.up ? 'In  ' : 'Out '], antialiasGloss: ['bool', false], Sftn: px(b.soften), useShape: ['bool', false], useTexture: ['bool', false] }];
   }
   if (st.stroke?.enabled) items.FrFX = ['Objc', 'FrFX', { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], Styl: ['enum', 'FStl', 'OutF'], PntT: ['enum', 'FrFl', 'SClr'], 'Md  ': md('Nrml'), Opct: pc(100), 'Sz  ': px(st.stroke.size), 'Clr ': rgbDV(st.stroke.color) }];
   const w = new Writer(); w.u32(0); w.u32(16); writeDescriptor(w, 'null', items);

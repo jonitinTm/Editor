@@ -141,6 +141,18 @@ Ya disponible:
 - **Deformar texto** (*Capa › Texto › Deformar texto…*, botón en la barra del texto o en *Propiedades*): arco,
   bandera, onda… y el texto sigue siendo editable.
 - **Exportar en varios tamaños a la vez**: en *Exportar como*, marca @0,5x, @2x o @3x y se descarga un ZIP.
+- **Estilos de capa**: *Bisel y relieve* (interior, exterior, relieve y acolchado; profundidad, tamaño, ángulo, altitud,
+  luces y sombras; se guarda en PSD) y *Superposición de motivo*, además de los que ya había.
+- **Panel Trazados** (junto a Capas y Canales): la Pluma en modo «Trazado» guarda trazados sin crear capas; se pueden
+  rellenar, contornear, convertir en selección y crear desde una selección (*Selección › Selección a trazado*).
+- **Transformar › Sesgar** (o `Ctrl` + arrastrar un tirador lateral en la transformación libre).
+- **Imagen › Rotación de imagen › Rotar lienzo un ángulo…** y herramienta **Regla** (con el cuentagotas, `I`): mide
+  distancias y ángulos, y «Enderezar» pone recta una foto torcida.
+- **Selección**: *Modificar › Borde* y *Suavizar*, *Extender* y *Similar*.
+- **Herramientas nuevas**: borrador de fondos y borrador mágico (con el borrador, `E`), pincel de ojos rojos (con los
+  correctores, `J`) y esponja (con sobreexponer/subexponer, `O`). El lazo magnético ya aparece en la barra.
+- **Exportar a PDF y SVG**, e **Imprimir** (`Ctrl+P`).
+- **Más fluido en imágenes grandes**: la vista usa una copia reducida que solo se actualiza donde cambia.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

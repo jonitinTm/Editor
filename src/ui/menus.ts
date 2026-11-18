@@ -16,11 +16,11 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
 };
 
 const MENUS: { label: string; items: Item[] }[] = [
-  { label: 'Archivo', items: ['new', 'open', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', '-', 'batch', '-', 'close'] },
+  { label: 'Archivo', items: ['new', 'open', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', '-', 'batch', '-', 'print', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fill', 'contentFill', 'stroke', '-', 'definePattern', '-', 'freeTransform',
-    { label: 'Transformar', items: ['distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'prefs'] },
+    { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'prefs'] },
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'dupDoc', '-', 'imageSize', 'canvasSize',
-    { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
+    { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', 'imgRotArb', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
   { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
     'artboard',
     { label: 'Nueva capa de relleno', items: ['fill:solid', 'fill:gradient', 'fill:pattern'] },
@@ -28,7 +28,7 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Objeto inteligente', items: ['toSmart', 'editSmart', 'replaceSmart', 'rasterize'] }, { label: 'Texto', items: ['warpText'] }, '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
-  { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'selectSubject', 'colorRange', 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['feather', 'expand', 'contract'] }] },
+  { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'selToPath', 'selectSubject', 'colorRange', 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['border', 'smoothSel', 'expand', 'contract', 'feather'] }, 'growSel', 'similarSel'] },
   { label: 'Filtro', items: ['lastFilter', '-', 'filter:develop', 'liquify', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'win:all'] },

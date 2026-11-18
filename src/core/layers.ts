@@ -94,9 +94,13 @@ export interface LayerStyles {
   colorOverlay?: { enabled: boolean; color: string; opacity: number };
   /** Degradado sobre la capa; `stops` = [posición 0-1, color]. */
   gradientOverlay?: { enabled: boolean; opacity: number; angle: number; stops: [number, string][] };
+  /** Bisel y relieve. */
+  bevel?: import('./bevel').BevelStyle;
+  /** Superposición de motivo. */
+  patternOverlay?: { enabled: boolean; pattern: string; scale: number; opacity: number };
 }
 export function hasStyles(s: LayerStyles | null | undefined): s is LayerStyles {
-  return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled || s.innerShadow?.enabled || s.innerGlow?.enabled || s.colorOverlay?.enabled || s.gradientOverlay?.enabled);
+  return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled || s.innerShadow?.enabled || s.innerGlow?.enabled || s.colorOverlay?.enabled || s.gradientOverlay?.enabled || s.bevel?.enabled || s.patternOverlay?.enabled);
 }
 
 export abstract class Layer {

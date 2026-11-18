@@ -657,7 +657,8 @@ export function toggleQuickMask() {
 
 export function pathToSelection() {
   const d = doc(); const l = d?.active;
-  if (!d || !(l instanceof ShapeLayer) || l.props.shape !== 'path' || !l.props.path) { app.toast('Selecciona una capa de trazado (creada con la pluma)', 'warn'); return; }
+  if (d && !(l instanceof ShapeLayer && l.props.shape === 'path') && d.activePath >= 0) { docPathToSelection(d.activePath); return; }
+  if (!d || !(l instanceof ShapeLayer) || l.props.shape !== 'path' || !l.props.path) { app.toast('Selecciona una capa de trazado o un trazado del panel Trazados', 'warn'); return; }
   const path = l.props.path;
   d.selection.combine('new', ctx => { ctx.beginPath(); tracePath(ctx, path.pts, true); ctx.fill(); });
   d.commit('Trazado a selección');
@@ -1114,4 +1115,155 @@ export async function exportSet(d: EditorDocument, type: 'image/png' | 'image/jp
   const { makeZip } = await import('../io/zip');
   await io.saveBlob(makeZip(files), base + '.zip');
   return files.length;
+}
+
+/** Imagen › Rotación del lienzo › Arbitrario: gira todo el documento; el lienzo crece para que no se corte nada. */
+export function rotateImageArbitrary(deg: number, fillBottom: boolean) {
+  const d = doc(); if (!d || !deg) return;
+  const W = d.width, H = d.height, a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  const nw = Math.max(1, Math.ceil(Math.abs(W * c) + Math.abs(H * s) - 1e-6)), nh = Math.max(1, Math.ceil(Math.abs(W * s) + Math.abs(H * c) - 1e-6));
+  if (nw * nh > 268e6) { app.toast('El resultado sería demasiado grande', 'warn'); return; }
+  const tf = (src: HTMLCanvasElement) => {
+    const out = makeCanvas(nw, nh), x = ctx2d(out);
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.translate(nw / 2, nh / 2); x.rotate(a); x.drawImage(src, -W / 2, -H / 2);
+    return out;
+  };
+  for (const l of d.allLayers()) if (isParametric(l) && !(l instanceof SmartLayer)) rasterizeLayer(l);
+  const D: Matrix = [c, s, -s, c, nw / 2 - c * W / 2 + s * H / 2, nh / 2 - s * W / 2 - c * H / 2];
+  const bottom = d.root.children[0];
+  for (const l of d.allLayers()) {
+    if (l instanceof SmartLayer) { l.canvas = makeCanvas(nw, nh); l.applyMatrix(D); }
+    else if (isRaster(l)) {
+      const r = tf(l.canvas);
+      if (fillBottom && l === bottom) { const b = makeCanvas(nw, nh), bx = ctx2d(b); bx.fillStyle = app.bg; bx.fillRect(0, 0, nw, nh); bx.drawImage(r, 0, 0); l.canvas = b; } else l.canvas = r;
+      l.touch();
+    }
+    if (l.mask) { l.mask.canvas = tf(l.mask.canvas); l.mask.touch(); }
+  }
+  d.channels = d.channels.map(ch => ({ ...ch, canvas: tf(ch.canvas) }));
+  d.width = nw; d.height = nh;
+  d.selection.width = nw; d.selection.height = nh;
+  d.selection.setMask(null);
+  d.guides = { h: [], v: [] };
+  d.invalidate();
+  d.commit(`Rotar lienzo ${+deg.toFixed(1)}°`);
+  app.viewport.fit(true);
+}
+
+/** Selección › Extender (contiguous) o Similar: añade los píxeles de colores parecidos a los seleccionados. */
+export function growSimilar(contiguous: boolean, tolerance = 32) {
+  const d = doc(); if (!d) return;
+  const m = d.selection.mask; if (!m) { app.toast('Haz primero una selección', 'warn'); return; }
+  const W = d.width, H = d.height, px = ctx2d(d.getComposite()).getImageData(0, 0, W, H).data, sm = ctx2d(m).getImageData(0, 0, W, H).data;
+  // colores presentes en la selección (cubos de 8 niveles por canal) ampliados con la tolerancia
+  const Q = (v: number) => v >> 3, present = new Uint8Array(32768);
+  for (let i = 0; i < W * H; i++) if (sm[i * 4 + 3] > 127) present[(Q(px[i * 4]) << 10) | (Q(px[i * 4 + 1]) << 5) | Q(px[i * 4 + 2])] = 1;
+  const t = Math.max(0, Math.round(tolerance / 8)), ok = new Uint8Array(32768);
+  for (let b = 0; b < 32768; b++) if (present[b]) {
+    const r = b >> 10, g = (b >> 5) & 31, bl = b & 31;
+    for (let dr = -t; dr <= t; dr++) for (let dg = -t; dg <= t; dg++) for (let db = -t; db <= t; db++) {
+      const R = r + dr, G = g + dg, B = bl + db; if (R < 0 || G < 0 || B < 0 || R > 31 || G > 31 || B > 31) continue;
+      ok[(R << 10) | (G << 5) | B] = 1;
+    }
+  }
+  const match = (i: number) => ok[(Q(px[i * 4]) << 10) | (Q(px[i * 4 + 1]) << 5) | Q(px[i * 4 + 2])] === 1;
+  const sel = new Uint8Array(W * H);
+  if (!contiguous) for (let i = 0; i < W * H; i++) sel[i] = sm[i * 4 + 3] > 127 || match(i) ? 1 : 0;
+  else {
+    const st: number[] = [];
+    for (let i = 0; i < W * H; i++) if (sm[i * 4 + 3] > 127) { sel[i] = 1; st.push(i); }
+    while (st.length) {
+      const i = st.pop()!, x = i % W;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, i - W, i + W]) if (j >= 0 && j < W * H && !sel[j] && match(j)) { sel[j] = 1; st.push(j); }
+    }
+  }
+  const out = makeCanvas(W, H), oc = ctx2d(out), img = oc.createImageData(W, H);
+  for (let i = 0; i < W * H; i++) { const k = i * 4; img.data[k] = img.data[k + 1] = img.data[k + 2] = 255; img.data[k + 3] = sel[i] ? 255 : sm[k + 3]; }
+  oc.putImageData(img, 0, 0);
+  d.selection.setMask(out);
+  d.commit(contiguous ? 'Extender selección' : 'Seleccionar similar');
+}
+
+// ---- Trazados (panel Trazados) ---------------------------------------------------------
+
+import type { DocPath } from '../core/document';
+/** Dibuja todos los subtrazados de un trazado en un contexto (para rellenar, contornear o seleccionar). */
+export function tracePathDoc(ctx: CanvasRenderingContext2D, p: DocPath) {
+  ctx.beginPath();
+  for (const sp of p.subpaths) tracePath(ctx, sp.pts, sp.closed);
+}
+export function newDocPath(subpaths: DocPath['subpaths'], name?: string) {
+  const d = doc(); if (!d) return;
+  let n = d.paths.length + 1; const names = new Set(d.paths.map(p => p.name)); while (names.has(`Trazado ${n}`)) n++;
+  d.paths.push({ name: name ?? `Trazado ${n}`, subpaths });
+  d.activePath = d.paths.length - 1;
+  d.commit('Nuevo trazado');
+}
+export function fillDocPath(i: number) {
+  const d = doc(); const p = d?.paths[i]; if (!d || !p) return;
+  const t = getPaintTarget(); if (!t) { app.toast('Selecciona una capa de píxeles', 'warn'); return; }
+  const out = cloneCanvas(t.canvas), c = ctx2d(out);
+  if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
+  c.fillStyle = t.isMask ? '#fff' : app.fg; tracePathDoc(c, p); c.fill('evenodd');
+  setTargetCanvas(t, out); d.commit('Rellenar trazado');
+}
+export function strokeDocPath(i: number) {
+  const d = doc(); const p = d?.paths[i]; if (!d || !p) return;
+  const t = getPaintTarget(); if (!t) { app.toast('Selecciona una capa de píxeles', 'warn'); return; }
+  const out = cloneCanvas(t.canvas), c = ctx2d(out);
+  if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
+  // contornea con el color frontal y el tamaño del pincel
+  c.strokeStyle = t.isMask ? '#fff' : app.fg; c.lineWidth = Math.max(1, app.opt<number>('size', 'brush') ?? 3); c.lineCap = 'round'; c.lineJoin = 'round';
+  tracePathDoc(c, p); c.stroke();
+  setTargetCanvas(t, out); d.commit('Contornear trazado');
+}
+export function docPathToSelection(i: number) {
+  const d = doc(); const p = d?.paths[i]; if (!d || !p) return;
+  d.selection.combine('new', ctx => { tracePathDoc(ctx, { ...p, subpaths: p.subpaths.map(s => ({ ...s, closed: true })) }); ctx.fill('evenodd'); });
+  d.commit('Trazado a selección');
+}
+export async function selectionToPath() {
+  const d = doc(); if (!d) return;
+  if (!d.selection.mask) { app.toast('Haz primero una selección', 'warn'); return; }
+  const { maskContours } = await import('../core/contour');
+  const loops = maskContours(d.selection.mask);
+  if (!loops.length) { app.toast('La selección está vacía', 'warn'); return; }
+  newDocPath(loops.map(l => ({ closed: true, pts: l.map(q => ({ x: q.x, y: q.y, ix: q.x, iy: q.y, ox: q.x, oy: q.y })) })));
+}
+export function deleteDocPath(i: number) {
+  const d = doc(); if (!d || !d.paths[i]) return;
+  d.paths.splice(i, 1); d.activePath = Math.min(d.activePath, d.paths.length - 1);
+  d.commit('Eliminar trazado');
+}
+
+/** Exportar como PDF (JPEG dentro) o SVG (PNG dentro). */
+export async function exportVector(kind: 'pdf' | 'svg', base: string, quality: number, scale: number) {
+  const d = doc(); if (!d) return;
+  const w = Math.max(1, Math.round(d.width * scale)), hh = Math.max(1, Math.round(d.height * scale));
+  if (kind === 'pdf') {
+    const jpg = await io.exportImage(d, 'image/jpeg', quality, scale);
+    const { makePdf } = await import('../io/pdf');
+    await io.saveBlob(await makePdf(new Uint8Array(await jpg.arrayBuffer()), w, hh), base + '.pdf');
+  } else {
+    const png = await io.exportImage(d, 'image/png', 1, scale);
+    const url = await new Promise<string>(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result)); fr.readAsDataURL(png); });
+    const svg = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${w}" height="${hh}" viewBox="0 0 ${w} ${hh}"><image width="${w}" height="${hh}" xlink:href="${url}" href="${url}"/></svg>`;
+    await io.saveBlob(new Blob([svg], { type: 'image/svg+xml' }), base + '.svg');
+  }
+}
+
+/** Archivo › Imprimir: abre el diálogo de impresión del navegador con la imagen ajustada a la página. */
+export async function printImage() {
+  const d = doc(); if (!d) return;
+  const png = await io.exportImage(d, 'image/png', 1, 1);
+  const url = URL.createObjectURL(png);
+  const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.append(f);
+  const fd = f.contentDocument!;
+  fd.open(); fd.write(`<!doctype html><title>${d.name.replace(/[<&]/g, '')}</title><style>@page{margin:10mm}html,body{margin:0;height:100%}img{display:block;max-width:100%;max-height:100vh;margin:auto;object-fit:contain}</style><img src="${url}">`); fd.close();
+  const img = fd.querySelector('img')!;
+  await new Promise(r => { if (img.complete) r(null); else img.onload = () => r(null); });
+  f.contentWindow!.focus(); f.contentWindow!.print();
+  setTimeout(() => { f.remove(); URL.revokeObjectURL(url); }, 60000);
 }

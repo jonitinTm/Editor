@@ -141,7 +141,7 @@ export class PencilTool extends StrokeTool {
 }
 
 export class EraserTool extends StrokeTool {
-  id = 'eraser'; name = 'Borrador'; icon = icon('eraser'); key = 'E'; historyName = 'Borrador';
+  id = 'eraser'; name = 'Borrador'; icon = icon('eraser'); key = 'E'; group = 'eraser'; historyName = 'Borrador';
   erase = true;
 }
 

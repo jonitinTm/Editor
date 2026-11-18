@@ -195,3 +195,39 @@ export function buildActionsPanel(parent: HTMLElement) {
   app.on('doc', render); app.on('docs', render);
   new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
 }
+
+// ---- Trazados ------------------------------------------------------------------------------
+
+export function buildPathsPanel(parent: HTMLElement) {
+  const list = h('div', { class: 'layer-list' });
+  const act = (fn: (i: number) => void) => () => { const d = app.doc; if (d && d.activePath >= 0) fn(d.activePath); else app.toast('Selecciona un trazado', 'warn'); };
+  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn }, label);
+  const foot = h('div', { class: 'panel-foot' },
+    btn('Rellenar el trazado con el color frontal', '●', act(ops.fillDocPath)),
+    btn('Contornear el trazado con el pincel (color frontal y tamaño del pincel)', '○', act(ops.strokeDocPath)),
+    btn('Cargar el trazado como selección', '◌', act(ops.docPathToSelection)),
+    btn('Crear un trazado a partir de la selección', '⬚', () => ops.selectionToPath()),
+    btn('Eliminar el trazado', '🗑', act(ops.deleteDocPath)));
+  const body = h('div', { class: 'panel-body layers' }, list, foot);
+  parent.append(body);
+  const render = () => {
+    const d = app.doc; list.innerHTML = ''; if (!d || !visible(body)) return;
+    d.paths.forEach((p, i) => {
+      const k = Math.min(36 / d.width, 36 / d.height);
+      const c = h('canvas', { class: 'thumb', width: Math.max(1, Math.round(d.width * k)), height: Math.max(1, Math.round(d.height * k)) });
+      const x = c.getContext('2d')!; x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.scale(k, k); x.fillStyle = '#555'; ops.tracePathDoc(x, p); x.fill('evenodd');
+      const row = h('div', { class: 'layer-row' + (i === d.activePath ? ' active' : ''), title: 'Clic: seleccionar (clic otra vez: ocultar) · Ctrl+clic: cargar como selección · Doble clic en el nombre: renombrar' },
+        h('span', { class: 'eye' }), c, h('span', { class: 'lname' }, p.name));
+      row.onclick = e => {
+        if (e.ctrlKey || e.metaKey) { ops.docPathToSelection(i); return; }
+        d.activePath = d.activePath === i ? -1 : i; app.viewport.requestRender(); render();
+      };
+      row.querySelector('.lname')!.addEventListener('dblclick', async ev => { ev.stopPropagation(); const n = await promptDialog('Cambiar nombre de trazado', 'Nombre', p.name); if (n) { p.name = n; d.commit('Cambiar nombre de trazado'); } });
+      list.append(row);
+    });
+    if (!d.paths.length) list.append(h('div', { class: 'hint ch-empty' }, 'Dibuja con la Pluma en modo «Trazado», o crea uno desde una selección (botón ⬚).'));
+  };
+  let t = 0;
+  app.on('doc', () => { clearTimeout(t); t = window.setTimeout(render, 150); }); app.on('docs', render);
+  new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}

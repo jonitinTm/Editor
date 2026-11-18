@@ -219,11 +219,11 @@ export class TransformTool implements Tool {
   private drag: Drag | null = null;
   private qdrag: { i: number | 'move'; start: P; q0: P[] } | null = null;
   /** Modo de la transformación: libre, distorsionar o perspectiva. */
-  warp: 'free' | 'distort' | 'perspective' | 'warp' = 'free';
+  warp: 'free' | 'distort' | 'perspective' | 'warp' | 'skew' = 'free';
   private mdrag: { kind: 'pt'; i: number; start: P; m0: P[] } | { kind: 'surf'; u: number; v: number; start: P; m0: P[] } | null = null;
   private warpStyle = 'none'; private bend = 50; private warpBox: Rect | null = null;
   /** Modo con el que debe empezar la próxima sesión (desde el menú). */
-  static startMode: 'free' | 'distort' | 'perspective' | 'warp' = 'free';
+  static startMode: 'free' | 'distort' | 'perspective' | 'warp' | 'skew' = 'free';
   private fields: Record<string, HTMLInputElement> = {};
 
   activate() {
@@ -251,9 +251,9 @@ export class TransformTool implements Tool {
       if (this.warpStyle !== 'none') bar.append(numberSlider({ label: 'Curvatura', min: -100, max: 100, value: this.bend, unit: '%', compact: true, onInput: v => { this.bend = v; this.applyStyle(); } }).el);
       else bar.append(h('span', { class: 'hint' }, 'Arrastra los puntos o directamente la imagen.'));
     }
-    else if (this.s?.quad) bar.append(h('span', { class: 'hint' }, this.warp === 'perspective' ? 'Perspectiva: arrastra una esquina (la vecina se mueve en espejo).' : 'Distorsionar: arrastra cada esquina libremente.'));
+    else if (this.s?.quad) bar.append(h('span', { class: 'hint' }, this.warp === 'perspective' ? 'Perspectiva: arrastra una esquina (la vecina se mueve en espejo).' : this.warp === 'skew' ? 'Sesgar: arrastra el punto medio de un lado.' : 'Distorsionar: arrastra cada esquina libremente.'));
     else { num('x', 'X', 'px'); num('y', 'Y', 'px'); num('w', 'An', '%'); num('h', 'Al', '%'); num('a', 'Ángulo', '°'); }
-    const modeSel = h('select', { title: 'Modo de transformación' }, h('option', { value: 'free' }, 'Libre'), h('option', { value: 'distort' }, 'Distorsionar'), h('option', { value: 'perspective' }, 'Perspectiva'), h('option', { value: 'warp' }, 'Deformar'));
+    const modeSel = h('select', { title: 'Modo de transformación' }, h('option', { value: 'free' }, 'Libre'), h('option', { value: 'distort' }, 'Distorsionar'), h('option', { value: 'skew' }, 'Sesgar'), h('option', { value: 'perspective' }, 'Perspectiva'), h('option', { value: 'warp' }, 'Deformar'));
     modeSel.value = this.warp;
     modeSel.onchange = () => { if (modeSel.value === 'free') { app.toast('Para volver a la transformación libre, cancela (Esc) y empieza de nuevo', 'warn'); modeSel.value = this.warp; return; } this.enterQuad(modeSel.value as any); };
     bar.append(modeSel);
@@ -305,7 +305,7 @@ export class TransformTool implements Tool {
   private local(x: number, y: number) { const st = this.s!.st; return rot(x - st.cx, y - st.cy, -st.angle); }
 
   /** Pasa al modo de esquinas libres (distorsionar / perspectiva). */
-  enterQuad(mode: 'distort' | 'perspective' | 'warp') {
+  enterQuad(mode: 'distort' | 'perspective' | 'warp' | 'skew') {
     const s = this.s; if (!s) return;
     if (s.mesh && mode !== 'warp') { app.toast('Para dejar de deformar, cancela (Esc) y empieza de nuevo', 'warn'); app.emit('tool'); return; }
     this.warp = mode;
@@ -331,6 +331,8 @@ export class TransformTool implements Tool {
   private quadHit(e: ToolEvent): number | 'move' | null {
     const q = this.s!.quad!, vp = app.viewport;
     for (let i = 0; i < 4; i++) { const sp = vp.toScreen(q[i].x, q[i].y); if (Math.abs(sp.x - e.sx) < 9 && Math.abs(sp.y - e.sy) < 9) return i; }
+    // puntos medios de los lados (4 + número de lado: arriba, derecha, abajo, izquierda)
+    for (let k = 0; k < 4; k++) { const a = q[k], b = q[(k + 1) % 4], sp = vp.toScreen((a.x + b.x) / 2, (a.y + b.y) / 2); if (Math.abs(sp.x - e.sx) < 8 && Math.abs(sp.y - e.sy) < 8) return 4 + k; }
     let inside = false;
     for (let i = 0, j = 3; i < 4; j = i++) if ((q[i].y > e.y) !== (q[j].y > e.y) && e.x < (q[j].x - q[i].x) * (e.y - q[i].y) / (q[j].y - q[i].y) + q[i].x) inside = !inside;
     return inside ? 'move' : null;
@@ -367,7 +369,17 @@ export class TransformTool implements Tool {
   }
   down(e: ToolEvent) {
     if (!this.s) return;
-    if (!this.s.quad && e.ctrl) { const r0 = this.hit(e); if (typeof r0 === 'object' && r0.hx && r0.hy) this.enterQuad(e.alt && e.shift ? 'perspective' : 'distort'); }
+    if (!this.s.quad && e.ctrl) {
+      const r0 = this.hit(e);
+      if (typeof r0 === 'object' && r0.hx && r0.hy) this.enterQuad(e.alt && e.shift ? 'perspective' : 'distort');
+      else if (typeof r0 === 'object') {
+        // Ctrl + tirador lateral: sesgar (el lado se desliza en su propia dirección)
+        this.enterQuad('skew');
+        const side = r0.hy === -1 ? 0 : r0.hx === 1 ? 1 : r0.hy === 1 ? 2 : 3;
+        this.qdrag = { i: 4 + side, start: { x: e.x, y: e.y }, q0: this.s.quad!.map(p => ({ ...p })) };
+        return;
+      }
+    }
     if (this.s.mesh) {
       const q = this.meshHit(e), m0 = this.s.mesh.map(p => ({ ...p }));
       if (typeof q === 'number') this.mdrag = { kind: 'pt', i: q, start: { x: e.x, y: e.y }, m0 };
@@ -404,6 +416,13 @@ export class TransformTool implements Tool {
     if (this.s?.quad && this.qdrag) {
       const { i, start, q0 } = this.qdrag, dx = e.x - start.x, dy = e.y - start.y, q = this.s.quad;
       if (i === 'move') q0.forEach((p, k) => { q[k] = { x: p.x + dx, y: p.y + dy }; });
+      else if (typeof i === 'number' && i >= 4) {
+        // lado: con Sesgar (o Ctrl) se desliza a lo largo de sí mismo; si no, se mueve libre
+        const a = (i - 4), b = (a + 1) % 4, ex = q0[b].x - q0[a].x, ey = q0[b].y - q0[a].y, L = Math.hypot(ex, ey) || 1;
+        let mx = dx, my = dy;
+        if (this.warp === 'skew' || e.ctrl) { const t = (dx * ex + dy * ey) / L; mx = ex / L * t; my = ey / L * t; }
+        q0.forEach((p, k) => { q[k] = { ...p }; }); q[a] = { x: q0[a].x + mx, y: q0[a].y + my }; q[b] = { x: q0[b].x + mx, y: q0[b].y + my };
+      }
       else if (this.warp === 'perspective' || (e.alt && e.shift)) {
         // Perspectiva: la esquina vecina se mueve en espejo
         q0.forEach((p, k) => { q[k] = { ...p }; });
@@ -498,6 +517,7 @@ export class TransformTool implements Tool {
       const q = this.s.quad.map(p => vp.toScreen(p.x, p.y));
       ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1.5; ctx.beginPath(); q.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)); ctx.closePath(); ctx.stroke();
       for (const p of q) { ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 4, p.y - 4, 8, 8); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1; ctx.strokeRect(p.x - 4, p.y - 4, 8, 8); }
+      for (let k = 0; k < 4; k++) { const a = q[k], b = q[(k + 1) % 4], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(mx, my, 3.5, 0, 7); ctx.fill(); ctx.strokeStyle = '#3d8bfd'; ctx.stroke(); }
       return;
     }
     const hs = this.handles();

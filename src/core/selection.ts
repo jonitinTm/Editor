@@ -86,6 +86,26 @@ export class Selection {
     gaussianBlur(img, radius, true);
     putPixels(this.mask, img); this.changed();
   }
+  /** Borde: una franja de `w` px alrededor del contorno de la selección. */
+  border(w: number) {
+    if (!this.mask || w <= 0) return;
+    const orig = cloneCanvas(this.mask);
+    this.grow(Math.max(1, Math.round(w / 2)));
+    const outer = cloneCanvas(this.mask!);
+    this.mask = cloneCanvas(orig); this.grow(-Math.max(1, Math.round(w / 2)));
+    const inner = this.mask!;
+    const c = ctx2d(outer); c.globalCompositeOperation = 'destination-out'; c.drawImage(inner, 0, 0);
+    this.mask = outer; this.feather(0.7);
+    this.changed();
+  }
+  /** Suavizar: redondea las esquinas y quita los picos de la selección. */
+  smooth(r: number) {
+    if (!this.mask || r <= 0) return;
+    const img = getPixels(this.mask);
+    gaussianBlur(img, r, true);
+    const d = img.data; for (let i = 3; i < d.length; i += 4) d[i] = d[i] >= 128 ? 255 : 0;
+    putPixels(this.mask, img); this.changed();
+  }
   /** Expandir (r>0) o contraer (r<0) la selección. */
   grow(r: number) {
     if (!this.mask || r === 0) return;

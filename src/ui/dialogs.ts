@@ -13,6 +13,7 @@ import { allPatterns } from '../core/patterns';
 import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
 import { prefs, savePrefs } from './prefs';
+import { BEVEL_DEFAULT } from '../core/bevel';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
 
@@ -58,6 +59,8 @@ export function exportDialog() {
     h('option', { value: 'image/jpeg' }, 'JPG (fotografías, sin transparencia)'),
     h('option', { value: 'image/webp' }, 'WebP (moderno, ligero)'),
     h('option', { value: 'gif' }, 'GIF (animado si hay cuadros en la línea de tiempo)'),
+    h('option', { value: 'pdf' }, 'PDF (para imprimir o enviar)'),
+    h('option', { value: 'svg' }, 'SVG (imagen incrustada, se puede ampliar en diseño web)'),
     h('option', { value: 'psd' }, 'PSD (Photoshop, conserva capas)'),
     h('option', { value: 'project' }, 'Proyecto de Editor (.edp, conserva todo)'));
   let quality = 90;
@@ -79,8 +82,12 @@ export function exportDialog() {
   const estimate = () => {
     clearTimeout(timer);
     qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
-    scRow.style.display = exRow.style.display = fmt.value.startsWith('image/') ? '' : 'none';
+    scRow.style.display = fmt.value.startsWith('image/') || fmt.value === 'pdf' || fmt.value === 'svg' ? '' : 'none';
+    exRow.style.display = fmt.value.startsWith('image/') ? '' : 'none';
+    qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' || fmt.value === 'pdf' ? '' : 'none';
     pbRow.style.display = hasBoards && fmt.value.startsWith('image/') ? '' : 'none';
+    if (fmt.value === 'pdf') { info.textContent = 'Un PDF de una página con la imagen (fondo blanco). Ideal para imprimir.'; return; }
+    if (fmt.value === 'svg') { info.textContent = 'Archivo SVG con la imagen incrustada (sin pérdida, con transparencia).'; return; }
     if (fmt.value === 'project') { info.textContent = 'Guarda todo (capas, texto, formas, ajustes, estilos) para seguir editando.'; return; }
     if (fmt.value === 'gif') { info.textContent = d.frames.length > 1 ? `Animación de ${d.frames.length} cuadros, 256 colores.` : 'Imagen de 256 colores. Para animar, crea cuadros en Ventana › Línea de tiempo.'; return; }
     if (fmt.value === 'psd') { info.textContent = 'Capas, grupos, máscaras, opacidad y modos de fusión. El texto y las formas van como píxeles.'; return; }
@@ -99,6 +106,7 @@ export function exportDialog() {
       if (fmt.value === 'project') { d.name = name.value || d.name; await ops.saveProject(true); return; }
       if (fmt.value === 'psd') { await ops.savePsd(name.value || d.name); return; }
       if (fmt.value === 'gif') { await ops.saveGif(name.value || d.name); return; }
+      if (fmt.value === 'pdf' || fmt.value === 'svg') { try { await ops.exportVector(fmt.value, name.value || d.name, quality / 100, scale / 100); app.toast('Exportado'); } catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); } return; }
       const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[fmt.value]!;
       const extra = extraChecks.filter(e => e.c.checked).map(e => e.k);
       if (extra.length || (hasBoards && perBoard.checked)) {
@@ -249,16 +257,18 @@ export function colorRangeDialog() {
 
 // ---- Modificar selección ------------------------------------------------------------
 
-export function modifySelectionDialog(kind: 'feather' | 'expand' | 'contract') {
+export function modifySelectionDialog(kind: 'feather' | 'expand' | 'contract' | 'border' | 'smooth') {
   const d = app.doc; if (!d) return;
   if (!d.selection.active) { app.toast('Haz primero una selección', 'warn'); return; }
-  const titles = { feather: 'Calar selección', expand: 'Expandir selección', contract: 'Contraer selección' };
+  const titles = { feather: 'Calar selección', expand: 'Expandir selección', contract: 'Contraer selección', border: 'Borde de la selección', smooth: 'Suavizar selección' };
   const inp = numInput(kind === 'feather' ? 5 : 2, 1, 500);
   showDialog({
-    title: titles[kind], body: row(kind === 'feather' ? 'Radio de calado' : 'Cantidad', inp, 'px'),
+    title: titles[kind], body: row(kind === 'feather' ? 'Radio de calado' : kind === 'border' ? 'Anchura' : kind === 'smooth' ? 'Radio de muestra' : 'Cantidad', inp, 'px'),
     onOk: () => {
       const v = +inp.value; if (!(v > 0)) return false;
       if (kind === 'feather') d.selection.feather(v / 2);
+      else if (kind === 'border') d.selection.border(v);
+      else if (kind === 'smooth') d.selection.smooth(v);
       else d.selection.grow(kind === 'expand' ? v : -v);
       d.commit(titles[kind]);
     },
@@ -460,6 +470,8 @@ export function layerStyleDialog() {
     innerGlow: { enabled: false, color: '#ffffaa', opacity: 75, size: 10 },
     colorOverlay: { enabled: false, color: '#ff0000', opacity: 100 },
     gradientOverlay: { enabled: false, opacity: 100, angle: 90, stops: [[0, '#000000'], [1, '#ffffff']] },
+    bevel: { ...BEVEL_DEFAULT },
+    patternOverlay: { enabled: false, pattern: allPatterns()[0]?.id ?? '', scale: 100, opacity: 100 },
     ...(before ? JSON.parse(JSON.stringify(before)) : {}),
   };
   const update = () => ops.setLayerStyles(l, JSON.parse(JSON.stringify(st)), false);
@@ -478,9 +490,27 @@ export function layerStyleDialog() {
     els.push(row('Colores', pick(0), '→', pick(g.stops.length - 1)));
     return els;
   };
+  const bevelSection = () => {
+    const b = st.bevel, els = section('Bisel y relieve', b, [['depth', 'Profundidad', 1, 1000, '%'], ['size', 'Tamaño', 0, 250, 'px'], ['soften', 'Suavizar', 0, 16, 'px'], ['angle', 'Ángulo', -180, 180, '°'], ['altitude', 'Altitud', 0, 90, '°'], ['highlightOpacity', 'Opacidad luces', 0, 100, '%'], ['shadowOpacity', 'Opacidad sombras', 0, 100, '%']]);
+    const enable = () => { if (!b.enabled) { b.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; } };
+    const style = h('select', {}, ...([['inner', 'Bisel interior'], ['outer', 'Bisel exterior'], ['emboss', 'Relieve'], ['pillow', 'Relieve acolchado']] as const).map(([v, n]) => h('option', { value: v, selected: b.style === v }, n)));
+    style.onchange = () => { b.style = style.value as any; enable(); update(); };
+    const dir = h('select', {}, h('option', { value: 'up', selected: b.up }, 'Arriba'), h('option', { value: 'down', selected: !b.up }, 'Abajo'));
+    dir.onchange = () => { b.up = dir.value === 'up'; enable(); update(); };
+    const col = (key: 'highlight' | 'shadowColor') => { const c = h('input', { type: 'color', class: 'color-input', value: b[key] }); c.oninput = () => { b[key] = c.value; enable(); update(); }; return c; };
+    els.splice(1, 0, row('Estilo', style), row('Dirección', dir));
+    els.push(row('Colores', h('span', {}, 'Luces '), col('highlight'), h('span', {}, ' Sombras '), col('shadowColor')));
+    return els;
+  };
+  const patSection = () => {
+    const po = st.patternOverlay, els = section('Superposición de motivo', po, [['opacity', 'Opacidad', 0, 100, '%'], ['scale', 'Escala', 1, 1000, '%']]);
+    els.splice(1, 0, row('Motivo', patternSelect(po.pattern, v => { po.pattern = v; if (!po.enabled) { po.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; } update(); })));
+    return els;
+  };
   showDialog({
     title: `Estilo de capa: ${l.name}`, width: 400, side: true,
     body: [
+      ...bevelSection(),
       ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
       ...section('Trazo (exterior)', st.stroke, [['size', 'Grosor', 1, 60, 'px']]),
       ...section('Resplandor exterior', st.glow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
@@ -488,6 +518,7 @@ export function layerStyleDialog() {
       ...section('Resplandor interior', st.innerGlow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
       ...section('Superposición de color', st.colorOverlay, [['opacity', 'Opacidad', 0, 100, '%']]),
       ...gradSection(),
+      ...patSection(),
     ],
     onOk: () => { const any = Object.values(st).some((x: any) => x.enabled); l.styles = before; ops.setLayerStyles(l, any || before ? JSON.parse(JSON.stringify(st)) : null, true); },
     onCancel: () => ops.setLayerStyles(l, before, false),
@@ -604,5 +635,19 @@ export function artboardDialog() {
       if (!(W >= 1 && H >= 1 && W <= 20000 && H <= 20000)) { app.toast('Tamaño no válido', 'warn'); return false; }
       ops.newArtboard(W, H, bg.value === 'bgc' ? app.bg : bg.value || null, name.value.trim() || undefined);
     },
+  });
+}
+
+// ---- Rotación arbitraria del lienzo ---------------------------------------------------------
+
+export function rotateArbitraryDialog() {
+  if (!app.doc) return;
+  const ang = h('input', { type: 'number', class: 'num', value: '15', step: '0.1', min: '-359.9', max: '359.9' });
+  const dir = h('select', {}, h('option', { value: '1' }, 'Horario'), h('option', { value: '-1' }, 'Antihorario'));
+  const fill = h('input', { type: 'checkbox', checked: true });
+  showDialog({
+    title: 'Rotar lienzo', okLabel: 'Rotar',
+    body: [row('Ángulo', ang, '°'), row('Sentido', dir), row('', h('label', { class: 'check' }, fill, ' Rellenar las esquinas de la capa inferior con el color de fondo'))],
+    onOk: () => { const v = parseFloat(ang.value); if (!isFinite(v) || !v) return; ops.rotateImageArbitrary(v * +dir.value, fill.checked); },
   });
 }

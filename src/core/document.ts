@@ -8,6 +8,8 @@ import { renderComposite, compositeGroup, LayerOverride } from './compositor';
 
 export interface ViewState { zoom: number; panX: number; panY: number; /** Giro de la vista en radianes (no afecta a la imagen). */ rot?: number; }
 
+export interface DocPath { name: string; subpaths: { closed: boolean; pts: import('./layers').PathPoint[] }[] }
+
 export class EditorDocument {
   name: string;
   width: number;
@@ -28,6 +30,10 @@ export class EditorDocument {
   snapshots: { name: string; snap: import('./history').DocSnap }[] = [];
   /** Canales alfa: selecciones guardadas (lienzos inmutables: se sustituyen, no se editan). */
   channels: { id: number; name: string; canvas: HTMLCanvasElement }[] = [];
+  /** Trazados guardados (panel Trazados): cada uno puede tener varios subtrazados. */
+  paths: DocPath[] = [];
+  /** Trazado activo en el panel (-1 = ninguno). */
+  activePath = -1;
   /** Máscara rápida: el pincel edita la selección, que se ve como una capa roja. */
   quickMask = false;
   quickPreview: HTMLCanvasElement | null = null;

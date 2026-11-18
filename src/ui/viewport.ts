@@ -5,7 +5,7 @@ import { app } from './app';
 import type { ToolEvent } from '../tools/tool';
 import { h } from './dom';
 import { drawSnap } from '../tools/snap';
-import { GroupLayer } from '../core/layers';
+import { GroupLayer, tracePath } from '../core/layers';
 
 const RULER = 20;
 
@@ -326,6 +326,13 @@ export class Viewport {
       this.boardLabels.push({ g: g as GroupLayer, x: p0.x, y: p0.y - 18, w: tw, h: 16 });
       if (act) { ctx.strokeStyle = '#5aa0ff'; ctx.lineWidth = 1; ctx.beginPath(); this.docPath(ctx, a.x, a.y, a.w, a.h); ctx.stroke(); }
       ctx.restore();
+    }
+
+    // Trazado activo del panel Trazados (la selección directa dibuja el suyo con puntos)
+    const ap = d.paths[d.activePath];
+    if (ap && app.tool?.id !== 'node') {
+      ctx.save(); this.docTransform(ctx); ctx.beginPath(); for (const sp of ap.subpaths) tracePath(ctx, sp.pts, sp.closed);
+      ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.lineWidth = 1.5; ctx.strokeStyle = '#3d8bfd'; ctx.stroke(); ctx.restore();
     }
 
     // Capa superpuesta de la herramienta
