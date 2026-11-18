@@ -203,6 +203,8 @@ Ya disponible:
   ajustar todo con *Filtro › Revelado*.
 - **Revelado de Sony ARW** (formato comprimido de las Alpha): desde los datos del sensor, con la curva de tono de Sony y
   balance de blancos automático.
+- **Revelado de Nikon NEF** (compresión de Nikon con y sin pérdida, 12 y 14 bits): con la curva de linealización y el
+  nivel de negro de la cámara. Si un NEF no se puede interpretar, se abre su vista previa.
 - **Revelado de Canon CR2**: desde los datos del sensor, recortando los márgenes tapados, con el nivel de negro medido
   y el balance de blancos de la toma guardado por la cámara. De los RAW aún no admitidos se abre la vista previa.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.

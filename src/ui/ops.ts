@@ -62,11 +62,12 @@ export async function openFiles(files: File[], asLayers = false) {
         const { isDng, decodeDng } = await import('../io/dng');
         const { isCr2, decodeCr2 } = await import('../io/cr2');
         const { isArw, decodeArw } = await import('../io/arw');
-        const cam = isCr2(bytes) ? 'Canon' : isArw(bytes) && !isDng(bytes) ? 'Sony' : null;
+        const { isNef, decodeNef } = await import('../io/nef');
+        const cam = isCr2(bytes) ? 'Canon' : isDng(bytes) ? null : isArw(bytes) ? 'Sony' : isNef(bytes) ? 'Nikon' : null;
         if (cam) {
           try {
             app.toast(`Revelando el RAW de ${cam}…`); await new Promise(r => setTimeout(r, 30));
-            const img = cam === 'Canon' ? decodeCr2(bytes) : decodeArw(bytes);
+            const img = cam === 'Canon' ? decodeCr2(bytes) : cam === 'Sony' ? decodeArw(bytes) : decodeNef(bytes);
             const rd = new EditorDocument(io.baseName(f.name), img.width, img.height);
             const rl = new RasterLayer('Fondo', img.width, img.height); ctx2d(rl.canvas).putImageData(img, 0, 0); rd.root.add(rl); rd.setActive(rl, false);
             app.addDocument(rd);
