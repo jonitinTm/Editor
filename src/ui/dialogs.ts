@@ -817,3 +817,18 @@ export function gradientButton(stops: GradStop[], onChange: (s: GradStop[]) => v
   c.addEventListener('click', () => gradientEditor(stops, s => { stops = s; paint(s); onChange(s); }));
   return c;
 }
+
+// ---- Escala según el contenido -------------------------------------------------------------
+
+export function contentAwareScaleDialog() {
+  if (!app.doc) return;
+  let wp = 70, hp = 100;
+  const skin = h('input', { type: 'checkbox', checked: true }), sel = h('input', { type: 'checkbox', checked: !!app.doc.selection.mask });
+  showDialog({
+    title: 'Escala según el contenido', okLabel: 'Aplicar',
+    body: [row('Anchura', numberSlider({ min: 20, max: 200, value: wp, unit: '%', onInput: v => wp = v }).el), row('Altura', numberSlider({ min: 20, max: 200, value: hp, unit: '%', onInput: v => hp = v }).el),
+      row('', h('label', { class: 'check' }, skin, ' Proteger tonos de piel')), row('', h('label', { class: 'check' }, sel, ' Proteger lo seleccionado')),
+      h('div', { class: 'hint' }, 'Se quitan o se repiten las franjas con menos detalle: el fondo se estira o encoge y las personas y objetos importantes no se deforman.')],
+    onOk: () => { ops.contentAwareScaleOp(wp, hp, skin.checked, sel.checked); },
+  });
+}

@@ -152,3 +152,87 @@ export function drawMeshExact(ctx: CanvasRenderingContext2D, img: HTMLCanvasElem
   const t = makeCanvas(bw, bh); t.getContext('2d')!.putImageData(out, 0, 0);
   ctx.drawImage(t, x0, y0);
 }
+
+/** Dibuja `img` deformada por una rejilla: dest[(j*(cols+1))+i] es dónde va el vértice (i, j) de la rejilla
+ *  (que cubre la imagen entera, con origen en (ox, oy) del documento). `exact` = píxel a píxel, sin costuras. */
+export function drawGrid(ctx: CanvasRenderingContext2D, img: HTMLCanvasElement, ox: number, oy: number, cols: number, rows: number, dest: P[], exact: boolean) {
+  const cw = img.width / cols, ch = img.height / rows;
+  const src = (i: number, j: number): P => ({ x: i * cw, y: j * ch });
+  if (!exact) {
+    ctx.save(); ctx.imageSmoothingEnabled = true;
+    const tri = (s0: P, s1: P, s2: P, d0: P, d1: P, d2: P) => {
+      const det = (s1.x - s0.x) * (s2.y - s0.y) - (s2.x - s0.x) * (s1.y - s0.y); if (Math.abs(det) < 1e-9) return;
+      const a = ((d1.x - d0.x) * (s2.y - s0.y) - (d2.x - d0.x) * (s1.y - s0.y)) / det, c = ((d2.x - d0.x) * (s1.x - s0.x) - (d1.x - d0.x) * (s2.x - s0.x)) / det;
+      const b = ((d1.y - d0.y) * (s2.y - s0.y) - (d2.y - d0.y) * (s1.y - s0.y)) / det, d = ((d2.y - d0.y) * (s1.x - s0.x) - (d1.y - d0.y) * (s2.x - s0.x)) / det;
+      const e = d0.x - a * s0.x - c * s0.y, f = d0.y - b * s0.x - d * s0.y;
+      const cx = (d0.x + d1.x + d2.x) / 3, cy = (d0.y + d1.y + d2.y) / 3, grow = (q: P) => { const l = Math.hypot(q.x - cx, q.y - cy) || 1; return { x: q.x + (q.x - cx) / l * 0.8, y: q.y + (q.y - cy) / l * 0.8 }; };
+      const [g0, g1, g2] = [grow(d0), grow(d1), grow(d2)];
+      ctx.save(); ctx.beginPath(); ctx.moveTo(g0.x, g0.y); ctx.lineTo(g1.x, g1.y); ctx.lineTo(g2.x, g2.y); ctx.closePath(); ctx.clip();
+      ctx.transform(a, b, c, d, e, f); ctx.drawImage(img, 0, 0); ctx.restore();
+    };
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const D = (ii: number, jj: number) => dest[jj * (cols + 1) + ii];
+      tri(src(i, j), src(i + 1, j), src(i + 1, j + 1), D(i, j), D(i + 1, j), D(i + 1, j + 1));
+      tri(src(i, j), src(i + 1, j + 1), src(i, j + 1), D(i, j), D(i + 1, j + 1), D(i, j + 1));
+    }
+    ctx.restore(); void ox; void oy; return;
+  }
+  // exacto: cada triángulo de destino se rasteriza y se muestrea con interpolación bilineal
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+  for (const q of dest) { bx0 = Math.min(bx0, q.x); by0 = Math.min(by0, q.y); bx1 = Math.max(bx1, q.x); by1 = Math.max(by1, q.y); }
+  const x0 = Math.max(0, Math.floor(bx0)), y0 = Math.max(0, Math.floor(by0)), x1 = Math.min(W, Math.ceil(bx1)), y1 = Math.min(H, Math.ceil(by1));
+  const bw = x1 - x0, bh = y1 - y0; if (bw < 1 || bh < 1) return;
+  const sw = img.width, sh = img.height, sd = img.getContext('2d')!.getImageData(0, 0, sw, sh).data;
+  const out = new ImageData(bw, bh), o = out.data, done = new Uint8Array(bw * bh);
+  const tri = (s0: P, s1: P, s2: P, d0: P, d1: P, d2: P) => {
+    const den = (d1.y - d2.y) * (d0.x - d2.x) + (d2.x - d1.x) * (d0.y - d2.y); if (Math.abs(den) < 1e-12) return;
+    const tx0 = Math.max(x0, Math.floor(Math.min(d0.x, d1.x, d2.x))), tx1 = Math.min(x1, Math.ceil(Math.max(d0.x, d1.x, d2.x)));
+    const ty0 = Math.max(y0, Math.floor(Math.min(d0.y, d1.y, d2.y))), ty1 = Math.min(y1, Math.ceil(Math.max(d0.y, d1.y, d2.y)));
+    for (let Y = ty0; Y < ty1; Y++) for (let X = tx0; X < tx1; X++) {
+      const k = (Y - y0) * bw + (X - x0); if (done[k]) continue;
+      const px = X + 0.5, py = Y + 0.5;
+      const l0 = ((d1.y - d2.y) * (px - d2.x) + (d2.x - d1.x) * (py - d2.y)) / den, l1 = ((d2.y - d0.y) * (px - d2.x) + (d0.x - d2.x) * (py - d2.y)) / den, l2 = 1 - l0 - l1;
+      if (l0 < -1e-6 || l1 < -1e-6 || l2 < -1e-6) continue;
+      done[k] = 1;
+      const sx = l0 * s0.x + l1 * s1.x + l2 * s2.x - 0.5, sy = l0 * s0.y + l1 * s1.y + l2 * s2.y - 0.5;
+      const ix = Math.floor(sx), iy = Math.floor(sy), fx = sx - ix, fy = sy - iy;
+      let r = 0, g = 0, b = 0, al = 0;
+      for (let q = 0; q < 4; q++) {
+        const qx = ix + (q & 1), qy = iy + (q >> 1); if (qx < 0 || qy < 0 || qx >= sw || qy >= sh) continue;
+        const wt = ((q & 1) ? fx : 1 - fx) * ((q >> 1) ? fy : 1 - fy), j = (qy * sw + qx) * 4, aa = sd[j + 3] * wt;
+        r += sd[j] * aa; g += sd[j + 1] * aa; b += sd[j + 2] * aa; al += aa;
+      }
+      if (al <= 0) continue;
+      const z = k * 4; o[z] = r / al; o[z + 1] = g / al; o[z + 2] = b / al; o[z + 3] = al;
+    }
+  };
+  for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+    const D = (ii: number, jj: number) => dest[jj * (cols + 1) + ii];
+    tri(src(i, j), src(i + 1, j), src(i + 1, j + 1), D(i, j), D(i + 1, j), D(i + 1, j + 1));
+    tri(src(i, j), src(i + 1, j + 1), src(i, j + 1), D(i, j), D(i + 1, j + 1), D(i, j + 1));
+  }
+  const t = makeCanvas(bw, bh); t.getContext('2d')!.putImageData(out, 0, 0);
+  ctx.drawImage(t, x0, y0);
+}
+
+/** Deformación rígida por mínimos cuadrados móviles: dónde acaba el punto v si las chinchetas p pasan a q. */
+export function mlsRigid(v: P, p: P[], q: P[]): P {
+  if (!p.length) return v;
+  let sw = 0, px = 0, py = 0, qx = 0, qy = 0;
+  const w: number[] = [];
+  for (let i = 0; i < p.length; i++) {
+    const d2 = (p[i].x - v.x) ** 2 + (p[i].y - v.y) ** 2;
+    if (d2 < 1e-8) return { x: q[i].x, y: q[i].y };
+    const wi = 1 / d2; w.push(wi); sw += wi; px += wi * p[i].x; py += wi * p[i].y; qx += wi * q[i].x; qy += wi * q[i].y;
+  }
+  px /= sw; py /= sw; qx /= sw; qy /= sw;
+  // giro óptimo (como números complejos: M = Σ w q̂ · conj(p̂))
+  let mr = 0, mi = 0;
+  for (let i = 0; i < p.length; i++) {
+    const ax = p[i].x - px, ay = p[i].y - py, bx = q[i].x - qx, by = q[i].y - qy;
+    mr += w[i] * (bx * ax + by * ay); mi += w[i] * (by * ax - bx * ay);
+  }
+  const len = Math.hypot(mr, mi) || 1, c = mr / len, s = mi / len, dx = v.x - px, dy = v.y - py;
+  return { x: qx + c * dx - s * dy, y: qy + s * dx + c * dy };
+}

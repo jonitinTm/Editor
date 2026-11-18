@@ -186,6 +186,10 @@ Ya disponible:
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
 - Si algo falla durante una operación, aparece un aviso (y se puede deshacer) en lugar de no pasar nada.
 - **Tableta gráfica**: la presión puede controlar el tamaño y/o la opacidad del pincel («Presión = opacidad»).
+- **Deformación de posición libre** (*Edición*): chinchetas sobre la capa; al mover una, la imagen se dobla alrededor
+  de las demás (Alt+clic quita una chincheta, Intro aplica).
+- **Escala según el contenido** (*Edición*): estrecha o ensancha una foto sin deformar a las personas ni los objetos
+  importantes (protege tonos de piel o lo seleccionado).
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

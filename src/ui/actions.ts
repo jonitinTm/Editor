@@ -62,6 +62,8 @@ export const ACTIONS: Action[] = [
   { id: 'distort', label: 'Distorsionar', enabled: hasLayer, run: () => { TransformTool.startMode = 'distort'; app.setTool('transform', true); } },
   { id: 'warpText', label: 'Deformar texto…', enabled: () => app.doc?.active?.kind === 'text', run: () => dlg.warpTextDialog(app.doc!.active as any) },
   { id: 'skew', label: 'Sesgar', enabled: hasLayer, run: () => { TransformTool.startMode = 'skew'; app.setTool('transform', true); } },
+  { id: 'caScale', label: 'Escala según el contenido…', enabled: hasLayer, run: dlg.contentAwareScaleDialog },
+  { id: 'puppet', label: 'Deformación de posición libre', enabled: hasLayer, run: () => app.setTool('puppet', true) },
   { id: 'warp', label: 'Deformar', enabled: hasLayer, run: () => { TransformTool.startMode = 'warp'; app.setTool('transform', true); } },
   { id: 'perspective', label: 'Perspectiva', enabled: hasLayer, run: () => { TransformTool.startMode = 'perspective'; app.setTool('transform', true); } },
   { id: 'flipH', label: 'Voltear horizontal', enabled: hasLayer, run: () => quickTransform('flipH') },

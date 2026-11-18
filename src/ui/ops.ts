@@ -1338,3 +1338,37 @@ export async function smartCopyIndependent() {
   d.setActive(c, false);
   d.commit('Nuevo objeto inteligente mediante copia');
 }
+
+/** Edición › Escala según el contenido: cambia el tamaño del contenido de la capa sin deformar lo importante. */
+export async function contentAwareScaleOp(wPct: number, hPct: number, protectSkin: boolean, protectSel: boolean) {
+  const d = doc(); let l = d?.active;
+  if (!d || !l || !isRaster(l) || l.isLocked()) { app.toast('Selecciona una capa de píxeles', 'warn'); return; }
+  if (isParametric(l)) l = rasterizeLayer(l as RasterLayer);
+  const layer = l as RasterLayer, b = contentBounds(layer.canvas);
+  if (!b) { app.toast('La capa está vacía', 'warn'); return; }
+  const tw = Math.max(2, Math.round(b.w * wPct / 100)), th = Math.max(2, Math.round(b.h * hPct / 100));
+  if (tw === b.w && th === b.h) return;
+  const src = ctx2d(layer.canvas).getImageData(b.x, b.y, b.w, b.h);
+  let prot: Float32Array | null = null;
+  if (protectSkin || (protectSel && d.selection.mask)) {
+    prot = new Float32Array(b.w * b.h);
+    const sm = protectSel && d.selection.mask ? ctx2d(d.selection.mask).getImageData(b.x, b.y, b.w, b.h).data : null, p = src.data;
+    for (let i = 0; i < prot.length; i++) {
+      const r = p[i * 4], g = p[i * 4 + 1], bl = p[i * 4 + 2];
+      const skin = protectSkin && r > 95 && g > 40 && bl > 20 && r > g && r > bl && r - g > 15 && Math.max(r, g, bl) - Math.min(r, g, bl) > 15;
+      prot[i] = (skin ? 1 : 0) + (sm && sm[i * 4 + 3] > 127 ? 1 : 0);
+    }
+  }
+  app.toast('Escalando según el contenido…');
+  const { contentAwareScale } = await import('../filters/seamcarve');
+  const t0 = performance.now();
+  const out = await contentAwareScale(src, tw, th, prot);
+  const c = makeCanvas(layer.canvas.width, layer.canvas.height), oc = makeCanvas(out.width, out.height);
+  ctx2d(oc).putImageData(out, 0, 0);
+  // el resultado queda centrado donde estaba el contenido
+  ctx2d(c).drawImage(layer.canvas, 0, 0); ctx2d(c).clearRect(b.x, b.y, b.w, b.h);
+  ctx2d(c).drawImage(oc, Math.round(b.x + (b.w - tw) / 2), Math.round(b.y + (b.h - th) / 2));
+  layer.canvas = c; layer.touch(); d.invalidate();
+  d.commit('Escala según el contenido');
+  app.toast(`Hecho en ${((performance.now() - t0) / 1000).toFixed(1)} s`);
+}
