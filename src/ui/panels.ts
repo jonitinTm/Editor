@@ -149,7 +149,7 @@ export function buildLayersPanel(parent: HTMLElement) {
   lockPx.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockPixels', !l.lockPixels); };
   const lockPs = h('button', { class: 'btn icon-btn', title: 'Bloquear posición (no se puede mover ni transformar)', html: icon('move') });
   lockPs.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockPos', !l.lockPos); };
-  const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint' }, 'Bloquear:'), lockA, lockPx, lockPs, lockBtn, fillSl.el));
+  const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint', title: 'Bloquear' }, 'Bloq.'), lockA, lockPx, lockPs, lockBtn, fillSl.el));
   const body = h('div', { class: 'panel-body layers' }, top, search, list, foot);
   parent.append(panel('Capas', body));
 
@@ -332,14 +332,25 @@ export function buildPropertiesPanel(parent: HTMLElement) {
   const render = () => {
     const d = app.doc;
     const l = d?.active;
-    const key = d ? `${d.width}x${d.height}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}${l instanceof SmartLayer ? l.inner.width + 'x' + l.inner.height + JSON.stringify(l.filters) : ''}${l instanceof AdjustmentLayer ? l.filterId + JSON.stringify(l.params) : ''}` : '';
+    const key = d ? `${d.width}x${d.height}|${d.ppi}|${d.mode}|${app.showRulers}${app.showGrid}${app.showGuides}|${l?.id}|${l?.kind}|${!!l?.mask}|${d.editMask}|${isParametric(l) ? JSON.stringify(l.props) : ''}${l instanceof SmartLayer ? l.inner.width + 'x' + l.inner.height + JSON.stringify(l.filters) : ''}${l instanceof AdjustmentLayer ? l.filterId + JSON.stringify(l.params) : ''}` : '';
     if (skipRender) { skipRender = false; lastKey = key; return; }
     if (key === lastKey && body.contains(document.activeElement)) return;
     lastKey = key;
     body.innerHTML = '';
     if (!d) { body.append(h('div', { class: 'hint' }, 'Abre o crea un documento.')); return; }
+    // Lienzo: ancho y alto editables (crece o se recorta desde el centro), resolución, modo y vista
+    const dim = (v: number, set: (n: number) => void, title: string) => { const i = h('input', { type: 'number', class: 'num', value: v, min: 1, max: 30000, title, style: 'width:72px' }) as HTMLInputElement; i.addEventListener('change', () => { const n = Math.round(+i.value); if (n >= 1 && n <= 30000) set(n); else i.value = String(v); }); return i; };
+    const setSize = (w: number, hh: number) => { if (w === d.width && hh === d.height) return; d.resizeCanvas(w, hh, Math.round((w - d.width) / 2), Math.round((hh - d.height) / 2)); d.commit('Tamaño de lienzo'); app.viewport.fit(true); };
+    const ppi = h('input', { type: 'number', class: 'num', value: d.ppi || 72, min: 1, max: 10000, style: 'width:72px', title: 'Resolución (píxeles por pulgada); no cambia los píxeles' }) as HTMLInputElement;
+    ppi.addEventListener('change', () => { const n = +ppi.value; if (n >= 1) { d.ppi = n; d.commit('Resolución'); } });
+    const mode = h('select', {}, h('option', { value: 'rgb', selected: d.mode !== 'gray' }, 'Color RGB'), h('option', { value: 'gray', selected: d.mode === 'gray' }, 'Escala de grises')) as HTMLSelectElement;
+    mode.addEventListener('change', () => ops.setColorMode(mode.value as any));
+    const viewCheck = (label: string, id: string, on: boolean) => { const c = h('input', { type: 'checkbox', checked: on }) as HTMLInputElement; c.addEventListener('change', () => actionById.get(id)!.run()); return h('label', { class: 'check' }, c, ' ' + label); };
     body.append(h('div', { class: 'prop-title' }, 'Documento'),
-      h('div', { class: 'prop-row' }, h('span', {}, 'Tamaño'), h('b', {}, `${d.width} × ${d.height} px`)),
+      h('div', { class: 'prop-row' }, h('span', {}, 'Lienzo'), h('span', { class: 'prop-dims' }, 'An ', dim(d.width, w => setSize(w, d.height), 'Ancho del lienzo (px)'), ' Al ', dim(d.height, hh => setSize(d.width, hh), 'Alto del lienzo (px)'), ' px')),
+      h('div', { class: 'prop-row' }, h('span', {}, 'Resolución'), h('span', {}, ppi, ' ppp')),
+      h('div', { class: 'prop-row' }, h('span', {}, 'Modo'), mode),
+      h('div', { class: 'prop-row prop-checks' }, viewCheck('Reglas', 'rulers', app.showRulers), viewCheck('Cuadrícula', 'grid', app.showGrid), viewCheck('Guías', 'guides', app.showGuides)),
       h('div', { class: 'prop-btns' },
         h('button', { class: 'btn', onclick: () => actionById.get('imageSize')!.run() }, 'Tamaño de imagen'),
         h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
