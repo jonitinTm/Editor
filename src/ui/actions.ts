@@ -54,6 +54,7 @@ export const ACTIONS: Action[] = [
   { id: 'paste', label: 'Pegar', keys: ['Ctrl+V'], run: () => app.toast('Pulsa Ctrl+V para pegar (el navegador solo permite pegar con el teclado)') },
   { id: 'clear', label: 'Borrar', keys: ['Delete', 'Backspace'], enabled: hasSel, run: () => ops.clearSelection() },
   { id: 'fade', label: 'Transición…', keys: ['Shift+Ctrl+F'], enabled: () => !!app.doc?.history.canUndo(), run: dlg.fadeDialog },
+  { id: 'findReplace', label: 'Buscar y reemplazar texto…', enabled: () => !!app.doc?.allLayers().some(l => l.kind === 'text'), run: () => dlg.findReplaceDialog() },
   { id: 'defineBrush', label: 'Definir pincel…', enabled: hasDoc, run: ops.defineBrush },
   { id: 'definePattern', label: 'Definir motivo…', enabled: hasDoc, run: async () => { const n = await promptDialog('Definir motivo', 'Nombre', 'Motivo ' + new Date().toLocaleTimeString('es')); if (n !== null) ops.definePattern(n || 'Motivo'); } },
   { id: 'stroke', label: 'Contornear…', enabled: hasSel, run: dlg.strokeDialog },
@@ -201,6 +202,7 @@ export const ACTIONS: Action[] = [
   { id: 'guides', label: 'Mostrar guías', keys: ['Ctrl+;'], checked: () => app.showGuides, run: () => { app.showGuides = !app.showGuides; app.viewport.requestRender(); } },
   { id: 'snap', label: 'Ajustar (magnético)', keys: ['Shift+Ctrl+;'], checked: () => app.snapOn, run: () => { app.snapOn = !app.snapOn; app.toast(app.snapOn ? 'Ajuste magnético activado' : 'Ajuste magnético desactivado'); } },
   { id: 'grid', label: 'Cuadrícula', keys: ["Ctrl+'"], checked: () => app.showGrid, run: () => { app.showGrid = !app.showGrid; app.viewport.requestRender(); } },
+  { id: 'guideLayout', label: 'Nueva disposición de guías…', enabled: hasDoc, run: () => dlg.guideLayoutDialog() },
   { id: 'newGuide', label: 'Nueva guía…', enabled: hasDoc, run: newGuideDialog },
   { id: 'clearGuides', label: 'Borrar guías', enabled: () => !!app.doc && (app.doc.guides.h.length + app.doc.guides.v.length > 0), run: () => { app.doc!.guides = { h: [], v: [] }; app.viewport.requestRender(); } },
 

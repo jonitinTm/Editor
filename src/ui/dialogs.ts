@@ -19,6 +19,7 @@ import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
 import { prefs, savePrefs } from './prefs';
 import { BEVEL_DEFAULT } from '../core/bevel';
+import { shiftRuns } from '../core/textruns';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
 
@@ -873,4 +874,82 @@ export function keysDialog() {
   const reset = h('button', { class: 'btn', type: 'button', onclick: () => { resetKeys(); render(); app.toast('Atajos restablecidos'); } }, 'Restablecer los de fábrica');
   showDialog({ title: 'Atajos de teclado', cancelLabel: null, okLabel: 'Cerrar', width: 520, body: [search, list, reset] });
   setTimeout(() => search.focus(), 0);
+}
+
+// ---- Vista › Nueva disposición de guías ---------------------------------------------------------
+
+export function guideLayoutDialog() {
+  const d = app.doc; if (!d) return;
+  const num = (v: number) => h('input', { type: 'number', class: 'num', value: v, min: 0, step: 1, style: 'width:70px' }) as HTMLInputElement;
+  const colOn = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement, rowOn = h('input', { type: 'checkbox', checked: false }) as HTMLInputElement, marOn = h('input', { type: 'checkbox', checked: false }) as HTMLInputElement;
+  const cols = num(4), colGut = num(20), rows = num(3), rowGut = num(20);
+  const mt = num(40), ml = num(40), mb = num(40), mr = num(40);
+  const clear = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement;
+  const compute = () => {
+    const g = { v: [] as number[], h: [] as number[] };
+    const L = marOn.checked ? +ml.value : 0, R = d.width - (marOn.checked ? +mr.value : 0), T = marOn.checked ? +mt.value : 0, B = d.height - (marOn.checked ? +mb.value : 0);
+    if (marOn.checked) { g.v.push(L, R); g.h.push(T, B); }
+    const split = (a: number, b: number, n: number, gut: number, out: number[]) => {
+      if (n < 1) return; const w = (b - a - gut * (n - 1)) / n; if (w <= 0) return;
+      for (let i = 0; i < n; i++) { const x0 = a + i * (w + gut); out.push(x0, x0 + w); }
+    };
+    if (colOn.checked) split(L, R, +cols.value, +colGut.value, g.v);
+    if (rowOn.checked) split(T, B, +rows.value, +rowGut.value, g.h);
+    const uniq = (a: number[]) => [...new Set(a.map(v => Math.round(v * 10) / 10))].filter(v => v >= 0);
+    return { v: uniq(g.v), h: uniq(g.h) };
+  };
+  const old = { v: [...d.guides.v], h: [...d.guides.h] };
+  const preview = () => { const g = compute(); d.guides = clear.checked ? g : { v: [...old.v, ...g.v], h: [...old.h, ...g.h] }; app.viewport.requestRender(); };
+  for (const el of [colOn, rowOn, marOn, cols, colGut, rows, rowGut, mt, ml, mb, mr, clear]) el.addEventListener('input', preview);
+  preview();
+  showDialog({
+    title: 'Nueva disposición de guías', side: true,
+    body: [
+      row('', h('label', { class: 'check' }, colOn, ' Columnas')), row('Número', cols), row('Medianil', colGut, ' px'),
+      row('', h('label', { class: 'check' }, rowOn, ' Filas')), row('Número', rows), row('Medianil', rowGut, ' px'),
+      row('', h('label', { class: 'check' }, marOn, ' Márgenes')), row('Superior', mt, ' px'), row('Izquierdo', ml, ' px'), row('Inferior', mb, ' px'), row('Derecho', mr, ' px'),
+      row('', h('label', { class: 'check' }, clear, ' Quitar las guías que ya hay')),
+    ],
+    onOk: () => { preview(); app.toast(`${d.guides.v.length + d.guides.h.length} guías`); },
+    onCancel: () => { d.guides = old; app.viewport.requestRender(); },
+  });
+}
+
+// ---- Edición › Buscar y reemplazar texto -----------------------------------------------------------
+
+export function findReplaceDialog() {
+  const d = app.doc; if (!d) return;
+  const find = h('input', { type: 'text', class: 'wide', placeholder: 'Texto a buscar' }) as HTMLInputElement;
+  const repl = h('input', { type: 'text', class: 'wide', placeholder: 'Reemplazar por' }) as HTMLInputElement;
+  const cs = h('input', { type: 'checkbox' }) as HTMLInputElement, whole = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  const info = h('div', { class: 'hint' }, '');
+  const rx = () => { const f = find.value; if (!f) return null; const e = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); return new RegExp(whole.checked ? `(?<![\\p{L}\\p{N}])${e}(?![\\p{L}\\p{N}])` : e, 'gu' + (cs.checked ? '' : 'i')); };
+  const texts = () => d.allLayers().filter((l): l is TextLayer => l instanceof TextLayer);
+  const count = () => { const r = rx(); if (!r) { info.textContent = `${texts().length} capas de texto`; return; } let n = 0, ls = 0; for (const l of texts()) { const m = l.props.text.match(r); if (m) { n += m.length; ls++; } } info.textContent = n ? `${n} coincidencias en ${ls} capa${ls === 1 ? '' : 's'}` : 'Sin coincidencias'; };
+  for (const el of [find, cs, whole]) el.addEventListener('input', count);
+  count();
+  showDialog({
+    title: 'Buscar y reemplazar texto', okLabel: 'Reemplazar todo',
+    body: [row('Buscar', find), row('Cambiar por', repl), row('', h('label', { class: 'check' }, cs, ' Distinguir mayúsculas'), h('label', { class: 'check' }, whole, ' Palabra completa')), info],
+    onOk: () => {
+      const r = rx(); if (!r) return;
+      let n = 0;
+      for (const l of texts()) {
+        const old = l.props.text; let cur = old, runs = l.props.runs;
+        // se reemplaza de una en una para conservar los estilos de cada trozo
+        const ms = [...old.matchAll(r)]; if (!ms.length) continue;
+        for (const m of ms.reverse()) {
+          const next = cur.slice(0, m.index!) + repl.value + cur.slice(m.index! + m[0].length);
+          if (runs) runs = shiftRuns(runs, cur, next);
+          cur = next; n++;
+        }
+        l.props.text = cur; if (runs) l.props.runs = runs;
+        l.props.keepPixels = false; l.props.psdTySh = undefined;
+        l.render(); l.touch();
+      }
+      if (n) { d.invalidate(); d.commit('Reemplazar texto'); app.toast(`${n} reemplazo${n === 1 ? '' : 's'}`); }
+      else app.toast('No se ha encontrado el texto', 'warn');
+    },
+  });
+  setTimeout(() => find.focus(), 50);
 }

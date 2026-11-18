@@ -203,6 +203,8 @@ Ya disponible:
   ángulo, transición y brillo de las luces tipo bokeh).
 - **Igualar color** (*Imagen › Ajustes*): da a la capa los colores y la luz de otro documento abierto o de otra capa
   (para que fotos de distintas cámaras o momentos combinen), con luminancia, intensidad, transición y neutralizar.
+- **Vista › Nueva disposición de guías…**: columnas, filas, medianiles y márgenes con vista previa.
+- **Edición › Buscar y reemplazar texto…**: en todas las capas de texto a la vez (conserva los estilos de cada trozo).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
