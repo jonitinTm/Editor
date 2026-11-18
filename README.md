@@ -289,6 +289,9 @@ Ya disponible:
   leen y guardan en PSD).
 - **Imagen › Separación de frecuencias…** (retoque de piel): divide la capa en color/luz y textura; juntas se ven igual, y
   se suavizan manchas en una sin perder los poros de la otra.
+- **Archivo › Panorámica…**: une varias fotos hechas de izquierda a derecha (en el orden de sus nombres), igualando la
+  exposición y suavizando las uniones. No corrige perspectiva ni giros grandes: va bien con fotos de paisaje lejano o
+  hechas girando con cuidado.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

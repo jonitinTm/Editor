@@ -167,6 +167,7 @@ export const ACTIONS: Action[] = [
   { id: 'toSmart', label: 'Convertir en objeto inteligente', enabled: hasLayer, run: ops.convertToSmart },
   { id: 'editSmart', label: 'Editar contenido', enabled: () => app.doc?.active?.kind === 'smart', run: () => ops.editSmartContents() },
   { id: 'rasterize', label: 'Rasterizar capa (texto, forma u objeto inteligente)', enabled: () => isParametric(app.doc?.active), run: ops.rasterize },
+  { id: 'panorama', label: 'Panorámica…', run: async () => { const fs = await io.pickFiles('image/*'); if (fs.length) ops.makePanorama(fs, false); } },
   { id: 'cropScans', label: 'Recortar y enderezar fotos escaneadas', enabled: hasDoc, run: () => ops.cropScannedPhotos() },
   { id: 'freqSep', label: 'Separación de frecuencias…', enabled: hasLayer, run: async () => { const v = await promptDialog('Separación de frecuencias', 'Radio del desenfoque (px): más grande = separa detalles más gruesos', '6'); const r = parseFloat(v ?? ''); if (r > 0) ops.frequencySeparation(Math.min(200, r)); } },
   { id: 'autoAlign', label: 'Alinear capas automáticamente', enabled: hasDoc, run: () => ops.autoAlignLayers() },

@@ -1953,3 +1953,20 @@ export async function frequencySeparation(radius: number) {
   d.setActive(lo, false); d.invalidate(); d.commit('Separación de frecuencias');
   app.toast('Suaviza manchas en «Baja frecuencia» (pincel corrector, desenfoque) y la textura en «Alta frecuencia» se conserva');
 }
+
+/** Archivo › Automatizar › Panorámica: une varias fotos (en el orden de sus nombres) en un documento nuevo. */
+export async function makePanorama(files: File[], vertical: boolean) {
+  const imgs = files.filter(f => io.isImageFile(f)).sort((a, b) => a.name.localeCompare(b.name, 'es', { numeric: true }));
+  if (imgs.length < 2) { app.toast('Elige al menos dos fotos', 'warn'); return; }
+  app.toast('Uniendo la panorámica…'); await new Promise(r => setTimeout(r, 30));
+  const canv = await Promise.all(imgs.map(f => io.imageToCanvas(f)));
+  // a lo sumo 2500 px de alto por foto para que sea rápido
+  const k = Math.min(1, 2500 / Math.max(...canv.map(c => vertical ? c.width : c.height)));
+  const scaled = k < 1 ? canv.map(c => { const t = makeCanvas(Math.round(c.width * k), Math.round(c.height * k)); const x = ctx2d(t); x.imageSmoothingQuality = 'high'; x.drawImage(c, 0, 0, t.width, t.height); return t; }) : canv;
+  const { stitch } = await import('../filters/panorama');
+  const out = stitch(scaled, vertical);
+  const d = new EditorDocument('Panorámica', out.width, out.height);
+  const l = new RasterLayer('Panorámica', out.width, out.height); l.canvas = out; l.touch(); d.root.add(l); d.setActive(l, false);
+  app.addDocument(d);
+  app.toast('Panorámica lista: recorta los bordes irregulares con Recortar (C) y «Rellenar según contenido» si quieres');
+}
