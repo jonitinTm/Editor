@@ -61,6 +61,14 @@ const root = document.getElementById('app')!;
 const header = h('header', { class: 'topbar' }, h('span', { class: 'logo', html: icon('logo') }, h('span', {}, 'Editor')));
 root.append(header);
 buildMenuBar(header);
+// En el móvil los paneles van en un cajón que se abre con este botón
+const sideToggle = h('button', { class: 'side-toggle', title: 'Mostrar u ocultar los paneles (capas, color, propiedades…)', html: icon('newLayer') + '<span>Paneles</span>' });
+sideToggle.onclick = () => { document.body.classList.toggle('show-side'); };
+header.append(sideToggle);
+// fondo oscuro detrás del cajón: tocarlo lo cierra
+const sideBackdrop = h('div', { class: 'side-backdrop' });
+sideBackdrop.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); document.body.classList.remove('show-side'); });
+document.body.append(sideBackdrop);
 buildOptionsBar(root);
 const main = h('div', { class: 'main' });
 root.append(main);
@@ -79,6 +87,8 @@ const status = h('div', { class: 'statusbar' });
 center.append(status);
 const side = h('aside', { class: 'side' });
 main.append(side);
+// tocar el lienzo cierra el cajón de paneles en el móvil
+viewHost.addEventListener('pointerdown', () => document.body.classList.remove('show-side'));
 const sideTop = h('div', { class: 'side-top' });
 const sideBottom = h('div', { class: 'side-bottom' });
 side.append(sideTop, h('div', { class: 'splitter', title: 'Arrastra para cambiar el tamaño' }), sideBottom);

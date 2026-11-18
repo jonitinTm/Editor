@@ -497,3 +497,33 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 .lc-row .btn.icon-btn { padding: 2px 3px; }
 .lc-row .num-slider.compact .lbl { font-size: 11px; }
 .lc-row { gap: 4px; }
+
+/* ---- Móvil (pantallas estrechas): los paneles se abren como un cajón desde la derecha ---- */
+.side-toggle { display: none; }
+@media (max-width: 700px) {
+  .topbar { overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+  .topbar::-webkit-scrollbar { display: none; }
+  .menubar { flex-shrink: 0; }
+  .side-toggle { display: flex; align-items: center; gap: 4px; position: sticky; right: 0; margin-left: auto; height: 100%; padding: 0 10px; border: none; border-left: 1px solid var(--border); background: var(--panel); color: var(--text); font-size: 12px; flex-shrink: 0; }
+  .side { position: fixed; top: 66px; right: 0; bottom: 0; width: min(82vw, 320px); z-index: 120; transform: translateX(100%); transition: transform .18s ease; box-shadow: -8px 0 24px rgba(0,0,0,.45); }
+  body.show-side .side { transform: none; }
+  body.show-side .side-toggle { background: var(--panel-3); color: var(--accent); }
+  .side-backdrop { display: none; }
+  body.show-side .side-backdrop { display: block; position: fixed; inset: 66px 0 0 0; z-index: 110; background: rgba(0,0,0,.35); }
+  .welcome { overflow: auto; align-items: flex-start; }
+  .welcome-card { max-width: 100%; padding: 20px 14px; }
+  .welcome-actions { flex-direction: column; align-items: stretch; margin: 16px 0; }
+  .welcome-presets { flex-wrap: wrap; }
+  .welcome h1 { font-size: 24px; }
+  .toolbar { width: 40px; }
+  .statusbar { font-size: 11px; }
+  .modal { width: auto !important; min-width: min(94vw, 300px); max-width: 96vw; }
+  .modal-overlay.at-side { justify-content: center; padding-right: 0; }
+  .menu-list { min-width: 250px; max-width: calc(100vw - 8px); }
+  .menu-item { padding-top: 8px; padding-bottom: 8px; }
+  .menu-item.has-sub:hover > .submenu { display: none; }
+  .menu-item:not(.has-sub) > .mi-key { display: none; }
+  .menu-item.has-sub { flex-wrap: wrap; }
+  .menu-item.has-sub > .submenu { position: static !important; box-shadow: none; border: none; border-left: 2px solid var(--border); margin: 6px 0 0 14px; width: 100%; min-width: 0; }
+  .menu-item.has-sub.sub-open > .submenu { display: block; }
+}

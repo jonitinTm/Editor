@@ -41,6 +41,7 @@ window.addEventListener('editor-keys', () => {
 });
 export function prettyKey(k: string) { return k.replace('Delete', 'Supr').replace('Backspace', 'Retroceso').replace('Shift', 'Mayús'); }
 
+const isNarrow = () => window.innerWidth <= 700;
 function buildList(items: Item[], close: () => void): HTMLElement {
   const ul = h('div', { class: 'menu-list' });
   for (const it of items) {
@@ -48,7 +49,10 @@ function buildList(items: Item[], close: () => void): HTMLElement {
     if (typeof it === 'object') {
       const sub = buildList(it.items, close);
       sub.classList.add('submenu');
-      ul.append(h('div', { class: 'menu-item has-sub' }, h('span', { class: 'mi-check' }), h('span', { class: 'mi-label' }, it.label), h('span', { class: 'mi-key' }, '▸'), sub));
+      const row = h('div', { class: 'menu-item has-sub' }, h('span', { class: 'mi-check' }), h('span', { class: 'mi-label' }, it.label), h('span', { class: 'mi-key' }, '▸'), sub);
+      // en pantallas táctiles los submenús se abren tocándolos (dentro del mismo menú)
+      row.addEventListener('click', e => { if (!isNarrow() || sub.contains(e.target as Node)) return; e.stopPropagation(); row.classList.toggle('sub-open'); });
+      ul.append(row);
       continue;
     }
     const a = actionById.get(it);
@@ -83,8 +87,15 @@ export function buildMenuBar(parent: HTMLElement) {
       if ((e.target as HTMLElement).closest('.menu-list')) return;
       if (openMenu === top) { close(); return; }
       close(); refreshStates(top); top.classList.add('open'); openMenu = top;
+      if (isNarrow()) {
+        // en el móvil la lista se coloca sobre la pantalla para que no la corte la barra que se desplaza
+        const list = top.querySelector(':scope > .menu-list') as HTMLElement, r = top.getBoundingClientRect();
+        list.style.position = 'fixed'; list.style.top = r.bottom + 'px'; list.style.left = Math.max(4, Math.min(r.left, window.innerWidth - list.offsetWidth - 4)) + 'px';
+        list.style.maxHeight = (window.innerHeight - r.bottom - 8) + 'px'; list.style.overflowY = 'auto';
+      }
     });
     top.addEventListener('pointerenter', () => {
+      if (isNarrow()) return;
       if (openMenu && openMenu !== top) { close(); refreshStates(top); top.classList.add('open'); openMenu = top; }
     });
     bar.append(top);
