@@ -239,6 +239,8 @@ Ya disponible:
   negrita, cursiva, mayúsculas, versalitas, subrayado, tachado y suavizado; alineación (también justificado), sangrías
   izquierda, derecha y de primera línea, y espacio antes y después de cada párrafo. Los números se cambian también
   arrastrando sobre su icono.
+- **Relleno de capa** (panel Capas, junto a la opacidad): baja la opacidad del contenido sin tocar sus efectos exteriores
+  (contorno, sombra, resplandor); por ejemplo, un texto con solo el contorno. Se lee y se guarda en PSD.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

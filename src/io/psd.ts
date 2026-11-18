@@ -623,7 +623,9 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
         layer = l;
       }
     }
-    layer.opacity = rec.opacity / 255 * (rec.blocks.lfx2 ? 1 : rec.fillOpacity / 255);
+    // el relleno solo es distinto de la opacidad en capas con efectos; en grupos y ajustes se combina con ella
+    if (rec.blocks.lfx2 && !(layer instanceof GroupLayer) && !(layer instanceof AdjustmentLayer)) { layer.opacity = rec.opacity / 255; layer.fillOpacity = rec.fillOpacity / 255; }
+    else layer.opacity = rec.opacity / 255 * rec.fillOpacity / 255;
     if (!(layer instanceof GroupLayer) && rec.blend === 'pass') rec.blend = 'norm';
     layer.visible = !(rec.flags & 2);
     layer.blendMode = keyToBlend.get(rec.blend) ?? 'source-over';
@@ -1137,6 +1139,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
     ex.u32(rc.name.length); for (let k = 0; k < rc.name.length; k++) ex.u16(rc.name.charCodeAt(k)); if (ul % 4 === 2) ex.u16(0);
     if (rc.section === 3) { ex.str('8BIM'); ex.str('lsct'); ex.u32(4); ex.u32(3); }
     if (rc.section > 0 && rc.section < 3) { ex.str('8BIM'); ex.str('lsct'); ex.u32(12); ex.u32(rc.section); ex.str('8BIM'); ex.str(blendToKey.get(l!.blendMode) ?? 'norm'); }
+    if (l && l.fillOpacity < 1) { ex.str('8BIM'); ex.str('iOpa'); ex.u32(4); ex.u8(Math.round(l.fillOpacity * 255)); ex.u8(0); ex.u8(0); ex.u8(0); }
     if (l?.label && LABELS.indexOf(l.label) > 0) { ex.str('8BIM'); ex.str('lclr'); ex.u32(8); ex.u16(LABELS.indexOf(l.label)); ex.u16(0); ex.u32(0); }
     if (l && (l.locked || l.lockAlpha || l.lockPos || l.lockPixels)) { ex.str('8BIM'); ex.str('lspf'); ex.u32(4); ex.u32((l.locked ? 0x80000000 : 0) | (l.lockAlpha ? 1 : 0) | (l.lockPixels ? 2 : 0) | (l.lockPos ? 4 : 0)); }
     for (const [k, bytes] of rc.extra ?? []) { ex.str('8BIM'); ex.str(k); ex.u32(bytes.length); ex.bytes(bytes); }

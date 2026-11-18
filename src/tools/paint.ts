@@ -23,7 +23,7 @@ export function rasterizeLayer(l: RasterLayer): RasterLayer {
   const doc = app.doc!;
   const r = new RasterLayer(l.name, doc.width, doc.height);
   r.canvas = cloneCanvas(l.canvas);
-  r.id = l.id; r.visible = l.visible; r.opacity = l.opacity; r.blendMode = l.blendMode; r.locked = l.locked; r.lockPos = l.lockPos; r.lockPixels = l.lockPixels; r.mask = l.mask;
+  r.id = l.id; r.visible = l.visible; r.opacity = l.opacity; r.blendMode = l.blendMode; r.locked = l.locked; r.lockPos = l.lockPos; r.lockPixels = l.lockPixels; r.fillOpacity = l.fillOpacity; r.mask = l.mask;
   const parent = l.parent!;
   const i = parent.children.indexOf(l);
   parent.remove(l); parent.add(r, i);

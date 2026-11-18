@@ -111,6 +111,12 @@ export function buildLayersPanel(parent: HTMLElement) {
     },
   });
   const commitOpacity = () => { if (opacityChanging && app.doc) { opacityChanging = false; app.doc.commit('Opacidad de capa'); } };
+  let fillChanging = false;
+  const fillSl = numberSlider({ label: 'Relleno', min: 0, max: 100, value: 100, unit: '%', compact: true,
+    onInput: v => { const l = app.doc?.active; if (!l) return; ops.setLayerProp(l, 'fillOpacity', v / 100, false); fillChanging = true; } });
+  fillSl.el.title = 'Relleno: opacidad del contenido sin afectar a la sombra, el contorno o el resplandor';
+  const commitFill = () => { if (fillChanging && app.doc) { fillChanging = false; app.doc.commit('Relleno de capa'); } };
+  for (const ev of ['change', 'pointerup', 'focusout']) fillSl.el.addEventListener(ev, commitFill);
   opacity.el.addEventListener('change', commitOpacity);
   opacity.el.addEventListener('pointerup', commitOpacity);
   opacity.el.addEventListener('focusout', commitOpacity);
@@ -143,7 +149,7 @@ export function buildLayersPanel(parent: HTMLElement) {
   lockPx.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockPixels', !l.lockPixels); };
   const lockPs = h('button', { class: 'btn icon-btn', title: 'Bloquear posición (no se puede mover ni transformar)', html: icon('move') });
   lockPs.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockPos', !l.lockPos); };
-  const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint' }, 'Bloquear:'), lockA, lockPx, lockPs, lockBtn));
+  const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint' }, 'Bloquear:'), lockA, lockPx, lockPs, lockBtn, fillSl.el));
   const body = h('div', { class: 'panel-body layers' }, top, search, list, foot);
   parent.append(panel('Capas', body));
 
@@ -273,6 +279,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const l = d.active;
     blend.value = l?.blendMode ?? 'source-over';
     if (!opacityChanging) opacity.set(Math.round((l?.opacity ?? 1) * 100));
+    if (!fillChanging) fillSl.set(Math.round((l?.fillOpacity ?? 1) * 100));
     lockBtn.classList.toggle('on', !!l?.locked);
     lockA.classList.toggle('on', !!l?.lockAlpha);
     lockPx.classList.toggle('on', !!l?.lockPixels);

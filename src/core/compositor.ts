@@ -115,20 +115,20 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
     gctx.restore();
     if (hasStyles(layer.styles)) {
       const st = borrowCanvas(w, h), sc = ctx2d(st); extra.push(st);
-      composeStyled(sc, surface, layer.styles, off.x, off.y, w, h, g);
+      composeStyled(sc, surface, layer.styles, off.x, off.y, w, h, g, layer.fillOpacity);
       surface = st;
     } else surface = g;
     off = { x: 0, y: 0 };
   } else if (hasStyles(layer.styles)) {
     // Con estilos: sombra/resplandor/trazo por debajo y la capa encima. Se guarda en caché si nada cambia.
-    const key = ov || !isRaster(layer) ? null : `${layer.version}|${layer.mask?.version}|${layer.mask?.enabled}|${w}x${h}|${JSON.stringify(layer.styles)}`;
+    const key = ov || !isRaster(layer) ? null : `${layer.version}|${layer.mask?.version}|${layer.mask?.enabled}|${w}x${h}|${layer.fillOpacity}|${JSON.stringify(layer.styles)}`;
     const cached = key ? styleCache.get(layer) : undefined;
     if (cached && cached.key === key) surface = cached.canvas;
     else {
       let out: HTMLCanvasElement;
       if (key) out = makeCanvas(w, h); else { out = borrowCanvas(w, h); extra.push(out); }
       const sctx = ctx2d(out);
-      composeStyled(sctx, surface, layer.styles, off.x, off.y, w, h);
+      composeStyled(sctx, surface, layer.styles, off.x, off.y, w, h, undefined, layer.fillOpacity);
       if (key) styleCache.set(layer, { key, canvas: out });
       surface = out;
     }
@@ -154,7 +154,7 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
     }
   }
   ctx.save();
-  ctx.globalAlpha = layer.opacity;
+  ctx.globalAlpha = layer.opacity * (hasStyles(layer.styles) ? 1 : layer.fillOpacity);
   ctx.globalCompositeOperation = canvasBlend(layer.blendMode);
   ctx.drawImage(surface, off.x, off.y);
   ctx.restore();
@@ -179,7 +179,7 @@ function dilated(src: HTMLCanvasElement, ox: number, oy: number, r: number, w: n
 }
 
 /** Dibuja los efectos de estilo de `src` (sin la propia capa). Sirve también para exportar. */
-export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null) {
+export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null, knock = false) {
   const FAR = w + 4096; // la imagen se dibuja fuera y solo su "sombra" cae dentro del lienzo
   const cast = (color: string, blur: number, dx: number, dy: number, times = 1) => {
     ctx.save();
@@ -206,6 +206,8 @@ export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasEleme
     // exterior: todo el grosor por fuera; centro: la mitad (la otra mitad va por dentro)
     const r = (sk.position ?? 'outside') === 'center' ? sk.size / 2 : sk.size;
     const t = dilated(src, ox, oy, r, w, h, sk.color);
+    // con el relleno bajado, el contorno no debe verse por dentro de la forma
+    if (knock) { const tc = ctx2d(t); tc.globalCompositeOperation = 'destination-out'; tc.drawImage(src, ox, oy); tc.globalCompositeOperation = 'source-over'; }
     ctx.save(); ctx.globalAlpha = (sk.opacity ?? 100) / 100; ctx.drawImage(t, 0, 0); ctx.restore();
     returnCanvas(t);
   }
@@ -304,9 +306,11 @@ function contentBoundsFast(src: HTMLCanvasElement, ox: number, oy: number, w: nu
 }
 
 /** Capa con todos sus estilos: efectos de fondo, la capa (o `body`) y efectos interiores. */
-export function composeStyled(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, body?: HTMLCanvasElement) {
+export function composeStyled(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, body?: HTMLCanvasElement, fill = 1) {
   const bl = st.bevel?.enabled ? bevelLayers(src, ox, oy, w, h, st.bevel) : null;
-  renderStyles(ctx, src, st, ox, oy, w, h, bl);
+  renderStyles(ctx, src, st, ox, oy, w, h, bl, fill < 1);
+  // Relleno: el contenido (y sus efectos interiores) con menos opacidad; los efectos exteriores quedan igual
+  ctx.save(); ctx.globalAlpha *= Math.max(0, Math.min(1, fill));
   const top = body ? null : innerStyled(src, st, ox, oy, w, h, bl);
   if (top) { ctx.drawImage(top, 0, 0); returnCanvas(top); }
   else if (body) {
@@ -314,6 +318,7 @@ export function composeStyled(ctx: CanvasRenderingContext2D, src: HTMLCanvasElem
     const t2 = innerStyled(body, st, 0, 0, w, h, bl);
     ctx.drawImage(t2 ?? body, 0, 0); if (t2) returnCanvas(t2);
   } else ctx.drawImage(src, ox, oy);
+  ctx.restore();
 }
 
 const filterById = new Map(FILTERS.map(f => [f.id, f]));
