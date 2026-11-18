@@ -25,17 +25,26 @@ const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'nu
 
 // ---- Nuevo documento -----------------------------------------------------------
 
-const PRESETS: [string, number, number][] = [
-  ['Personalizado', 0, 0], ['HD 1280 × 720', 1280, 720], ['Full HD 1920 × 1080', 1920, 1080], ['4K 3840 × 2160', 3840, 2160],
-  ['Cuadrado 1080 × 1080', 1080, 1080], ['Historia 1080 × 1920', 1080, 1920], ['A4 300 ppp 2480 × 3508', 2480, 3508],
-  ['Carta 300 ppp 2550 × 3300', 2550, 3300], ['Web 800 × 600', 800, 600], ['Icono 512 × 512', 512, 512],
+const PRESET_GROUPS: [string, [string, number, number][]][] = [
+  ['Redes sociales', [['Publicación cuadrada 1080 × 1080', 1080, 1080], ['Publicación vertical 1080 × 1350', 1080, 1350], ['Historia / vídeo vertical 1080 × 1920', 1080, 1920],
+    ['Miniatura de vídeo 1280 × 720', 1280, 720], ['Portada de canal 2560 × 1440', 2560, 1440], ['Portada de perfil 1500 × 500', 1500, 500], ['Portada de página 1640 × 624', 1640, 624],
+    ['Banner profesional 1584 × 396', 1584, 396], ['Pin vertical 1000 × 1500', 1000, 1500]]],
+  ['Pantalla', [['HD 1280 × 720', 1280, 720], ['Full HD 1920 × 1080', 1920, 1080], ['2K 2560 × 1440', 2560, 1440], ['4K 3840 × 2160', 3840, 2160], ['Móvil 1170 × 2532', 1170, 2532], ['Tableta 2048 × 2732', 2048, 2732]]],
+  ['Impresión (300 ppp)', [['A4 210 × 297 mm', 2480, 3508], ['A5 148 × 210 mm', 1748, 2480], ['A3 297 × 420 mm', 3508, 4961], ['Carta 8,5 × 11 in', 2550, 3300],
+    ['Tarjeta de visita 85 × 55 mm', 1004, 650], ['Postal 10 × 15 cm', 1181, 1772], ['Foto 13 × 18 cm', 1535, 2126], ['Póster A2', 4961, 7016]]],
+  ['Web', [['Web 800 × 600', 800, 600], ['Cabecera web 1920 × 600', 1920, 600], ['Anuncio horizontal 728 × 90', 728, 90], ['Anuncio rectángulo 300 × 250', 300, 250], ['Icono 512 × 512', 512, 512], ['Favicon 64 × 64', 64, 64]]],
 ];
+const PRESETS: [string, number, number][] = [['Personalizado', 0, 0], ...PRESET_GROUPS.flatMap(([g, l]) => l.map(([n, w, h]) => [(g.startsWith('Impresión') ? n + ' · 300 ppp' : n), w, h] as [string, number, number]))];
+
 
 export function newDocumentDialog() {
   const name = h('input', { type: 'text', value: 'Sin título', class: 'wide' });
   const w = numInput(1280), hh = numInput(720), res = numInput(72, 1, 10000);
-  const preset = h('select', {}, ...PRESETS.map(([n], i) => h('option', { value: String(i) }, n)));
-  preset.value = '1';
+  let k = 1;
+  const preset = h('select', {}, h('option', { value: '0' }, 'Personalizado'), ...PRESET_GROUPS.map(([g, l]) => h('optgroup', { label: g }, ...l.map(([n]) => h('option', { value: String(k++) }, n)))));
+  preset.value = String(PRESETS.findIndex(p => p[1] === 1280 && p[2] === 720 && /HD/.test(p[0])));
+  const orient = h('button', { class: 'btn', type: 'button', title: 'Cambiar entre horizontal y vertical' }, '⇄ Girar');
+  orient.onclick = () => { const a = w.value; w.value = hh.value; hh.value = a; };
   preset.addEventListener('change', () => { const p = PRESETS[+preset.value]; if (p[1]) { w.value = String(p[1]); hh.value = String(p[2]); res.value = /ppp/.test(p[0]) ? '300' : '72'; } });
   [w, hh].forEach(i => i.addEventListener('input', () => preset.value = '0'));
   const bg = h('select', {},
@@ -44,7 +53,7 @@ export function newDocumentDialog() {
     h('option', { value: '' }, 'Transparente'));
   showDialog({
     title: 'Nuevo documento', okLabel: 'Crear',
-    body: [row('Nombre', name), row('Predefinido', preset), row('Anchura', w, 'px'), row('Altura', hh, 'px'), row('Resolución', res, 'ppp'), row('Fondo', bg)],
+    body: [row('Nombre', name), row('Predefinido', preset), row('Anchura', w, 'px'), row('Altura', hh, 'px', orient), row('Resolución', res, 'ppp'), row('Fondo', bg)],
     onOk: () => {
       const W = Math.round(+w.value), H = Math.round(+hh.value);
       if (!(W >= 1 && H >= 1 && W <= 30000 && H <= 30000)) { app.toast('Tamaño no válido (1 – 30000 px)', 'warn'); return false; }
