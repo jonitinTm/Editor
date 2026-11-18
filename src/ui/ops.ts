@@ -1970,3 +1970,28 @@ export async function makePanorama(files: File[], vertical: boolean) {
   app.addDocument(d);
   app.toast('Panorámica lista: recorta los bordes irregulares con Recortar (C) y «Rellenar según contenido» si quieres');
 }
+
+/** Exporta la animación de la línea de tiempo como vídeo WebM (lo admiten las redes y los navegadores). */
+export async function saveVideo(name: string, loops = 1) {
+  const d = doc(); if (!d) return;
+  if (d.frames.length < 2) { app.toast('Crea primero los cuadros en Ventana › Línea de tiempo', 'warn'); return; }
+  if (typeof MediaRecorder === 'undefined') { app.toast('Este navegador no puede grabar vídeo; usa GIF', 'warn'); return; }
+  const frames = renderFrames(d);
+  // tamaño par (lo piden los códecs) y como mucho 1920 px
+  const k = Math.min(1, 1920 / Math.max(d.width, d.height)), W = Math.max(2, Math.round(d.width * k / 2) * 2), H = Math.max(2, Math.round(d.height * k / 2) * 2);
+  const c = makeCanvas(W, H), x = ctx2d(c);
+  const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) ?? 'video/webm';
+  const stream = (c as any).captureStream(0) as MediaStream, track = stream.getVideoTracks()[0] as any;
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+  const chunks: Blob[] = []; rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+  const done = new Promise<void>(r => { rec.onstop = () => r(); });
+  app.toast('Grabando el vídeo…');
+  rec.start();
+  const draw = (f: HTMLCanvasElement) => { x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); x.drawImage(f, 0, 0, W, H); track.requestFrame?.(); };
+  for (let l = 0; l < Math.max(1, loops); l++) for (const f of frames) { draw(f.canvas); await new Promise(r => setTimeout(r, Math.max(20, f.delay))); }
+  draw(frames[frames.length - 1].canvas); await new Promise(r => setTimeout(r, 60));
+  rec.stop(); await done;
+  const blob = new Blob(chunks, { type: 'video/webm' });
+  try { await io.saveBlob(blob, name + '.webm'); app.toast(`Vídeo guardado (${frames.length} cuadros, ${(blob.size / 1024).toFixed(0)} KB)`); }
+  catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
+}

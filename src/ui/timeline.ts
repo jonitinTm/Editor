@@ -48,7 +48,7 @@ export function buildTimeline(parent: HTMLElement) {
     btn('+ Cuadro', 'Duplicar el cuadro actual', () => { const d = app.doc; if (!d) return; if (!d.frames.length) d.frames.push({ delay: 100, visible: visibleIds(d) }); d.frames.splice(d.frameIndex + 1, 0, { delay: d.frames[d.frameIndex].delay, visible: visibleIds(d) }); applyFrame(d, d.frameIndex + 1); }),
     btn('Eliminar', 'Eliminar el cuadro actual', () => { const d = app.doc; if (!d || !d.frames.length) return; d.frames.splice(d.frameIndex, 1); if (d.frames.length) applyFrame(d, Math.min(d.frameIndex, d.frames.length - 1)); else d.changed(); }),
     btn('Cuadros desde capas', 'Crea un cuadro por cada capa', () => { if (app.doc) framesFromLayers(app.doc); }),
-    h('span', { class: 'hint' }, 'Cada cuadro recuerda qué capas se ven. Exporta con Archivo › Exportar como › GIF animado.'));
+    h('span', { class: 'hint' }, 'Cada cuadro recuerda qué capas se ven. Exporta con Archivo › Exportar como (GIF animado o vídeo WebM).'));
   const el = h('div', { class: 'timeline closed', 'data-group': 'timeline' }, bar, strip);
   parent.append(el);
 

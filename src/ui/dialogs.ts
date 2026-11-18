@@ -79,6 +79,7 @@ export function exportDialog() {
     h('option', { value: 'image/x-tga' }, 'TGA (Targa, para juegos y vídeo)'),
     h('option', { value: 'image/x-icon' }, 'ICO (icono de Windows o favicon, varios tamaños)'),
     h('option', { value: 'gif' }, 'GIF (animado si hay cuadros en la línea de tiempo)'),
+    h('option', { value: 'webm' }, 'Vídeo WebM (la animación de la línea de tiempo)'),
     h('option', { value: 'pdf' }, 'PDF (para imprimir o enviar)'),
     h('option', { value: 'svg' }, 'SVG (imagen incrustada, se puede ampliar en diseño web)'),
     h('option', { value: 'psd' }, 'PSD (Photoshop, conserva capas)'),
@@ -109,6 +110,7 @@ export function exportDialog() {
     if (fmt.value === 'pdf') { info.textContent = 'Un PDF de una página con la imagen (fondo blanco). Ideal para imprimir.'; return; }
     if (fmt.value === 'svg') { info.textContent = 'Archivo SVG con la imagen incrustada (sin pérdida, con transparencia).'; return; }
     if (fmt.value === 'project') { info.textContent = 'Guarda todo (capas, texto, formas, ajustes, estilos) para seguir editando.'; return; }
+    if (fmt.value === 'webm') { info.textContent = d.frames.length > 1 ? `Vídeo de ${d.frames.length} cuadros (se graba en tiempo real: tarda lo que dura la animación).` : 'Primero crea cuadros en Ventana › Línea de tiempo.'; return; }
     if (fmt.value === 'gif') { info.textContent = d.frames.length > 1 ? `Animación de ${d.frames.length} cuadros, 256 colores.` : 'Imagen de 256 colores. Para animar, crea cuadros en Ventana › Línea de tiempo.'; return; }
     if (fmt.value === 'psd') { info.textContent = 'Capas, grupos, máscaras, opacidad y modos de fusión. El texto y las formas van como píxeles.'; return; }
     info.textContent = 'Calculando tamaño…';
@@ -126,6 +128,7 @@ export function exportDialog() {
       if (fmt.value === 'project') { d.name = name.value || d.name; await ops.saveProject(true); return; }
       if (fmt.value === 'psd') { await ops.savePsd(name.value || d.name); return; }
       if (fmt.value === 'gif') { await ops.saveGif(name.value || d.name); return; }
+      if (fmt.value === 'webm') { await ops.saveVideo(name.value || d.name); return; }
       if (fmt.value === 'pdf' || fmt.value === 'svg') { try { await ops.exportVector(fmt.value, name.value || d.name, quality / 100, scale / 100); app.toast('Exportado'); } catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); } return; }
       const ext = io.EXPORT_EXT[fmt.value as io.ExportType];
       const extra = extraChecks.filter(e => e.c.checked).map(e => e.k);
