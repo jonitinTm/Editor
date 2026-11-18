@@ -12,7 +12,7 @@ export interface LayerSnap {
   blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; clip: boolean; label?: string | null;
   canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
-  children?: LayerSnap[]; expanded?: boolean; artboard?: any;
+  children?: LayerSnap[]; expanded?: boolean; artboard?: any; vmask?: string;
 }
 export interface DocSnap {
   width: number; height: number; root: LayerSnap; activeId: number | null;
@@ -40,6 +40,7 @@ function snapLayer(l: Layer): LayerSnap {
     mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled } : null,
   };
   s.styles = l.styles ? JSON.stringify(l.styles) : null;
+  s.vmask = l.vmask ? JSON.stringify(l.vmask) : undefined;
   if (l instanceof AdjustmentLayer) s.adjust = JSON.stringify({ filterId: l.filterId, params: l.params });
   if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; s.artboard = l.artboard ? { ...l.artboard } : undefined; }
   else if (l instanceof RasterLayer) {
@@ -102,6 +103,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
   }
   l.name = s.name; l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.clip = s.clip; l.label = s.label ?? null;
   l.styles = s.styles ? JSON.parse(s.styles) : null;
+  l.vmask = s.vmask ? JSON.parse(s.vmask) : undefined;
   if (s.mask) {
     const om = old?.mask, fm = om ? frozen.get(om) : undefined;
     if (om && fm && fm.version === om.version && fm.canvas === s.mask.canvas && om.canvas.width === w && om.canvas.height === h) { om.enabled = s.mask.enabled; l.mask = om; }

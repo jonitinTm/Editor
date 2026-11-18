@@ -118,8 +118,48 @@ export function hasStyles(s: LayerStyles | null | undefined): s is LayerStyles {
   return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled || s.innerShadow?.enabled || s.innerGlow?.enabled || s.colorOverlay?.enabled || s.gradientOverlay?.enabled || s.bevel?.enabled || s.patternOverlay?.enabled || s.satin?.enabled);
 }
 
+/** Máscara vectorial: la capa solo se ve dentro de los trazados (se puede editar con la selección directa). */
+export interface VectorMask { subpaths: { closed: boolean; pts: PathPoint[]; op?: number }[]; enabled: boolean; invert?: boolean }
+const vmCache = new WeakMap<object, { key: string; canvas: HTMLCanvasElement }>();
+const comboCache = new WeakMap<object, { pixel: HTMLCanvasElement; ver: number; v: HTMLCanvasElement; canvas: HTMLCanvasElement }>();
+/** La máscara vectorial dibujada (blanco = se ve). */
+export function vectorMaskCanvas(l: Layer, w: number, h: number): HTMLCanvasElement | null {
+  const vm = l.vmask; if (!vm || !vm.enabled) return null;
+  const key = `${w}x${h}|${JSON.stringify(vm)}`, c0 = vmCache.get(l);
+  if (c0 && c0.key === key) return c0.canvas;
+  const c = makeCanvas(w, h), x = ctx2d(c);
+  x.fillStyle = '#fff';
+  if (vm.invert) { x.fillRect(0, 0, w, h); x.globalCompositeOperation = 'destination-out'; }
+  if (vm.subpaths.some(sp => sp.op !== undefined)) {
+    // como en Photoshop: cada trazado se une, se resta, se interseca o se excluye (0 excluir, 1 unir, 2 restar, 3 intersecar)
+    const t = makeCanvas(w, h), tx = ctx2d(t); tx.fillStyle = '#fff';
+    for (const sp of vm.subpaths) {
+      tx.globalCompositeOperation = sp.op === 2 ? 'destination-out' : sp.op === 3 ? 'destination-in' : sp.op === 0 ? 'xor' : 'source-over';
+      tx.beginPath(); tracePath(tx, sp.pts, true); tx.fill();
+    }
+    x.drawImage(t, 0, 0);
+  } else { x.beginPath(); for (const sp of vm.subpaths) tracePath(x, sp.pts, true); x.fill('evenodd'); }
+  vmCache.set(l, { key, canvas: c });
+  return c;
+}
+/** Máscara efectiva de una capa: la de píxeles y la vectorial combinadas. */
+export function effectiveMask(l: Layer, pixel: HTMLCanvasElement | null | undefined, w: number, h: number, off?: { x: number; y: number }): HTMLCanvasElement | null {
+  let v = vectorMaskCanvas(l, w, h);
+  if (v && off && (off.x || off.y)) { const t = makeCanvas(w, h); ctx2d(t).drawImage(v, off.x, off.y); v = t; }
+  if (!v) return pixel ?? null;
+  if (!pixel) return v;
+  // se guarda la combinación mientras no cambien ni la máscara de píxeles ni el trazado
+  const ver = l.mask?.canvas === pixel ? l.mask.version : -1, c0 = comboCache.get(l);
+  if (c0 && c0.pixel === pixel && c0.ver === ver && ver !== -1 && c0.v === v) return c0.canvas;
+  const c = makeCanvas(w, h), x = ctx2d(c); x.drawImage(pixel, 0, 0); x.globalCompositeOperation = 'destination-in'; x.drawImage(v, 0, 0);
+  comboCache.set(l, { pixel, ver, v, canvas: c });
+  return c;
+}
+
 export abstract class Layer {
   id = newLayerId();
+  /** Máscara vectorial (opcional, además de la de píxeles). */
+  vmask?: VectorMask;
   name: string;
   visible = true;
   opacity = 1;

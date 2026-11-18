@@ -3,6 +3,7 @@
 
 import { app } from './app';
 import { EditorDocument } from '../core/document';
+import { effectiveMask } from '../core/layers';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, SmartFilter, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, composeStyled } from '../core/compositor';
@@ -185,6 +186,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
   c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip; c.lockAlpha = l.lockAlpha; c.label = l.label;
+  if (l.vmask) c.vmask = JSON.parse(JSON.stringify(l.vmask));
   if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
   return c;
 }
@@ -1394,4 +1396,31 @@ export function toggleVerticalText() {
   if (!d || !(l instanceof TextLayer)) { app.toast('Selecciona una capa de texto', 'warn'); return; }
   l.props.vertical = !l.props.vertical; if (l.props.vertical) delete l.props.onPath;
   l.render(); d.commit(l.props.vertical ? 'Texto vertical' : 'Texto horizontal');
+}
+
+// ---- Máscaras vectoriales ---------------------------------------------------------------
+
+/** Capa › Máscara vectorial › Trazado actual: la capa solo se ve dentro del trazado activo. */
+export function vectorMaskFromPath() {
+  const d = doc(), l = d?.active;
+  if (!d || !l || l === d.root) return;
+  const path = d.paths[d.activePath];
+  if (!path || !path.subpaths.some(s => s.pts.length >= 2)) { app.toast('Elige un trazado en el panel Trazados (dibújalo con la Pluma en modo «Trazado»)', 'warn'); return; }
+  l.vmask = { subpaths: JSON.parse(JSON.stringify(path.subpaths.map(s => ({ closed: true, pts: s.pts })))), enabled: true };
+  d.activePath = -1; d.invalidate(); d.commit('Máscara vectorial');
+}
+export function vectorMaskOp(kind: 'toggle' | 'invert' | 'delete' | 'rasterize') {
+  const d = doc(), l = d?.active; if (!d || !l?.vmask) { app.toast('La capa no tiene máscara vectorial', 'warn'); return; }
+  if (kind === 'toggle') l.vmask.enabled = !l.vmask.enabled;
+  else if (kind === 'invert') l.vmask.invert = !l.vmask.invert;
+  else if (kind === 'delete') l.vmask = undefined;
+  else {
+    // se convierte en máscara de píxeles (combinada con la que ya hubiera)
+    const v = { ...l.vmask, enabled: true }; l.vmask = v;
+    const m = effectiveMask(l, l.mask?.enabled ? l.mask.canvas : null, d.width, d.height)!;
+    l.mask = new LayerMask(d.width, d.height, 'white'); l.mask.canvas = cloneCanvas(m); l.mask.touch();
+    l.vmask = undefined;
+  }
+  d.invalidate();
+  d.commit({ toggle: 'Activar/desactivar máscara vectorial', invert: 'Invertir máscara vectorial', delete: 'Eliminar máscara vectorial', rasterize: 'Rasterizar máscara vectorial' }[kind]);
 }

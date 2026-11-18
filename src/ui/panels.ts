@@ -4,6 +4,7 @@ import { app } from './app';
 import { h, numberSlider } from './dom';
 import { icon } from './icons';
 import * as ops from './ops';
+import { tracePath } from '../core/layers';
 import { BLEND_MODES, GroupLayer, AdjustmentLayer, SmartLayer, hasStyles, Layer, TextLayer, ShapeLayer, isRaster, isParametric } from '../core/layers';
 import { ctx2d } from '../core/canvas';
 import { renderComposite } from '../core/compositor';
@@ -189,10 +190,18 @@ export function buildLayersPanel(parent: HTMLElement) {
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
     if (l.label) eye.style.background = LABEL_COLORS[l.label] ?? '';
+    // miniatura de la máscara vectorial
+    let vmEl: HTMLElement | null = null;
+    if (l.vmask) {
+      const vm = l.vmask, sig = JSON.stringify(vm);
+      const c = thumb(vm, hashStr(sig), (ctx, w, hh) => { ctx.fillStyle = vm.invert ? '#fff' : '#9a9a9a'; ctx.fillRect(0, 0, w, hh); ctx.scale(w / d.width, hh / d.height); ctx.fillStyle = vm.invert ? '#9a9a9a' : '#fff'; ctx.beginPath(); for (const sp of vm.subpaths) tracePath(ctx, sp.pts, true); ctx.fill('evenodd'); }, 'thumb mask');
+      vmEl = h('span', { class: 'thumb-wrap' + (vm.enabled ? '' : ' disabled'), title: 'Máscara vectorial (edítala con la Selección directa, A; Mayús+clic para desactivarla)' }, c);
+      vmEl.addEventListener('click', e => { e.stopPropagation(); d.setActive(l); if (e.shiftKey) ops.vectorMaskOp('toggle'); else { d.activePath = -1; app.setTool('node'); } });
+    }
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
       draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
-    }, eye, arrow, clipMark, thumbWrap, maskEl, name, kindTag, fx, lock);
+    }, eye, arrow, clipMark, thumbWrap, maskEl, vmEl, name, kindTag, fx, lock);
     el.addEventListener('click', e => {
       if (e.ctrlKey || e.metaKey) {
         if (d.selectedIds.has(l.id) && d.selectedIds.size > 1) d.selectedIds.delete(l.id); else d.selectedIds.add(l.id);

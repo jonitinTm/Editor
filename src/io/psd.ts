@@ -8,6 +8,7 @@ import { EditorDocument } from '../core/document';
 import { imageToCanvas } from './files';
 import { familyFromPostScript } from '../core/fonts';
 import { normalizeRuns, type TextRun } from '../core/textruns';
+import type { VectorMask, PathPoint } from '../core/layers';
 import { ShapeLayer, GroupLayer, Layer, LayerMask, LayerStyles, RasterLayer, TextLayer, TextProps, SmartLayer, Matrix, AdjustmentLayer, BlendMode, isRaster, hasStyles } from '../core/layers';
 import { cloneCanvas, contentBounds, ctx2d, makeCanvas, getPixels } from '../core/canvas';
 
@@ -215,6 +216,37 @@ function fillLayer(l: RasterLayer, soco?: Uint8Array, gdfl?: Uint8Array, bounds?
 }
 
 /** Dibuja una máscara vectorial de Photoshop (curvas de Bézier) como máscara de píxeles. */
+/** Máscara vectorial de Photoshop → trazados editables (null si usa combinaciones que no se pueden representar). */
+function vectorPaths(b: Uint8Array, W: number, H: number): VectorMask | null {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength), flags = v.getUint32(4);
+  const pt = (o: number) => ({ y: v.getInt32(o) / 16777216 * H, x: v.getInt32(o + 4) / 16777216 * W });
+  const subs: VectorMask['subpaths'] = []; let cur: PathPoint[] | null = null, ok = true, startFilled = false;
+  for (let o = 8; o + 26 <= b.length; o += 26) {
+    const sel = v.getUint16(o);
+    if (sel === 0 || sel === 3) { const op = v.getUint16(o + 4); cur = []; subs.push({ closed: sel === 0, pts: cur, op: op <= 3 ? op : 1 }); }
+    else if ((sel === 1 || sel === 2 || sel === 4 || sel === 5) && cur) { const a = pt(o + 2), n = pt(o + 10), z = pt(o + 18); cur.push({ ix: a.x, iy: a.y, x: n.x, y: n.y, ox: z.x, oy: z.y }); }
+    else if (sel === 8) startFilled = v.getUint16(o + 2) === 1;
+  }
+  const real = subs.filter(sp => sp.pts.length >= 2);
+  if (!ok || !real.length || startFilled) return null;
+  return { subpaths: real.map(sp => ({ ...sp, closed: true })), enabled: !(flags & 2), invert: !!(flags & 1) };
+}
+/** Trazados → bloque vmsk de Photoshop. */
+function vectorMaskBlock(vm: VectorMask, W: number, H: number): Uint8Array {
+  const v = new Writer(); v.u32(3); v.u32((vm.invert ? 1 : 0) | (vm.enabled ? 0 : 2));
+  const pad = (n: number) => { for (let i = 0; i < n; i++) v.u8(0); };
+  v.u16(6); pad(24);
+  v.u16(8); v.u16(0); pad(22);
+  const fx = (val: number, size: number) => v.i32(Math.round(val / size * 16777216));
+  for (const sp of vm.subpaths) {
+    // combinación: la guardada o, para trazados propios (par-impar), unir el primero y excluir los demás
+    const op = sp.op ?? (vm.subpaths.indexOf(sp) === 0 ? 1 : 0);
+    v.u16(0); v.u16(sp.pts.length); v.u16(op); v.u16(1); pad(18);
+    for (const q of sp.pts) { v.u16(q.ix === q.x && q.iy === q.y && q.ox === q.x && q.oy === q.y ? 2 : 1); fx(q.iy, H); fx(q.ix, W); fx(q.y, H); fx(q.x, W); fx(q.oy, H); fx(q.ox, W); }
+  }
+  return v.flat();
+}
+
 function vectorMask(b: Uint8Array, W: number, H: number): HTMLCanvasElement | null {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
   const flags = v.getUint32(4);
@@ -573,14 +605,22 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
     const m0 = rec.mask;
     // Si la máscara principal procede de un trazado vectorial (bit 3), la de píxeles real va en el canal -3
     const fromVector = !!m0 && !!(m0.flags & 8);
-    if (m0 && data[-2] && (data[-2].length || !fromVector) && !(m0.flags & 2)) addMask(pixelMask(m0, data[-2], fromVector ? m0.vdensity : m0.density));
+    // la máscara vectorial editable sustituye a su versión en píxeles (canal -2 cuando viene de un trazado)
+    const vmB = rec.blocks.vmsk ?? rec.blocks.vsms;
+    const editableVm = vmB && !(m0 && m0.vdensity !== undefined && m0.vdensity < 255) && !pendingFill && !(layer instanceof ShapeLayer) && !(layer instanceof AdjustmentLayer) ? vectorPaths(vmB, W, H) : null;
+    if (m0 && data[-2] && (data[-2].length || !fromVector) && !(m0.flags & 2) && !(editableVm && fromVector)) addMask(pixelMask(m0, data[-2], fromVector ? m0.vdensity : m0.density));
     if (m0?.real && data[-3] && !(m0.real.flags & 2)) addMask(pixelMask(m0.real, data[-3], m0.density));
     const vm = rec.blocks.vmsk ?? rec.blocks.vsms;
     let shapeBounds = null as ReturnType<typeof contentBounds>;
     if (vm) {
       // Máscara vectorial (formas): se dibuja como máscara, salvo que el PSD ya la traiga dibujada
-      const shape = vectorMask(vm, W, H);
-      if (shape) { shapeBounds = contentBounds(shape); if (!(fromVector && data[-2]?.length)) addMask(shape); }
+      // en capas normales se conserva como máscara vectorial editable; en formas y rellenos, como hasta ahora
+      const editable = editableVm;
+      if (editable) layer.vmask = editable;
+      else {
+        const shape = vectorMask(vm, W, H);
+        if (shape) { shapeBounds = contentBounds(shape); if (!(fromVector && data[-2]?.length)) addMask(shape); }
+      }
     }
     if (pendingFill) { try { fillLayer(pendingFill, rec.blocks.SoCo, rec.blocks.GdFl, shapeBounds); } catch { warnings.push('Un relleno de degradado no se pudo interpretar'); } pendingFill.touch(); }
     stack[stack.length - 1].add(layer);
@@ -938,6 +978,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
         const extra: [string, Uint8Array][] = [];
         const sb = l instanceof ShapeLayer ? shapeBlocks(l, W, H) : null;
         if (sb) { extra.push(['SoCo', sb.soco], ['vmsk', sb.vmsk]); vectors++; }
+        else if (l.vmask?.subpaths.length) extra.push(['vmsk', vectorMaskBlock(l.vmask, W, H)]);
         else if (l.kind === 'shape' || l.kind === 'smart') asPixels++;
         if (l instanceof TextLayer) { if (l.props.keepPixels && l.props.psdTySh) { extra.push(['TySh', patchTySh(unb64(l.props.psdTySh), l.props)]); } else asPixels++; }
         if (hasStyles(l.styles)) extra.push(['lfx2', effectsBlock(l.styles)]);

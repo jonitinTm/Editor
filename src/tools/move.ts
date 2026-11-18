@@ -104,6 +104,7 @@ export class MoveTool implements Tool {
         if (isParametric(l)) ov.offset = this.offset;
         else if (isRaster(l)) { const f = l.fullContent(); ov.canvas = f.canvas; ov.offset = { x: f.x + this.offset.x, y: f.y + this.offset.y }; }
         if (l.mask) ov.mask = shiftCanvas(l.mask.canvas, this.offset.x, this.offset.y, '#fff');
+        if (l.vmask) ov.vmOffset = this.offset;
         doc.overrides.set(l, ov);
       }
     }
@@ -149,6 +150,7 @@ export class MoveTool implements Tool {
         if (isParametric(l)) l.translate(dx, dy);
         else if (isRaster(l)) { const f = l.fullContent(); l.placeFull(f.canvas, f.x + dx, f.y + dy); }
         if (l.mask) { l.mask.canvas = shiftCanvas(l.mask.canvas, dx, dy, '#fff'); l.mask.touch(); }
+        if (l.vmask) for (const sp of l.vmask.subpaths) for (const q of sp.pts) { q.x += dx; q.y += dy; q.ix += dx; q.iy += dy; q.ox += dx; q.oy += dy; }
       }
     }
     this.floating = null; this.layers = []; this.start = null; this.boards = [];

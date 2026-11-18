@@ -119,6 +119,11 @@ export class NodeTool implements Tool {
   private layer(): { props: { path: { closed: boolean; pts: PathPoint[] } }; render(): void; isLocked(): boolean; subs?: { closed: boolean; pts: PathPoint[] }[] } | null {
     const d = app.doc, l = d?.active;
     if (l instanceof ShapeLayer && l.props.shape === 'path' && l.props.path) return l as any;
+    // máscara vectorial de la capa (si no se ha elegido otro trazado en el panel)
+    if (d && l?.vmask && d.activePath < 0) {
+      const subs = l.vmask.subpaths, pts = subs.flatMap(sp => sp.pts);
+      return { props: { path: { closed: true, pts } }, render: () => d.invalidate(), isLocked: () => l.isLocked(), subs };
+    }
     if (d && d.activePath >= 0 && d.paths[d.activePath]) {
       // todos los subtrazados se tratan como una lista de puntos única
       const subs = d.paths[d.activePath].subpaths, pts = subs.flatMap(sp => sp.pts);
@@ -126,7 +131,7 @@ export class NodeTool implements Tool {
     }
     return null;
   }
-  activate() { this.active = -1; if (app.doc && !this.layer()) app.toast('Selecciona una capa de trazado o un trazado del panel Trazados'); }
+  activate() { this.active = -1; if (app.doc && !this.layer()) app.toast('Selecciona una capa de trazado, una capa con máscara vectorial o un trazado del panel Trazados'); }
   docChanged() { this.active = -1; this.drag = null; }
   private hit(e: ToolEvent): { i: number; part: 'a' | 'i' | 'o' } | null {
     const l = this.layer(); if (!l) return null;

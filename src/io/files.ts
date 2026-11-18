@@ -98,6 +98,7 @@ async function layerToProj(l: Layer): Promise<ProjLayer> {
     mask: l.mask ? { image: await canvasToDataURL(l.mask.canvas), enabled: l.mask.enabled } : null,
   };
   if (l.styles) p.styles = l.styles;
+  if (l.vmask) (p as any).vmask = l.vmask;
   if (l instanceof AdjustmentLayer) p.adjust = { filterId: l.filterId, params: l.params };
   if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; if (l.artboard) p.artboard = l.artboard; }
   else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument), filters: l.filters };
@@ -135,7 +136,7 @@ async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
     l = r;
   }
   l.id = p.id; bumpLayerId(p.id);
-  l.styles = p.styles ?? null; l.clip = !!p.clip;
+  l.styles = p.styles ?? null; l.clip = !!p.clip; if ((p as any).vmask) l.vmask = (p as any).vmask;
   l.visible = p.visible; l.opacity = p.opacity; l.blendMode = p.blendMode as any; l.locked = p.locked; l.lockAlpha = !!p.lockAlpha; l.label = p.label ?? null;
   if (p.mask) {
     const m = new LayerMask(w, h, 'black');

@@ -1,7 +1,7 @@
 // Compositor: combina todas las capas visibles en una sola imagen.
 
 import { borrowCanvas, returnCanvas, ctx2d, Rect } from './canvas';
-import { canvasBlend, GroupLayer, Layer, AdjustmentLayer, LayerStyles, hasStyles, isRaster, blendIfActive } from './layers';
+import { canvasBlend, GroupLayer, Layer, AdjustmentLayer, LayerStyles, hasStyles, isRaster, blendIfActive, effectiveMask } from './layers';
 import { FILTERS } from '../filters/registry';
 import { hexToRgb, makeCanvas } from './canvas';
 import { bevelLayers } from './bevel';
@@ -14,6 +14,8 @@ export interface LayerOverride {
   offset?: { x: number; y: number };
   /** Dibujo extra encima del contenido de la capa (p. ej. contenido flotante). */
   extra?: (ctx: CanvasRenderingContext2D) => void;
+  /** Desplazamiento provisional de la máscara vectorial (al mover la capa). */
+  vmOffset?: { x: number; y: number };
 }
 
 export interface CompositeOptions {
@@ -46,7 +48,7 @@ export function compositeGroup(group: GroupLayer, ctx: CanvasRenderingContext2D,
     }
     else if (layer instanceof GroupLayer && layer.blendMode === 'pass-through' && !clipped.length && !hasStyles(layer.styles)) {
       // Grupo en modo «Pasar»: sus capas actúan directamente sobre lo de debajo
-      const mask = opts.overrides?.get(layer)?.mask ?? (layer.mask?.enabled ? layer.mask.canvas : null);
+      const mask = effectiveMask(layer, opts.overrides?.get(layer)?.mask ?? (layer.mask?.enabled ? layer.mask.canvas : null), w, h);
       if (layer.opacity >= 1 && !mask) compositeGroup(layer, ctx, w, h, opts);
       else {
         const r = borrowCanvas(w, h), rc = ctx2d(r);
@@ -70,7 +72,7 @@ function clipTo(ctx: CanvasRenderingContext2D, opts: CompositeOptions) {
 /** Contenido de una capa (con su máscara aplicada) sin opacidad ni modo de fusión. */
 function layerSurface(layer: Layer, w: number, h: number, opts: CompositeOptions): { canvas: HTMLCanvasElement; off: { x: number; y: number }; temp: HTMLCanvasElement | null } {
   const ov = opts.overrides?.get(layer);
-  const mask = ov?.mask ?? (layer.mask?.enabled ? layer.mask.canvas : null);
+  const mask = effectiveMask(layer, ov?.mask ?? (layer.mask?.enabled ? layer.mask.canvas : null), w, h, ov?.vmOffset);
   if (isRaster(layer) && !mask && !ov?.extra) return { canvas: ov?.canvas ?? layer.canvas, off: ov?.offset ?? { x: 0, y: 0 }, temp: null };
   // Sin estilos, todo lo que se dibuje queda recortado a la zona: basta con vaciar esa zona
   const temp = borrowCanvas(w, h, hasStyles(layer.styles) ? null : opts.rect);
@@ -323,7 +325,7 @@ function applyAdjustment(l: AdjustmentLayer, ctx: CanvasRenderingContext2D, w: n
   let x = 0, y = 0, x1 = w, y1 = h;
   if (opts.rect) { x = Math.max(0, Math.floor(opts.rect.x)); y = Math.max(0, Math.floor(opts.rect.y)); x1 = Math.min(w, Math.ceil(opts.rect.x + opts.rect.w)); y1 = Math.min(h, Math.ceil(opts.rect.y + opts.rect.h)); }
   if (x1 <= x || y1 <= y) return;
-  const mc = opts.overrides?.get(l)?.mask ?? (l.mask?.enabled ? l.mask.canvas : null);
+  const mc = effectiveMask(l, opts.overrides?.get(l)?.mask ?? (l.mask?.enabled ? l.mask.canvas : null), w, h);
   const params = def.fill ? { ...l.params, _x: x, _y: y, _W: w, _H: h } : l.params;
   if (def.fill || canvasBlend(l.blendMode) !== 'source-over') {
     // Relleno o ajuste con modo de fusión: el resultado se dibuja encima con su máscara, opacidad y modo
