@@ -1,5 +1,6 @@
 // Herramienta Mover: desplaza la capa activa (o el contenido seleccionado).
 
+import { TextLayer } from '../core/layers';
 import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
@@ -60,6 +61,11 @@ export class MoveTool implements Tool {
 
   down(e: ToolEvent) {
     const doc = app.doc!;
+    // Doble clic sobre un texto: se pasa a editarlo (como en los editores profesionales)
+    if (e.detail >= 2) {
+      const hit = layerAt(e.x, e.y), l = hit instanceof TextLayer ? hit : doc.active instanceof TextLayer && doc.active.bounds && (() => { const b = (doc.active as TextLayer).bounds(); return e.x >= b.x && e.x <= b.x + b.w && e.y >= b.y && e.y <= b.y + b.h; })() ? doc.active : null;
+      if (l instanceof TextLayer) { doc.setActive(l); app.setTool('text'); (app.tool as any)?.editLayer?.(l); return; }
+    }
     // Ctrl invierte la opción «Selección automática de capa» (como en los editores profesionales)
     if (!!app.opt('autoSelect', this.id) !== e.ctrl) {
       const l = layerAt(e.x, e.y);

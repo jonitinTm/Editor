@@ -156,6 +156,8 @@ export class TextTool implements Tool {
     doc.changed();
   }
 
+  /** Empieza a editar una capa de texto existente (p. ej. con doble clic desde la herramienta Mover). */
+  editLayer(layer: TextLayer) { if (!layer.isLocked()) this.startEditing(layer, false); }
   private startEditing(layer: TextLayer, isNew: boolean) {
     this.loaded = layer.id;
     const area = document.createElement('textarea');
