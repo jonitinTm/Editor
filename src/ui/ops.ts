@@ -1809,3 +1809,38 @@ export function stackLayers(mode: 'median' | 'mean' | 'max' | 'min') {
   const top = list[n - 1]; top.parent!.add(l, top.parent!.children.indexOf(top) + 1);
   d.setActive(l, false); d.selectedIds = new Set([l.id]); d.invalidate(); d.commit(`Combinar en pila: ${names[mode]}`);
 }
+
+/** Edición › Alinear capas automáticamente: desplaza cada capa seleccionada para que encaje con la de abajo del todo. */
+export function autoAlignLayers() {
+  const d = doc(); if (!d) return;
+  const order = d.allLayers();
+  const list = selectedLayers().filter(l => isRaster(l) && !l.posLocked()).sort((a, b) => order.indexOf(a) - order.indexOf(b)) as RasterLayer[];
+  if (list.length < 2) { app.toast('Selecciona al menos dos capas de imagen', 'warn'); return; }
+  // escala de grises reducida (pirámide) para buscar rápido y después afinar
+  const gray = (c: HTMLCanvasElement, k: number) => { const w = Math.max(8, Math.round(c.width * k)), h = Math.max(8, Math.round(c.height * k)); const t = makeCanvas(w, h), x = ctx2d(t); x.imageSmoothingQuality = 'high'; x.drawImage(c, 0, 0, w, h); const dd = x.getImageData(0, 0, w, h).data, g = new Float32Array(w * h), a = new Uint8Array(w * h); for (let i = 0; i < w * h; i++) { g[i] = dd[i * 4] * 0.3 + dd[i * 4 + 1] * 0.59 + dd[i * 4 + 2] * 0.11; a[i] = dd[i * 4 + 3] > 128 ? 1 : 0; } return { g, a, w, h }; };
+  // diferencia media en la zona común (con bordes: más fiable que el color)
+  const edges = (G: { g: Float32Array; w: number; h: number }) => { const { g, w, h } = G, e = new Float32Array(w * h); for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x; e[i] = Math.abs(g[i + 1] - g[i - 1]) + Math.abs(g[i + w] - g[i - w]); } return e; };
+  const cost = (A: Float32Array, B: Float32Array, aa: Uint8Array, ba: Uint8Array, w: number, h: number, dx: number, dy: number) => {
+    let s = 0, n = 0; const st = Math.max(1, Math.floor(Math.sqrt(w * h / 20000)));
+    for (let y = Math.max(0, dy); y < Math.min(h, h + dy); y += st) for (let x = Math.max(0, dx); x < Math.min(w, w + dx); x += st) { const i = y * w + x, j = (y - dy) * w + (x - dx); if (!aa[i] || !ba[j]) continue; s += Math.abs(A[i] - B[j]); n++; }
+    return n > w * h / (st * st) * 0.3 ? s / n : Infinity;
+  };
+  const base = list[0];
+  const levels = [1 / 16, 1 / 8, 1 / 4, 1 / 2, 1].filter(k => k === 1 || Math.max(d.width, d.height) * k >= 48);
+  let moved = 0;
+  for (const l of list.slice(1)) {
+    let dx = 0, dy = 0;
+    for (let li = 0; li < levels.length; li++) {
+      const k = levels[li], A = gray(base.canvas, k), B = gray(l.canvas, k), EA = edges(A), EB = edges(B);
+      const R = li === 0 ? Math.ceil(Math.max(A.w, A.h) * 0.12) : 2;
+      let best = Infinity, bx = Math.round(dx * k), by = Math.round(dy * k);
+      const cx = bx, cy = by;
+      for (let y = cy - R; y <= cy + R; y++) for (let x = cx - R; x <= cx + R; x++) { const c = cost(EA, EB, A.a, B.a, A.w, A.h, x, y); if (c < best) { best = c; bx = x; by = y; } }
+      dx = bx / k; dy = by / k;
+    }
+    dx = Math.round(dx); dy = Math.round(dy);
+    if (dx || dy) { shiftLayer(l, dx, dy); moved++; }
+  }
+  d.invalidate(); d.commit('Alinear capas automáticamente');
+  app.toast(moved ? `${moved} capa${moved === 1 ? '' : 's'} alineada${moved === 1 ? '' : 's'}` : 'Las capas ya estaban alineadas');
+}

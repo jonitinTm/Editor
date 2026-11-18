@@ -263,7 +263,8 @@ Ya disponible:
   (si no hay documento abierto, se crea uno del tamaño de la mayor).
 - **Capa › Combinar en pila** (con varias capas seleccionadas): *Mediana* quita lo que se mueve entre fotos del mismo sitio
   (gente, coches), *Media* reduce el ruido, *Máximo* junta estelas de luz o estrellas y *Mínimo* lo contrario. Usa
-  *Archivo › Abrir como capas* para cargar las fotos (tienen que estar alineadas, hechas con trípode).
+  *Archivo › Abrir como capas* para cargar las fotos y, si se hicieron a mano alzada, *Edición › Alinear capas
+  automáticamente* (corrige desplazamientos; no giros ni cambios de perspectiva).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

@@ -167,6 +167,7 @@ export const ACTIONS: Action[] = [
   { id: 'toSmart', label: 'Convertir en objeto inteligente', enabled: hasLayer, run: ops.convertToSmart },
   { id: 'editSmart', label: 'Editar contenido', enabled: () => app.doc?.active?.kind === 'smart', run: () => ops.editSmartContents() },
   { id: 'rasterize', label: 'Rasterizar capa (texto, forma u objeto inteligente)', enabled: () => isParametric(app.doc?.active), run: ops.rasterize },
+  { id: 'autoAlign', label: 'Alinear capas automáticamente', enabled: hasDoc, run: () => ops.autoAlignLayers() },
   { id: 'stack:median', label: 'Mediana (quita lo que se mueve)', enabled: hasDoc, run: () => ops.stackLayers('median') },
   { id: 'stack:mean', label: 'Media (reduce el ruido)', enabled: hasDoc, run: () => ops.stackLayers('mean') },
   { id: 'stack:max', label: 'Máximo (estelas de luz)', enabled: hasDoc, run: () => ops.stackLayers('max') },
