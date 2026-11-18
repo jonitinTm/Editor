@@ -603,7 +603,7 @@ export class Viewport {
       extra = h('div', { class: 'cm-brush' }, mk('Tamaño', 'size', 1, 500), app.opt('hardness', t.id) !== undefined ? mk('Dureza', 'hardness', 0, 100) : null);
     }
     const ids = d.selection.active
-      ? ['deselect', 'invertSel', 'feather', 'refine', '-', 'layerViaCopy', 'layerViaCut', '-', 'freeTransform', 'fill', 'stroke', 'contentFill', '-', 'saveSel']
+      ? ['deselect', 'invertSel', 'feather', 'refine', '-', 'layerViaCopy', 'layerViaCut', '-', 'freeTransform', 'skew', 'distort', 'perspective', 'warp', 'flipH', 'flipV', '-', 'fill', 'stroke', 'contentFill', '-', 'saveSel']
       : ['selectAll', '-', 'freeTransform', 'newLayer', 'dupLayer', 'mergeDown', '-', 'undo', 'redo'];
     import('./panels').then(m => m.contextMenu(x, y, ids, extra));
   }
