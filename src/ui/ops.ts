@@ -1844,3 +1844,22 @@ export function autoAlignLayers() {
   d.invalidate(); d.commit('Alinear capas automáticamente');
   app.toast(moved ? `${moved} capa${moved === 1 ? '' : 's'} alineada${moved === 1 ? '' : 's'}` : 'Las capas ya estaban alineadas');
 }
+
+/** Archivo › Automatizar › Recortar y enderezar fotos: cada foto del escaneo pasa a su propio documento. */
+export async function cropScannedPhotos() {
+  const d = doc(); if (!d) return;
+  app.toast('Buscando las fotos…'); await new Promise(r => setTimeout(r, 30));
+  const { findScannedPhotos } = await import('../filters/cropscan');
+  const src = d.flatten(), list = findScannedPhotos(src);
+  if (!list.length) { app.toast('No se han encontrado fotos separadas del fondo', 'warn'); return; }
+  list.forEach((pc, i) => {
+    // se recortan un poco hacia dentro para no arrastrar el borde del escáner
+    const inset = Math.max(1, Math.round(Math.min(pc.w, pc.h) * 0.006)), w = Math.max(1, Math.round(pc.w - inset * 2)), hh = Math.max(1, Math.round(pc.h - inset * 2));
+    const c = makeCanvas(w, hh), x = ctx2d(c); x.imageSmoothingQuality = 'high';
+    x.translate(w / 2, hh / 2); x.rotate(-pc.angle); x.drawImage(src, -pc.cx, -pc.cy);
+    const nd = new EditorDocument(`${d.name} ${i + 1}`, w, hh); nd.ppi = d.ppi;
+    const l = new RasterLayer('Fondo', w, hh); l.canvas = c; l.touch(); nd.root.add(l); nd.setActive(l, false);
+    app.addDocument(nd);
+  });
+  app.toast(`${list.length} foto${list.length === 1 ? '' : 's'} separada${list.length === 1 ? '' : 's'}, cada una en su pestaña`);
+}
