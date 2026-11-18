@@ -198,7 +198,8 @@ export const ACTIONS: Action[] = [
   { id: 'win:all', label: 'Ocultar / mostrar todos los paneles', keys: ['Tab'], run: () => { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); } },
 
   // Ayuda
-  { id: 'shortcuts', label: 'Atajos de teclado', keys: ['F1'], run: () => dlg.shortcutsDialog(shortcutList()) },
+  { id: 'guide', label: 'Guía rápida', keys: ['F1'], run: dlg.quickGuideDialog },
+  { id: 'shortcuts', label: 'Atajos de teclado', keys: ['Alt+Shift+Ctrl+K'], run: () => dlg.shortcutsDialog(shortcutList()) },
   { id: 'about', label: 'Acerca de Editor', run: dlg.aboutDialog },
 ];
 

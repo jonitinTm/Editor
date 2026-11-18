@@ -443,3 +443,12 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 .font-cat { font-size: 10px; color: var(--muted); margin-left: 8px; flex-shrink: 0; }
 .font-note { font-size: 10px; }
 .grad-btn { cursor: pointer; border: 1px solid var(--border); border-radius: 2px; width: 200px; height: 18px; }
+.opt-more { margin-left: auto; flex-shrink: 0; }
+.opt-more-pop { display: none; position: fixed; z-index: 160; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.5); padding: 8px 10px; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 360px; white-space: nowrap; }
+.opt-more-pop.open { display: flex; }
+.guide { max-height: 62vh; overflow: auto; padding-right: 6px; }
+.guide-sec h3 { margin: 12px 0 4px; font-size: 13px; color: var(--title); }
+.guide-sec ul { margin: 0; padding-left: 18px; color: var(--text); line-height: 1.5; }
+.guide-sec li { margin: 3px 0; }
+.guide kbd { background: var(--input); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; font-size: 11px; }
+.link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; margin-top: 10px; font-size: 12px; } .link-btn:hover { text-decoration: underline; }

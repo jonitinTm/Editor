@@ -588,7 +588,9 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
   while (stack.length > 1) { const g = stack.pop()!; g.name ||= 'Grupo'; stack[stack.length - 1].add(g); }
   if (skippedAdj) warnings.push(`${skippedAdj} capa(s) de ajuste de un tipo aún no admitido no se han importado`);
   if (recs.some(x => x.keys.includes('TySh'))) warnings.push('El texto es editable: se ve como en Photoshop hasta que lo cambies; al editarlo se redibuja con las fuentes de tu equipo' + (textAsPixels ? ` (${textAsPixels} texto(s) girados o especiales se quedan como píxeles)` : ''));
-  if (recs.some(x => (x.keys.includes('lfx2') || x.keys.includes('lrFX')))) warnings.push('De los efectos de capa no se importan biselado, satinado ni superposición de motivo');
+  // de los efectos de capa solo falta la superposición de motivo (necesitaría los motivos del PSD)
+  const hasPatternFx = recs.some(x => { const b = x.blocks.lfx2; if (!b) return false; const t = new TextDecoder('latin1').decode(b); return t.includes('patternFill'); });
+  if (hasPatternFx) warnings.push('La superposición de motivo de los efectos de capa no se importa');
 }
 
 export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult> {

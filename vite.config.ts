@@ -9,6 +9,7 @@ export default defineConfig({
   base: './',
   publicDir: '../public',
   plugins: [viteSingleFile()],
+  define: { __BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)) },
   build: {
     outDir: '../app',
     emptyOutDir: true,

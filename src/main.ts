@@ -14,7 +14,7 @@ import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel, buildColorPa
 import { ACTIONS } from './ui/actions';
 import * as ops from './ui/ops';
 import { dialogOpen } from './ui/dialog';
-import { newDocumentDialog } from './ui/dialogs';
+import { newDocumentDialog, quickGuideDialog } from './ui/dialogs';
 import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildActionsPanel } from './ui/panels2';
@@ -174,7 +174,8 @@ function buildWelcome() {
       h('p', {}, 'Editor de imágenes por capas. Todo se procesa en tu equipo: tus imágenes no salen de él.'),
       h('div', { class: 'welcome-actions' }, openBtn, newBtn),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,
-      h('div', { class: 'drop-hint' }, 'También puedes arrastrar imágenes (PNG, JPG, WebP, GIF) PSD o proyectos .edp aquí, o pegar con Ctrl+V.')));
+      h('div', { class: 'drop-hint' }, 'También puedes arrastrar imágenes (PNG, JPG, WebP, GIF) PSD o proyectos .edp aquí, o pegar con Ctrl+V.'),
+      h('button', { class: 'link-btn', onclick: () => quickGuideDialog() }, '¿Primera vez aquí? Lee la guía rápida (F1)')));
 }
 
 // ---- Teclado -----------------------------------------------------------------------------
@@ -332,3 +333,14 @@ window.addEventListener('editor-font', (e: Event) => {
   }
   app.viewport.requestRender();
 });
+
+// Errores inesperados: se avisa con un mensaje en vez de fallar en silencio (el trabajo sigue a salvo:
+// hay copia de recuperación y se puede deshacer)
+let lastErr = 0;
+const reportError = (msg: string) => {
+  console.error(msg);
+  if (Date.now() - lastErr < 4000) return; lastErr = Date.now();
+  app.toast('Algo ha fallado en esta operación. Puedes deshacer (Ctrl+Z) y seguir trabajando.', 'warn');
+};
+window.addEventListener('error', e => { if (e.error) reportError(String(e.error?.stack ?? e.message)); });
+window.addEventListener('unhandledrejection', e => { const r = e.reason; if (r?.name === 'AbortError') return; reportError(String(r?.stack ?? r)); });

@@ -652,8 +652,42 @@ export function aboutDialog() {
     body: [
       h('p', {}, h('b', {}, 'Editor'), ' — editor de imágenes por capas que funciona en tu navegador.'),
       h('p', {}, 'Todo se procesa en tu equipo: tus imágenes no se envían a ningún servidor.'),
-      h('p', { class: 'hint' }, 'Versión 0.1 (primera fase)'),
+      h('p', {}, 'Funciona sin conexión una vez abierto y se puede instalar como aplicación desde el navegador.'),
+      h('p', { class: 'hint' }, `Versión 1.0 · ${typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : ''}`),
     ],
+  });
+}
+
+// ---- Guía rápida ---------------------------------------------------------------------------
+
+export function quickGuideDialog() {
+  const sec = (t: string, ...items: (string | HTMLElement)[]) => h('div', { class: 'guide-sec' }, h('h3', {}, t), h('ul', {}, ...items.map(x => h('li', {}, x))));
+  const k = (s: string) => h('kbd', {}, s);
+  showDialog({
+    title: 'Guía rápida', cancelLabel: null, okLabel: 'Entendido', width: 620,
+    body: [h('div', { class: 'guide' },
+      sec('Empezar',
+        'Abre una imagen (Archivo › Abrir, o arrástrala a la ventana), crea un documento nuevo o pega una imagen con Ctrl+V.',
+        'Guarda tu trabajo como proyecto (.edp) para seguir editando más tarde, o expórtalo como PNG, JPG, WebP, PSD, PDF o SVG.',
+        'Abre y guarda archivos de Photoshop (.psd y .psb) con sus capas, máscaras, textos, estilos y ajustes.'),
+      sec('Herramientas',
+        'La barra de la izquierda tiene las herramientas; las que tienen un triángulo esconden más: mantén pulsado o haz clic derecho.',
+        'Cada herramienta tiene su letra (pasa el ratón por encima para verla). Si mantienes la letra pulsada, la herramienta solo se activa mientras la sueltas.',
+        'La barra de arriba muestra las opciones de la herramienta activa. En pantallas pequeñas, las que no caben están en «Más».'),
+      sec('Capas',
+        'Todo se hace sobre la capa seleccionada en el panel Capas. Las capas de ajuste y de relleno no estropean la imagen: se pueden cambiar o quitar cuando quieras.',
+        'Con una selección activa (marco, lazo, varita, Seleccionar sujeto…) los cambios solo afectan a esa zona.',
+        'Los objetos inteligentes se escalan y giran sin perder calidad; doble clic en su miniatura para editar su contenido.'),
+      sec('Atajos más útiles',
+        h('span', {}, k('Ctrl+Z'), ' deshacer · ', k('Ctrl+T'), ' transformar · ', k('Ctrl+J'), ' duplicar capa · ', k('Ctrl+D'), ' deseleccionar'),
+        h('span', {}, k('Espacio'), ' + arrastrar: moverse · ', k('Alt'), ' + rueda: zoom · ', k('Ctrl+0'), ' ajustar a la pantalla'),
+        h('span', {}, k('[ ]'), ' tamaño del pincel · ', k('X'), ' intercambiar colores · ', k('Alt'), ' + clic con el pincel: tomar color'),
+        h('span', {}, 'Ayuda › Atajos de teclado muestra la lista completa.')),
+      sec('Privacidad',
+        'Todo se procesa en tu navegador: tus imágenes nunca se envían a ningún servidor.',
+        'Solo se descargan de internet las fuentes de la biblioteca que elijas usar (de Google Fonts).',
+        'Se guarda automáticamente una copia de recuperación en este navegador por si se cierra la pestaña.'),
+    )],
   });
 }
 

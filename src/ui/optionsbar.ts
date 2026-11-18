@@ -16,6 +16,7 @@ export function buildOptionsBar(parent: HTMLElement) {
     const t = app.tool;
     if (!t) return;
     bar.append(h('span', { class: 'opt-tool', html: t.icon }), h('span', { class: 'opt-name' }, t.name), h('span', { class: 'opt-sep' }));
+    if (t.extraFirst) t.extraOptions?.(bar);
     for (const d of t.options ?? []) {
       const get = () => app.opt(d.key, t.id);
       const set = (v: any) => app.setOpt(t.id, d.key, v);
@@ -62,8 +63,26 @@ export function buildOptionsBar(parent: HTMLElement) {
         bar.append(group);
       }
     }
-    t.extraOptions?.(bar);
+    if (!t.extraFirst) t.extraOptions?.(bar);
+    requestAnimationFrame(fitOverflow);
   };
+  /** Si las opciones no caben (pantallas pequeñas), las últimas pasan a un desplegable «Más». */
+  const fitOverflow = () => {
+    if (bar.scrollWidth <= bar.clientWidth + 1) return;
+    const more = h('div', { class: 'opt-more' });
+    const btn = h('button', { class: 'btn opt-more-btn', type: 'button', title: 'Más opciones' }, 'Más ▾');
+    const pop = h('div', { class: 'opt-more-pop' });
+    more.append(btn, pop); bar.append(more);
+    const items = [...bar.children].slice(3).filter(el => el !== more) as HTMLElement[];
+    while (bar.scrollWidth > bar.clientWidth + 1 && items.length > 1) pop.prepend(items.pop()!);
+    btn.onclick = e => {
+      e.stopPropagation(); pop.classList.toggle('open');
+      if (pop.classList.contains('open')) { const r = btn.getBoundingClientRect(); pop.style.top = r.bottom + 4 + 'px'; pop.style.right = Math.max(8, innerWidth - r.right) + 'px'; }
+    };
+    document.addEventListener('pointerdown', ev => { if (!more.contains(ev.target as Node) && !(ev.target as HTMLElement).closest?.('.flyout, .slider-pop')) pop.classList.remove('open'); });
+  };
+  let rt = 0;
+  window.addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(render, 150); });
   app.on('tool', render);
   app.on('options', () => setters.forEach(s => s()));
   render();

@@ -34,6 +34,8 @@ export interface Tool {
   options?: OptionDef[];
   /** Controles adicionales para la barra de opciones. */
   extraOptions?(bar: HTMLElement): void;
+  /** Los controles adicionales van al principio de la barra (p. ej. la punta del pincel). */
+  extraFirst?: boolean;
   activate?(): void;
   deactivate?(): void;
   down?(e: ToolEvent): void;

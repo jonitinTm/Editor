@@ -136,6 +136,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
+  extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
 }
 
@@ -185,6 +186,7 @@ export class PencilTool extends StrokeTool {
 
 export class EraserTool extends StrokeTool {
   id = 'eraser'; name = 'Borrador'; icon = icon('eraser'); key = 'E'; group = 'eraser'; historyName = 'Borrador';
+  extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
   erase = true;
 }

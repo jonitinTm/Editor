@@ -181,6 +181,10 @@ Ya disponible:
 - **18 filtros más**: corrección de lente (barril/cojín, aberración cromática, viñeta), destello de lente, desenfoque de
   lente (bokeh), de caja y promediar, solarizar, viento, difusión, azulejos, trazar contorno, recortes, semitono de
   color, puntillista, fragmentar, nubes de diferencia, fibras, zigzag y vidrio.
+- **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
+  (`Alt+Mayús+Ctrl+K`).
+- **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
+- Si algo falla durante una operación, aparece un aviso (y se puede deshacer) en lugar de no pasar nada.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña
