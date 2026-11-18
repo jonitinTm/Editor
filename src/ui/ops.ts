@@ -672,23 +672,28 @@ export function distributeLayers(mode: 'left' | 'hcenter' | 'right' | 'top' | 'v
  * zona cercana y adaptando su color. Lo usan el corrector puntual y "Rellenar según contenido".
  */
 export function healHole(t: PaintTarget, holeCanvas: HTMLCanvasElement, box: Rect, name: string) {
-  const d = doc()!;
-  const W = d.width, H = d.height;
+  const out = healCanvas(t.canvas, holeCanvas, box); if (!out) return;
+  setTargetCanvas(t, out);
+  doc()!.commit(name);
+}
+
+/** Rellena el hueco (alfa de `holeCanvas`, dentro de `box`) con textura del entorno; devuelve el lienzo nuevo. */
+export function healCanvas(src: HTMLCanvasElement, holeCanvas: HTMLCanvasElement, box: Rect): HTMLCanvasElement | null {
+  const W = src.width, H = src.height;
   const m = Math.max(6, Math.round(Math.max(box.w, box.h) * 0.35));
   const reg = { x: Math.max(0, box.x - m), y: Math.max(0, box.y - m), w: 0, h: 0 };
   reg.w = Math.min(W, box.x + box.w + m) - reg.x; reg.h = Math.min(H, box.y + box.h + m) - reg.y;
-  if (reg.w < 2 || reg.h < 2) return;
+  if (reg.w < 2 || reg.h < 2) return null;
   const ha = getPixels(holeCanvas, reg).data, hole = new Float32Array(reg.w * reg.h);
   for (let i = 0; i < hole.length; i++) hole[i] = ha[i * 4 + 3] / 255;
-  const full = getPixels(t.canvas);
+  const full = getPixels(src);
   const { dx, dy } = findSource(full, reg, hole, { x: box.x - reg.x, y: box.y - reg.y, w: box.w, h: box.h });
-  const O = getPixels(t.canvas, reg);
+  const O = getPixels(src, reg);
   const sx = Math.max(0, Math.min(W - reg.w, reg.x + dx)), sy = Math.max(0, Math.min(H - reg.h, reg.y + dy));
-  const C = getPixels(t.canvas, { x: sx, y: sy, w: reg.w, h: reg.h });
-  const out = cloneCanvas(t.canvas);
+  const C = getPixels(src, { x: sx, y: sy, w: reg.w, h: reg.h });
+  const out = cloneCanvas(src);
   putPixels(out, heal(O, C, hole), reg.x, reg.y);
-  setTargetCanvas(t, out);
-  d.commit(name);
+  return out;
 }
 
 /** Edición › Rellenar según contenido: rellena la selección con textura del entorno. */

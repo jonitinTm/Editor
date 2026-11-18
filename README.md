@@ -187,6 +187,9 @@ Ya disponible:
 - **TIFF, TGA, BMP e ICO**: se abren TIFF (sin comprimir, LZW, ZIP o PackBits; 8, 16 y 32 bits; RGB, grises, paleta y
   CMYK; con transparencia; por bandas o mosaicos; los de varias páginas, una capa por página) y TGA; se exportan TIFF
   (sin pérdida, con transparencia y resolución), BMP, TGA e ICO con varios tamaños (16 a 256 px, para favicons).
+- **Parche** y **Movimiento con detección de contenido** (con los correctores, `J`): rodea una imperfección y arrástrala
+  a una zona limpia para taparla; o selecciona un objeto y arrástralo: se funde en el sitio nuevo y el hueco se rellena solo
+  (modo «Extender» para duplicarlo).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

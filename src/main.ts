@@ -36,6 +36,7 @@ import { PenTool, NodeTool } from './tools/pen';
 import { MagneticLassoTool } from './tools/maglasso';
 import { HistoryBrushTool } from './tools/brush';
 import { PuppetTool } from './tools/puppet';
+import { PatchTool, ContentMoveTool } from './tools/patch';
 import { ColorReplaceTool, MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool } from './tools/extra';
 import { buildBrushesPanel } from './ui/brushes';
 import { TextLayer } from './core/layers';
@@ -51,7 +52,7 @@ app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
 // Las herramientas añadidas después van al final: la tecla de cada grupo sigue eligiendo la de siempre
-for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool]) app.registerTool(new T());
+for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool]) app.registerTool(new T());
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;
