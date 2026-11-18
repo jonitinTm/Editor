@@ -162,6 +162,20 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
 const styleCache = new WeakMap<Layer, { key: string; canvas: HTMLCanvasElement }>();
 const rgba = (hex: string, a: number) => { const [r, g, b] = hexToRgb(hex); return `rgba(${r},${g},${b},${a})`; };
 
+
+/** Silueta de `src` ensanchada `r` px (en un lienzo de w×h, ya coloreada). */
+function dilated(src: HTMLCanvasElement, ox: number, oy: number, r: number, w: number, h: number, color: string): HTMLCanvasElement {
+  const t = borrowCanvas(w, h), tc = ctx2d(t);
+  if (r <= 0.5) tc.drawImage(src, ox, oy);
+  else for (const rr of r > 3 ? [r, r * 0.66, r * 0.33] : [r]) {
+    const n = Math.max(12, Math.ceil(rr * 2.5));
+    for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; tc.drawImage(src, ox + Math.cos(a) * rr, oy + Math.sin(a) * rr); }
+  }
+  tc.drawImage(src, ox, oy);
+  tc.globalCompositeOperation = 'source-in'; tc.fillStyle = color; tc.fillRect(0, 0, w, h); tc.globalCompositeOperation = 'source-over';
+  return t;
+}
+
 /** Dibuja los efectos de estilo de `src` (sin la propia capa). Sirve también para exportar. */
 export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null) {
   const FAR = w + 4096; // la imagen se dibuja fuera y solo su "sombra" cae dentro del lienzo
@@ -171,20 +185,26 @@ export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasEleme
     for (let i = 0; i < times; i++) ctx.drawImage(src, ox - FAR, oy);
     ctx.restore();
   };
+  // Extensión: la silueta se ensancha antes de difuminar (sombra o resplandor más duros)
+  const castSpread = (color: string, size: number, spread: number, dx: number, dy: number, times = 1) => {
+    if (!spread) { cast(color, size, dx, dy, times); return; }
+    const grow = size * spread / 100, blur = size * (1 - spread / 100);
+    const big = dilated(src, ox, oy, grow, w, h, '#000');
+    ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = blur; ctx.shadowOffsetX = FAR + dx; ctx.shadowOffsetY = dy;
+    for (let i = 0; i < times; i++) ctx.drawImage(big, -FAR, 0);
+    ctx.restore(); returnCanvas(big);
+  };
   if (st.shadow?.enabled) {
     const s = st.shadow, a = s.angle * Math.PI / 180;
-    cast(rgba(s.color, s.opacity / 100), s.blur, -Math.cos(a) * s.distance, Math.sin(a) * s.distance);
+    castSpread(rgba(s.color, s.opacity / 100), s.blur, s.spread ?? 0, -Math.cos(a) * s.distance, Math.sin(a) * s.distance);
   }
-  if (st.glow?.enabled) cast(rgba(st.glow.color, st.glow.opacity / 100), st.glow.size, 0, 0, 2);
-  if (st.stroke?.enabled && st.stroke.size > 0) {
-    const t = borrowCanvas(w, h), tc = ctx2d(t), size = st.stroke.size;
-    for (const r of size > 3 ? [size, size * 0.5] : [size]) {
-      const n = Math.max(12, Math.ceil(r * 2.5));
-      for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; tc.drawImage(src, ox + Math.cos(a) * r, oy + Math.sin(a) * r); }
-    }
-    tc.globalCompositeOperation = 'source-in'; tc.fillStyle = st.stroke.color; tc.fillRect(0, 0, w, h);
-    tc.globalCompositeOperation = 'source-over';
-    ctx.drawImage(t, 0, 0);
+  if (st.glow?.enabled) castSpread(rgba(st.glow.color, st.glow.opacity / 100), st.glow.size, st.glow.spread ?? 0, 0, 0, 2);
+  const sk = st.stroke;
+  if (sk?.enabled && sk.size > 0 && (sk.position ?? 'outside') !== 'inside') {
+    // exterior: todo el grosor por fuera; centro: la mitad (la otra mitad va por dentro)
+    const r = (sk.position ?? 'outside') === 'center' ? sk.size / 2 : sk.size;
+    const t = dilated(src, ox, oy, r, w, h, sk.color);
+    ctx.save(); ctx.globalAlpha = (sk.opacity ?? 100) / 100; ctx.drawImage(t, 0, 0); ctx.restore();
     returnCanvas(t);
   }
   // Parte exterior del bisel (exterior, relieve, almohadillado): fuera de la forma de la capa
@@ -200,7 +220,8 @@ export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasEleme
 
 /** Efectos que van por encima de la capa, recortados a su forma (superposiciones, sombra y resplandor interiores). */
 function innerStyled(src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null): HTMLCanvasElement | null {
-  if (!(st.innerShadow?.enabled || st.innerGlow?.enabled || st.colorOverlay?.enabled || st.gradientOverlay?.enabled || st.patternOverlay?.enabled || (bl && st.bevel!.style !== 'outer'))) return null;
+  const innerStroke = !!st.stroke?.enabled && (st.stroke.position ?? 'outside') !== 'outside';
+  if (!(innerStroke || st.satin?.enabled || st.innerShadow?.enabled || st.innerGlow?.enabled || st.colorOverlay?.enabled || st.gradientOverlay?.enabled || st.patternOverlay?.enabled || (bl && st.bevel!.style !== 'outer'))) return null;
   const o = borrowCanvas(w, h), c = ctx2d(o);
   c.drawImage(src, ox, oy);
   c.globalCompositeOperation = 'source-atop';
@@ -243,6 +264,28 @@ function innerStyled(src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: nu
       c.globalCompositeOperation = mode; c.drawImage(t, 0, 0);
       returnCanvas(t);
     }
+  }
+  if (st.satin?.enabled) {
+    // Satinado: dos copias desplazadas y difuminadas de la forma; donde difieren, sombra
+    const sa = st.satin, ang = sa.angle * Math.PI / 180, dx = -Math.cos(ang) * sa.distance, dy = Math.sin(ang) * sa.distance;
+    const t = borrowCanvas(w, h), tc = ctx2d(t);
+    tc.filter = `blur(${Math.max(0, sa.size / 2)}px)`;
+    tc.drawImage(src, ox + dx, oy + dy); tc.globalCompositeOperation = 'xor'; tc.drawImage(src, ox - dx, oy - dy);
+    tc.filter = 'none';
+    if (sa.invert) { tc.globalCompositeOperation = 'xor'; tc.fillStyle = '#000'; tc.fillRect(0, 0, w, h); }
+    tc.globalCompositeOperation = 'source-in'; tc.fillStyle = rgba(sa.color, sa.opacity / 100); tc.fillRect(0, 0, w, h);
+    tc.globalCompositeOperation = 'destination-in'; tc.drawImage(src, ox, oy);
+    c.globalCompositeOperation = 'multiply'; c.drawImage(t, 0, 0); returnCanvas(t);
+  }
+  if (innerStroke) {
+    // Trazo interior (o la mitad interior del centrado): la silueta invertida ensanchada hacia dentro
+    const sk = st.stroke!, r = sk.position === 'center' ? sk.size / 2 : sk.size;
+    const inv = borrowCanvas(w, h), ic = ctx2d(inv);
+    ic.fillStyle = '#000'; ic.fillRect(0, 0, w, h); ic.globalCompositeOperation = 'destination-out'; ic.drawImage(src, ox, oy);
+    const t = dilated(inv, 0, 0, r, w, h, sk.color), tc = ctx2d(t);
+    tc.globalCompositeOperation = 'destination-in'; tc.drawImage(src, ox, oy);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = (sk.opacity ?? 100) / 100; c.drawImage(t, 0, 0); c.globalAlpha = 1;
+    returnCanvas(t); returnCanvas(inv);
   }
   c.globalCompositeOperation = 'source-over';
   return o;

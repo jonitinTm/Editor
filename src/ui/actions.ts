@@ -123,6 +123,8 @@ export const ACTIONS: Action[] = [
   { id: 'fill:solid', label: 'Color sólido…', enabled: hasDoc, run: () => ops.newFillLayer('solidfill') },
   { id: 'fill:gradient', label: 'Degradado…', enabled: hasDoc, run: () => ops.newFillLayer('gradfill') },
   { id: 'fill:pattern', label: 'Motivo…', enabled: hasDoc, run: () => ops.newFillLayer('patternfill') },
+  { id: 'smartCopy', label: 'Nuevo objeto inteligente mediante copia', enabled: () => app.doc?.active?.kind === 'smart', run: ops.smartCopyIndependent },
+  { id: 'exportSmart', label: 'Exportar contenido…', enabled: () => app.doc?.active?.kind === 'smart', run: ops.exportSmartContents },
   { id: 'replaceSmart', label: 'Reemplazar contenido…', enabled: () => app.doc?.active?.kind === 'smart', run: async () => { const fs = await io.pickFiles('image/*,.psd', false); if (fs[0]) ops.replaceSmartContents(fs[0]); } },
   { id: 'prefs', label: 'Preferencias…', keys: ['Ctrl+K'], run: dlg.prefsDialog },
   { id: 'toSmart', label: 'Convertir en objeto inteligente', enabled: hasLayer, run: ops.convertToSmart },

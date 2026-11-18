@@ -365,6 +365,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('div', { class: 'prop-row' }, chk('Subrayado', !!p.underline, v => p.underline = v), chk('Tachado', !!p.strike, v => p.strike = v), chk('MAYÚS', !!p.caps, v => p.caps = v)),
         h('div', { class: 'prop-row' }, h('span', {}, 'Caja'), num(Math.round(p.boxWidth ?? 0), v => p.boxWidth = v > 0 ? v : undefined), h('span', { class: 'hint' }, 'px de ancho (0 = texto de punto)')));
       body.append(h('div', { class: 'prop-btns' }, warpBtn));
+      if (p.runs?.length) body.append(h('div', { class: 'hint' }, 'Este texto tiene partes con otro estilo. Para cambiar solo una parte, edítalo y selecciónala antes de cambiar el color, la fuente o el tamaño.'), h('div', { class: 'prop-btns' }, h('button', { class: 'btn', onclick: () => upd(() => { delete p.runs; }) }, 'Quitar estilos parciales')));
     }
     if (l instanceof AdjustmentLayer) {
       const def = FILTERS.find(f => f.id === l.filterId);

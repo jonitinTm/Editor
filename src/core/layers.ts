@@ -7,6 +7,7 @@ import { FILTERS } from '../filters/registry';
 import { drawMeshExact, styledMesh } from '../tools/warpmesh';
 import { ensureFont, needsDownload } from './fonts';
 import { customShapePath } from './customshapes';
+import { segments, type TextRun, type RunStyle } from './textruns';
 
 
 /** 'pass-through' solo vale para grupos: sus capas se mezclan directamente con lo de debajo. */
@@ -85,12 +86,16 @@ export interface TextProps {
   psdTySh?: string;
   /** Deformar texto (Arco, Bandera…): el texto sigue siendo editable. */
   warp?: { style: string; bend: number };
+  /** Partes del texto con estilo propio (color, fuente, tamaño…). */
+  runs?: TextRun[];
 }
 
 export interface LayerStyles {
-  shadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number };
-  stroke?: { enabled: boolean; color: string; size: number };
-  glow?: { enabled: boolean; color: string; opacity: number; size: number };
+  shadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number; spread?: number };
+  stroke?: { enabled: boolean; color: string; size: number; position?: 'outside' | 'inside' | 'center'; opacity?: number };
+  glow?: { enabled: boolean; color: string; opacity: number; size: number; spread?: number };
+  /** Satinado: sombreado interior ondulado (dos copias desplazadas de la forma). */
+  satin?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; size: number; invert?: boolean };
   innerShadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number };
   innerGlow?: { enabled: boolean; color: string; opacity: number; size: number };
   colorOverlay?: { enabled: boolean; color: string; opacity: number };
@@ -106,7 +111,7 @@ export interface LayerStyles {
 /** ¿«Fusionar si» cambia algo? */
 export function blendIfActive(s: LayerStyles | null | undefined) { const b = s?.blendIf; return !!b && (b.this.join() !== '0,0,255,255' || b.under.join() !== '0,0,255,255'); }
 export function hasStyles(s: LayerStyles | null | undefined): s is LayerStyles {
-  return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled || s.innerShadow?.enabled || s.innerGlow?.enabled || s.colorOverlay?.enabled || s.gradientOverlay?.enabled || s.bevel?.enabled || s.patternOverlay?.enabled);
+  return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled || s.innerShadow?.enabled || s.innerGlow?.enabled || s.colorOverlay?.enabled || s.gradientOverlay?.enabled || s.bevel?.enabled || s.patternOverlay?.enabled || s.satin?.enabled);
 }
 
 export abstract class Layer {
@@ -197,7 +202,45 @@ export class TextLayer extends RasterLayer {
     if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${(p.tracking ?? 0) / 1000 * p.size}px`;
   }
   /** Reparte el texto en líneas (ajustando al ancho de la caja si es texto de párrafo). */
+  /** Fuente de un trozo con estilo propio. */
+  private runFont(st: RunStyle) {
+    const p = this.props;
+    return `${(st.italic ?? p.italic) ? 'italic ' : ''}${(st.bold ?? p.bold) ? 'bold ' : ''}${st.size ?? p.size}px ${JSON.stringify(st.font ?? p.font)}, sans-serif`;
+  }
+  /** Maquetación con varios estilos: cada línea guarda qué parte del texto ocupa. */
+  private richLayout(runs: TextRun[]) {
+    const p = this.props, ctx = ctx2d(this.canvas);
+    ctx.save();
+    const txt = p.caps ? p.text.toUpperCase() : p.text;
+    const m = (a: number, b: number) => {
+      let w = 0;
+      for (const sg of segments(runs, a, b)) { ctx.font = this.runFont(sg.st); if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${(p.tracking ?? 0) / 1000 * (sg.st.size ?? p.size)}px`; w += ctx.measureText(txt.slice(sg.a, sg.b)).width; }
+      return w;
+    };
+    const lines: { text: string; w: number; start: number; end: number }[] = [];
+    let pos = 0;
+    for (const para of txt.split('\n')) {
+      const a0 = pos, b0 = pos + para.length;
+      if (!p.boxWidth) lines.push({ text: para, w: m(a0, b0), start: a0, end: b0 });
+      else {
+        let ls = a0, k = a0;
+        const words = para.split(/(\s+)/);
+        for (const word of words) {
+          const we = k + word.length;
+          if (k > ls && /\S/.test(txt.slice(ls, k)) && m(ls, we) > p.boxWidth && /\S/.test(word)) { let e = k; while (e > ls && /\s/.test(txt[e - 1])) e--; lines.push({ text: txt.slice(ls, e), w: m(ls, e), start: ls, end: e }); ls = k; }
+          k = we;
+        }
+        let e = b0; while (e > ls && /\s/.test(txt[e - 1])) e--;
+        lines.push({ text: txt.slice(ls, e), w: m(ls, e), start: ls, end: e });
+      }
+      pos = b0 + 1;
+    }
+    ctx.restore();
+    const maxSize = Math.max(p.size, ...runs.map(r => r.size ?? 0));
+    return { lines, lh: maxSize * p.lineHeight, width: p.boxWidth ?? Math.max(1, ...lines.map(l => l.w)), maxSize };
+  }
   layout(): { lines: { text: string; w: number }[]; lh: number; width: number } {
+    if (this.props.runs?.length) return this.richLayout(this.props.runs);
     const p = this.props, ctx = ctx2d(this.canvas);
     ctx.save(); this.setupCtx(ctx);
     const txt = p.caps ? p.text.toUpperCase() : p.text, lines: { text: string; w: number }[] = [];
@@ -249,6 +292,25 @@ export class TextLayer extends RasterLayer {
     ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
     ctx.textBaseline = 'top';
     const left = p.boxWidth ? p.x : p.align === 'left' ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.x - L.width;
+    if (p.runs?.length) {
+      // Varios estilos: cada trozo con su fuente y color, sobre una línea base común
+      const R = L as ReturnType<TextLayer['richLayout']>, txt = p.caps ? p.text.toUpperCase() : p.text;
+      ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+      R.lines.forEach((line, i) => {
+        let x = p.align === 'left' ? left : p.align === 'center' ? left + (L.width - line.w) / 2 : left + L.width - line.w;
+        const base = p.y + i * lh + (lh - R.maxSize) / 2 + R.maxSize * 0.8;
+        for (const sg of segments(p.runs!, line.start, line.end)) {
+          const size = sg.st.size ?? p.size, t = txt.slice(sg.a, sg.b);
+          ctx.font = this.runFont(sg.st); if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${(p.tracking ?? 0) / 1000 * size}px`;
+          ctx.fillStyle = sg.st.color ?? p.color;
+          ctx.fillText(t, x, base);
+          const w = ctx.measureText(t).width, thick = Math.max(1, size / 16);
+          if (sg.st.underline ?? p.underline) ctx.fillRect(x, base + size * 0.12, w, thick);
+          if (sg.st.strike ?? p.strike) ctx.fillRect(x, base - size * 0.28, w, thick);
+          x += w;
+        }
+      });
+    } else
     L.lines.forEach((line, i) => {
       const lx = p.align === 'left' ? left : p.align === 'center' ? left + (L.width - line.w) / 2 : left + L.width - line.w;
       const ty = p.y + i * lh + (lh - p.size) / 2;

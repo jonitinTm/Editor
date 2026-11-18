@@ -1313,3 +1313,28 @@ export async function defineBrush() {
   app.setTool('brush');
   app.toast('Punta de pincel creada: ya puedes pintar con ella');
 }
+
+/** Capa › Objeto inteligente › Exportar contenido: guarda lo que hay dentro (PSD si tiene capas, si no PNG). */
+export async function exportSmartContents() {
+  const d = doc(), l = d?.active;
+  if (!(l instanceof SmartLayer)) { app.toast('Selecciona un objeto inteligente', 'warn'); return; }
+  const inner = l.inner as EditorDocument;
+  try {
+    if (inner.allLayers().length > 1) { const { writePsd } = await import('../io/psd'); await io.saveBlob(writePsd(inner).blob, (inner.name || l.name) + '.psd'); }
+    else await io.saveBlob(await io.exportImage(inner, 'image/png', 1, 1), (inner.name || l.name) + '.png');
+    app.toast('Contenido exportado');
+  } catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); }
+}
+
+/** Capa › Objeto inteligente › Nuevo objeto inteligente mediante copia: una copia con contenido propio (no compartido). */
+export async function smartCopyIndependent() {
+  const d = doc(), l = d?.active;
+  if (!d || !(l instanceof SmartLayer)) { app.toast('Selecciona un objeto inteligente', 'warn'); return; }
+  const inner = await io.openProject(await io.serializeProject(l.inner as EditorDocument));
+  inner.embedded = true; inner.name = (l.inner as EditorDocument).name;
+  const c = new SmartLayer(l.name + ' copia', d.width, d.height, inner, l.props.m, l.filters);
+  c.opacity = l.opacity; c.blendMode = l.blendMode; c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null;
+  const parent = l.parent!; parent.add(c, parent.children.indexOf(l) + 1);
+  d.setActive(c, false);
+  d.commit('Nuevo objeto inteligente mediante copia');
+}

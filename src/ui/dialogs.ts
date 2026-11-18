@@ -495,9 +495,10 @@ export function layerStyleDialog() {
   if (l.kind === 'adjust') { app.toast('Las capas de ajuste no admiten estilos', 'warn'); return; }
   const before = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null;
   const st: Required<LayerStyles> = {
-    shadow: { enabled: false, color: '#000000', opacity: 60, angle: 120, distance: 8, blur: 10 },
-    stroke: { enabled: false, color: '#000000', size: 3 },
-    glow: { enabled: false, color: '#ffffaa', opacity: 75, size: 12 },
+    shadow: { enabled: false, color: '#000000', opacity: 60, angle: 120, distance: 8, blur: 10, spread: 0 },
+    stroke: { enabled: false, color: '#000000', size: 3, position: 'outside', opacity: 100 },
+    glow: { enabled: false, color: '#ffffaa', opacity: 75, size: 12, spread: 0 },
+    satin: { enabled: false, color: '#000000', opacity: 50, angle: 19, distance: 11, size: 14, invert: true },
     innerShadow: { enabled: false, color: '#000000', opacity: 60, angle: 120, distance: 6, blur: 8 },
     innerGlow: { enabled: false, color: '#ffffaa', opacity: 75, size: 10 },
     colorOverlay: { enabled: false, color: '#ff0000', opacity: 100 },
@@ -535,6 +536,19 @@ export function layerStyleDialog() {
     els.push(row('Colores', h('span', {}, 'Luces '), col('highlight'), h('span', {}, ' Sombras '), col('shadowColor')));
     return els;
   };
+  const strokeSection = () => {
+    const sk = st.stroke as any, els = section('Trazo', sk, [['size', 'Grosor', 1, 250, 'px'], ['opacity', 'Opacidad', 0, 100, '%']]);
+    const pos = h('select', {}, ...([['outside', 'Exterior'], ['inside', 'Interior'], ['center', 'Centro']] as const).map(([v, n]) => h('option', { value: v, selected: (sk.position ?? 'outside') === v }, n)));
+    pos.onchange = () => { sk.position = pos.value; if (!sk.enabled) { sk.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; } update(); };
+    els.splice(1, 0, row('Posición', pos));
+    return els;
+  };
+  const satinSection = () => {
+    const sa = st.satin as any, els = section('Satinado', sa, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 1, 250, 'px'], ['size', 'Tamaño', 0, 250, 'px']]);
+    const inv = h('input', { type: 'checkbox', checked: !!sa.invert }); inv.onchange = () => { sa.invert = inv.checked; update(); };
+    els.push(row('', h('label', { class: 'check' }, inv, ' Invertir')));
+    return els;
+  };
   const patSection = () => {
     const po = st.patternOverlay, els = section('Superposición de motivo', po, [['opacity', 'Opacidad', 0, 100, '%'], ['scale', 'Escala', 1, 1000, '%']]);
     els.splice(1, 0, row('Motivo', patternSelect(po.pattern, v => { po.pattern = v; if (!po.enabled) { po.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; } update(); })));
@@ -556,9 +570,10 @@ export function layerStyleDialog() {
   showDialog({
     title: `Estilo de capa: ${l.name}`, width: 400, side: true,
     body: [
-      ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
-      ...section('Trazo (exterior)', st.stroke, [['size', 'Grosor', 1, 60, 'px']]),
-      ...section('Resplandor exterior', st.glow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
+      ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['spread', 'Extensión', 0, 100, '%'], ['blur', 'Tamaño', 0, 200, 'px']]),
+      ...strokeSection(),
+      ...section('Resplandor exterior', st.glow, [['opacity', 'Opacidad', 0, 100, '%'], ['spread', 'Extensión', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
+      ...satinSection(),
       ...section('Sombra interior', st.innerShadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
       ...section('Resplandor interior', st.innerGlow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
       ...section('Superposición de color', st.colorOverlay, [['opacity', 'Opacidad', 0, 100, '%']]),

@@ -7,6 +7,7 @@
 import { EditorDocument } from '../core/document';
 import { imageToCanvas } from './files';
 import { familyFromPostScript } from '../core/fonts';
+import { normalizeRuns, type TextRun } from '../core/textruns';
 import { ShapeLayer, GroupLayer, Layer, LayerMask, LayerStyles, RasterLayer, TextLayer, TextProps, SmartLayer, Matrix, AdjustmentLayer, BlendMode, isRaster, hasStyles } from '../core/layers';
 import { cloneCanvas, contentBounds, ctx2d, makeCanvas, getPixels } from '../core/canvas';
 
@@ -135,9 +136,11 @@ function parseEffects(bytes: Uint8Array): LayerStyles | null {
   if (d.masterFXSwitch === false) return null;
   const st: LayerStyles = {};
   const sh = d.DrSh, gl = d.OrGl, fr = d.FrFX;
-  if (sh?.enab) st.shadow = { enabled: true, color: descColor(sh.Clr), opacity: Math.round(sh.Opct ?? 75), angle: Math.round(sh.lagl ?? 120), distance: Math.round(sh.Dstn ?? 5), blur: Math.round(sh.blur ?? 5) };
-  if (gl?.enab) st.glow = { enabled: true, color: descColor(gl.Clr), opacity: Math.round(gl.Opct ?? 75), size: Math.round(gl.blur ?? 5) };
-  if (fr?.enab) st.stroke = { enabled: true, color: descColor(fr.Clr), size: Math.round(fr.Sz ?? 3) };
+  if (sh?.enab) st.shadow = { enabled: true, color: descColor(sh.Clr), opacity: Math.round(sh.Opct ?? 75), angle: Math.round(sh.lagl ?? 120), distance: Math.round(sh.Dstn ?? 5), blur: Math.round(sh.blur ?? 5), spread: Math.round(sh.Ckmt ?? 0) };
+  if (gl?.enab) st.glow = { enabled: true, color: descColor(gl.Clr), opacity: Math.round(gl.Opct ?? 75), size: Math.round(gl.blur ?? 5), spread: Math.round(gl.Ckmt ?? 0) };
+  if (fr?.enab) st.stroke = { enabled: true, color: descColor(fr.Clr), size: Math.round(fr.Sz ?? 3), position: ({ InsF: 'inside', CtrF: 'center' } as Record<string, 'inside' | 'center'>)[String(fr.Styl ?? '').trim()] ?? 'outside', opacity: Math.round(fr.Opct ?? 100) };
+  const ch = d.ChFX;
+  if (ch?.enab) st.satin = { enabled: true, color: descColor(ch.Clr), opacity: Math.round(ch.Opct ?? 50), angle: Math.round(ch.lagl ?? 19), distance: Math.round(ch.Dstn ?? 11), size: Math.round(ch.blur ?? 14), invert: !!ch.Invr };
   const is = d.IrSh, ig = d.IrGl, so = d.SoFi, gr = d.GrFl;
   if (is?.enab) st.innerShadow = { enabled: true, color: descColor(is.Clr), opacity: Math.round(is.Opct ?? 75), angle: Math.round(is.lagl ?? 120), distance: Math.round(is.Dstn ?? 5), blur: Math.round(is.blur ?? 5) };
   if (ig?.enab) st.innerGlow = { enabled: true, color: descColor(ig.Clr), opacity: Math.round(ig.Opct ?? 75), size: Math.round(ig.blur ?? 5) };
@@ -363,7 +366,26 @@ function parseText(b: Uint8Array): TextProps | null {
   // "TimesNewRomanPS-BoldMT" → familia "Times New Roman", negrita
   const family = familyFromPostScript(ps) ?? (ps.split('-')[0].replace(/(PS)?MT$|PS$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').trim() || 'Arial');
   const lh = st.AutoLeading === false && st.Leading ? st.Leading / (st.FontSize || 12) : 1.2;
+  // Trozos con otro estilo (color, fuente, tamaño…): se guardan como tramos del texto
+  const runs: TextRun[] = [];
+  try {
+    const arr = e.EngineDict?.StyleRun?.RunArray ?? [], lens = e.EngineDict?.StyleRun?.RunLengthArray ?? [];
+    const bold0 = /Bold|Black|Heavy/i.test(ps) || !!st.FauxBold, ital0 = /Italic|Oblique/i.test(ps) || !!st.FauxItalic;
+    let pos = 0;
+    for (let i = 0; i < arr.length && i < lens.length; i++) {
+      const s2 = arr[i]?.StyleSheet?.StyleSheetData ?? {}, n = Number(lens[i]) || 0;
+      const r: TextRun = { start: pos, end: Math.min(text.length, pos + n) };
+      const c2 = s2.FillColor?.Values; if (c2) { const h2 = '#' + [c2[1], c2[2], c2[3]].map((c: number) => Math.round(Math.max(0, Math.min(1, c ?? 0)) * 255).toString(16).padStart(2, '0')).join(''); if (h2 !== hex) r.color = h2; }
+      if (s2.FontSize && Math.abs(s2.FontSize * yy - size) > 0.01) r.size = s2.FontSize * yy;
+      const ps2 = String(fonts[s2.Font ?? st.Font ?? 0]?.Name ?? ps);
+      if (ps2 !== ps) { r.font = familyFromPostScript(ps2) ?? (ps2.split('-')[0].replace(/(PS)?MT$|PS$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').trim() || family); const b2 = /Bold|Black|Heavy/i.test(ps2) || !!s2.FauxBold, i2 = /Italic|Oblique/i.test(ps2) || !!s2.FauxItalic; if (b2 !== bold0) r.bold = b2; if (i2 !== ital0) r.italic = i2; }
+      if (s2.Underline) r.underline = true; if (s2.Strikethrough) r.strike = true;
+      runs.push(r); pos += n;
+    }
+  } catch { /* estilos no reconocidos */ }
+  const cleanRuns = normalizeRuns(runs, text.length);
   return {
+    ...(cleanRuns.length ? { runs: cleanRuns } : {}),
     text, font: family, size, color: hex, bold: /Bold|Black|Heavy/i.test(ps) || !!st.FauxBold, italic: /Italic|Oblique/i.test(ps) || !!st.FauxItalic,
     align: just === 1 ? 'right' : just === 2 ? 'center' : 'left', lineHeight: lh, x: tx, y: ty - size * 0.8 - size * (lh - 1) / 2, keepPixels: true,
   };
@@ -814,9 +836,10 @@ function effectsBlock(st: LayerStyles): Uint8Array {
   const pc = (v: number): DV => ['UntF', '#Prc', v], px = (v: number): DV => ['UntF', '#Pxl', v], ang = (v: number): DV => ['UntF', '#Ang', v];
   const md = (m: string): DV => ['enum', 'BlnM', m];
   const items: Record<string, DV> = { 'Scl ': pc(100), masterFXSwitch: ['bool', true] };
-  const shadow = (s: NonNullable<LayerStyles['shadow']>, cls: string): DV => ['Objc', cls, { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Mltp'), 'Clr ': rgbDV(s.color), Opct: pc(s.opacity), uglg: ['bool', false], lagl: ang(s.angle), Dstn: px(s.distance), Ckmt: px(0), blur: px(s.blur), Nose: pc(0), AntA: ['bool', false] }];
-  const glow = (g: NonNullable<LayerStyles['glow']>, cls: string, inner: boolean): DV => ['Objc', cls, { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Scrn'), 'Clr ': rgbDV(g.color), Opct: pc(g.opacity), GlwT: ['enum', 'BETE', 'SfBL'], Ckmt: px(0), blur: px(g.size), Nose: pc(0), ShdN: pc(0), AntA: ['bool', false], ...(inner ? { glwS: ['enum', 'IGSr', 'SrcE'] as DV } : {}) }];
+  const shadow = (s: NonNullable<LayerStyles['shadow']>, cls: string): DV => ['Objc', cls, { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Mltp'), 'Clr ': rgbDV(s.color), Opct: pc(s.opacity), uglg: ['bool', false], lagl: ang(s.angle), Dstn: px(s.distance), Ckmt: pc(s.spread ?? 0), blur: px(s.blur), Nose: pc(0), AntA: ['bool', false] }];
+  const glow = (g: NonNullable<LayerStyles['glow']>, cls: string, inner: boolean): DV => ['Objc', cls, { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Scrn'), 'Clr ': rgbDV(g.color), Opct: pc(g.opacity), GlwT: ['enum', 'BETE', 'SfBL'], Ckmt: pc(g.spread ?? 0), blur: px(g.size), Nose: pc(0), ShdN: pc(0), AntA: ['bool', false], ...(inner ? { glwS: ['enum', 'IGSr', 'SrcE'] as DV } : {}) }];
   if (st.shadow?.enabled) items.DrSh = shadow(st.shadow, 'DrSh');
+  if (st.satin?.enabled) { const sa = st.satin; items.ChFX = ['Objc', 'ChFX', { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Mltp'), 'Clr ': rgbDV(sa.color), AntA: ['bool', true], Invr: ['bool', !!sa.invert], Opct: pc(sa.opacity), lagl: ang(sa.angle), Dstn: px(sa.distance), blur: px(sa.size) }]; }
   if (st.innerShadow?.enabled) items.IrSh = shadow(st.innerShadow, 'IrSh');
   if (st.glow?.enabled) items.OrGl = glow(st.glow, 'OrGl', false);
   if (st.innerGlow?.enabled) items.IrGl = glow(st.innerGlow, 'IrGl', true);
@@ -836,7 +859,7 @@ function effectsBlock(st: LayerStyles): Uint8Array {
       bvlT: ['enum', 'bvlT', 'SfBL'], bvlS: ['enum', 'BESl', style], uglg: ['bool', false], lagl: ang(b.angle), Lald: ang(b.altitude),
       srgR: pc(b.depth), blur: px(b.size), bvlD: ['enum', 'BESs', b.up ? 'In  ' : 'Out '], antialiasGloss: ['bool', false], Sftn: px(b.soften), useShape: ['bool', false], useTexture: ['bool', false] }];
   }
-  if (st.stroke?.enabled) items.FrFX = ['Objc', 'FrFX', { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], Styl: ['enum', 'FStl', 'OutF'], PntT: ['enum', 'FrFl', 'SClr'], 'Md  ': md('Nrml'), Opct: pc(100), 'Sz  ': px(st.stroke.size), 'Clr ': rgbDV(st.stroke.color) }];
+  if (st.stroke?.enabled) items.FrFX = ['Objc', 'FrFX', { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], Styl: ['enum', 'FStl', ({ outside: 'OutF', inside: 'InsF', center: 'CtrF' } as const)[st.stroke.position ?? 'outside']], PntT: ['enum', 'FrFl', 'SClr'], 'Md  ': md('Nrml'), Opct: pc(st.stroke.opacity ?? 100), 'Sz  ': px(st.stroke.size), 'Clr ': rgbDV(st.stroke.color) }];
   const w = new Writer(); w.u32(0); w.u32(16); writeDescriptor(w, 'null', items);
   if (w.size & 1) w.u8(0);
   return w.flat();

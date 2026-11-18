@@ -173,6 +173,11 @@ Ya disponible:
 - **Biblioteca de formas**: bocadillos, flechas, rayo, nube, gota, luna, ubicación, escudo, etiqueta, cinta, casa,
   visto bueno, cruz… (herramienta Forma, `U`). Siguen siendo vectoriales y editables.
 - **Menú Ventana** con todos los paneles (Capas, Canales, Trazados, Historial, Pinceles, Info…).
+- **Texto con varios estilos**: mientras editas un texto, selecciona una parte y cambia su color, fuente, tamaño,
+  negrita, cursiva o subrayado; solo cambia esa parte. Los PSD con textos de varios colores o fuentes se importan así.
+- **Más opciones de estilo de capa**: trazo exterior, interior o centrado con opacidad; extensión en la sombra y el
+  resplandor; *Satinado*. Todo se guarda en PSD.
+- **Objetos inteligentes**: *Nuevo objeto inteligente mediante copia* (contenido independiente) y *Exportar contenido*.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

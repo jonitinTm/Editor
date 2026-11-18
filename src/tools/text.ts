@@ -1,5 +1,6 @@
 // Herramienta Texto: clic para escribir. Crea capas de texto editables.
 
+import { applyRunStyle, shiftRuns, normalizeRuns, type RunStyle } from '../core/textruns';
 import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
@@ -40,6 +41,8 @@ export class TextTool implements Tool {
 
   /** Capa de texto cuyos valores muestra la barra de opciones (sin estar editándola). */
   private loaded = -1; private loading = false;
+  private prevOpts: ReturnType<TextTool['optsNow']> | null = null;
+  private optsNow() { const o = (k: string) => app.opt<any>(k, this.id); return { font: o('font'), size: o('size'), bold: !!o('bold'), italic: !!o('italic'), underline: !!o('underline'), color: app.fg }; }
   private loadFrom(l: TextLayer) {
     this.loading = true;
     const p = l.props;
@@ -65,11 +68,36 @@ export class TextTool implements Tool {
       if (changed) { l.render(); app.doc!.commit('Editar texto'); }
       return;
     }
-    const p = this.editing.layer.props;
-    p.font = app.opt('font', this.id); p.size = app.opt('size', this.id);
-    p.bold = app.opt('bold', this.id); p.italic = app.opt('italic', this.id); p.align = app.opt('align', this.id);
-    p.tracking = app.opt('tracking', this.id); p.lineHeight = app.opt<number>('leading', this.id) / 100; p.underline = app.opt('underline', this.id); p.caps = app.opt('caps', this.id);
-    p.color = app.fg;
+    const p = this.editing.layer.props, area = this.editing.area;
+    const now = this.optsNow(), prev = this.prevOpts ?? now; this.prevOpts = now;
+    const a = area.selectionStart ?? 0, b = area.selectionEnd ?? 0;
+    // qué ha cambiado (fuente, tamaño, negrita, cursiva, subrayado o color)
+    const changed: RunStyle = {};
+    if (now.font !== prev.font) changed.font = now.font;
+    if (now.size !== prev.size) changed.size = now.size;
+    if (now.bold !== prev.bold) changed.bold = now.bold;
+    if (now.italic !== prev.italic) changed.italic = now.italic;
+    if (now.underline !== prev.underline) changed.underline = now.underline;
+    if (now.color !== prev.color) changed.color = now.color;
+    if (b > a && Object.keys(changed).length) {
+      // Hay texto seleccionado: el cambio solo afecta a esa parte
+      p.runs = applyRunStyle(p.runs ?? [], a, b, changed, p.text.length);
+      this.editing.layer.render(); app.touchDoc();
+      setTimeout(() => { area.focus(); area.setSelectionRange(a, b); }, 0);
+      return;
+    }
+    // Sin selección: se aplica a todo el texto (y deja de ser excepción en los trozos que lo tuvieran)
+    if (p.runs?.length) { const keys = Object.keys(changed) as (keyof RunStyle)[]; p.runs = normalizeRuns(p.runs.map(r => { const c = { ...r }; for (const k of keys) delete (c as any)[k]; return c; }), p.text.length); }
+    // solo lo que ha cambiado (el color, por ejemplo, avisa dos veces y no debe pisar nada la segunda)
+    if (p.runs?.length) {
+      if ('font' in changed) p.font = now.font; if ('size' in changed) p.size = now.size; if ('bold' in changed) p.bold = now.bold;
+      if ('italic' in changed) p.italic = now.italic; if ('underline' in changed) p.underline = now.underline; if ('color' in changed) p.color = now.color;
+    } else {
+      p.font = app.opt('font', this.id); p.size = app.opt('size', this.id);
+      p.bold = app.opt('bold', this.id); p.italic = app.opt('italic', this.id); p.underline = app.opt('underline', this.id);
+      p.color = app.fg;
+    }
+    p.align = app.opt('align', this.id); p.tracking = app.opt('tracking', this.id); p.lineHeight = app.opt<number>('leading', this.id) / 100; p.caps = app.opt('caps', this.id);
     this.editing.layer.render();
     app.touchDoc();
   }
@@ -134,7 +162,10 @@ export class TextTool implements Tool {
     area.spellcheck = false;
     app.viewport.canvas.parentElement!.append(area);
     this.editing = { layer, isNew, before: layer.props.text, area };
+    this.prevOpts = this.optsNow();
     area.addEventListener('input', () => {
+      // los estilos parciales se desplazan con lo que se escribe o se borra
+      if (layer.props.runs?.length) layer.props.runs = shiftRuns(layer.props.runs, layer.props.text, area.value);
       layer.props.text = area.value;
       layer.render();
       app.touchDoc();
