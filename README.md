@@ -201,6 +201,8 @@ Ya disponible:
   máscara, sin borrar nada (pinta en la máscara para retocar el borde).
 - **Desenfoque de iris** (*Filtro › Desenfocar*): elipse nítida con el resto desenfocado (posición, tamaño, alargamiento,
   ángulo, transición y brillo de las luces tipo bokeh).
+- **Igualar color** (*Imagen › Ajustes*): da a la capa los colores y la luz de otro documento abierto o de otra capa
+  (para que fotos de distintas cámaras o momentos combinen), con luminancia, intensidad, transición y neutralizar.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

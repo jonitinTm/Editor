@@ -9,6 +9,7 @@ import * as M from './more';
 import * as L from './lut';
 import * as N from './more2';
 import { indexColors } from './indexed';
+import { matchColor } from './matchcolor';
 
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string; showIf?: [string, string] }
@@ -35,6 +36,8 @@ export interface FilterDef {
   noLayer?: boolean;
   /** Capa de relleno: genera los píxeles en vez de modificar los de debajo. */
   fill?: boolean;
+  /** Se llama justo antes de abrir el diálogo (p. ej. para rellenar opciones que dependen de lo abierto). */
+  prepare?: () => void;
   apply(img: ImageData, p: any): void;
 }
 
@@ -140,6 +143,18 @@ export const FILTERS: FilterDef[] = [
       { key: 'amount', label: 'Intensidad del tramado', type: 'range', min: 0, max: 100, default: 100, unit: '%' },
     ],
     apply: (img, p) => indexColors(img, p as any),
+  },
+  {
+    id: 'matchcolor', name: 'Igualar color…', group: 'ajuste', noLayer: true,
+    params: [
+      { key: 'source', label: 'Tomar los colores de', type: 'select', default: '', choices: [['', '(ninguna: solo neutralizar)']] },
+      { key: 'luminance', label: 'Luminancia', type: 'range', min: 1, max: 200, default: 100, unit: '%' },
+      { key: 'intensity', label: 'Intensidad del color', type: 'range', min: 0, max: 200, default: 100, unit: '%' },
+      { key: 'fade', label: 'Transición', type: 'range', min: 0, max: 100, default: 0, unit: '%' },
+      { key: 'neutralize', label: 'Neutralizar (quitar dominantes de color)', type: 'checkbox', default: false },
+    ],
+    // las opciones de «source» (con las estadísticas de color ya calculadas) las rellena la interfaz al abrir el diálogo
+    apply: (img, p) => matchColor(img, p.source ? JSON.parse(p.source) : null, p),
   },
   {
     id: 'posterize', name: 'Posterizar…', group: 'ajuste',

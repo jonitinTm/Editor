@@ -1,4 +1,5 @@
 // Catálogo de acciones: cada una tiene nombre, atajo y qué hace.
+import '../filters/matchsrc';
 // Menús y teclado se construyen a partir de esta lista.
 
 import { app } from './app';
@@ -235,7 +236,7 @@ export const ACTIONS: Action[] = [
 
 // Ajustes y filtros desde el registro
 for (const f of FILTERS) {
-  ACTIONS.push({ id: 'filter:' + f.id, label: f.name, keys: f.shortcut ? [f.shortcut] : undefined, enabled: hasLayer, run: () => dlg.filterDialog(f) });
+  ACTIONS.push({ id: 'filter:' + f.id, label: f.name, keys: f.shortcut ? [f.shortcut] : undefined, enabled: hasLayer, run: () => { f.prepare?.(); dlg.filterDialog(f); } });
 }
 
 for (const f of FILTERS) if (f.group === 'ajuste' && !f.noLayer) {
