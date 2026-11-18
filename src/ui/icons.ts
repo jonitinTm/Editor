@@ -49,6 +49,7 @@ export const ICONS: Record<string, string> = {
   patternStamp: S('<path d="M9 3h6v5l3 3v3H6v-3l3-3z"/><path d="M5 17h14v4H5z"/><path d="M8 19h2M12 19h2M16 19h0"/>'),
   colorSampler: S('<path d="M14 4l6 6-8 8H6v-6z"/><circle cx="6" cy="18" r="3"/><path d="M11 9l4 4"/>'),
   slice: S('<path d="M4 20L20 4"/><path d="M14 4h6v6"/><path d="M3 9h6v6H3z" stroke-dasharray="2 2"/>'),
+  freePen: S('<path d="M12 19l7-7 3 3-7 7z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/><path d="M3 21c3-1 4-4 7-3"/>'),
   patch: S('<path d="M5 7c3-3 8-3 11 0s2 8-2 9-9 1-10-3 0-5 1-6z" stroke-dasharray="2.5 2"/><path d="M14 14l6 6M20 15v5h-5"/>'),
   contentMove: S('<rect x="3" y="3" width="9" height="9" rx="1.5" stroke-dasharray="2.5 2"/><path d="M12 12l8 8M20 14v6h-6"/><path d="M5 8l2-2 3 3"/>'),
   spotHeal: S('<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><circle cx="18.5" cy="18.5" r="2.5" stroke-dasharray="1.5 1.5"/>'),

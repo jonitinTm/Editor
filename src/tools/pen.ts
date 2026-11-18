@@ -38,8 +38,8 @@ export class PenTool implements Tool {
     { key: 'strokeColor', type: 'color', default: '#000000' },
     { key: 'strokeWidth', label: 'Grosor', type: 'range', min: 1, max: 200, default: 4, unit: 'px' },
   ] as any[];
-  private pts: PathPoint[] = [];
-  private dragging = false;
+  protected pts: PathPoint[] = [];
+  protected dragging = false;
   /** Los siguientes subtrazados se añaden al trazado recién creado (hasta cambiar de herramienta). */
   private appendToActive = false;
   activate() { this.appendToActive = false; }
@@ -190,3 +190,56 @@ export class NodeTool implements Tool {
   }
 }
 export { drawPathOverlay };
+
+/** Simplifica una polilínea (Ramer–Douglas–Peucker). */
+function rdp(pts: { x: number; y: number }[], eps: number): { x: number; y: number }[] {
+  if (pts.length < 3) return pts;
+  const a = pts[0], b = pts[pts.length - 1], dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+  let mi = 0, md = 0;
+  const same = Math.hypot(dx, dy) < 1e-6;
+  for (let i = 1; i < pts.length - 1; i++) { const d = same ? Math.hypot(pts[i].x - a.x, pts[i].y - a.y) : Math.abs((pts[i].x - a.x) * dy - (pts[i].y - a.y) * dx) / L; if (d > md) { md = d; mi = i; } }
+  if (md <= eps) return [a, b];
+  return [...rdp(pts.slice(0, mi + 1), eps).slice(0, -1), ...rdp(pts.slice(mi), eps)];
+}
+/** Convierte puntos en un trazado Bézier suave (tiradores de Catmull-Rom). */
+export function smoothPath(raw: { x: number; y: number }[], closed: boolean): PathPoint[] {
+  const n = raw.length, k = 1 / 6;
+  return raw.map((p, i) => {
+    const prev = raw[closed ? (i - 1 + n) % n : Math.max(0, i - 1)], next = raw[closed ? (i + 1) % n : Math.min(n - 1, i + 1)];
+    const tx = (next.x - prev.x) * k, ty = (next.y - prev.y) * k;
+    return { x: p.x, y: p.y, ix: p.x - tx, iy: p.y - ty, ox: p.x + tx, oy: p.y + ty };
+  });
+}
+
+/** Pluma de forma libre: se dibuja a mano alzada y se convierte en un trazado de curvas editable. */
+export class FreeformPenTool extends PenTool {
+  id = 'freePen'; name = 'Pluma de forma libre'; icon = icon('freePen');
+  options = [...this.options, { key: 'fit', label: 'Ajuste de curva', type: 'range', min: 1, max: 10, default: 2, unit: 'px' }] as any[];
+  private raw: { x: number; y: number }[] = [];
+  extraOptions(bar: HTMLElement) { bar.append(h('span', { class: 'hint' }, 'Arrastra para dibujar; termina cerca del inicio para cerrar la forma. Después se edita con la Selección directa (A).')); }
+  down(e: ToolEvent) { this.raw = [{ x: e.x, y: e.y }]; this.dragging = true; }
+  move(e: ToolEvent) {
+    if (!this.dragging) return;
+    const l = this.raw[this.raw.length - 1];
+    if (Math.hypot(e.x - l.x, e.y - l.y) * app.viewport.zoom > 2) { this.raw.push({ x: e.x, y: e.y }); app.viewport.requestRender(); }
+  }
+  up() {
+    if (!this.dragging) return; this.dragging = false;
+    const raw = this.raw; this.raw = [];
+    if (raw.length < 3) { app.viewport.requestRender(); return; }
+    const a = app.viewport.toScreen(raw[0].x, raw[0].y), b = app.viewport.toScreen(raw[raw.length - 1].x, raw[raw.length - 1].y);
+    const closed = Math.hypot(a.x - b.x, a.y - b.y) < 14 && raw.length > 6;
+    if (closed) raw.push({ ...raw[0] });
+    let simp = rdp(raw, app.opt<number>('fit', this.id) / Math.max(0.05, app.viewport.zoom));
+    if (closed && simp.length > 2) simp = simp.slice(0, -1);
+    if (simp.length < 2) return;
+    this.pts = smoothPath(simp, closed);
+    this.finish(closed);
+  }
+  key_() { return false; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (this.raw.length < 2) return;
+    ctx.save(); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1.5; ctx.beginPath();
+    this.raw.forEach((q, i) => { const s = vp.toScreen(q.x, q.y); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); }); ctx.stroke(); ctx.restore();
+  }
+}
