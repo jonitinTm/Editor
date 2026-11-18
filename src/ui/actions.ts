@@ -133,6 +133,7 @@ export const ACTIONS: Action[] = [
   { id: 'layerStyle', label: 'Estilo de capa (sombra, trazo, resplandor)…', enabled: hasLayer, run: dlg.layerStyleDialog },
   { id: 'copyStyle', label: 'Copiar estilo de capa', enabled: () => hasStyles(app.doc?.active?.styles), run: () => { styleClipboard = JSON.stringify(app.doc!.active!.styles); app.toast('Estilo copiado'); } },
   { id: 'pasteStyle', label: 'Pegar estilo de capa', enabled: () => !!styleClipboard && !!app.doc?.active, run: () => { const d = app.doc!; const sel = d.allLayers().filter(l => d.selectedIds.has(l.id) || l === d.active); for (const l of sel) if (l.kind !== 'group' && l.kind !== 'adjust') l.styles = JSON.parse(styleClipboard!); d.invalidate(); d.commit('Pegar estilo de capa'); } },
+  { id: 'rasterizeStyle', label: 'Rasterizar estilo de capa', enabled: () => hasStyles(app.doc?.active?.styles), run: () => ops.rasterizeStyle() },
   { id: 'clearStyle', label: 'Quitar estilo de capa', enabled: () => !!app.doc?.active?.styles, run: () => ops.setLayerStyles(app.doc!.active!, null, true) },
   { id: 'align:left', label: 'Bordes izquierdos', enabled: hasLayer, run: () => ops.alignLayer('left') },
   { id: 'align:hcenter', label: 'Centros horizontales', enabled: hasLayer, run: () => ops.alignLayer('hcenter') },

@@ -357,8 +357,21 @@ function bakeLayer(l: Layer, d: EditorDocument): HTMLCanvasElement {
   const ctx = ctx2d(c);
   if (l instanceof GroupLayer) compositeGroup(l, ctx, d.width, d.height, {});
   else ctx.drawImage((l as RasterLayer).canvas, 0, 0);
-  if (l.mask?.enabled) { ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(l.mask.canvas, 0, 0); }
+  // máscara de píxeles y vectorial
+  const m = effectiveMask(l, l.mask?.enabled ? l.mask.canvas : null, d.width, d.height);
+  if (m) { ctx.globalCompositeOperation = 'destination-in'; ctx.drawImage(m, 0, 0); ctx.globalCompositeOperation = 'source-over'; }
   return c;
+}
+
+/** Capa › Estilo de capa › Rasterizar estilo: los efectos (sombra, contorno…) pasan a ser píxeles de la capa. */
+export function rasterizeStyle() {
+  const d = doc(); let l = d?.active; if (!d || !l || !hasStyles(l.styles)) return;
+  if (l instanceof GroupLayer || l instanceof AdjustmentLayer) { app.toast('Solo en capas de píxeles, texto o forma', 'warn'); return; }
+  const base = bakeLayer(l, d), out = makeCanvas(d.width, d.height);
+  composeStyled(ctx2d(out), base, l.styles!, 0, 0, d.width, d.height, undefined, l.fillOpacity);
+  let r = l as RasterLayer; if (isParametric(r)) r = rasterizeLayer(r);
+  r.canvas = out; r.mask = null; r.vmask = undefined; r.styles = null; r.fillOpacity = 1; r.touch();
+  d.setActive(r, false); d.invalidate(); d.commit('Rasterizar estilo de capa');
 }
 
 /** Combina en una sola capa las capas seleccionadas (tal como se ven juntas). */
@@ -393,7 +406,7 @@ export function mergeDown() {
   for (const [layer, c] of [[below, base], [l, top]] as const) if (hasStyles(layer.styles)) {
     // Los estilos se "hornean" en los píxeles al combinar
     const plain = cloneCanvas(c), cc = ctx2d(c);
-    cc.clearRect(0, 0, d.width, d.height); composeStyled(cc, plain, layer.styles, 0, 0, d.width, d.height);
+    cc.clearRect(0, 0, d.width, d.height); composeStyled(cc, plain, layer.styles, 0, 0, d.width, d.height, undefined, layer.fillOpacity);
   }
   ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode);
   if (l.visible) ctx.drawImage(top, 0, 0);
