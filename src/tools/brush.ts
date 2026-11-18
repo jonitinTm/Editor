@@ -16,6 +16,7 @@ const HARD = { key: 'hardness', label: 'Dureza', type: 'range' as const, min: 0,
 const OPAC = { key: 'opacity', label: 'Opacidad', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
 const FLOW = { key: 'flow', label: 'Flujo', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
 const PRESS = { key: 'pressure', label: 'Presión = tamaño', type: 'checkbox' as const, default: true };
+const PRESS_OP = { key: 'pressureOpacity', label: 'Presión = opacidad', type: 'checkbox' as const, default: false };
 const SMOOTH = { key: 'smoothing', label: 'Suavizar', type: 'range' as const, min: 0, max: 100, default: 10, unit: '%' };
 const ANGLE = { key: 'angle', label: 'Ángulo', type: 'range' as const, min: -180, max: 180, default: 0, unit: '°' };
 const ROUND = { key: 'roundness', label: 'Redondez', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
@@ -49,7 +50,7 @@ export function drawBrushCursor(ctx: CanvasRenderingContext2D, vp: Viewport, siz
 abstract class StrokeTool implements Tool {
   abstract id: string; abstract name: string; abstract icon: string;
   cursor = 'none';
-  options = [SIZE, HARD, OPAC, FLOW, SMOOTH, SPACING, ANGLE, ROUND, SCATTER, PRESS] as any[];
+  options = [SIZE, HARD, OPAC, FLOW, SMOOTH, SPACING, ANGLE, ROUND, SCATTER, PRESS, PRESS_OP] as any[];
   protected stroke: Stroke | null = null;
   private picking = false;
   /** Posición suavizada (el trazo sigue al ratón con algo de retraso para eliminar temblores). */
@@ -78,7 +79,12 @@ abstract class StrokeTool implements Tool {
       if (scatter > 0) { x += (Math.random() * 2 - 1) * scatter * size; y += (Math.random() * 2 - 1) * scatter * size; }
       let dx = x - tip.width / 2, dy = y - tip.height / 2;
       if (this.aliased) { dx = Math.round(dx); dy = Math.round(dy); }
-      ctx.globalAlpha = flow;
+      // con tableta, la presión también puede controlar la opacidad de cada pincelada
+      if (app.opt('pressureOpacity', this.id)) {
+        // las pinceladas se solapan: cada una aporta lo justo para que el trazo llegue a la opacidad de la presión
+        const overlap = Math.max(1, size / Math.max(0.5, this.spacing(p)));
+        ctx.globalAlpha = flow * (1 - Math.pow(1 - Math.min(1, Math.max(0.02, p)), 1 / overlap));
+      } else ctx.globalAlpha = flow;
       ctx.drawImage(tip, dx, dy);
       return { x: dx, y: dy, w: tip.width, h: tip.height };
     };
