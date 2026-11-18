@@ -51,8 +51,17 @@ export async function openFiles(files: File[], asLayers = false, remember = true
     try {
       if (io.isProjectFile(f)) { app.addDocument(await io.openProject(f)); continue; }
       if (io.isPsdFile(f)) {
-        if (asLayers && app.doc) { app.toast('Los PSD se abren en una pestaña aparte'); }
         const { doc: pd, warnings } = await readPsd(await f.arrayBuffer(), io.baseName(f.name));
+        const host = app.doc;
+        if (asLayers && host) {
+          // colocado en otro documento: como objeto inteligente que conserva sus capas (doble clic para editarlas)
+          pd.embedded = true;
+          const k = Math.min(1, host.width / pd.width, host.height / pd.height);
+          const sl = new SmartLayer(pd.name, host.width, host.height, pd, [k, 0, 0, k, Math.round((host.width - pd.width * k) / 2), Math.round((host.height - pd.height * k) / 2)]);
+          host.insertAboveActive(sl); host.setActive(sl, false); host.commit('Colocar PSD como objeto inteligente');
+          if (warnings.length) app.toast('PSD colocado con avisos: ' + warnings[0], 'warn');
+          continue;
+        }
         app.addDocument(pd);
         if (warnings.length) alertDialog('PSD abierto con avisos', warnings.join('. ') + '.');
         continue;

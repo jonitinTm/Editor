@@ -269,6 +269,8 @@ Ya disponible:
   propia pestaña (el fondo del escáner tiene que ser liso y las fotos no deben tocarse).
 - **Fusión de exposiciones (HDR)** (*Capa › Combinar en pila*): con varias fotos del mismo sitio a distinta exposición (una
   oscura, una normal y una clara), junta el detalle de las sombras y de las luces en una sola, sin halos.
+- **Colocar un PSD dentro de otro documento** (*Archivo › Colocar…* o arrastrándolo sobre la imagen): entra como objeto
+  inteligente que conserva sus capas (doble clic en su miniatura para editarlas). Soltado sobre las pestañas, se abre aparte.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

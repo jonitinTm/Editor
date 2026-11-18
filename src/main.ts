@@ -302,7 +302,8 @@ window.addEventListener('drop', e => {
   e.preventDefault(); dragDepth = 0; dropHint.classList.remove('show');
   const onTabs = (e.target as HTMLElement).closest?.('.tabs');
   const files = [...e.dataTransfer.files];
-  const isDoc = (f: File) => io.isProjectFile(f) || io.isPsdFile(f) || io.isRawFile(f);
+  // los PSD soltados sobre un documento se colocan como objeto inteligente (sobre las pestañas: se abren aparte)
+  const isDoc = (f: File) => io.isProjectFile(f) || io.isRawFile(f) || (io.isPsdFile(f) && (!app.doc || !!onTabs));
   const projects = files.filter(isDoc), images = files.filter(f => !isDoc(f));
   if (projects.length) ops.openFiles(projects);
   if (images.length) ops.openFiles(images, !!app.doc && !onTabs);

@@ -36,7 +36,7 @@ export const ACTIONS: Action[] = [
   { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles(io.OPEN_ACCEPT)) },
   { id: 'openLayers', label: 'Abrir como capas…', run: async () => ops.openAsLayers(await io.pickFiles('image/*,.tif,.tiff,.tga')) },
   { id: 'recent', label: 'Abrir reciente…', run: () => dlg.recentDialog() },
-  { id: 'place', label: 'Colocar imagen como objeto inteligente…', keys: ['Shift+Ctrl+P'], enabled: hasDoc, run: async () => ops.openFiles(await io.pickFiles('image/*'), true) },
+  { id: 'place', label: 'Colocar imagen como objeto inteligente…', keys: ['Shift+Ctrl+P'], enabled: hasDoc, run: async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,.tif,.tiff,.tga'), true) },
   { id: 'save', label: 'Guardar proyecto (.edp)', keys: ['Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(false) },
   { id: 'saveAs', label: 'Guardar proyecto como…', keys: ['Alt+Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(true) },
   { id: 'export', label: 'Exportar como (PNG, JPG, TIFF, PSD, PDF…)…', keys: ['Shift+Ctrl+S', 'Alt+Shift+Ctrl+W'], enabled: hasDoc, run: dlg.exportDialog },
