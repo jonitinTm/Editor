@@ -2027,3 +2027,32 @@ export async function duplicateLayerTo(target: EditorDocument | 'new') {
   dst.insertAboveActive(copy); dst.setActive(copy, false); dst.invalidate(); dst.commit('Duplicar capa');
   if (target !== 'new') { app.setDocument(dst); app.toast(`Capa copiada a «${dst.name}»`); }
 }
+
+/** Capa › Combinar formas: une, resta, interseca o excluye las formas seleccionadas en una sola forma vectorial. */
+export async function combineShapes(mode: 'unite' | 'subtract' | 'intersect' | 'exclude') {
+  const d = doc(); if (!d) return;
+  const order = d.allLayers();
+  const list = selectedLayers().filter(l => l instanceof ShapeLayer || l instanceof TextLayer || (l instanceof AdjustmentLayer && l.vmask) || isRaster(l)).sort((a, b) => order.indexOf(a) - order.indexOf(b));
+  if (list.length < 2) { app.toast('Selecciona al menos dos formas o textos (Ctrl+clic en el panel Capas)', 'warn'); return; }
+  const op = { unite: 1, subtract: 2, intersect: 3, exclude: 0 }[mode];
+  const subpaths: { closed: boolean; pts: import('../core/layers').PathPoint[]; op?: number }[] = [];
+  for (let k = 0; k < list.length; k++) {
+    const l = list[k];
+    let subs: { closed: boolean; pts: import('../core/layers').PathPoint[] }[];
+    if (l instanceof ShapeLayer && l.props.shape === 'path' && l.props.path?.closed) subs = [JSON.parse(JSON.stringify(l.props.path))];
+    else if (l instanceof AdjustmentLayer && l.vmask) subs = JSON.parse(JSON.stringify(l.vmask.subpaths));
+    else subs = await layerOutlines(l);
+    // dentro de una misma forma, los contornos interiores son huecos (como la «o»)
+    subs.forEach((sp, i) => subpaths.push({ ...sp, closed: true, op: i === 0 ? (k === 0 ? 1 : op) : (k === 0 || op === 1 ? 0 : op) }));
+  }
+  if (!subpaths.length) return;
+  const base = list[0];
+  const color = base instanceof ShapeLayer ? (base.props.fill ?? base.props.stroke ?? app.fg) : base instanceof TextLayer ? base.props.color : base instanceof AdjustmentLayer ? (base.params.color ?? app.fg) : app.fg;
+  const def = FILTERS_BY_ID.get('solidfill')!, pr = defaultParams(def); pr.color = color;
+  const f = new AdjustmentLayer('Forma combinada', 'solidfill', pr);
+  f.vmask = { subpaths, enabled: true };
+  const top = list[list.length - 1]; top.parent!.add(f, top.parent!.children.indexOf(top) + 1);
+  for (const l of list) l.parent?.remove(l);
+  d.setActive(f, false); d.selectedIds = new Set([f.id]); d.invalidate();
+  d.commit({ unite: 'Unir formas', subtract: 'Restar formas', intersect: 'Intersecar formas', exclude: 'Excluir formas' }[mode]);
+}

@@ -298,6 +298,8 @@ Ya disponible:
   animar a mano.
 - **Imagen › Recortar bordes…**: quita los bordes transparentes o del color de una esquina, por los lados que elijas.
 - **Capa › Duplicar capa en…**: copia la capa (con máscara y estilos) a otro documento abierto o a uno nuevo.
+- **Capa › Combinar formas** (con varias formas o textos seleccionados): unir, restar la de encima, intersecar (lo común)
+  o excluir (lo que no se solapa). El resultado es una forma vectorial editable; se guarda en PSD.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
