@@ -1,7 +1,7 @@
 // Compositor: combina todas las capas visibles en una sola imagen.
 
 import { borrowCanvas, returnCanvas, ctx2d, Rect } from './canvas';
-import { canvasBlend, GroupLayer, Layer, AdjustmentLayer, LayerStyles, hasStyles, isRaster } from './layers';
+import { canvasBlend, GroupLayer, Layer, AdjustmentLayer, LayerStyles, hasStyles, isRaster, blendIfActive } from './layers';
 import { FILTERS } from '../filters/registry';
 import { hexToRgb, makeCanvas } from './canvas';
 import { bevelLayers } from './bevel';
@@ -131,6 +131,25 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
       surface = out;
     }
     off = { x: 0, y: 0 };
+  }
+  if (blendIfActive(layer.styles)) {
+    // Fusionar si: la capa se ve según su luminosidad y la de lo que tiene debajo
+    const bi = layer.styles!.blendIf!;
+    let x = 0, y = 0, x1 = w, y1 = h;
+    if (opts.rect) { x = Math.max(0, Math.floor(opts.rect.x)); y = Math.max(0, Math.floor(opts.rect.y)); x1 = Math.min(w, Math.ceil(opts.rect.x + opts.rect.w)); y1 = Math.min(h, Math.ceil(opts.rect.y + opts.rect.h)); }
+    if (x1 > x && y1 > y) {
+      const t = borrowCanvas(w, h), tc = ctx2d(t); extra.push(t);
+      tc.drawImage(surface, off.x, off.y);
+      const sd = tc.getImageData(x, y, x1 - x, y1 - y), ud = ctx.getImageData(x, y, x1 - x, y1 - y).data, a = sd.data;
+      const ramp = (v: number, r: number[]) => v < r[0] ? 0 : v < r[1] ? (v - r[0]) / Math.max(1, r[1] - r[0]) : v <= r[2] ? 1 : v <= r[3] ? (r[3] - v) / Math.max(1, r[3] - r[2]) : 0;
+      for (let i = 0; i < a.length; i += 4) {
+        if (!a[i + 3]) continue;
+        const ls = a[i] * 0.3 + a[i + 1] * 0.59 + a[i + 2] * 0.11, lu = ud[i] * 0.3 + ud[i + 1] * 0.59 + ud[i + 2] * 0.11;
+        a[i + 3] *= ramp(ls, bi.this) * ramp(lu, bi.under);
+      }
+      tc.putImageData(sd, x, y);
+      surface = t; off = { x: 0, y: 0 };
+    }
   }
   ctx.save();
   ctx.globalAlpha = layer.opacity;

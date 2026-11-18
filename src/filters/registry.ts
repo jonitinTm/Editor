@@ -6,10 +6,13 @@ import * as A from './adjustments';
 import * as F from './advanced';
 import { develop, DEVELOP_DEFAULTS } from './develop';
 import * as M from './more';
+import * as L from './lut';
 
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string; showIf?: [string, string] }
   | { key: string; label: string; type: 'select'; choices: [string, string][]; default: string; section?: string }
+  | { key: string; label: string; type: 'lut'; default: string }
+  | { key: string; label: string; type: 'gradient'; default: A.Stop[] }
   | { key: string; label: string; type: 'checkbox'; default: boolean }
   | { key: string; label: string; type: 'color'; default: string }
   | { key: string; label: string; type: 'pattern'; default: string };
@@ -138,7 +141,9 @@ export const FILTERS: FilterDef[] = [
     ],
     apply: (img, p) => A.threshold(img, p.level),
   },
-  { id: 'gradmap', name: 'Mapa de degradado…', group: 'ajuste', params: [{ key: 'c1', label: 'Sombras', type: 'color', default: '#1a1040' }, { key: 'c2', label: 'Luces', type: 'color', default: '#ffd27a' }], apply: (img, p) => A.gradientMap(img, p.c1, p.c2) },
+  { id: 'gradmap', name: 'Mapa de degradado…', group: 'ajuste', params: [{ key: 'grad', label: 'Degradado', type: 'gradient', default: [{ t: 0, color: '#1a1040', a: 1 }, { t: 1, color: '#ffd27a', a: 1 }] }, { key: 'reverse', label: 'Invertir', type: 'checkbox', default: false }],
+    // los proyectos antiguos guardaban solo dos colores (c1, c2)
+    apply: (img, p) => p.grad ? A.gradientMapStops(img, p.grad, p.reverse) : A.gradientMap(img, p.c1, p.c2) },
   { id: 'photofilter', name: 'Filtro de fotografía…', group: 'ajuste', params: [{ key: 'color', label: 'Color', type: 'color', default: '#ec8a00' }, { key: 'density', label: 'Densidad', type: 'range', min: 1, max: 100, default: 25, unit: '%' }, { key: 'preserve', label: 'Conservar luminosidad', type: 'checkbox', default: true }], apply: (img, p) => A.photoFilter(img, p.color, p.density, p.preserve) },
   { id: 'autotone', name: 'Tono automático', group: 'ajuste', shortcut: 'Shift+Ctrl+L', noLayer: true, apply: img => A.autoAdjust(img, 'tone') },
   { id: 'autocontrast', name: 'Contraste automático', group: 'ajuste', shortcut: 'Alt+Shift+Ctrl+L', noLayer: true, apply: img => A.autoAdjust(img, 'contrast') },
@@ -189,6 +194,11 @@ export const FILTERS: FilterDef[] = [
       ...M.SELCOLOR_GROUPS.flatMap(([g]) => ([['c', 'Cian'], ['m', 'Magenta'], ['y', 'Amarillo'], ['k', 'Negro']] as const).map(([c, n]) => ({ key: `${g}_${c}`, label: n, type: 'range' as const, min: -100, max: 100, default: 0, unit: '%', showIf: ['group', g] as [string, string] }))),
       { key: 'absolute', label: 'Absoluto (si no, relativo)', type: 'checkbox', default: false }],
     apply: (img, p) => M.selectiveColor(img, p) },
+  { id: 'colorlookup', name: 'Consulta de colores…', group: 'ajuste',
+    params: [{ key: 'preset', label: 'Look', type: 'select', choices: L.LUT_PRESETS, default: 'tealorange' },
+      { key: 'lutData', label: 'Archivo LUT', type: 'lut', default: '' },
+      { key: 'amount', label: 'Intensidad', type: 'range', min: 0, max: 100, default: 100, unit: '%' }],
+    apply: (img, p) => L.applyLut(img, p) },
   { id: 'replacecolor', name: 'Reemplazar color…', group: 'ajuste', noLayer: true,
     params: [{ key: 'color', label: 'Color a cambiar', type: 'color', default: '#d03030' }, { key: 'fuzziness', label: 'Tolerancia', type: 'range', min: 1, max: 200, default: 40 },
       { key: 'hue', label: 'Tono', type: 'range', min: -180, max: 180, default: 0, unit: '°', section: 'Reemplazo' }, { key: 'sat', label: 'Saturación', type: 'range', min: -100, max: 100, default: 0 }, { key: 'light', label: 'Luminosidad', type: 'range', min: -100, max: 100, default: 0 }],
@@ -210,18 +220,18 @@ export const FILTERS: FilterDef[] = [
   { id: 'solidfill', name: 'Color sólido', group: 'relleno', fill: true, params: [{ key: 'color', label: 'Color', type: 'color', default: '#3d8bfd' }],
     apply: (img, p) => { const n = parseInt(String(p.color).slice(1), 16), d = img.data; for (let i = 0; i < d.length; i += 4) { d[i] = n >> 16 & 255; d[i + 1] = n >> 8 & 255; d[i + 2] = n & 255; d[i + 3] = 255; } } },
   { id: 'gradfill', name: 'Degradado', group: 'relleno', fill: true,
-    params: [{ key: 'c1', label: 'Color inicial', type: 'color', default: '#000000' }, { key: 'c2', label: 'Color final', type: 'color', default: '#ffffff' },
+    params: [{ key: 'grad', label: 'Degradado', type: 'gradient', default: [{ t: 0, color: '#000000', a: 1 }, { t: 1, color: '#ffffff', a: 1 }] },
       { key: 'angle', label: 'Ángulo', type: 'range', min: -180, max: 180, default: 90, unit: '°' }, { key: 'scale', label: 'Escala', type: 'range', min: 10, max: 300, default: 100, unit: '%' },
       { key: 'radial', label: 'Radial', type: 'checkbox', default: false }],
     apply: (img, p) => {
-      const c1 = parseInt(String(p.c1).slice(1), 16), c2 = parseInt(String(p.c2).slice(1), 16), d = img.data, W = p._W ?? img.width, H = p._H ?? img.height;
+      const lut = A.gradientLut(p.grad ?? [{ t: 0, color: p.c1 ?? '#000000', a: 1 }, { t: 1, color: p.c2 ?? '#ffffff', a: 1 }]), d = img.data, W = p._W ?? img.width, H = p._H ?? img.height;
       const a = -(p.angle ?? 90) * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), k = (p.scale ?? 100) / 100;
       const half = (Math.abs(ca) * W + Math.abs(sa) * H) / 2 * k, rad = Math.hypot(W, H) / 2 * k;
       for (let y = 0; y < img.height; y++) for (let x = 0; x < img.width; x++) {
         const X = x + (p._x ?? 0) - W / 2, Y = y + (p._y ?? 0) - H / 2;
         let t = p.radial ? Math.hypot(X, Y) / rad : ((X * ca + Y * sa) / half + 1) / 2; t = t < 0 ? 0 : t > 1 ? 1 : t;
         const i = (y * img.width + x) * 4;
-        d[i] = (c1 >> 16 & 255) * (1 - t) + (c2 >> 16 & 255) * t; d[i + 1] = (c1 >> 8 & 255) * (1 - t) + (c2 >> 8 & 255) * t; d[i + 2] = (c1 & 255) * (1 - t) + (c2 & 255) * t; d[i + 3] = 255;
+        const k = Math.round(t * 255) * 4; d[i] = lut[k]; d[i + 1] = lut[k + 1]; d[i + 2] = lut[k + 2]; d[i + 3] = lut[k + 3];
       }
     } },
   { id: 'patternfill', name: 'Motivo', group: 'relleno', fill: true,
@@ -245,6 +255,6 @@ export function defaultParams(f: FilterDef): any {
   if (f.custom === 'levels') return { inBlack: 0, inWhite: 255, gamma: 1, outBlack: 0, outWhite: 255 };
   if (f.custom === 'curves') return { rgb: [[0, 0], [255, 255]], r: [[0, 0], [255, 255]], g: [[0, 0], [255, 255]], b: [[0, 0], [255, 255]] };
   const p: any = {};
-  for (const d of f.params ?? []) p[d.key] = d.default;
+  for (const d of f.params ?? []) p[d.key] = typeof d.default === 'object' ? JSON.parse(JSON.stringify(d.default)) : d.default;
   return p;
 }

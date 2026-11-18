@@ -8,6 +8,8 @@ import { ctx2d, makeCanvas, cloneCanvas, getPixels, putPixels } from '../core/ca
 import { heal } from '../filters/heal';
 import { healHole } from '../ui/ops';
 import type { Viewport } from '../ui/viewport';
+import { layerCanvasIn } from '../core/history';
+import { sampledTip, getTip, allTips, loadUserTips, removeUserTip } from '../core/brushtips';
 
 const SIZE = { key: 'size', label: 'Tamaño', type: 'range' as const, min: 1, max: 1000, default: 20, unit: 'px' };
 const HARD = { key: 'hardness', label: 'Dureza', type: 'range' as const, min: 0, max: 100, default: 80, unit: '%' };
@@ -68,9 +70,11 @@ abstract class StrokeTool implements Tool {
     const flow = (app.opt<number>('flow', this.id) ?? 100) / 100;
     const ctx = ctx2d(this.stroke!.buffer);
     const round = (app.opt<number>('roundness', this.id) ?? 100) / 100, angle = app.opt<number>('angle', this.id) ?? 0, scatter = (app.opt<number>('scatter', this.id) ?? 0) / 100;
+    const tipId = this.aliased ? '' : (app.opt<string>('tip', this.id) ?? ''), jitter = !!app.opt('tipJitter', this.id);
     return (x, y, p) => {
       const size = this.size(p);
-      const tip = brushTip(size, hard, color, this.aliased, round, angle);
+      // punta con imagen (si hay) o la redonda de siempre
+      const tip = (tipId && sampledTip(tipId, size, color, jitter ? Math.random() * 360 : angle, round)) || brushTip(size, hard, color, this.aliased, round, angle);
       if (scatter > 0) { x += (Math.random() * 2 - 1) * scatter * size; y += (Math.random() * 2 - 1) * scatter * size; }
       let dx = x - tip.width / 2, dy = y - tip.height / 2;
       if (this.aliased) { dx = Math.round(dx); dy = Math.round(dy); }
@@ -132,6 +136,45 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
+  extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
+}
+
+/** Selector de punta (redonda o con imagen) para la barra de opciones. */
+export function tipPicker(bar: HTMLElement, toolId: string) {
+  loadUserTips();
+  const btn = document.createElement('button'); btn.className = 'btn tip-btn'; btn.title = 'Punta del pincel';
+  const paint = () => {
+    const id = app.opt<string>('tip', toolId) ?? '', t = id ? getTip(id) : null;
+    btn.innerHTML = '';
+    const c = document.createElement('canvas'); c.width = c.height = 22; const x = c.getContext('2d')!;
+    if (t) { x.drawImage(sampledTip(t.id, 20, '#ddd')!, 1, 1, 20, 20); } else { x.fillStyle = '#ddd'; x.beginPath(); x.arc(11, 11, 8, 0, 7); x.fill(); }
+    btn.append(c, document.createTextNode(' ' + (t ? t.name : 'Redonda') + ' ▾'));
+  };
+  paint();
+  btn.onclick = e => {
+    e.stopPropagation();
+    document.querySelector('.tip-fly')?.remove();
+    const fly = document.createElement('div'); fly.className = 'flyout tip-fly';
+    const r = btn.getBoundingClientRect(); fly.style.left = r.left + 'px'; fly.style.top = r.bottom + 4 + 'px';
+    const grid = document.createElement('div'); grid.className = 'tip-grid';
+    const item = (id: string, name: string, draw: (x: CanvasRenderingContext2D) => void, del?: () => void) => {
+      const el = document.createElement('div'); el.className = 'tip-item' + ((app.opt<string>('tip', toolId) ?? '') === id ? ' on' : ''); el.title = name;
+      const c = document.createElement('canvas'); c.width = c.height = 40; draw(c.getContext('2d')!); el.append(c);
+      const lab = document.createElement('span'); lab.textContent = name; el.append(lab);
+      el.onclick = () => { app.setOpt(toolId, 'tip', id); paint(); fly.remove(); };
+      if (del) { const b = document.createElement('button'); b.className = 'brush-del'; b.textContent = '×'; b.title = 'Eliminar esta punta'; b.onclick = ev => { ev.stopPropagation(); del(); fly.remove(); }; el.append(b); }
+      grid.append(el);
+    };
+    item('', 'Redonda', x => { x.fillStyle = '#ddd'; x.beginPath(); x.arc(20, 20, 14, 0, 7); x.fill(); });
+    for (const t of allTips()) item(t.id, t.name, x => x.drawImage(sampledTip(t.id, 36, '#ddd')!, 2, 2, 36, 36), t.user ? () => { removeUserTip(t.id); if (app.opt('tip', toolId) === t.id) app.setOpt(toolId, 'tip', ''); paint(); } : undefined);
+    const jit = document.createElement('label'); jit.className = 'check tip-jit';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!app.opt('tipJitter', toolId); cb.onchange = () => app.setOpt(toolId, 'tipJitter', cb.checked);
+    jit.append(cb, document.createTextNode(' Ángulo aleatorio en cada pincelada'));
+    const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = 'Crea las tuyas con Edición › Definir pincel (a partir de una selección).';
+    fly.append(grid, jit, hint); document.body.append(fly);
+    setTimeout(() => document.addEventListener('pointerdown', function close(ev) { if (!fly.contains(ev.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', close); } }), 0);
+  };
+  bar.append(btn);
 }
 
 export class PencilTool extends StrokeTool {
@@ -142,6 +185,7 @@ export class PencilTool extends StrokeTool {
 
 export class EraserTool extends StrokeTool {
   id = 'eraser'; name = 'Borrador'; icon = icon('eraser'); key = 'E'; group = 'eraser'; historyName = 'Borrador';
+  extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
   erase = true;
 }
 
@@ -176,7 +220,7 @@ export class CloneTool extends StrokeTool {
     this.stroke.update();
   }
   protected spacing() { return Math.max(1, app.opt<number>('size', this.id) * 0.12); }
-  private makeCloneDab() {
+  protected makeCloneDab() {
     const hard = app.opt<number>('hardness', this.id) / 100;
     const flow = app.opt<number>('flow', this.id) / 100;
     const ctx = ctx2d(this.stroke!.buffer);
@@ -292,4 +336,28 @@ export class SpotHealTool implements Tool {
     if (this.hole) { const v = vp.doc!.view; ctx.save(); ctx.globalAlpha = 0.45; ctx.imageSmoothingEnabled = v.zoom < 1; vp.docTransform(ctx); ctx.drawImage(this.hole, 0, 0); ctx.restore(); }
     drawBrushCursor(ctx, vp, app.opt<number>('size', this.id));
   }
+}
+
+/** Pincel de historia: pinta con cómo estaba la capa en el estado inicial (o en la última instantánea). */
+export class HistoryBrushTool extends CloneTool {
+  id = 'historyBrush'; name = 'Pincel de historia'; icon = icon('historyBrush'); key = 'Y'; group = 'history'; historyName = 'Pincel de historia';
+  options = [SIZE, { ...HARD, default: 50 }, OPAC, FLOW,
+    { key: 'origin', label: 'Origen', type: 'select', default: 'first', choices: [{ value: 'first', label: 'Estado inicial' }, { value: 'snapshot', label: 'Última instantánea' }] },
+  ] as any[];
+  down(e: ToolEvent) {
+    const d = app.doc!, t = getPaintTarget(); if (!t || t.isMask) return;
+    const useSnap = app.opt('origin', this.id) === 'snapshot' && d.snapshots.length;
+    const snap = useSnap ? d.snapshots[d.snapshots.length - 1].snap : d.history.steps[0]?.snap;
+    const src = snap ? layerCanvasIn(snap, t.layer.id) : null;
+    if (!src) { app.toast('Esta capa no existía en ese estado', 'warn'); return; }
+    this.srcCanvas = cloneCanvas(src); this.offset = { x: 0, y: 0 };
+    this.target = t;
+    const s = strokeSetup(t, false);
+    this.stroke = new Stroke(t, s.mode === 'mask' ? 'mask' : 'paint', app.opt<number>('opacity', this.id) / 100, s.maskValue);
+    (this as any).dabFn = (this as any).makeCloneDab();
+    this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(), (this as any).dabFn);
+    this.stroke.update();
+  }
+  move(e: ToolEvent) { if (!this.stroke) return; this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(), (this as any).dabFn); this.stroke.update(); }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) { drawBrushCursor(ctx, vp, app.opt<number>('size', this.id)); }
 }

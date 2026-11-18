@@ -6,6 +6,7 @@
 
 import { EditorDocument } from '../core/document';
 import { imageToCanvas } from './files';
+import { familyFromPostScript } from '../core/fonts';
 import { ShapeLayer, GroupLayer, Layer, LayerMask, LayerStyles, RasterLayer, TextLayer, TextProps, SmartLayer, Matrix, AdjustmentLayer, BlendMode, isRaster, hasStyles } from '../core/layers';
 import { cloneCanvas, contentBounds, ctx2d, makeCanvas, getPixels } from '../core/canvas';
 
@@ -164,10 +165,13 @@ function editableFill(soco?: Uint8Array, gdfl?: Uint8Array): { id: string; param
     const d = readDescriptor(r);
     if (soco) return { id: 'solidfill', params: { color: descColor(d.Clr) } };
     const stops = (d.Grad?.Clrs ?? []) as any[], tr = (d.Grad?.Trns ?? []) as any[];
-    if (stops.length !== 2 || tr.some(t => (t.Opct ?? 100) < 100) || !(d.Type === 'Lnr' || d.Type === 'Rdl')) return null;
-    let [a, z] = stops; if ((a.Lctn ?? 0) > (z.Lctn ?? 0)) [a, z] = [z, a];
-    if (d.Rvrs) [a, z] = [z, a];
-    return { id: 'gradfill', params: { c1: descColor(a.Clr), c2: descColor(z.Clr), angle: d.Angl ?? 90, scale: d.Scl ?? 100, radial: d.Type === 'Rdl' } };
+    if (stops.length < 2 || !(d.Type === 'Lnr' || d.Type === 'Rdl')) return null;
+    // opacidad en cada posición, interpolada entre las paradas de transparencia
+    const trs = tr.map(t => ({ t: (t.Lctn ?? 0) / 4096, a: (t.Opct ?? 100) / 100 })).sort((p, q) => p.t - q.t);
+    const alphaAt = (t: number) => { if (!trs.length) return 1; if (t <= trs[0].t) return trs[0].a; for (let i = 1; i < trs.length; i++) if (t <= trs[i].t) { const f = (t - trs[i - 1].t) / Math.max(1e-6, trs[i].t - trs[i - 1].t); return trs[i - 1].a + (trs[i].a - trs[i - 1].a) * f; } return trs[trs.length - 1].a; };
+    let grad = stops.map(s => { const t = Math.max(0, Math.min(1, (s.Lctn ?? 0) / 4096)); return { t, color: descColor(s.Clr), a: alphaAt(t) }; }).sort((p, q) => p.t - q.t);
+    if (d.Rvrs) grad = grad.map(s => ({ ...s, t: 1 - s.t })).reverse();
+    return { id: 'gradfill', params: { grad, angle: d.Angl ?? 90, scale: d.Scl ?? 100, radial: d.Type === 'Rdl' } };
   } catch { return null; }
 }
 
@@ -299,7 +303,7 @@ const BIG_KEYS = new Set(['LMsk', 'Lr16', 'Lr32', 'Layr', 'Mt16', 'Mt32', 'Mtrn'
 interface Rec {
   top: number; left: number; bottom: number; right: number;
   channels: { id: number; len: number }[];
-  blend: string; opacity: number; flags: number; name: string; clip: boolean; fillOpacity: number; protect: number; labelIdx: number;
+  blend: string; opacity: number; flags: number; name: string; clip: boolean; fillOpacity: number; protect: number; labelIdx: number; blendIf: { this: [number, number, number, number]; under: [number, number, number, number] } | null;
   mask: { top: number; left: number; bottom: number; right: number; def: number; flags: number; real?: { top: number; left: number; bottom: number; right: number; def: number; flags: number }; density?: number; vdensity?: number } | null;
   section: number; keys: string[]; blocks: Record<string, Uint8Array>;
 }
@@ -357,7 +361,7 @@ function parseText(b: Uint8Array): TextProps | null {
   const hex = '#' + [col[1], col[2], col[3]].map((c: number) => Math.round(Math.max(0, Math.min(1, c ?? 0)) * 255).toString(16).padStart(2, '0')).join('');
   const size = (st.FontSize ?? 12) * yy;
   // "TimesNewRomanPS-BoldMT" → familia "Times New Roman", negrita
-  const family = ps.split('-')[0].replace(/(PS)?MT$|PS$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').trim() || 'Arial';
+  const family = familyFromPostScript(ps) ?? (ps.split('-')[0].replace(/(PS)?MT$|PS$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').trim() || 'Arial');
   const lh = st.AutoLeading === false && st.Leading ? st.Leading / (st.FontSize || 12) : 1.2;
   return {
     text, font: family, size, color: hex, bold: /Bold|Black|Heavy/i.test(ps) || !!st.FauxBold, italic: /Italic|Oblique/i.test(ps) || !!st.FauxItalic,
@@ -420,7 +424,11 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
       }
     }
     r.pos = mEnd;
-    r.skipBlock(); // rangos de fusión
+    // rangos de fusión: el primero (gris compuesto) es «Fusionar si» de luminosidad
+    let blendIf: { this: [number, number, number, number]; under: [number, number, number, number] } | null = null;
+    { const bl = r.u32(), bEnd = r.pos + bl;
+      if (bl >= 8) { const b = [r.u8(), r.u8(), r.u8(), r.u8(), r.u8(), r.u8(), r.u8(), r.u8()]; blendIf = { this: [b[0], b[1], b[2], b[3]], under: [b[4], b[5], b[6], b[7]] }; }
+      r.pos = bEnd; }
     const nl = r.u8(); let lname = r.str(nl); r.pos += (4 - ((nl + 1) % 4)) % 4;
     let section = 0, fillOpacity = 255, sectionBlend = '', protect = 0, labelIdx = 0; const keys: string[] = []; const blocks: Rec['blocks'] = {};
     while (r.pos + 12 <= extraEnd && r.isSig()) {
@@ -437,7 +445,7 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
       for (let pad = 0; pad < 4; pad++) { r.pos = start + len + pad; if (r.pos >= extraEnd || r.isSig()) break; }
     }
     r.pos = extraEnd;
-    recs.push({ labelIdx, protect, fillOpacity, top, left, bottom, right, channels, blend: sectionBlend || blend, opacity, flags, clip, name: lname, mask, section, keys, blocks });
+    recs.push({ blendIf, labelIdx, protect, fillOpacity, top, left, bottom, right, channels, blend: sectionBlend || blend, opacity, flags, clip, name: lname, mask, section, keys, blocks });
   }
   const stack: GroupLayer[] = [doc.root];
   let skippedAdj = 0, textAsPixels = 0;
@@ -514,6 +522,7 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
     if (rec.blocks.lfx2 && layer.kind !== 'adjust') {
       try { layer.styles = parseEffects(rec.blocks.lfx2); } catch { /* efecto no reconocido */ }
     }
+    if (rec.blendIf && (rec.blendIf.this.join() !== '0,0,255,255' || rec.blendIf.under.join() !== '0,0,255,255')) layer.styles = { ...(layer.styles ?? {}), blendIf: rec.blendIf };
     if (rec.blocks.vstk) {
       // Trazo de las formas vectoriales → estilo de trazo
       try {
@@ -573,10 +582,22 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
   if (mode === 4) warnings.push('Documento CMYK convertido a RGB sin perfil de color: los colores pueden variar ligeramente');
   if (W * H > 268e6) throw new Error('La imagen es demasiado grande para el navegador');
   r.skipBlock();              // datos de modo de color
-  r.skipBlock();              // recursos de imagen
+  // recursos de imagen: de aquí solo interesa la resolución (1005)
+  let ppi = 72;
+  { const rl = r.u32(), rEnd = r.pos + rl;
+    try {
+      while (r.pos + 12 <= rEnd && r.str(4) === '8BIM') {
+        const id = r.u16(), nl = r.u8(); r.pos += nl + ((nl + 1) & 1 ? 1 : 0);
+        const sz = r.u32(), dataStart = r.pos;
+        if (id === 1005 && sz >= 16) { const v = r.u32() / 65536, unit = r.u16(); ppi = unit === 2 ? v * 2.54 : v; }
+        r.pos = dataStart + sz + (sz & 1);
+      }
+    } catch { /* recursos inesperados */ }
+    r.pos = rEnd; }
   const lmLen = r.len();
   const lmEnd = r.pos + lmLen;
   const doc = new EditorDocument(name, W, H);
+  if (ppi > 1 && ppi < 100000) doc.ppi = Math.round(ppi * 100) / 100;
   const gray = mode === 1, cmyk = mode === 4;
   const pending: PendingSmart[] = [];
   const linked = new Map<string, { name: string; data: Uint8Array }>();
@@ -738,12 +759,13 @@ function adjustmentBlock(l: AdjustmentLayer): { key: string; bytes: Uint8Array }
   const i16 = (v: number) => w.u16(Math.round(v) & 0xffff);
   switch (l.filterId) {
     case 'solidfill': w.u32(16); writeDescriptor(w, 'null', { 'Clr ': rgbDV(p.color) }); return done('SoCo');
-    case 'gradfill': w.u32(16); writeDescriptor(w, 'null', {
+    case 'gradfill': { const gstops: { t: number; color: string; a: number }[] = (p.grad ?? [{ t: 0, color: p.c1 ?? '#000000', a: 1 }, { t: 1, color: p.c2 ?? '#ffffff', a: 1 }]).slice().sort((x: any, y: any) => x.t - y.t);
+      w.u32(16); writeDescriptor(w, 'null', {
       Angl: ['UntF', '#Ang', p.angle], Type: ['enum', 'GrdT', p.radial ? 'Rdl ' : 'Lnr '], Algn: ['bool', false], 'Scl ': ['UntF', '#Prc', p.scale],
       Grad: ['Objc', 'Grdn', { 'Nm  ': ['TEXT', 'Editor'], GrdF: ['enum', 'GrdF', 'CstS'], Intr: ['doub', 4096],
-        Clrs: ['VlLs', [[0, p.c1], [4096, p.c2]].map(([l, c]) => ['Objc', 'Clrt', { 'Clr ': rgbDV(c as string), Type: ['enum', 'Clry', 'UsrS'], Lctn: ['long', l as number], Mdpn: ['long', 50] }] as DV)],
-        Trns: ['VlLs', [0, 4096].map(l => ['Objc', 'TrnS', { Opct: ['UntF', '#Prc', 100], Lctn: ['long', l], Mdpn: ['long', 50] }] as DV)] }] });
-      return done('GdFl');
+        Clrs: ['VlLs', gstops.map(s => ['Objc', 'Clrt', { 'Clr ': rgbDV(s.color), Type: ['enum', 'Clry', 'UsrS'], Lctn: ['long', Math.round(s.t * 4096)], Mdpn: ['long', 50] }] as DV)],
+        Trns: ['VlLs', gstops.map(s => ['Objc', 'TrnS', { Opct: ['UntF', '#Prc', Math.round((s.a ?? 1) * 100)], Lctn: ['long', Math.round(s.t * 4096)], Mdpn: ['long', 50] }] as DV)] }] });
+      return done('GdFl'); }
     case 'selcolor': w.u16(1); w.u16(p.absolute ? 1 : 0); for (let k = 0; k < 4; k++) w.u16(0);
       for (const g of ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks']) for (const c of ['c', 'm', 'y', 'k']) i16(p[g + '_' + c] ?? 0);
       return done('selc');
@@ -823,7 +845,7 @@ function effectsBlock(st: LayerStyles): Uint8Array {
 /** Forma del editor → relleno de color + máscara vectorial de Photoshop (null si lleva trazo o es una línea). */
 function shapeBlocks(l: ShapeLayer, W: number, H: number): { soco: Uint8Array; vmsk: Uint8Array } | null {
   const p = l.props;
-  if (p.shape === 'line' || p.stroke || !p.fill || ['polygon', 'star', 'arrow', 'heart'].includes(p.shape)) return null;
+  if (p.shape === 'line' || p.stroke || !p.fill || ['polygon', 'star', 'arrow', 'heart', 'custom'].includes(p.shape)) return null;
   const x = Math.min(p.x0, p.x1), y = Math.min(p.y0, p.y1), w = Math.abs(p.x1 - p.x0), h = Math.abs(p.y1 - p.y0);
   type P = [number, number];
   const knots: [P, P, P][] = []; // [control anterior, ancla, control siguiente]
@@ -932,7 +954,9 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
     const ex = new Writer();
     if (rc.hasMask) { ex.u32(20); ex.i32(0); ex.i32(0); ex.i32(H); ex.i32(W); ex.u8(255); ex.u8(l!.mask!.enabled ? 0 : 2); ex.u16(0); }
     else ex.u32(0);
-    ex.u32(0);
+    // rangos de fusión (gris compuesto = «Fusionar si»)
+    const bi = l?.styles?.blendIf;
+    if (bi) { ex.u32(8); for (const v of [...bi.this, ...bi.under]) ex.u8(Math.max(0, Math.min(255, Math.round(v)))); } else ex.u32(0);
     const ascii = rc.name.replace(/[^\x20-\x7e]/g, '?').slice(0, 255);
     ex.u8(ascii.length); ex.str(ascii); for (let k = (ascii.length + 1) % 4; k % 4 !== 0; k++) ex.u8(0);
     ex.str('8BIM'); ex.str('luni'); const ul = 4 + rc.name.length * 2; ex.u32(ul + (ul & 1 ? 1 : 0) + (ul % 4 === 2 ? 2 : 0));
@@ -951,7 +975,10 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
   const out = new Writer();
   out.str('8BPS'); out.u16(1); for (let i = 0; i < 6; i++) out.u8(0);
   out.u16(3); out.u32(H); out.u32(W); out.u16(8); out.u16(3);
-  out.u32(0); out.u32(0);
+  out.u32(0);
+  // recursos de imagen: resolución (1005)
+  { const fx16 = Math.round(doc.ppi * 65536); out.u32(28); out.str('8BIM'); out.u16(1005); out.u8(0); out.u8(0); out.u32(16);
+    out.u32(fx16); out.u16(1); out.u16(2); out.u32(fx16); out.u16(1); out.u16(2); }
   out.u32(4 + li.size + 4); out.u32(li.size); out.writer(li); out.u32(0);
   // Imagen combinada (sobre blanco), para los programas que no leen capas
   const flat = makeCanvas(W, H), fx = ctx2d(flat);

@@ -89,6 +89,8 @@ class App {
   saveOpts() { try { localStorage.setItem('editor.opts', JSON.stringify(this.opts)); } catch { /* */ } }
 
   setColors(fg = this.fg, bg = this.bg) {
+    // en un documento en escala de grises los colores también lo son
+    if (this.doc?.mode === 'gray') { const g = (hex: string) => { const n = parseInt(hex.slice(1, 7), 16); if (isNaN(n)) return hex; const v = Math.round((n >> 16 & 255) * 0.3 + (n >> 8 & 255) * 0.59 + (n & 255) * 0.11).toString(16).padStart(2, '0'); return '#' + v + v + v; }; fg = g(fg); bg = g(bg); }
     this.fg = fg; this.bg = bg;
     try { localStorage.setItem('editor.colors', JSON.stringify({ fg, bg })); } catch { /* */ }
     this.emit('colors');

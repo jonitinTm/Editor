@@ -51,6 +51,8 @@ export const ACTIONS: Action[] = [
   { id: 'pasteInto', label: 'Pegar dentro de la selección', keys: ['Alt+Shift+Ctrl+V'], enabled: () => !!app.doc?.selection.mask, run: async () => { if (!await ops.pasteInternal('into')) app.toast('Copia algo primero') } },
   { id: 'paste', label: 'Pegar', keys: ['Ctrl+V'], run: () => app.toast('Pulsa Ctrl+V para pegar (el navegador solo permite pegar con el teclado)') },
   { id: 'clear', label: 'Borrar', keys: ['Delete', 'Backspace'], enabled: hasSel, run: () => ops.clearSelection() },
+  { id: 'fade', label: 'Transición…', keys: ['Shift+Ctrl+F'], enabled: () => !!app.doc?.history.canUndo(), run: dlg.fadeDialog },
+  { id: 'defineBrush', label: 'Definir pincel…', enabled: hasDoc, run: ops.defineBrush },
   { id: 'definePattern', label: 'Definir motivo…', enabled: hasDoc, run: async () => { const n = await promptDialog('Definir motivo', 'Nombre', 'Motivo ' + new Date().toLocaleTimeString('es')); if (n !== null) ops.definePattern(n || 'Motivo'); } },
   { id: 'stroke', label: 'Contornear…', enabled: hasSel, run: dlg.strokeDialog },
   { id: 'fill', label: 'Rellenar…', keys: ['Shift+F5'], enabled: hasLayer, run: dlg.fillDialog },
@@ -72,6 +74,8 @@ export const ACTIONS: Action[] = [
   { id: 'dupDoc', label: 'Duplicar…', enabled: hasDoc, run: () => ops.duplicateDocument() },
   { id: 'imageSize', label: 'Tamaño de imagen…', keys: ['Alt+Ctrl+I'], enabled: hasDoc, run: dlg.imageSizeDialog },
   { id: 'canvasSize', label: 'Tamaño de lienzo…', keys: ['Alt+Ctrl+C'], enabled: hasDoc, run: dlg.canvasSizeDialog },
+  { id: 'modeRgb', label: 'Color RGB', enabled: hasDoc, checked: () => app.doc?.mode !== 'gray', run: () => ops.setColorMode('rgb') },
+  { id: 'modeGray', label: 'Escala de grises', enabled: hasDoc, checked: () => app.doc?.mode === 'gray', run: () => ops.setColorMode('gray') },
   { id: 'imgRotArb', label: 'Rotar lienzo un ángulo…', enabled: hasDoc, run: dlg.rotateArbitraryDialog },
   { id: 'imgRot90', label: 'Rotar lienzo 90° horario', enabled: hasDoc, run: () => ops.transformImage('rot90') },
   { id: 'imgRot-90', label: 'Rotar lienzo 90° antihorario', enabled: hasDoc, run: () => ops.transformImage('rot-90') },
@@ -135,6 +139,7 @@ export const ACTIONS: Action[] = [
   { id: 'invertSel', label: 'Invertir', keys: ['Shift+Ctrl+I'], enabled: hasDoc, run: ops.invertSelection },
   { id: 'selFromLayer', label: 'Cargar selección desde la capa', enabled: hasLayer, run: () => ops.selectionFromLayer(app.doc!.active!) },
   { id: 'pathToSel', label: 'Trazado a selección', keys: ['Ctrl+Enter'], enabled: () => app.doc?.active?.kind === 'shape' || (app.doc?.activePath ?? -1) >= 0, run: ops.pathToSelection },
+  { id: 'transformSel', label: 'Transformar selección', enabled: hasSel, run: () => { TransformTool.selectionOnly = true; app.setTool('transform', true); } },
   { id: 'selToPath', label: 'Selección a trazado', enabled: hasSel, run: ops.selectionToPath },
   { id: 'saveSel', label: 'Guardar selección…', enabled: hasSel, run: async () => { const n = await promptDialog('Guardar selección', 'Nombre del canal', `Alfa ${(app.doc!.channels.length + 1)}`); if (n !== null) ops.saveSelectionAsChannel(n); } },
   { id: 'loadSel', label: 'Cargar selección…', enabled: () => !!app.doc?.channels.length, run: dlg.loadSelectionDialog },
@@ -173,6 +178,18 @@ export const ACTIONS: Action[] = [
     id: 'win:' + g, label, checked: () => !(document.querySelector(`[data-group=${g}]`) as HTMLElement)?.classList.contains('closed'),
     run: () => { document.querySelector(`[data-group=${g}]`)?.classList.toggle('closed'); },
   })),
+  { id: 'panel:Capas', label: 'Capas', run: () => showPanel('Capas') },
+  { id: 'panel:Canales', label: 'Canales', run: () => showPanel('Canales') },
+  { id: 'panel:Trazados', label: 'Trazados', run: () => showPanel('Trazados') },
+  { id: 'panel:Acciones', label: 'Acciones', run: () => showPanel('Acciones') },
+  { id: 'panel:Propiedades', label: 'Propiedades', run: () => showPanel('Propiedades') },
+  { id: 'panel:Historial', label: 'Historial', run: () => showPanel('Historial') },
+  { id: 'panel:Navegador', label: 'Navegador', run: () => showPanel('Navegador') },
+  { id: 'panel:Histograma', label: 'Histograma', run: () => showPanel('Histograma') },
+  { id: 'panel:Info', label: 'Info', run: () => showPanel('Info') },
+  { id: 'panel:Color', label: 'Color', run: () => showPanel('Color') },
+  { id: 'panel:Muestras', label: 'Muestras', run: () => showPanel('Muestras') },
+  { id: 'panel:Pinceles', label: 'Pinceles', run: () => showPanel('Pinceles') },
   { id: 'win:timeline', label: 'Línea de tiempo (animación)', checked: () => !document.querySelector('.timeline')?.classList.contains('closed'), run: () => { document.querySelector('.timeline')?.classList.toggle('closed'); app.doc?.changed(); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:tools', label: 'Herramientas', checked: () => !document.body.classList.contains('no-tools'), run: () => { document.body.classList.toggle('no-tools'); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:options', label: 'Opciones', checked: () => !document.body.classList.contains('no-options'), run: () => { document.body.classList.toggle('no-options'); requestAnimationFrame(() => app.viewport.resize()); } },
@@ -214,4 +231,14 @@ export function shortcutList(): [string, string][] {
     ['Alt + rueda', 'Zoom'], ['Flechas', 'Mover la capa 1 px (Mayús: 10 px)'], ['Intro / Esc', 'Aplicar / cancelar (recorte, transformación, texto)']);
   for (const a of ACTIONS) if (a.keys) out.push([a.keys[0], a.label.replace('…', '')]);
   return out;
+}
+
+/** Muestra un panel: abre su grupo si estaba cerrado y activa su pestaña. */
+function showPanel(name: string) {
+  document.body.classList.remove('hide-panels');
+  const tab = [...document.querySelectorAll('.tg-tab')].find(t => t.textContent === name) as HTMLElement | undefined;
+  if (!tab) return;
+  tab.closest('.tab-group')?.classList.remove('closed');
+  tab.click();
+  requestAnimationFrame(() => app.viewport.resize());
 }

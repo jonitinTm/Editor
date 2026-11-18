@@ -7,12 +7,12 @@ import * as ops from './ops';
 import { BLEND_MODES, GroupLayer, AdjustmentLayer, SmartLayer, hasStyles, Layer, TextLayer, ShapeLayer, isRaster, isParametric } from '../core/layers';
 import { ctx2d } from '../core/canvas';
 import { renderComposite } from '../core/compositor';
-import { FONTS } from '../tools/text';
+import { fontPicker } from './fontpicker';
 import { WARP_STYLES } from '../tools/warpmesh';
 import { actionById } from './actions';
 import { promptDialog, row as formRow } from './dialog';
 import { createPicker, SWATCHES } from './colorpicker';
-import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect, warpTextDialog } from './dialogs';
+import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect, warpTextDialog, lutPicker, gradientButton } from './dialogs';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';
 
@@ -347,8 +347,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
       const chk = (label: string, v: boolean, set: (v: boolean) => void) => { const c = h('input', { type: 'checkbox', checked: v }); c.onchange = () => upd(() => set(c.checked)); return h('label', { class: 'check' }, c, ' ' + label); };
       const ta = h('textarea', { class: 'prop-text', rows: 3 }, p.text);
       ta.addEventListener('change', () => upd(() => { p.text = ta.value; l.name = ta.value.split('\n')[0].slice(0, 30) || l.name; }));
-      const font = h('select', {}, ...FONTS.map(f => h('option', { value: f }, f)));
-      font.value = p.font; font.onchange = () => upd(() => p.font = font.value);
+      const font = fontPicker(p.font, f => upd(() => p.font = f));
       const size = h('input', { type: 'number', class: 'num', value: String(Math.round(p.size)), min: '1', max: '2000' });
       size.onchange = () => upd(() => p.size = Math.max(1, +size.value));
       const color = h('input', { type: 'color', value: p.color, class: 'color-input' });
@@ -389,6 +388,10 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           body.append(formRow(pd.label, c));
         } else if (pd.type === 'pattern') {
           body.append(formRow(pd.label, patternSelect(l.params[pd.key], v => { l.params[pd.key] = v; changed(); })));
+        } else if (pd.type === 'gradient') {
+          body.append(formRow(pd.label, gradientButton(l.params[pd.key] ?? [{ t: 0, color: l.params.c1 ?? '#000000', a: 1 }, { t: 1, color: l.params.c2 ?? '#ffffff', a: 1 }], s => { l.params[pd.key] = s; changed(); })));
+        } else if (pd.type === 'lut') {
+          body.append(formRow(pd.label, lutPicker(l.params, changed)));
         } else if (pd.type === 'select') {
           const sel = h('select', {}, ...pd.choices.map(([v, n]) => h('option', { value: v, selected: l.params[pd.key] === v }, n)));
           sel.onchange = () => { l.params[pd.key] = sel.value; syncShow(); changed(); };

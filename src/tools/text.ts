@@ -34,11 +34,37 @@ export class TextTool implements Tool {
 
   constructor() {
     app.on('options', () => this.syncFromOptions());
-    app.on('colors', () => this.syncFromOptions());
+    app.on('colors', () => { if (this.editing) this.syncFromOptions(); });
+    app.on('doc', () => { const l = app.doc?.active; if (app.tool === this && !this.editing && l instanceof TextLayer && l.id !== this.loaded) this.loadFrom(l); });
   }
 
+  /** Capa de texto cuyos valores muestra la barra de opciones (sin estar editándola). */
+  private loaded = -1; private loading = false;
+  private loadFrom(l: TextLayer) {
+    this.loading = true;
+    const p = l.props;
+    app.setOpt(this.id, 'font', p.font); app.setOpt(this.id, 'size', Math.round(p.size * 10) / 10);
+    app.setOpt(this.id, 'bold', p.bold); app.setOpt(this.id, 'italic', p.italic); app.setOpt(this.id, 'align', p.align);
+    app.setOpt(this.id, 'tracking', p.tracking ?? 0); app.setOpt(this.id, 'leading', Math.round(p.lineHeight * 100)); app.setOpt(this.id, 'underline', !!p.underline); app.setOpt(this.id, 'caps', !!p.caps);
+    this.loaded = l.id; this.loading = false;
+  }
+  activate() { const l = app.doc?.active; if (l instanceof TextLayer) this.loadFrom(l); }
   private syncFromOptions() {
-    if (!this.editing || app.tool !== this) return;
+    if (app.tool !== this || this.loading) return;
+    if (!this.editing) {
+      // Capa de texto seleccionada: lo que cambie en la barra se aplica a toda la capa
+      const l = app.doc?.active;
+      if (!(l instanceof TextLayer) || l.id !== this.loaded || l.isLocked()) return;
+      const p = l.props, o = (k: string) => app.opt<any>(k, this.id);
+      const next = { font: o('font'), size: o('size'), bold: o('bold'), italic: o('italic'), align: o('align'), tracking: o('tracking'), lineHeight: o('leading') / 100, underline: o('underline'), caps: o('caps') };
+      let changed = false;
+      for (const [k, v] of Object.entries(next)) {
+        const cur = (p as any)[k] ?? (k === 'tracking' ? 0 : k === 'underline' || k === 'caps' ? false : undefined);
+        if (v !== undefined && (k === 'size' ? Math.abs(v - cur) > 0.05 : k === 'lineHeight' ? Math.abs(v - cur) > 0.001 : v !== cur)) { (p as any)[k] = v; changed = true; }
+      }
+      if (changed) { l.render(); app.doc!.commit('Editar texto'); }
+      return;
+    }
     const p = this.editing.layer.props;
     p.font = app.opt('font', this.id); p.size = app.opt('size', this.id);
     p.bold = app.opt('bold', this.id); p.italic = app.opt('italic', this.id); p.align = app.opt('align', this.id);
@@ -101,6 +127,7 @@ export class TextTool implements Tool {
   }
 
   private startEditing(layer: TextLayer, isNew: boolean) {
+    this.loaded = layer.id;
     const area = document.createElement('textarea');
     area.className = 'text-editor';
     area.value = layer.props.text;

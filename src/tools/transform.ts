@@ -33,6 +33,8 @@ interface Session {
   items: Item[];
   rect: Rect;                        // caja que engloba todos los elementos
   selMask: HTMLCanvasElement | null; // selección original recortada a rect
+  /** Transformar selección (sin píxeles) y la selección de partida para cancelar. */
+  selOnly?: boolean; selOrig?: HTMLCanvasElement;
   st: TState;
 }
 
@@ -41,6 +43,14 @@ const rot = (x: number, y: number, a: number) => ({ x: x * Math.cos(a) - y * Mat
 /** Prepara el contenido a transformar: la capa activa, varias capas o grupos enteros. */
 function prepare(): Session | null {
   const doc = app.doc!;
+  if (TransformTool.selectionOnly) {
+    // Transformar selección: solo se mueve el contorno, no los píxeles
+    TransformTool.selectionOnly = false;
+    const sel = doc.selection.mask, b = sel ? contentBounds(sel) : null;
+    if (!sel || !b) { app.toast('Haz primero una selección', 'warn'); return null; }
+    const selMask = makeCanvas(b.w, b.h); ctx2d(selMask).drawImage(sel, -b.x, -b.y);
+    return { items: [], rect: b, selMask, selOnly: true, selOrig: cloneCanvas(sel), st: { cx: b.x + b.w / 2, cy: b.y + b.h / 2, sx: 1, sy: 1, angle: 0 } };
+  }
   if (!doc.active) { app.toast('No hay ninguna capa seleccionada', 'warn'); return null; }
   let chosen = selectedLayers();
   if (!chosen.includes(doc.active)) chosen = [doc.active];
@@ -224,6 +234,8 @@ export class TransformTool implements Tool {
   private warpStyle = 'none'; private bend = 50; private warpBox: Rect | null = null;
   /** Modo con el que debe empezar la próxima sesión (desde el menú). */
   static startMode: 'free' | 'distort' | 'perspective' | 'warp' | 'skew' = 'free';
+  /** La próxima sesión transforma solo la selección. */
+  static selectionOnly = false;
   private fields: Record<string, HTMLInputElement> = {};
 
   activate() {
@@ -284,6 +296,11 @@ export class TransformTool implements Tool {
   private preview() {
     const s = this.s; if (!s) return;
     const doc = app.doc!;
+    if (s.selOnly && s.selMask) {
+      // la selección transformada se ve en vivo
+      const m = makeCanvas(doc.width, doc.height); drawItem(ctx2d(m), s.selMask, s.rect, s, undefined, false);
+      doc.selection.setMask(m);
+    }
     for (const it of s.items) doc.overrides.set(it.layer, { canvas: it.hole, extra: ctx => drawItem(ctx, it.src, it.rect, s, it.m0) });
     doc.invalidate();
     this.syncFields();
@@ -478,11 +495,12 @@ export class TransformTool implements Tool {
     if (!s.quad && st.sx === 1 && st.sy === 1 && st.angle === 0 && st.cx === s.rect.x + s.rect.w / 2 && st.cy === s.rect.y + s.rect.h / 2) {
       clearOverrides(s); app.doc!.invalidate(); return;
     }
-    applySession(s, s.mesh ? 'Deformar' : 'Transformación libre');
+    applySession(s, s.selOnly ? 'Transformar selección' : s.mesh ? 'Deformar' : 'Transformación libre');
   }
   cancel() {
     const s = this.s; if (!s) return;
     this.s = null;
+    if (s.selOnly && s.selOrig) app.doc!.selection.setMask(s.selOrig);
     clearOverrides(s); app.doc!.invalidate(); app.viewport.requestRender();
   }
   key_(e: KeyboardEvent) {

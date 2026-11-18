@@ -1,7 +1,7 @@
 // Documento: tamaño, árbol de capas, selección, guías, historial y vista.
 
 import { makeCanvas, ctx2d, Rect } from './canvas';
-import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric } from './layers';
+import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric , blendIfActive } from './layers';
 import { Selection } from './selection';
 import { History } from './history';
 import { renderComposite, compositeGroup, LayerOverride } from './compositor';
@@ -32,6 +32,10 @@ export class EditorDocument {
   channels: { id: number; name: string; canvas: HTMLCanvasElement }[] = [];
   /** Trazados guardados (panel Trazados): cada uno puede tener varios subtrazados. */
   paths: DocPath[] = [];
+  /** Resolución para imprimir (píxeles por pulgada). */
+  ppi = 72;
+  /** Modo de color: en «gris» se trabaja en escala de grises. */
+  mode: 'rgb' | 'gray' = 'rgb';
   /** Trazado activo en el panel (-1 = ninguno). */
   activePath = -1;
   /** Máscara rápida: el pincel edita la selección, que se ve como una capa roja. */
@@ -143,11 +147,11 @@ export class EditorDocument {
     if (l.parent !== this.root || l.kind === 'group' || l.clip) return null;
     const ch = this.root.children, i = ch.indexOf(l);
     if (i < 0 || ch[i + 1]?.clip) return null;
-    const special = (x: Layer): boolean => x.kind === 'adjust' || (x.blendMode !== 'source-over' && x.blendMode !== 'pass-through') || (x instanceof GroupLayer && x.children.some(special));
+    const special = (x: Layer): boolean => blendIfActive(x.styles) || x.kind === 'adjust' || (x.blendMode !== 'source-over' && x.blendMode !== 'pass-through') || (x instanceof GroupLayer && x.children.some(special));
     for (let k = i + 1; k < ch.length; k++) {
       const a = ch[k];
       if (!a.visible) continue;
-      if (a.kind === 'adjust' || (a.blendMode !== 'source-over' && a.blendMode !== 'pass-through')) return null;
+      if (blendIfActive(a.styles) || a.kind === 'adjust' || (a.blendMode !== 'source-over' && a.blendMode !== 'pass-through')) return null;
       if (a instanceof GroupLayer && a.blendMode === 'pass-through' && a.children.some(special)) return null;
     }
     return l;

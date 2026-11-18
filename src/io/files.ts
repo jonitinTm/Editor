@@ -84,6 +84,7 @@ interface ProjFile {
   guides: { h: number[]; v: number[] }; activeId: number | null; layers: ProjLayer[]; frames?: { delay: number; visible: number[] }[];
   channels?: { name: string; image: string }[];
   paths?: any[];
+  ppi?: number;
 }
 
 async function canvasToDataURL(c: HTMLCanvasElement) {
@@ -109,7 +110,7 @@ export async function serializeProject(doc: EditorDocument): Promise<Blob> {
 }
 async function projectData(doc: EditorDocument): Promise<ProjFile> {
   return {
-    format: 'editor-proyecto', version: 1, name: doc.name, width: doc.width, height: doc.height,
+    format: 'editor-proyecto', version: 1, name: doc.name, width: doc.width, height: doc.height, ppi: doc.ppi,
     guides: doc.guides, activeId: doc.active?.id ?? null, frames: doc.frames,
     channels: await Promise.all(doc.channels.map(async c => ({ name: c.name, image: await canvasToDataURL(c.canvas) }))),
     paths: doc.paths,
@@ -156,6 +157,7 @@ async function docFromData(data: ProjFile): Promise<EditorDocument> {
   doc.guides = data.guides ?? { h: [], v: [] };
   doc.frames = data.frames ?? [];
   doc.paths = Array.isArray(data.paths) ? data.paths : [];
+  if ((data as any).ppi > 0) doc.ppi = (data as any).ppi;
   for (const [i, c] of (data.channels ?? []).entries()) { const cv = makeCanvas(data.width, data.height); ctx2d(cv).drawImage(await loadImage(c.image), 0, 0); doc.channels.push({ id: i + 1, name: c.name, canvas: cv }); }
   doc.setActive(doc.findLayer(data.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);
   return doc;

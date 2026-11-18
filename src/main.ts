@@ -33,8 +33,10 @@ import { ShapeTool } from './tools/shape';
 import { TransformTool } from './tools/transform';
 import { PenTool, NodeTool } from './tools/pen';
 import { MagneticLassoTool } from './tools/maglasso';
-import { MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool } from './tools/extra';
+import { HistoryBrushTool } from './tools/brush';
+import { ColorReplaceTool, MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool } from './tools/extra';
 import { buildBrushesPanel } from './ui/brushes';
+import { TextLayer } from './core/layers';
 
 // ---- Herramientas ----------------------------------------------------------------
 for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSelectTool, WandTool, CropTool, EyedropperTool, CloneTool,
@@ -43,10 +45,11 @@ for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSe
 }
 app.registerTool(new PolyLassoTool());
 app.registerTool(new MagneticLassoTool());
-for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool]) app.registerTool(new T());
 app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
+// Las herramientas añadidas después van al final: la tecla de cada grupo sigue eligiendo la de siempre
+for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool]) app.registerTool(new T());
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;
@@ -317,4 +320,15 @@ import('./io/autosave').then(async ({ autosave, listSaved, restoreSaved, removeS
     row.append(open, del); box.append(row);
   }
   welcome.querySelector('.welcome-card')!.append(box);
+});
+
+// Al llegar una fuente descargada, se redibujan los textos que la usan
+window.addEventListener('editor-font', (e: Event) => {
+  const fam = (e as CustomEvent).detail;
+  for (const d of app.docs) {
+    let any = false;
+    for (const l of d.allLayers()) if (l instanceof TextLayer && l.props.font === fam && !l.props.keepPixels) { l.render(); any = true; }
+    if (any) d.invalidate();
+  }
+  app.viewport.requestRender();
 });

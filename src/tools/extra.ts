@@ -9,6 +9,7 @@ import { getPaintTarget, setPreview, setTargetCanvas, PaintTarget } from './pain
 import { drawBrushCursor } from './brush';
 import { floodMask } from './floodfill';
 import { h } from '../ui/dom';
+import { rgb2hsl, hsl2rgb } from '../filters/adjustments';
 
 /** Borrador mágico: un clic borra la zona de color parecido (como la varita, pero borrando). */
 export class MagicEraserTool implements Tool {
@@ -40,11 +41,13 @@ export class BackgroundEraserTool implements Tool {
     { key: 'sampling', label: 'Muestreo', type: 'select', default: 'continuous', choices: [{ value: 'continuous', label: 'Continuo' }, { value: 'once', label: 'Una vez' }] },
     { key: 'protect', label: 'Proteger color frontal', type: 'checkbox', default: false },
   ] as any[];
+  /** Qué se hace con cada píxel parecido: aquí, borrarlo. */
+  protected apply(d: Uint8ClampedArray, i: number, f: number) { d[i + 3] = d[i + 3] * (1 - f); }
   private t: PaintTarget | null = null; private work: HTMLCanvasElement | null = null; private last: { x: number; y: number } | null = null;
   private sample: number[] | null = null; private changed = false;
   down(e: ToolEvent) {
     const t = getPaintTarget(); if (!t || t.isMask) return;
-    if (t.lockAlpha) { app.toast('La transparencia de la capa está bloqueada', 'warn'); return; }
+    if (t.lockAlpha && this.id === 'bgEraser') { app.toast('La transparencia de la capa está bloqueada', 'warn'); return; }
     this.t = t; this.work = cloneCanvas(t.canvas); this.changed = false; this.sample = null;
     setPreview(t, this.work); this.last = { x: e.x, y: e.y }; this.dab(e.x, e.y);
   }
@@ -72,7 +75,7 @@ export class BackgroundEraserTool implements Tool {
       if (fg >= 0 && Math.max(Math.abs(d[i] - fr), Math.abs(d[i + 1] - fgc), Math.abs(d[i + 2] - fb)) < 20) continue;
       // borde suave del pincel y de la tolerancia
       const f = Math.min(1, (1 - dist) * 3) * Math.min(1, (tol - cd) / Math.max(1, tol * 0.25)) * (sel ? sel[i + 3] / 255 : 1);
-      d[i + 3] = d[i + 3] * (1 - f);
+      this.apply(d, i, f);
     }
     ctx.putImageData(img, x0, y0); this.changed = true;
     app.doc!.invalidate({ x: x0, y: y0, w, h: hh });
@@ -170,5 +173,24 @@ export class RulerTool implements Tool {
     ctx.lineWidth = 1; ctx.strokeStyle = '#fff'; ctx.stroke();
     for (const s of [p, q]) { ctx.beginPath(); ctx.moveTo(s.x - 5, s.y); ctx.lineTo(s.x + 5, s.y); ctx.moveTo(s.x, s.y - 5); ctx.lineTo(s.x, s.y + 5); ctx.stroke(); }
     ctx.restore();
+  }
+}
+
+/** Sustitución de color: cambia el tono y la saturación de los colores parecidos al muestreado, conservando la luz. */
+export class ColorReplaceTool extends BackgroundEraserTool {
+  id = 'colorReplace'; name = 'Sustitución de color'; icon = icon('colorReplace'); key = 'B'; group = 'brush'; cursor = 'none';
+  options = [
+    { key: 'size', label: 'Tamaño', type: 'range', min: 1, max: 500, default: 40, unit: 'px' },
+    { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 1, max: 100, default: 30, unit: '%' },
+    { key: 'sampling', label: 'Muestreo', type: 'select', default: 'continuous', choices: [{ value: 'continuous', label: 'Continuo' }, { value: 'once', label: 'Una vez' }] },
+    { key: 'mode', label: 'Modo', type: 'select', default: 'color', choices: [{ value: 'color', label: 'Color' }, { value: 'hue', label: 'Tono' }, { value: 'saturation', label: 'Saturación' }, { value: 'luminosity', label: 'Luminosidad' }] },
+  ] as any[];
+  protected apply(d: Uint8ClampedArray, i: number, f: number) {
+    const fg = parseInt(app.fg.slice(1), 16), [fh, fs, fl] = rgb2hsl(fg >> 16 & 255, fg >> 8 & 255, fg & 255);
+    let [h0, s0, l0] = rgb2hsl(d[i], d[i + 1], d[i + 2]);
+    const m = app.opt('mode', this.id);
+    if (m === 'color') { h0 = fh; s0 = fs; } else if (m === 'hue') h0 = fh; else if (m === 'saturation') s0 = fs; else l0 = fl;
+    const [r, g, b] = hsl2rgb(h0, s0, l0);
+    d[i] += (r - d[i]) * f; d[i + 1] += (g - d[i + 1]) * f; d[i + 2] += (b - d[i + 2]) * f;
   }
 }

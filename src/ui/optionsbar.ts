@@ -3,7 +3,7 @@
 import { app } from './app';
 import { h, numberSlider } from './dom';
 import { icon } from './icons';
-import { FONTS } from '../tools/text';
+import { fontPicker } from './fontpicker';
 
 export function buildOptionsBar(parent: HTMLElement) {
   const bar = h('div', { class: 'optionsbar' });
@@ -24,10 +24,16 @@ export function buildOptionsBar(parent: HTMLElement) {
         s.el.classList.add('opt');
         setters.push(() => { const inp = s.el.querySelector('input.num') as HTMLInputElement; if (document.activeElement !== inp) inp.value = String(get()); (s.el.querySelector('input[type=range]') as HTMLInputElement).value = String(get()); });
         bar.append(s.el);
-      } else if (d.type === 'select' || d.type === 'font') {
-        const choices = d.type === 'font' ? FONTS.map(f => ({ value: f, label: f })) : d.choices;
+      } else if (d.type === 'font') {
+        let fp = fontPicker(get(), v => set(v));
+        const wrap = h('label', { class: 'opt' }, fp);
+        // si cambia desde fuera (p. ej. al seleccionar otra capa de texto), se rehace el botón
+        setters.push(() => { const nfp = fontPicker(get(), v => set(v)); wrap.replaceChild(nfp, fp); fp = nfp; });
+        bar.append(wrap);
+      } else if (d.type === 'select') {
+        const choices = d.choices;
         const sel = h('select', {}, ...choices.map(c => h('option', { value: c.value }, c.label)));
-        if (d.type === 'font') [...sel.options].forEach(o => o.style.fontFamily = o.value);
+
         sel.value = get();
         sel.addEventListener('change', () => set(sel.value));
         setters.push(() => { sel.value = get(); });

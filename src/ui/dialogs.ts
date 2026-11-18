@@ -7,8 +7,11 @@ import * as ops from './ops';
 import * as io from '../io/files';
 import { FilterDef, defaultParams } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
-import { SmartLayer, TextLayer, type LayerStyles } from '../core/layers';
+import { SmartLayer, TextLayer, blendIfActive, type LayerStyles } from '../core/layers';
 import { WARP_STYLES } from '../tools/warpmesh';
+import { gradientEditor, type GradStop } from './gradienteditor';
+import { layerCanvasIn } from '../core/history';
+import { cloneCanvas, ctx2d } from '../core/canvas';
 import { allPatterns } from '../core/patterns';
 import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
@@ -27,10 +30,10 @@ const PRESETS: [string, number, number][] = [
 
 export function newDocumentDialog() {
   const name = h('input', { type: 'text', value: 'Sin título', class: 'wide' });
-  const w = numInput(1280), hh = numInput(720);
+  const w = numInput(1280), hh = numInput(720), res = numInput(72, 1, 10000);
   const preset = h('select', {}, ...PRESETS.map(([n], i) => h('option', { value: String(i) }, n)));
   preset.value = '1';
-  preset.addEventListener('change', () => { const p = PRESETS[+preset.value]; if (p[1]) { w.value = String(p[1]); hh.value = String(p[2]); } });
+  preset.addEventListener('change', () => { const p = PRESETS[+preset.value]; if (p[1]) { w.value = String(p[1]); hh.value = String(p[2]); res.value = /ppp/.test(p[0]) ? '300' : '72'; } });
   [w, hh].forEach(i => i.addEventListener('input', () => preset.value = '0'));
   const bg = h('select', {},
     h('option', { value: '#ffffff' }, 'Blanco'), h('option', { value: '#000000' }, 'Negro'),
@@ -38,13 +41,14 @@ export function newDocumentDialog() {
     h('option', { value: '' }, 'Transparente'));
   showDialog({
     title: 'Nuevo documento', okLabel: 'Crear',
-    body: [row('Nombre', name), row('Predefinido', preset), row('Anchura', w, 'px'), row('Altura', hh, 'px'), row('Fondo', bg)],
+    body: [row('Nombre', name), row('Predefinido', preset), row('Anchura', w, 'px'), row('Altura', hh, 'px'), row('Resolución', res, 'ppp'), row('Fondo', bg)],
     onOk: () => {
       const W = Math.round(+w.value), H = Math.round(+hh.value);
       if (!(W >= 1 && H >= 1 && W <= 30000 && H <= 30000)) { app.toast('Tamaño no válido (1 – 30000 px)', 'warn'); return false; }
       if (W * H > 268e6) { app.toast('La imagen es demasiado grande para el navegador', 'warn'); return false; }
       const b = bg.value === 'fg' ? app.fg : bg.value === 'bgc' ? app.bg : bg.value || null;
       ops.newDocument(name.value.trim() || 'Sin título', W, H, b);
+      if (app.doc && +res.value > 0) app.doc.ppi = +res.value;
     },
   });
 }
@@ -128,20 +132,46 @@ export function exportDialog() {
 
 export function imageSizeDialog() {
   const d = app.doc; if (!d) return;
-  const w = numInput(d.width), hh = numInput(d.height);
-  const link = h('input', { type: 'checkbox', checked: true });
+  // Estado en píxeles; anchura y altura se muestran en la unidad elegida
+  let W = d.width, H = d.height, ppi = d.ppi;
   const ratio = d.width / d.height;
-  w.addEventListener('input', () => { if (link.checked) hh.value = String(Math.max(1, Math.round(+w.value / ratio))); });
-  hh.addEventListener('input', () => { if (link.checked) w.value = String(Math.max(1, Math.round(+hh.value * ratio))); });
+  const unit = h('select', {}, h('option', { value: 'px' }, 'Píxeles'), h('option', { value: 'cm' }, 'Centímetros'), h('option', { value: 'mm' }, 'Milímetros'), h('option', { value: 'in' }, 'Pulgadas'), h('option', { value: '%' }, 'Porcentaje'));
+  const w = h('input', { type: 'number', class: 'num', step: 'any' }), hh = h('input', { type: 'number', class: 'num', step: 'any' });
+  const res = h('input', { type: 'number', class: 'num', step: 'any', value: String(ppi) });
+  const link = h('input', { type: 'checkbox', checked: true }), resample = h('input', { type: 'checkbox', checked: true });
+  const info = h('div', { class: 'hint' });
+  const toUnit = (px: number, base: number) => { const u = unit.value; return u === 'px' ? px : u === '%' ? px / base * 100 : u === 'in' ? px / ppi : u === 'cm' ? px / ppi * 2.54 : px / ppi * 25.4; };
+  const fromUnit = (v: number, base: number) => { const u = unit.value; return u === 'px' ? v : u === '%' ? v / 100 * base : u === 'in' ? v * ppi : u === 'cm' ? v / 2.54 * ppi : v / 25.4 * ppi; };
+  const fmt = (v: number) => String(unit.value === 'px' ? Math.round(v) : +v.toFixed(2));
+  const show = () => {
+    w.value = fmt(toUnit(W, d.width)); hh.value = fmt(toUnit(H, d.height));
+    const mb = W * H * 4 / 1048576;
+    info.textContent = `${Math.round(W)} × ${Math.round(H)} px · ${(W / ppi * 2.54).toFixed(1)} × ${(H / ppi * 2.54).toFixed(1)} cm a ${+ppi.toFixed(2)} ppp · ${mb.toFixed(1)} MB` + (resample.checked ? '' : ' · sin remuestrear (solo cambia el tamaño de impresión)');
+  };
+  unit.addEventListener('change', show);
+  w.addEventListener('input', () => { const v = parseFloat(w.value); if (!(v > 0)) return; if (resample.checked) { W = fromUnit(v, d.width); if (link.checked) H = W / ratio; } else { /* sin remuestrear: cambia la resolución */ const inch = unit.value === 'in' ? v : unit.value === 'cm' ? v / 2.54 : unit.value === 'mm' ? v / 25.4 : 0; if (inch > 0) { ppi = W / inch; res.value = String(+ppi.toFixed(2)); } } hh.value = fmt(toUnit(H, d.height)); show2(); });
+  hh.addEventListener('input', () => { const v = parseFloat(hh.value); if (!(v > 0)) return; if (resample.checked) { H = fromUnit(v, d.height); if (link.checked) W = H * ratio; } else { const inch = unit.value === 'in' ? v : unit.value === 'cm' ? v / 2.54 : unit.value === 'mm' ? v / 25.4 : 0; if (inch > 0) { ppi = H / inch; res.value = String(+ppi.toFixed(2)); } } w.value = fmt(toUnit(W, d.width)); show2(); });
+  res.addEventListener('input', () => {
+    const v = parseFloat(res.value); if (!(v > 0)) return;
+    // con remuestreo, el tamaño de impresión se mantiene y cambian los píxeles
+    if (resample.checked) { const k = v / ppi; W *= k; H *= k; }
+    ppi = v; show();
+  });
+  resample.addEventListener('change', show);
+  const show2 = () => { const mb = W * H * 4 / 1048576; info.textContent = `${Math.round(W)} × ${Math.round(H)} px · ${(W / ppi * 2.54).toFixed(1)} × ${(H / ppi * 2.54).toFixed(1)} cm a ${+ppi.toFixed(2)} ppp · ${mb.toFixed(1)} MB`; };
+  show();
   showDialog({
     title: 'Tamaño de imagen',
-    body: [row('Anchura', w, 'px'), row('Altura', hh, 'px'), row('', h('label', { class: 'check' }, link, ' Mantener proporciones')),
-      h('div', { class: 'hint' }, `Tamaño actual: ${d.width} × ${d.height} px`)],
+    body: [row('Anchura', w), row('Altura', hh), row('Unidades', unit), row('Resolución', res, 'ppp'),
+      row('', h('label', { class: 'check' }, link, ' Mantener proporciones')), row('', h('label', { class: 'check' }, resample, ' Remuestrear (cambiar el número de píxeles)')),
+      info, h('div', { class: 'hint' }, `Tamaño actual: ${d.width} × ${d.height} px a ${d.ppi} ppp`)],
     onOk: () => {
-      const W = Math.round(+w.value), H = Math.round(+hh.value);
-      if (!(W >= 1 && H >= 1 && W <= 30000 && H <= 30000)) return false;
-      if (W === d.width && H === d.height) return;
-      d.resample(W, H); d.commit('Tamaño de imagen'); record({ kind: 'imageSize', w: W, h: H, label: `Tamaño de imagen: ${W} × ${H}` }); app.viewport.fit(true);
+      const Wn = Math.round(W), Hn = Math.round(H);
+      if (!(Wn >= 1 && Hn >= 1 && Wn <= 30000 && Hn <= 30000)) { app.toast('Tamaño no válido', 'warn'); return false; }
+      const ppiChanged = Math.abs(ppi - d.ppi) > 1e-6;
+      if (!resample.checked || (Wn === d.width && Hn === d.height)) { if (ppiChanged) { d.ppi = +ppi.toFixed(3); d.commit('Resolución'); } return; }
+      d.ppi = +ppi.toFixed(3);
+      d.resample(Wn, Hn); d.commit('Tamaño de imagen'); record({ kind: 'imageSize', w: Wn, h: Hn, label: `Tamaño de imagen: ${Wn} × ${Hn}` }); app.viewport.fit(true);
     },
   });
 }
@@ -310,6 +340,8 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
       return row(p.label, c);
     }
     if (p.type === 'pattern') return row(p.label, patternSelect(params[p.key], v => { params[p.key] = v; update(); }));
+    if (p.type === 'lut') return row(p.label, lutPicker(params, update));
+    if (p.type === 'gradient') return row(p.label, gradientButton(params[p.key], s => { params[p.key] = s; update(); }));
     if (p.type === 'select') {
       const sel = h('select', {}, ...p.choices.map(([v, n]: [string, string]) => h('option', { value: v, selected: params[p.key] === v }, n)));
       sel.addEventListener('change', () => { params[p.key] = sel.value; syncShow(); update(); });
@@ -487,7 +519,8 @@ export function layerStyleDialog() {
   const gradSection = () => {
     const g = st.gradientOverlay, els = section('Superposición de degradado', g, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°']]);
     const pick = (i: number) => { const c = h('input', { type: 'color', class: 'color-input', value: g.stops[i][1] }); c.oninput = () => { g.stops[i][1] = c.value; g.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; update(); }; return c; };
-    els.push(row('Colores', pick(0), '→', pick(g.stops.length - 1)));
+    void pick;
+    els.push(row('Degradado', gradientButton(g.stops.map(([t, c]) => ({ t, color: c, a: 1 })), st2 => { g.stops = st2.map(x => [x.t, x.color] as [number, string]); if (!g.enabled) { g.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; } update(); })));
     return els;
   };
   const bevelSection = () => {
@@ -507,10 +540,22 @@ export function layerStyleDialog() {
     els.splice(1, 0, row('Motivo', patternSelect(po.pattern, v => { po.pattern = v; if (!po.enabled) { po.enabled = true; (els[0].querySelector('input') as HTMLInputElement).checked = true; } update(); })));
     return els;
   };
+  // Fusionar si: como en las opciones de fusión de Photoshop (con transición suave)
+  const bi = l.styles?.blendIf ?? { this: [0, 0, 255, 255] as [number, number, number, number], under: [0, 0, 255, 255] as [number, number, number, number] };
+  const biState = { tb: bi.this[1], tw: bi.this[2], tsoft: bi.this[1] - bi.this[0], ub: bi.under[1], uw: bi.under[2], usoft: bi.under[1] - bi.under[0] };
+  const syncBI = () => {
+    const r = (b: number, w: number, s: number): [number, number, number, number] => [Math.max(0, b - s), b, w, Math.min(255, w + s)];
+    (st as any).blendIf = { this: r(biState.tb, biState.tw, biState.tsoft), under: r(biState.ub, biState.uw, biState.usoft) };
+    update();
+  };
+  const biSlider = (label: string, key: keyof typeof biState, max = 255) => row(label, numberSlider({ min: 0, max, value: biState[key], onInput: v => { biState[key] = Math.round(v); syncBI(); } }).el);
+  const blendIfEls = [h('div', { class: 'style-head' }, h('b', {}, 'Fusionar si (luminosidad)')),
+    h('div', { class: 'hint' }, 'Oculta las zonas de esta capa más oscuras o más claras que los límites, o deja ver la de debajo donde sea muy oscura o muy clara.'),
+    biSlider('Esta capa: negros', 'tb'), biSlider('Esta capa: blancos', 'tw'), biSlider('Transición', 'tsoft', 128),
+    biSlider('Debajo: negros', 'ub'), biSlider('Debajo: blancos', 'uw'), biSlider('Transición', 'usoft', 128)];
   showDialog({
     title: `Estilo de capa: ${l.name}`, width: 400, side: true,
     body: [
-      ...bevelSection(),
       ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['blur', 'Tamaño', 0, 200, 'px']]),
       ...section('Trazo (exterior)', st.stroke, [['size', 'Grosor', 1, 60, 'px']]),
       ...section('Resplandor exterior', st.glow, [['opacity', 'Opacidad', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
@@ -519,8 +564,10 @@ export function layerStyleDialog() {
       ...section('Superposición de color', st.colorOverlay, [['opacity', 'Opacidad', 0, 100, '%']]),
       ...gradSection(),
       ...patSection(),
+      ...bevelSection(),
+      ...blendIfEls,
     ],
-    onOk: () => { const any = Object.values(st).some((x: any) => x.enabled); l.styles = before; ops.setLayerStyles(l, any || before ? JSON.parse(JSON.stringify(st)) : null, true); },
+    onOk: () => { const any = Object.values(st).some((x: any) => x.enabled) || blendIfActive(st as any); l.styles = before; ops.setLayerStyles(l, any || before ? JSON.parse(JSON.stringify(st)) : null, true); },
     onCancel: () => ops.setLayerStyles(l, before, false),
   });
 }
@@ -650,4 +697,74 @@ export function rotateArbitraryDialog() {
     body: [row('Ángulo', ang, '°'), row('Sentido', dir), row('', h('label', { class: 'check' }, fill, ' Rellenar las esquinas de la capa inferior con el color de fondo'))],
     onOk: () => { const v = parseFloat(ang.value); if (!isFinite(v) || !v) return; ops.rotateImageArbitrary(v * +dir.value, fill.checked); },
   });
+}
+
+// ---- Edición › Transición (atenuar el último filtro o trazo) ------------------------------
+
+export function fadeDialog() {
+  const d = app.doc, l = d?.active; if (!d || !l) return;
+  const H = d.history, prev = H.steps[H.index - 1], last = H.steps[H.index];
+  const before = prev ? layerCanvasIn(prev.snap, l.id) : null;
+  if (!before || !(l as any).canvas || before === (l as any).canvas || l.kind !== 'raster') { app.toast('No hay nada que atenuar en esta capa', 'warn'); return; }
+  const after = cloneCanvas((l as any).canvas);
+  let op = 100, mode = 'source-over';
+  const bd = ctx2d(before).getImageData(0, 0, before.width, before.height).data, ad = ctx2d(after).getImageData(0, 0, after.width, after.height).data;
+  const apply = () => {
+    const c = cloneCanvas(before), x = ctx2d(c), k = op / 100;
+    if (mode === 'source-over' && before.width === after.width && before.height === after.height) {
+      // Normal: mezcla directa entre el antes y el después (también la transparencia)
+      const img = x.createImageData(c.width, c.height), o = img.data;
+      for (let i = 0; i < o.length; i += 4) {
+        const a0 = bd[i + 3], a1 = ad[i + 3], a = a0 + (a1 - a0) * k;
+        if (a <= 0) continue;
+        for (let ch = 0; ch < 3; ch++) o[i + ch] = (bd[i + ch] * a0 * (1 - k) + ad[i + ch] * a1 * k) / a;
+        o[i + 3] = a;
+      }
+      x.putImageData(img, 0, 0);
+    } else { x.globalAlpha = k; x.globalCompositeOperation = mode as GlobalCompositeOperation; x.drawImage(after, 0, 0); }
+    (l as any).canvas = c; (l as any).touch(); d.invalidate(); app.viewport.requestRender();
+  };
+  const modes: [string, string][] = [['source-over', 'Normal'], ['multiply', 'Multiplicar'], ['screen', 'Trama'], ['overlay', 'Superponer'], ['soft-light', 'Luz suave'], ['hard-light', 'Luz fuerte'], ['darken', 'Oscurecer'], ['lighten', 'Aclarar'], ['difference', 'Diferencia'], ['color', 'Color'], ['luminosity', 'Luminosidad'], ['hue', 'Tono'], ['saturation', 'Saturación']];
+  const sel = h('select', {}, ...modes.map(([v, n]) => h('option', { value: v }, n)));
+  sel.addEventListener('change', () => { mode = sel.value; apply(); });
+  showDialog({
+    title: `Transición: ${last.name}`, side: true,
+    body: [row('Opacidad', numberSlider({ min: 0, max: 100, value: 100, unit: '%', onInput: v => { op = v; apply(); } }).el), row('Modo', sel)],
+    onOk: () => { apply(); d.commit(`Transición: ${last.name}`); },
+    onCancel: () => { (l as any).canvas = after; (l as any).touch(); d.invalidate(); app.viewport.requestRender(); },
+  });
+}
+
+/** Botón para cargar un LUT .cube en los parámetros de «Consulta de colores». */
+export function lutPicker(params: any, onChange: () => void): HTMLElement {
+  const name = h('span', { class: 'hint' }, params.lutName ?? 'Ningún archivo');
+  const b = h('button', { class: 'btn', type: 'button' }, 'Cargar .cube…');
+  b.onclick = async () => {
+    const [f] = await io.pickFiles('.cube', false); if (!f) return;
+    try {
+      const { parseCube, lutToB64 } = await import('../filters/lut');
+      const l = parseCube(await f.text());
+      params.lutData = lutToB64(l.data); params.lutSize = l.size; params.lutName = f.name; params.preset = 'file';
+      name.textContent = f.name;
+      // el desplegable de looks pasa a «Archivo .cube cargado»
+      const sel = b.closest('.modal, .panel-body, .props')?.querySelector('select') as HTMLSelectElement | null; if (sel) sel.value = 'file';
+      onChange();
+    } catch (e: any) { app.toast(e?.message ?? 'No se pudo leer el archivo', 'warn'); }
+  };
+  return h('div', { class: 'pat-select' }, b, name);
+}
+
+/** Barra con un degradado; al pulsarla se abre el editor de degradados. */
+export function gradientButton(stops: GradStop[], onChange: (s: GradStop[]) => void): HTMLElement {
+  const c = h('canvas', { width: 200, height: 18, class: 'grad-btn', title: 'Pulsa para editar el degradado' });
+  const paint = (s: GradStop[]) => {
+    const x = c.getContext('2d')!; x.clearRect(0, 0, 200, 18);
+    for (let i = 0; i < 200; i += 6) for (let j = 0; j < 18; j += 6) { x.fillStyle = ((i + j) / 6) % 2 ? '#cfcfcf' : '#fff'; x.fillRect(i, j, 6, 6); }
+    const g = x.createLinearGradient(0, 0, 200, 0);
+    for (const st of [...s].sort((a, b) => a.t - b.t)) { const n = parseInt(st.color.slice(1, 7), 16); g.addColorStop(Math.max(0, Math.min(1, st.t)), `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${st.a ?? 1})`); }
+    x.fillStyle = g; x.fillRect(0, 0, 200, 18);
+  };
+  paint(stops);
+  c.addEventListener('click', () => gradientEditor(stops, s => { stops = s; paint(s); onChange(s); }));
+  return c;
 }

@@ -23,7 +23,7 @@ import { applyOnTarget } from '../tools/misc';
 import { forget } from '../io/autosave';
 import { encodeGif } from '../io/gif';
 import { renderFrames } from './timeline';
-import { alertDialog, confirmDialog } from './dialog';
+import { alertDialog, confirmDialog, promptDialog } from './dialog';
 
 const doc = () => app.doc;
 
@@ -361,7 +361,7 @@ export function newFillLayer(id: 'solidfill' | 'gradfill' | 'patternfill') {
   const def = FILTERS_BY_ID.get(id)!;
   const p = defaultParams(def);
   if (id === 'solidfill') p.color = app.fg;
-  if (id === 'gradfill') { p.c1 = app.fg; p.c2 = app.bg; }
+  if (id === 'gradfill') p.grad = [{ t: 0, color: app.fg, a: 1 }, { t: 1, color: app.bg, a: 1 }];
   const l = new AdjustmentLayer(`${def.name} ${d.allLayers().filter(x => x instanceof AdjustmentLayer && x.filterId === id).length + 1}`, id, p);
   l.mask = new LayerMask(d.width, d.height, 'white');
   if (d.selection.mask) { l.mask.canvas = cloneCanvas(d.selection.mask); l.mask.touch(); d.selection.clear(); }
@@ -1244,7 +1244,7 @@ export async function exportVector(kind: 'pdf' | 'svg', base: string, quality: n
   if (kind === 'pdf') {
     const jpg = await io.exportImage(d, 'image/jpeg', quality, scale);
     const { makePdf } = await import('../io/pdf');
-    await io.saveBlob(await makePdf(new Uint8Array(await jpg.arrayBuffer()), w, hh), base + '.pdf');
+    await io.saveBlob(await makePdf(new Uint8Array(await jpg.arrayBuffer()), w, hh, d.ppi * scale), base + '.pdf');
   } else {
     const png = await io.exportImage(d, 'image/png', 1, scale);
     const url = await new Promise<string>(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result)); fr.readAsDataURL(png); });
@@ -1266,4 +1266,50 @@ export async function printImage() {
   await new Promise(r => { if (img.complete) r(null); else img.onload = () => r(null); });
   f.contentWindow!.focus(); f.contentWindow!.print();
   setTimeout(() => { f.remove(); URL.revokeObjectURL(url); }, 60000);
+}
+
+/** Imagen › Modo › Escala de grises: convierte todas las capas (los textos y formas cambian su color a gris). */
+export function setColorMode(mode: 'rgb' | 'gray') {
+  const d = doc(); if (!d || d.mode === mode) return;
+  if (mode === 'gray') {
+    const g = (hex: string | null | undefined) => { if (!hex || hex[0] !== '#') return hex; const n = parseInt(hex.slice(1, 7), 16), v = Math.round((n >> 16 & 255) * 0.3 + (n >> 8 & 255) * 0.59 + (n & 255) * 0.11).toString(16).padStart(2, '0'); return '#' + v + v + v; };
+    for (const l of d.allLayers()) {
+      if (l instanceof TextLayer) { l.props.color = g(l.props.color)!; l.render(); }
+      else if (l instanceof ShapeLayer) { l.props.fill = g(l.props.fill) ?? null; l.props.stroke = g(l.props.stroke) ?? null; l.render(); }
+      else if (l instanceof SmartLayer) rasterizeLayer(l);
+      if (isRaster(d.findLayer(l.id) ?? l) && !(l instanceof TextLayer) && !(l instanceof ShapeLayer)) {
+        const r = (d.findLayer(l.id) ?? l) as RasterLayer, f = r.fullContent(), c = ctx2d(f.canvas), img = c.getImageData(0, 0, f.canvas.width, f.canvas.height), p = img.data;
+        for (let i = 0; i < p.length; i += 4) { const v = p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11; p[i] = p[i + 1] = p[i + 2] = v; }
+        c.putImageData(img, 0, 0); if (f.canvas !== r.canvas) r.placeFull(f.canvas, f.x, f.y); r.touch();
+      }
+    }
+    app.setColors(g(app.fg)!, g(app.bg)!);
+  }
+  d.mode = mode; d.invalidate();
+  d.commit(mode === 'gray' ? 'Escala de grises' : 'Color RGB');
+}
+
+/** Edición › Definir pincel: lo seleccionado (o la capa) se convierte en una punta de pincel. Lo oscuro pinta. */
+export async function defineBrush() {
+  const d = doc(); if (!d) return;
+  const src = d.getComposite();
+  let b = d.selection.bounds ?? (d.active && isRaster(d.active) ? contentBounds(d.active.canvas) : null) ?? { x: 0, y: 0, w: d.width, h: d.height };
+  b = { x: Math.max(0, Math.floor(b.x)), y: Math.max(0, Math.floor(b.y)), w: Math.min(d.width, Math.ceil(b.w)), h: Math.min(d.height, Math.ceil(b.h)) };
+  if (b.w < 2 || b.h < 2) { app.toast('La zona es demasiado pequeña', 'warn'); return; }
+  const k = Math.min(1, 512 / Math.max(b.w, b.h)), w = Math.max(1, Math.round(b.w * k)), hh = Math.max(1, Math.round(b.h * k));
+  const c = makeCanvas(w, hh), x = ctx2d(c); x.imageSmoothingQuality = 'high';
+  // fondo blanco para que lo transparente cuente como «no pinta»
+  x.fillStyle = '#fff'; x.fillRect(0, 0, w, hh); x.drawImage(src, b.x, b.y, b.w, b.h, 0, 0, w, hh);
+  if (d.selection.mask) { const m = makeCanvas(w, hh), mx = ctx2d(m); mx.drawImage(d.selection.mask, b.x, b.y, b.w, b.h, 0, 0, w, hh); x.globalCompositeOperation = 'destination-in'; x.drawImage(m, 0, 0); }
+  const img = x.getImageData(0, 0, w, hh), p = img.data;
+  for (let i = 0; i < p.length; i += 4) { const lum = p[i] * 0.3 + p[i + 1] * 0.59 + p[i + 2] * 0.11; p[i + 3] = (255 - lum) * p[i + 3] / 255; p[i] = p[i + 1] = p[i + 2] = 255; }
+  x.globalCompositeOperation = 'copy'; x.putImageData(img, 0, 0);
+  const name = await promptDialog('Definir pincel', 'Nombre de la punta', `Punta ${new Date().toLocaleDateString()}`);
+  if (name === null) return;
+  const { addUserTip, loadUserTips } = await import('../core/brushtips');
+  await loadUserTips();
+  const t = addUserTip(name || 'Mi punta', c);
+  app.setOpt('brush', 'tip', t.id); app.setOpt('brush', 'size', Math.min(300, Math.max(w, hh)));
+  app.setTool('brush');
+  app.toast('Punta de pincel creada: ya puedes pintar con ella');
 }

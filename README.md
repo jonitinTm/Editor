@@ -153,6 +153,26 @@ Ya disponible:
   correctores, `J`) y esponja (con sobreexponer/subexponer, `O`). El lazo magnético ya aparece en la barra.
 - **Exportar a PDF y SVG**, e **Imprimir** (`Ctrl+P`).
 - **Más fluido en imágenes grandes**: la vista usa una copia reducida que solo se actualiza donde cambia.
+- **Fuentes**: más de 100 fuentes de Google Fonts (Montserrat, Poppins, Bebas Neue, Playfair…) con buscador,
+  categorías y vista previa; se descargan solas al usarlas (solo la fuente: tus imágenes no salen del equipo).
+  En Chrome y Edge también se pueden usar las fuentes instaladas en el equipo (categoría «Equipo»).
+  Con la herramienta Texto y una capa de texto seleccionada, los cambios de la barra se aplican a toda la capa.
+- **Puntas de pincel con imagen**: tiza, esponja, salpicadura, pincel seco, hierba, estrella, hoja y nube (botón de la
+  punta en la barra del pincel), con «ángulo aleatorio»; y las tuyas con *Edición › Definir pincel* (a partir de una
+  selección: lo oscuro pinta).
+- **Consulta de colores** (ajuste o capa de ajuste): looks de cine (cian y naranja, película, vintage…) y archivos
+  LUT `.cube`.
+- **Transición** (`Mayús+Ctrl+F`): atenúa el último filtro, ajuste o trazo, con modo de fusión.
+- **Pincel de historia** (`Y`): pinta con cómo estaba la imagen al abrirla (o en la última instantánea).
+- **Sustitución de color** (con el pincel, `B`), **Fusionar si** (en *Estilo de capa*; se guarda en PSD),
+  **Selección › Transformar selección**, **Imagen › Modo › Escala de grises**.
+- **Resolución**: *Tamaño de imagen* trabaja en píxeles, cm, mm, pulgadas o %, con resolución (ppp) y la opción de
+  remuestrear o no; *Nuevo documento* también tiene resolución. Se guarda y se lee en PSD, y el PDF sale a su tamaño real.
+- **Degradados de varios colores** (con transparencia) en el *Mapa de degradado*, la capa de relleno de degradado y la
+  superposición de degradado: se editan con el editor de degradados y se guardan en PSD.
+- **Biblioteca de formas**: bocadillos, flechas, rayo, nube, gota, luna, ubicación, escudo, etiqueta, cinta, casa,
+  visto bueno, cruz… (herramienta Forma, `U`). Siguen siendo vectoriales y editables.
+- **Menú Ventana** con todos los paneles (Capas, Canales, Trazados, Historial, Pinceles, Info…).
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

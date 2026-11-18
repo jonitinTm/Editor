@@ -19,7 +19,7 @@ export interface DocSnap {
   selection: HTMLCanvasElement | null;
   quickMask?: boolean;
   channels?: { id: number; name: string; canvas: HTMLCanvasElement }[];
-  paths?: string; activePath?: number;
+  paths?: string; activePath?: number; ppi?: number; mode?: 'rgb' | 'gray';
 }
 export interface HistoryStep { name: string; icon?: string; snap: DocSnap; }
 
@@ -61,7 +61,7 @@ export function snapshot(doc: EditorDocument): DocSnap {
     else { selCanvas = cloneCanvas(sel.mask); selFrozen = { version: sel.version, canvas: selCanvas, owner: sel }; }
   }
   return {
-    width: doc.width, height: doc.height, root: snapLayer(doc.root),
+    width: doc.width, height: doc.height, ppi: doc.ppi, mode: doc.mode, root: snapLayer(doc.root),
     activeId: doc.active?.id ?? null, selection: selCanvas, quickMask: doc.quickMask, channels: doc.channels.slice(), paths: JSON.stringify(doc.paths), activePath: doc.activePath,
   };
 }
@@ -115,7 +115,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
   return l;
 }
 export function restore(doc: EditorDocument, snap: DocSnap) {
-  doc.width = snap.width; doc.height = snap.height;
+  doc.width = snap.width; doc.height = snap.height; if (snap.ppi) doc.ppi = snap.ppi; doc.mode = snap.mode ?? 'rgb';
   const olds = new Map<number, Layer>([[doc.root.id, doc.root], ...doc.allLayers().map(l => [l.id, l] as [number, Layer])]);
   const root = restoreLayer(snap.root, snap.width, snap.height, olds) as GroupLayer;
   doc.root = root;
@@ -152,4 +152,10 @@ export class History {
     this.index = i;
     restore(doc, this.steps[i].snap);
   }
+}
+
+/** Lienzo de una capa (por id) dentro de un estado guardado, o null si no existía o no era de píxeles. */
+export function layerCanvasIn(snap: DocSnap, id: number): HTMLCanvasElement | null {
+  const find = (s: LayerSnap): LayerSnap | null => { if (s.id === id) return s; for (const c of s.children ?? []) { const r = find(c); if (r) return r; } return null; };
+  return find(snap.root)?.canvas ?? null;
 }

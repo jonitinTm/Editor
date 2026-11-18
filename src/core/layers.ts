@@ -5,6 +5,8 @@
 import { makeCanvas, ctx2d, clearCanvas, Rect } from './canvas';
 import { FILTERS } from '../filters/registry';
 import { drawMeshExact, styledMesh } from '../tools/warpmesh';
+import { ensureFont, needsDownload } from './fonts';
+import { customShapePath } from './customshapes';
 
 
 /** 'pass-through' solo vale para grupos: sus capas se mezclan directamente con lo de debajo. */
@@ -98,7 +100,11 @@ export interface LayerStyles {
   bevel?: import('./bevel').BevelStyle;
   /** Superposición de motivo. */
   patternOverlay?: { enabled: boolean; pattern: string; scale: number; opacity: number };
+  /** Fusionar si (luminosidad): rangos [negro0, negro1, blanco0, blanco1] de esta capa y de la de debajo. */
+  blendIf?: { this: [number, number, number, number]; under: [number, number, number, number] };
 }
+/** ¿«Fusionar si» cambia algo? */
+export function blendIfActive(s: LayerStyles | null | undefined) { const b = s?.blendIf; return !!b && (b.this.join() !== '0,0,255,255' || b.under.join() !== '0,0,255,255'); }
 export function hasStyles(s: LayerStyles | null | undefined): s is LayerStyles {
   return !!s && !!(s.shadow?.enabled || s.stroke?.enabled || s.glow?.enabled || s.innerShadow?.enabled || s.innerGlow?.enabled || s.colorOverlay?.enabled || s.gradientOverlay?.enabled || s.bevel?.enabled || s.patternOverlay?.enabled);
 }
@@ -230,6 +236,8 @@ export class TextLayer extends RasterLayer {
   render() {
     clearCanvas(this.canvas);
     const p = this.props;
+    // fuente de la biblioteca aún sin descargar: se pide y el texto se redibuja al llegar
+    if (needsDownload(p.font)) ensureFont(p.font);
     p.keepPixels = false; delete p.psdTySh;
     const warped = p.warp && p.warp.style !== 'none' && p.warp.bend !== 0;
     // Con deformación, el texto se dibuja aparte y luego se pasa por la malla
@@ -272,7 +280,9 @@ export function tracePath(ctx: { moveTo(x: number, y: number): void; bezierCurve
 }
 
 export interface ShapeProps {
-  shape: 'rect' | 'round' | 'ellipse' | 'line' | 'path' | 'polygon' | 'star' | 'arrow' | 'heart';
+  shape: 'rect' | 'round' | 'ellipse' | 'line' | 'path' | 'polygon' | 'star' | 'arrow' | 'heart' | 'custom';
+  /** Forma personalizada (biblioteca de formas). */
+  custom?: string;
   /** Lados del polígono o puntas de la estrella. */
   sides?: number;
   /** Estrella: radio interior respecto al exterior (0-1). */
@@ -338,6 +348,14 @@ export class ShapeLayer extends RasterLayer {
       ctx.bezierCurveTo(cx + w * 0.1, y + h * 0.78, x + w, y + h * 0.62, x + w, y + h * 0.32);
       ctx.bezierCurveTo(x + w, y, cx, y, cx, y + h * 0.3);
       ctx.closePath();
+    }
+    else if (p.shape === 'custom') {
+      // la forma de la biblioteca se estira a la caja (como en Photoshop)
+      const base = customShapePath(p.custom ?? ''), path = new Path2D();
+      if (base && w > 0 && h > 0) path.addPath(base, new DOMMatrix([w / 100, 0, 0, h / 100, x, y]));
+      if (p.fill) { ctx.fillStyle = p.fill; ctx.fill(path, 'evenodd'); }
+      if (p.stroke) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.lineJoin = 'round'; ctx.stroke(path); }
+      ctx.restore(); this.touch(); return;
     }
     else if (p.shape === 'round' && (ctx as any).roundRect) (ctx as any).roundRect(x, y, w, h, Math.min(p.radius, w / 2, h / 2));
     else ctx.rect(x, y, w, h);

@@ -3,9 +3,10 @@
 import { app } from './app';
 import { h } from './dom';
 import { brushTip } from '../tools/paint';
+import { sampledTip, loadUserTips } from '../core/brushtips';
 import { promptDialog } from './dialog';
 
-export interface BrushPreset { name: string; size: number; hardness: number; opacity: number; flow: number; spacing: number; angle: number; roundness: number; scatter: number; smoothing: number; pressure: boolean; user?: boolean }
+export interface BrushPreset { name: string; size: number; hardness: number; opacity: number; flow: number; spacing: number; angle: number; roundness: number; scatter: number; smoothing: number; pressure: boolean; tip?: string; tipJitter?: boolean; user?: boolean }
 
 const P = (name: string, o: Partial<BrushPreset>): BrushPreset => ({ name, size: 20, hardness: 80, opacity: 100, flow: 100, spacing: 12, angle: 0, roundness: 100, scatter: 0, smoothing: 10, pressure: true, ...o });
 export const BUILTIN_BRUSHES: BrushPreset[] = [
@@ -18,6 +19,12 @@ export const BUILTIN_BRUSHES: BrushPreset[] = [
   P('Marcador', { size: 26, hardness: 70, opacity: 60, roundness: 60, angle: -30 }),
   P('Tiza', { size: 14, hardness: 60, flow: 60, scatter: 60, spacing: 30 }),
   P('Salpicado', { size: 10, hardness: 90, scatter: 300, spacing: 60 }),
+  P('Tiza con textura', { size: 40, tip: 'base:Tiza', spacing: 25, tipJitter: true }),
+  P('Esponja', { size: 50, tip: 'base:Esponja', spacing: 35, tipJitter: true, flow: 70 }),
+  P('Hierba', { size: 60, tip: 'base:Hierba', spacing: 40, scatter: 40, tipJitter: false }),
+  P('Pincel seco', { size: 50, tip: 'base:Pincel seco', spacing: 8, flow: 60 }),
+  P('Nubes', { size: 160, tip: 'base:Nube', spacing: 30, tipJitter: true, flow: 50 }),
+  P('Hojas', { size: 40, tip: 'base:Hoja', spacing: 90, scatter: 120, tipJitter: true }),
   P('Difuminado grande', { size: 200, hardness: 0, opacity: 40, flow: 30 }),
 ];
 
@@ -27,12 +34,12 @@ try { user = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { /* sin alm
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(user)); } catch { /* lleno */ } };
 export const allBrushes = () => [...user.map(b => ({ ...b, user: true })), ...BUILTIN_BRUSHES];
 
-const FIELDS = ['size', 'hardness', 'opacity', 'flow', 'spacing', 'angle', 'roundness', 'scatter', 'smoothing', 'pressure'] as const;
+const FIELDS = ['size', 'hardness', 'opacity', 'flow', 'spacing', 'angle', 'roundness', 'scatter', 'smoothing', 'pressure', 'tip', 'tipJitter'] as const;
 
 /** Aplica un ajuste al pincel (y lo activa). */
 export function applyBrush(b: BrushPreset) {
   const tool = ['brush', 'eraser'].includes(app.tool?.id) ? app.tool.id : 'brush';
-  for (const f of FIELDS) app.setOpt(tool, f, b[f]);
+  for (const f of FIELDS) app.setOpt(tool, f, (b as any)[f] ?? (f === 'tip' ? '' : f === 'tipJitter' ? false : undefined));
   if (app.tool?.id !== tool) app.setTool(tool); else app.emit('tool');
   current = b.name;
   app.emit('brushes');
@@ -45,7 +52,7 @@ function preview(b: BrushPreset, color: string, w = 150, hh = 34) {
   c.style.width = w + 'px'; c.style.height = hh + 'px';
   const ctx = c.getContext('2d')!; ctx.scale(2, 2);
   const maxSize = hh * 0.7, size = Math.max(1.5, Math.min(maxSize, b.size));
-  const tip = brushTip(size * 2, b.hardness / 100, color, false, b.roundness / 100, b.angle);
+  const tip = (b.tip && sampledTip(b.tip, size * 2, color, b.angle, b.roundness / 100)) || brushTip(size * 2, b.hardness / 100, color, false, b.roundness / 100, b.angle);
   const step = Math.max(0.5, size * b.spacing / 100);
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   ctx.globalAlpha = b.flow / 100 * (b.opacity / 100);
@@ -86,6 +93,7 @@ export function buildBrushesPanel(parent: HTMLElement) {
   };
   parent.append(h('div', { class: 'brush-panel' }, h('div', { class: 'brush-foot' }, add), list));
   render();
+  loadUserTips().then(render);
   app.on('brushes', render);
   // si se cambia el tema, la vista previa se repinta con el nuevo color de texto
   new MutationObserver(render).observe(document.body, { attributes: true, attributeFilter: ['data-theme'] });

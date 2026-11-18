@@ -279,3 +279,28 @@ export function autoAdjust(img: ImageData, mode: 'tone' | 'contrast' | 'color') 
   const luts = rs.map(([lo, hi], c) => { const g = mode === 'color' && sum[c] > 0 ? Math.max(0.6, Math.min(1.6, avg / sum[c])) : 1; const l = new Uint8ClampedArray(256); for (let i = 0; i < 256; i++) l[i] = clamp((i - lo) / (hi - lo) * 255 * g); return l; });
   applyLut(img, luts[0], luts[1], luts[2]);
 }
+
+/** Paradas de un degradado: posición 0-1, color y opacidad 0-1. */
+export interface Stop { t: number; color: string; a: number }
+/** Tabla de 256 colores (RGBA) a partir de las paradas. */
+export function gradientLut(stops: Stop[]): Uint8ClampedArray {
+  const s = [...stops].sort((p, q) => p.t - q.t), out = new Uint8ClampedArray(256 * 4);
+  const rgb = (h: string) => { const n = parseInt(h.slice(1, 7), 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255; let k = 0; while (k < s.length - 1 && s[k + 1].t < t) k++;
+    const A = s[Math.min(k, s.length - 1)], B = s[Math.min(k + 1, s.length - 1)];
+    const f = t <= A.t ? 0 : t >= B.t ? 1 : (t - A.t) / Math.max(1e-6, B.t - A.t);
+    const ca = rgb(A.color), cb = rgb(B.color);
+    for (let c = 0; c < 3; c++) out[i * 4 + c] = ca[c] + (cb[c] - ca[c]) * f;
+    out[i * 4 + 3] = 255 * ((A.a ?? 1) + ((B.a ?? 1) - (A.a ?? 1)) * f);
+  }
+  return out;
+}
+/** Mapa de degradado con varias paradas (y «invertir»). */
+export function gradientMapStops(img: ImageData, stops: Stop[], reverse = false) {
+  const lut = gradientLut(stops), d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    let t = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]); if (reverse) t = 255 - t;
+    d[i] = lut[t * 4]; d[i + 1] = lut[t * 4 + 1]; d[i + 2] = lut[t * 4 + 2];
+  }
+}

@@ -13,6 +13,8 @@ export const ICONS: Record<string, string> = {
   redEye: S('<path d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 10.5v3M10.5 12h3"/>'),
   ruler: S('<path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/>'),
   sponge: S('<rect x="4" y="7" width="16" height="11" rx="3"/><circle cx="9" cy="11" r="1"/><circle cx="14" cy="13" r="1"/><circle cx="16" cy="10" r="1"/>'),
+  historyBrush: S('<path d="M18 3l3 3-9 9-3 1 1-3z"/><path d="M8 17c-1 2-2.5 3-5 3 .5-2 1-4 3-5"/><path d="M14 20h7M17.5 16.5v7"/>'),
+  colorReplace: S('<path d="M18 3l3 3-8 8-3 1 1-3z"/><path d="M6 15c-2 0-3 2-3 5 3 0 5-1 5-3"/><circle cx="17" cy="17" r="4"/><path d="M17 13v8"/>'),
   lasso: S('<path d="M7 16c-3-1.5-4-4-2.5-6.5C6.5 6 12 4.5 16.5 6s5 5.5 1.5 8-9 2.5-11 2z"/><path d="M7 16c-.5 2 .5 3.5 2 4"/><circle cx="7.3" cy="16.4" r="1.2"/>'),
   wand: S('<path d="M4 20l11-11"/><path d="M13.5 7.5l3 3"/><path d="M18 3v3M16.5 4.5h3M20.5 9v2M19.5 10h2M11 3.5v2M10 4.5h2"/>'),
   crop: S('<path d="M6 2v16h16"/><path d="M2 6h16v16"/>'),

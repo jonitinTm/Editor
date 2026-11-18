@@ -1,6 +1,7 @@
 // Herramienta Forma: rectángulo, rectángulo redondeado, elipse y línea.
 // Cada forma se crea en una capa vectorial nueva, editable desde Propiedades.
 
+import { CUSTOM_SHAPES } from '../core/customshapes';
 import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
@@ -12,7 +13,8 @@ export class ShapeTool implements Tool {
     { key: 'shape', label: 'Forma', type: 'select', default: 'rect', choices: [
       { value: 'rect', label: 'Rectángulo' }, { value: 'round', label: 'Rect. redondeado' },
       { value: 'ellipse', label: 'Elipse' }, { value: 'polygon', label: 'Polígono' }, { value: 'star', label: 'Estrella' },
-      { value: 'line', label: 'Línea' }, { value: 'arrow', label: 'Flecha' }, { value: 'heart', label: 'Corazón' }] },
+      { value: 'line', label: 'Línea' }, { value: 'arrow', label: 'Flecha' }, { value: 'heart', label: 'Corazón' },
+      ...CUSTOM_SHAPES.map(([id, n]) => ({ value: 'custom:' + id, label: n }))] },
     { key: 'sides', label: 'Lados', type: 'range', min: 3, max: 40, default: 5 },
     { key: 'inner', label: 'Sangría', type: 'range', min: 5, max: 95, default: 45, unit: '%' },
     { key: 'fill', label: 'Relleno (color frontal)', type: 'checkbox', default: true },
@@ -27,9 +29,10 @@ export class ShapeTool implements Tool {
   down(e: ToolEvent) {
     const doc = app.doc!;
     this.a = { x: e.x, y: e.y };
-    const shape = app.opt<ShapeProps['shape']>('shape', this.id);
+    const opt = app.opt<string>('shape', this.id), custom = opt.startsWith('custom:') ? opt.slice(7) : undefined;
+    const shape = (custom ? 'custom' : opt) as ShapeProps['shape'];
     this.layer = new ShapeLayer('Forma', doc.width, doc.height, {
-      shape, x0: e.x, y0: e.y, x1: e.x, y1: e.y,
+      shape, custom, x0: e.x, y0: e.y, x1: e.x, y1: e.y,
       fill: shape === 'line' ? null : app.opt('fill', this.id) ? app.fg : null,
       stroke: shape === 'line' ? app.fg : app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : null,
       strokeWidth: app.opt('strokeWidth', this.id), radius: app.opt('radius', this.id),
