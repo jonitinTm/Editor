@@ -46,6 +46,8 @@ export const ICONS: Record<string, string> = {
   polyLasso: S('<path d="M5 17L3.500 8 12 4l8.500 5-4 9z"/><path d="M5 17c-.500 2 .500 3.500 2 4"/><circle cx="5" cy="17" r="1.200"/>'),
   heal: S('<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><path d="M10.5 10.5l.01.01M13.5 13.5l.01.01M10.5 13.5l.01.01M13.5 10.5l.01.01"/>'),
   perspCrop: S('<path d="M7 2v15h15"/><path d="M2 7h5"/><path d="M17 22v-5"/><path d="M10 6l8-1-1 8" stroke-dasharray="2 2"/>'),
+  patternStamp: S('<path d="M9 3h6v5l3 3v3H6v-3l3-3z"/><path d="M5 17h14v4H5z"/><path d="M8 19h2M12 19h2M16 19h0"/>'),
+  colorSampler: S('<path d="M14 4l6 6-8 8H6v-6z"/><circle cx="6" cy="18" r="3"/><path d="M11 9l4 4"/>'),
   patch: S('<path d="M5 7c3-3 8-3 11 0s2 8-2 9-9 1-10-3 0-5 1-6z" stroke-dasharray="2.5 2"/><path d="M14 14l6 6M20 15v5h-5"/>'),
   contentMove: S('<rect x="3" y="3" width="9" height="9" rx="1.5" stroke-dasharray="2.5 2"/><path d="M12 12l8 8M20 14v6h-6"/><path d="M5 8l2-2 3 3"/>'),
   spotHeal: S('<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><circle cx="18.5" cy="18.5" r="2.5" stroke-dasharray="1.5 1.5"/>'),

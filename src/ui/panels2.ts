@@ -111,6 +111,12 @@ export function buildInfoPanel(parent: HTMLElement) {
       body.append(row('R G B', `${c[0]}  ${c[1]}  ${c[2]}`, hex), row('Hex', hex), row('H S B', `${Math.round(hue * 60)}°  ${mx ? Math.round((mx - mn) / mx * 100) : 0}%  ${Math.round(mx / 2.55)}%`), row('Opacidad', Math.round(c[3] / 2.55) + ' %'));
       body.append(row('X', Math.floor(m.x) + ' px'), row('Y', Math.floor(m.y) + ' px'));
     } else body.append(h('div', { class: 'hint' }, 'Pasa el ratón por la imagen para ver el color y la posición.'));
+    const smp = (d as any).samplers as { x: number; y: number }[] | undefined;
+    if (smp?.length) {
+      body.append(h('div', { class: 'info-sep' }));
+      const comp = d.getComposite().getContext('2d')!;
+      smp.forEach((q, i) => { const c = comp.getImageData(Math.max(0, Math.min(d.width - 1, q.x)), Math.max(0, Math.min(d.height - 1, q.y)), 1, 1).data; const hex = '#' + [c[0], c[1], c[2]].map(v => v.toString(16).padStart(2, '0')).join(''); body.append(row(`Muestra ${i + 1}`, `${c[0]}  ${c[1]}  ${c[2]}  ${hex}`, hex)); });
+    }
     const b = d.selection.bounds;
     body.append(h('div', { class: 'info-sep' }), row('Documento', `${d.width} × ${d.height} px`), row('Selección', b ? `${b.w} × ${b.h} px en (${b.x}, ${b.y})` : '—'), row('Capa', d.active?.name ?? '—'));
   };

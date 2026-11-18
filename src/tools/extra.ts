@@ -194,3 +194,39 @@ export class ColorReplaceTool extends BackgroundEraserTool {
     d[i] += (r - d[i]) * f; d[i + 1] += (g - d[i + 1]) * f; d[i + 2] += (b - d[i + 2]) * f;
   }
 }
+
+/** Muestra de color: hasta 4 puntos fijos cuyo color se ve en el panel Info (Alt+clic quita uno). */
+export class ColorSamplerTool implements Tool {
+  id = 'colorSampler'; name = 'Muestra de color'; icon = icon('colorSampler'); key = 'I'; group = 'eyedropper'; cursor = 'crosshair';
+  private drag = -1;
+  extraOptions(bar: HTMLElement) {
+    bar.append(h('span', { class: 'hint' }, 'Clic: añadir un punto (hasta 4) · arrastra para moverlo · Alt+clic para quitarlo. Los colores se ven en Ventana › Info.'),
+      h('button', { class: 'btn', onclick: () => { const d = app.doc; if (d) { (d as any).samplers = []; app.viewport.requestRender(); app.emit('view'); } } }, 'Borrar todos'));
+  }
+  private list(): { x: number; y: number }[] { const d = app.doc as any; if (!d.samplers) d.samplers = []; return d.samplers; }
+  private hit(e: ToolEvent) { return this.list().findIndex(p => { const s = app.viewport.toScreen(p.x, p.y); return Math.hypot(s.x - e.sx, s.y - e.sy) < 9; }); }
+  down(e: ToolEvent) {
+    const L = this.list(), k = this.hit(e);
+    if (e.alt) { if (k >= 0) L.splice(k, 1); app.viewport.requestRender(); app.emit('view'); return; }
+    if (k >= 0) { this.drag = k; return; }
+    if (L.length >= 4) { app.toast('Como mucho 4 puntos de muestra (Alt+clic para quitar uno)', 'warn'); return; }
+    L.push({ x: Math.floor(e.x), y: Math.floor(e.y) }); this.drag = L.length - 1;
+    app.viewport.requestRender(); app.emit('view');
+  }
+  move(e: ToolEvent) { if (this.drag < 0) return; const p = this.list()[this.drag]; if (p) { p.x = Math.floor(e.x); p.y = Math.floor(e.y); app.emit('view'); } }
+  up() { this.drag = -1; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) { drawSamplers(ctx, vp); }
+}
+/** Dibuja los puntos de muestra (se ven con cualquier herramienta). */
+export function drawSamplers(ctx: CanvasRenderingContext2D, vp: Viewport) {
+  const L = (app.doc as any)?.samplers as { x: number; y: number }[] | undefined; if (!L?.length) return;
+  ctx.save(); ctx.font = 'bold 11px system-ui';
+  L.forEach((p, i) => {
+    const s = vp.toScreen(p.x + 0.5, p.y + 0.5);
+    for (const [c, w] of [['#000', 3], ['#fff', 1.4]] as const) { ctx.strokeStyle = c; ctx.lineWidth = w; ctx.beginPath(); ctx.arc(s.x, s.y, 6, 0, 7); ctx.moveTo(s.x - 10, s.y); ctx.lineTo(s.x - 3, s.y); ctx.moveTo(s.x + 3, s.y); ctx.lineTo(s.x + 10, s.y); ctx.moveTo(s.x, s.y - 10); ctx.lineTo(s.x, s.y - 3); ctx.moveTo(s.x, s.y + 3); ctx.lineTo(s.x, s.y + 10); ctx.stroke(); }
+    ctx.fillStyle = '#000'; ctx.fillText(String(i + 1), s.x + 9, s.y + 15); ctx.fillStyle = '#fff'; ctx.fillText(String(i + 1), s.x + 8, s.y + 14);
+  });
+  ctx.restore();
+}
+
+(app as any).drawSamplers = drawSamplers;

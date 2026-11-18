@@ -211,6 +211,8 @@ Ya disponible:
   ocupa la parte de arriba y se distingue del resto.
 - **Archivos recientes** (*Archivo › Abrir reciente…* y en la pantalla de inicio): los últimos 12 archivos abiertos, con
   miniatura, se reabren con un clic. Se guardan solo en este navegador.
+- **Tampón de motivo** (con el tampón, `S`): pinta con cualquier motivo, a la escala que quieras.
+- **Muestra de color** (con el cuentagotas, `I`): fija hasta 4 puntos y ve su color en el panel *Info* mientras editas.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

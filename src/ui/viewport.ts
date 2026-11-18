@@ -337,6 +337,7 @@ export class Viewport {
 
     // Capa superpuesta de la herramienta
     ctx.save();
+    if (app.tool?.id !== 'colorSampler') (app as any).drawSamplers?.(ctx, this);
     app.tool?.drawOverlay?.(ctx, this);
     ctx.restore();
     drawSnap(ctx, this);

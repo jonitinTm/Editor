@@ -6,6 +6,7 @@ import { icon } from '../ui/icons';
 import { Stroke, getPaintTarget, brushTip, strokeSetup, PaintTarget } from './paint';
 import { ctx2d, makeCanvas, cloneCanvas, getPixels, putPixels } from '../core/canvas';
 import { heal } from '../filters/heal';
+import { allPatterns, getPattern, patternFill } from '../core/patterns';
 import { healHole } from '../ui/ops';
 import type { Viewport } from '../ui/viewport';
 import { layerCanvasIn } from '../core/history';
@@ -199,7 +200,7 @@ export class EraserTool extends StrokeTool {
 
 /** Tampón de clonar: Alt + clic marca el origen; luego se pinta copiando de él. */
 export class CloneTool extends StrokeTool {
-  id = 'clone'; name = 'Tampón de clonar'; icon = icon('clone'); key = 'S'; historyName = 'Tampón de clonar';
+  id = 'clone'; name = 'Tampón de clonar'; icon = icon('clone'); key = 'S'; group = 'clone'; historyName = 'Tampón de clonar';
   options = [SIZE, { ...HARD, default: 50 }, OPAC, FLOW,
     { key: 'aligned', label: 'Alineado', type: 'checkbox', default: true },
     { key: 'sample', label: 'Muestra', type: 'select', default: 'layer', choices: [{ value: 'layer', label: 'Capa actual' }, { value: 'all', label: 'Todas las capas' }] },
@@ -367,5 +368,28 @@ export class HistoryBrushTool extends CloneTool {
     this.stroke.update();
   }
   move(e: ToolEvent) { if (!this.stroke) return; this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(), (this as any).dabFn); this.stroke.update(); }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) { drawBrushCursor(ctx, vp, app.opt<number>('size', this.id)); }
+}
+
+/** Tampón de motivo: pinta con un motivo repetido (alineado con el documento). */
+export class PatternStampTool extends CloneTool {
+  id = 'patternStamp'; name = 'Tampón de motivo'; icon = icon('patternStamp'); key = 'S'; group = 'clone'; historyName = 'Tampón de motivo';
+  options = [SIZE, { ...HARD, default: 50 }, OPAC, FLOW,
+    { key: 'pattern', label: 'Motivo', type: 'select', default: 'base:Damero', choices: [] },
+    { key: 'scale', label: 'Escala', type: 'range', min: 10, max: 400, default: 100, unit: '%' },
+  ] as any[];
+  activate() { const o = this.options.find((x: any) => x.key === 'pattern'); o.choices = allPatterns().map(p => ({ value: p.id, label: p.name })); }
+  down(e: ToolEvent) {
+    const t = getPaintTarget(); if (!t) return;
+    const pat = getPattern(app.opt('pattern', this.id)) ?? allPatterns()[0]; if (!pat) return;
+    this.offset = { x: 0, y: 0 };
+    this.srcCanvas = patternFill(pat, t.canvas.width, t.canvas.height, app.opt<number>('scale', this.id) / 100);
+    this.target = t;
+    const s = strokeSetup(t, false);
+    this.stroke = new Stroke(t, s.mode === 'mask' ? 'mask' : 'paint', app.opt<number>('opacity', this.id) / 100, s.maskValue);
+    (this as any).dabFn = this.makeCloneDab();
+    this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(), (this as any).dabFn);
+    this.stroke.update();
+  }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) { drawBrushCursor(ctx, vp, app.opt<number>('size', this.id)); }
 }
