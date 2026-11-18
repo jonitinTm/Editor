@@ -1185,3 +1185,21 @@ const BUILTIN_PRESETS: Record<string, Preset[]> = {
     { name: 'Desaturar a medias', params: { hue: 0, sat: -50, light: 0 } },
   ],
 };
+
+// ---- Imagen › Recortar… y Capa › Duplicar en… ---------------------------------------------------
+
+export function trimDialog() {
+  if (!app.doc) return;
+  const by = h('select', {}, h('option', { value: 'transparent' }, 'Píxeles transparentes'), h('option', { value: 'topleft' }, 'Color del píxel superior izquierdo'), h('option', { value: 'bottomright' }, 'Color del píxel inferior derecho')) as HTMLSelectElement;
+  const cb = (l: string) => { const c = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement; return [c, h('label', { class: 'check' }, c, ' ' + l)] as const; };
+  const [t, tl] = cb('Arriba'), [b, bl] = cb('Abajo'), [l, ll] = cb('Izquierda'), [r, rl] = cb('Derecha');
+  showDialog({ title: 'Recortar bordes', okLabel: 'Recortar', body: [row('Según', by), row('Quitar', h('div', { class: 'check-row' }, tl, bl, ll, rl))],
+    onOk: () => ops.trimImage(by.value as any, { top: t.checked, bottom: b.checked, left: l.checked, right: r.checked }) });
+}
+
+export function duplicateToDialog() {
+  const d = app.doc; if (!d?.active) return;
+  const sel = h('select', {}, ...app.docs.map((x, i) => h('option', { value: String(i), selected: x === d }, x === d ? `${x.name} (este)` : x.name)), h('option', { value: 'new' }, 'Documento nuevo')) as HTMLSelectElement;
+  showDialog({ title: 'Duplicar capa en…', okLabel: 'Duplicar', body: [row('Capa', h('b', {}, d.active.name)), row('Destino', sel)],
+    onOk: () => ops.duplicateLayerTo(sel.value === 'new' ? 'new' : app.docs[+sel.value]) });
+}

@@ -97,13 +97,14 @@ export const ACTIONS: Action[] = [
   { id: 'imgFlipH', label: 'Voltear lienzo horizontal', enabled: hasDoc, run: () => ops.transformImage('flipH') },
   { id: 'imgFlipV', label: 'Voltear lienzo vertical', enabled: hasDoc, run: () => ops.transformImage('flipV') },
   { id: 'cropSel', label: 'Recortar a la selección', enabled: hasSel, run: ops.cropToSelection },
-  { id: 'trim', label: 'Cortar transparencia', enabled: hasDoc, run: ops.trimTransparent },
+  { id: 'trim', label: 'Recortar bordes…', enabled: hasDoc, run: () => dlg.trimDialog() },
   { id: 'revealAll', label: 'Revelar todo', enabled: hasDoc, run: ops.revealAll },
 
   // Capa
   { id: 'newLayer', label: 'Nueva capa', keys: ['Shift+Ctrl+N'], enabled: hasDoc, run: ops.newLayer },
   { id: 'newGroup', label: 'Nuevo grupo', enabled: hasDoc, run: ops.newGroup },
   { id: 'dupLayer', label: 'Duplicar capa', enabled: hasLayer, run: ops.duplicateLayer },
+  { id: 'dupLayerTo', label: 'Duplicar capa en…', enabled: hasLayer, run: () => dlg.duplicateToDialog() },
   { id: 'layerViaCopy', label: 'Capa vía copiar', keys: ['Ctrl+J'], enabled: hasLayer, run: () => ops.layerVia(false) },
   { id: 'layerViaCut', label: 'Capa vía cortar', keys: ['Shift+Ctrl+J'], enabled: hasSel, run: () => ops.layerVia(true) },
   { id: 'delLayer', label: 'Eliminar capa', enabled: hasLayer, run: ops.deleteLayers },

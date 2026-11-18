@@ -22,7 +22,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'dupDoc', '-', 'applyImage', 'freqSep', '-', 'imageSize', 'canvasSize',
     { label: 'Modo', items: ['modeRgb', 'modeGray', '-', 'filter:indexed'] },
     { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', 'imgRotArb', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
-  { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
+  { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'dupLayerTo', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
     'artboard',
     { label: 'Nueva capa de relleno', items: ['fill:solid', 'fill:gradient', 'fill:pattern'] },
     { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste' && !f.noLayer).map(f => 'adjust:' + f.id) }, 'layerStyle', 'copyStyle', 'pasteStyle', 'rasterizeStyle', 'clearStyle', 'clip',

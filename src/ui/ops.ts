@@ -251,11 +251,11 @@ export function newGroup() {
 
 function cloneLayer(l: Layer, d: EditorDocument): Layer {
   let c: Layer;
-  if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; if (l.artboard) g.artboard = { ...l.artboard }; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
+  if (l instanceof GroupLayer) { const g = new GroupLayer(l.name); g.expanded = l.expanded; if (l.artboard) g.artboard = { ...l.artboard }; g.frame = l.frame; for (const ch of l.children) g.add(cloneLayer(ch, d)); c = g; }
   else if (l instanceof AdjustmentLayer) { c = new AdjustmentLayer(l.name, l.filterId, JSON.parse(JSON.stringify(l.params))); }
   else if (l instanceof SmartLayer) { c = new SmartLayer(l.name, d.width, d.height, l.inner, l.props.m, l.filters); }
-  else if (l instanceof TextLayer) { const t = new TextLayer(l.name, d.width, d.height, { ...l.props }); if (l.props.keepPixels) t.canvas = cloneCanvas(l.canvas); c = t; }
-  else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
+  else if (l instanceof TextLayer) { const t = new TextLayer(l.name, d.width, d.height, JSON.parse(JSON.stringify(l.props))); if (l.props.keepPixels) t.canvas = cloneCanvas(l.canvas); c = t; }
+  else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, JSON.parse(JSON.stringify(l.props))); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
   c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip; c.lockAlpha = l.lockAlpha; c.lockPos = l.lockPos; c.lockPixels = l.lockPixels; c.fillOpacity = l.fillOpacity; c.label = l.label;
@@ -1994,4 +1994,36 @@ export async function saveVideo(name: string, loops = 1) {
   const blob = new Blob(chunks, { type: 'video/webm' });
   try { await io.saveBlob(blob, name + '.webm'); app.toast(`Vídeo guardado (${frames.length} cuadros, ${(blob.size / 1024).toFixed(0)} KB)`); }
   catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
+}
+
+/** Imagen › Recortar…: quita los bordes transparentes o del color de una esquina (por los lados elegidos). */
+export function trimImage(by: 'transparent' | 'topleft' | 'bottomright', sides: { top: boolean; bottom: boolean; left: boolean; right: boolean }, tolerance = 8) {
+  const d = doc(); if (!d) return;
+  const W = d.width, H = d.height, px = ctx2d(d.flatten()).getImageData(0, 0, W, H).data;
+  const ref = by === 'topleft' ? 0 : (W * H - 1) * 4;
+  const empty = (i: number) => by === 'transparent' ? px[i + 3] <= tolerance : Math.abs(px[i] - px[ref]) <= tolerance && Math.abs(px[i + 1] - px[ref + 1]) <= tolerance && Math.abs(px[i + 2] - px[ref + 2]) <= tolerance && Math.abs(px[i + 3] - px[ref + 3]) <= tolerance;
+  const rowEmpty = (y: number) => { for (let x = 0; x < W; x++) if (!empty((y * W + x) * 4)) return false; return true; };
+  let top = 0, bottom = H - 1; if (sides.top) while (top < H - 1 && rowEmpty(top)) top++; if (sides.bottom) while (bottom > top && rowEmpty(bottom)) bottom--;
+  const colEmpty = (x: number) => { for (let y = top; y <= bottom; y++) if (!empty((y * W + x) * 4)) return false; return true; };
+  let left = 0, right = W - 1; if (sides.left) while (left < W - 1 && colEmpty(left)) left++; if (sides.right) while (right > left && colEmpty(right)) right--;
+  const nw = right - left + 1, nh = bottom - top + 1;
+  if (nw === W && nh === H) { app.toast('No hay bordes que recortar'); return; }
+  d.resizeCanvas(nw, nh, -left, -top); d.commit('Recortar bordes'); app.viewport.fit(true);
+}
+
+/** Capa › Duplicar en…: copia la capa activa (con todo: máscara, estilos…) a otro documento abierto o a uno nuevo. */
+export async function duplicateLayerTo(target: EditorDocument | 'new') {
+  const d = doc(); const l = d?.active; if (!d || !l) return;
+  let dst: EditorDocument;
+  if (target === 'new') { dst = new EditorDocument(l.name, d.width, d.height); dst.ppi = d.ppi; app.addDocument(dst); }
+  else dst = target;
+  const copy: Layer = cloneLayer(l, d);
+  // centrada si el otro documento tiene otro tamaño
+  if (dst.width !== d.width || dst.height !== d.height) {
+    const dx = Math.round((dst.width - d.width) / 2), dy = Math.round((dst.height - d.height) / 2);
+    const fit = (x: Layer) => { if (x instanceof GroupLayer) { x.children.forEach(fit); return; } if (isRaster(x) && !isParametric(x)) { const c = makeCanvas(dst.width, dst.height); ctx2d(c).drawImage((x as RasterLayer).canvas, dx, dy); (x as RasterLayer).canvas = c; x.touch(); } else if (isParametric(x)) (x as any).translate?.(dx, dy); if (x.mask) { const m = makeCanvas(dst.width, dst.height), mx = ctx2d(m); mx.fillStyle = '#fff'; mx.fillRect(0, 0, dst.width, dst.height); mx.clearRect(dx, dy, d.width, d.height); mx.drawImage(x.mask.canvas, dx, dy); x.mask.canvas = m; x.mask.touch(); } };
+    fit(copy);
+  }
+  dst.insertAboveActive(copy); dst.setActive(copy, false); dst.invalidate(); dst.commit('Duplicar capa');
+  if (target !== 'new') { app.setDocument(dst); app.toast(`Capa copiada a «${dst.name}»`); }
 }
