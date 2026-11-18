@@ -301,6 +301,8 @@ Ya disponible:
 - **Capa › Combinar formas** (con varias formas o textos seleccionados): unir, restar la de encima, intersecar (lo común)
   o excluir (lo que no se solapa). El resultado es una forma vectorial editable. En PSD se guarda como capa de forma
   (vectorial en Photoshop); al reabrir ese PSD aquí se ve igual pero queda como píxeles.
+- **Selección › Gama de colores** ampliada: además del color frontal, tonos de piel, rojos, amarillos, verdes, cianes,
+  azules, magentas, luces, medios tonos y sombras, con tolerancia e «Invertir».
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

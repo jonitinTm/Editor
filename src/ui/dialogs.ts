@@ -297,11 +297,15 @@ export function colorRangeDialog() {
   const d = app.doc; if (!d) return;
   let tol = 40;
   const before = d.selection.mask;
-  const preview = () => ops.colorRange(tol, false);
+  const kind = h('select', {}, ...([['sampled', 'Color frontal (muestreado)'], ['skin', 'Tonos de piel'], ['reds', 'Rojos'], ['yellows', 'Amarillos'], ['greens', 'Verdes'], ['cyans', 'Cianes'], ['blues', 'Azules'], ['magentas', 'Magentas'], ['highlights', 'Luces'], ['midtones', 'Medios tonos'], ['shadows', 'Sombras']] as const).map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement;
+  const inv = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  const hint = h('div', { class: 'hint' }, '');
+  const preview = () => { hint.textContent = kind.value === 'sampled' ? 'Selecciona lo que se parezca al color frontal (elígelo antes con el cuentagotas).' : 'La tolerancia amplía o estrecha la gama.'; ops.colorRange(tol, false, kind.value as ops.RangeKind, inv.checked); };
   const s = numberSlider({ min: 0, max: 200, value: tol, onInput: v => { tol = v; preview(); } });
+  kind.addEventListener('change', preview); inv.addEventListener('change', preview);
   showDialog({
-    title: 'Gama de colores', body: [h('div', { class: 'hint' }, 'Selecciona todo lo que se parezca al color frontal (elígelo antes con el cuentagotas).'), row('Tolerancia', s.el)],
-    onOk: () => ops.colorRange(tol, true), onCancel: () => { d.selection.setMask(before); d.changed(); },
+    title: 'Gama de colores', side: true, body: [row('Seleccionar', kind), hint, row('Tolerancia', s.el), row('', h('label', { class: 'check' }, inv, ' Invertir'))],
+    onOk: () => ops.colorRange(tol, true, kind.value as ops.RangeKind, inv.checked), onCancel: () => { d.selection.setMask(before); d.changed(); },
   });
   preview();
 }

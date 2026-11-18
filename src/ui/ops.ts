@@ -658,15 +658,37 @@ export function strokeSelection(width: number, pos: 'center' | 'inside' | 'outsi
 }
 
 /** Selecciona los píxeles de la imagen parecidos al color frontal. */
-export function colorRange(tolerance: number, record: boolean) {
+export type RangeKind = 'sampled' | 'skin' | 'reds' | 'yellows' | 'greens' | 'cyans' | 'blues' | 'magentas' | 'highlights' | 'midtones' | 'shadows';
+export function colorRange(tolerance: number, record: boolean, kind: RangeKind = 'sampled', invert = false) {
   const d = doc(); if (!d) return;
   const src = getPixels(d.flatten()), s = src.data, n = parseInt(app.fg.slice(1), 16), r0 = n >> 16 & 255, g0 = n >> 8 & 255, b0 = n & 255;
   const m = makeCanvas(d.width, d.height), img = ctx2d(m).createImageData(d.width, d.height), o = img.data;
+  const hueC: Record<string, number> = { reds: 0, yellows: 60, greens: 120, cyans: 180, blues: 240, magentas: 300 };
+  const fuzz = Math.max(1, tolerance) / 200; // 0..1
   for (let i = 0; i < s.length; i += 4) {
-    const dist = Math.max(Math.abs(s[i] - r0), Math.abs(s[i + 1] - g0), Math.abs(s[i + 2] - b0));
-    // borde suave: del todo dentro hasta la tolerancia, y se desvanece un poco más allá
-    const a = s[i + 3] === 0 ? 0 : dist <= tolerance ? 255 : Math.max(0, 255 - (dist - tolerance) * 12);
-    o[i] = o[i + 1] = o[i + 2] = 255; o[i + 3] = a;
+    const r = s[i], g = s[i + 1], b = s[i + 2]; let a: number;
+    if (kind === 'sampled') {
+      const dist = Math.max(Math.abs(r - r0), Math.abs(g - g0), Math.abs(b - b0));
+      // borde suave: del todo dentro hasta la tolerancia, y se desvanece un poco más allá
+      a = dist <= tolerance ? 255 : Math.max(0, 255 - (dist - tolerance) * 12);
+    } else if (kind === 'highlights' || kind === 'midtones' || kind === 'shadows') {
+      const L = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+      const v = kind === 'highlights' ? (L - 0.55) / 0.25 : kind === 'shadows' ? (0.45 - L) / 0.25 : 1 - Math.abs(L - 0.5) / 0.25;
+      a = Math.max(0, Math.min(1, v + (fuzz - 0.2))) * 255;
+    } else {
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), sat = mx ? (mx - mn) / mx : 0;
+      let h = 0; if (mx !== mn) h = mx === r ? ((g - b) / (mx - mn) + 6) % 6 : mx === g ? (b - r) / (mx - mn) + 2 : (r - g) / (mx - mn) + 4; h *= 60;
+      if (kind === 'skin') {
+        // tonos de piel: tono anaranjado, saturación media y luz suficiente
+        const dh = Math.min(Math.abs(h - 22), 360 - Math.abs(h - 22)), okS = sat > 0.12 && sat < 0.7, okV = mx > 60;
+        a = okS && okV ? Math.max(0, Math.min(1, 1 - (dh - 10 - fuzz * 20) / 15)) * Math.min(1, (sat - 0.12) / 0.08) * 255 : 0;
+      } else {
+        const c = hueC[kind], dh = Math.min(Math.abs(h - c), 360 - Math.abs(h - c));
+        a = Math.max(0, Math.min(1, 1 - (dh - 8 - fuzz * 25) / 15)) * Math.min(1, sat / 0.25) * 255;
+      }
+    }
+    if (invert) a = 255 - a;
+    o[i] = o[i + 1] = o[i + 2] = 255; o[i + 3] = s[i + 3] === 0 ? 0 : a;
   }
   ctx2d(m).putImageData(img, 0, 0);
   d.selection.setMask(m);
