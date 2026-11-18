@@ -1539,3 +1539,21 @@ export function applyLayerComp(i: number) {
   d.invalidate(); d.commit(`Composición: ${c.name}`);
 }
 export function deleteLayerComp(i: number) { const d = doc(); if (!d) return; d.layerComps.splice(i, 1); d.changed(); app.emit('doc'); }
+
+/** Recorte con perspectiva: el cuadrilátero elegido pasa a ser el documento entero, enderezado. */
+export async function perspectiveCrop(quad: { x: number; y: number }[], ow: number, oh: number) {
+  const d = doc(); if (!d || quad.length !== 4) return;
+  ow = Math.max(1, Math.round(ow)); oh = Math.max(1, Math.round(oh));
+  if (ow * oh > 268e6) { app.toast('El resultado sería demasiado grande', 'warn'); return; }
+  const { warpQuadToRect } = await import('../tools/transform');
+  for (const l of d.allLayers()) if (isParametric(l)) rasterizeLayer(l);
+  const tf = (c: HTMLCanvasElement) => warpQuadToRect(c, quad, ow, oh);
+  for (const l of d.allLayers()) {
+    if (isRaster(l)) { (l as RasterLayer).canvas = tf(l.canvas); l.touch(); }
+    if (l.mask) { l.mask.canvas = tf(l.mask.canvas); l.mask.touch(); }
+  }
+  d.channels = d.channels.map(ch => ({ ...ch, canvas: tf(ch.canvas) }));
+  d.width = ow; d.height = oh; d.selection.width = ow; d.selection.height = oh; d.selection.setMask(null);
+  d.guides = { h: [], v: [] };
+  d.invalidate(); d.commit('Recorte con perspectiva'); app.viewport.fit(true);
+}

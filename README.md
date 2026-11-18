@@ -190,6 +190,8 @@ Ya disponible:
 - **Parche** y **Movimiento con detección de contenido** (con los correctores, `J`): rodea una imperfección y arrástrala
   a una zona limpia para taparla; o selecciona un objeto y arrástralo: se funde en el sitio nuevo y el hueco se rellena solo
   (modo «Extender» para duplicarlo).
+- **Recorte con perspectiva** (con Recortar, `C`): coloca las cuatro esquinas sobre un documento, cartel o cuadro
+  fotografiado de lado y sale enderezado; tamaño automático o el que indiques.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

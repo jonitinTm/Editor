@@ -39,6 +39,12 @@ export function buildOptionsBar(parent: HTMLElement) {
         sel.addEventListener('change', () => set(sel.value));
         setters.push(() => { sel.value = get(); });
         bar.append(h('label', { class: 'opt' }, d.label ? h('span', { class: 'lbl' }, d.label) : null, sel));
+      } else if (d.type === 'number') {
+        const n = h('input', { type: 'number', class: 'num', min: d.min, max: d.max, step: 1, value: get(), title: (d as any).title ?? '' }) as HTMLInputElement;
+        n.style.width = '64px';
+        n.addEventListener('change', () => set(Math.max(d.min ?? -1e9, Math.min(d.max ?? 1e9, +n.value || 0))));
+        setters.push(() => { if (document.activeElement !== n) n.value = String(get()); });
+        bar.append(h('label', { class: 'opt' }, h('span', { class: 'lbl' }, d.label), n, d.unit ? h('span', { class: 'hint' }, ' ' + d.unit) : null));
       } else if (d.type === 'checkbox') {
         const c = h('input', { type: 'checkbox', checked: !!get() });
         c.addEventListener('change', () => set(c.checked));

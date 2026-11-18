@@ -111,7 +111,7 @@ function sessionMatrix(s: Session): Matrix {
 }
 
 /** Proyección del cuadrado unidad sobre un cuadrilátero (para perspectiva). */
-function homography(q: P[]) {
+export function homography(q: P[]) {
   const [p0, p1, p2, p3] = q;
   const sx = p0.x - p1.x + p2.x - p3.x, sy = p0.y - p1.y + p2.y - p3.y;
   let a, b, c, d, e, f, g = 0, h = 0;
@@ -551,4 +551,23 @@ export class TransformTool implements Tool {
     const c = vp.toScreen(this.s.st.cx, this.s.st.cy);
     ctx.beginPath(); ctx.arc(c.x, c.y, 4, 0, 7); ctx.strokeStyle = '#3d8bfd'; ctx.stroke();
   }
+}
+
+/** Endereza el cuadrilátero `quad` de `src` en un rectángulo de ow × oh (recorte con perspectiva). */
+export function warpQuadToRect(src: HTMLCanvasElement, quad: P[], ow: number, oh: number): HTMLCanvasElement {
+  const Hm = homography(quad), sw = src.width, sh = src.height;
+  const s = src.getContext('2d')!.getImageData(0, 0, sw, sh).data, out = new ImageData(ow, oh), o = out.data;
+  for (let y = 0; y < oh; y++) for (let x = 0; x < ow; x++) {
+    const p = Hm((x + 0.5) / ow, (y + 0.5) / oh), fx0 = p.x - 0.5, fy0 = p.y - 0.5;
+    const ix = Math.floor(fx0), iy = Math.floor(fy0), fx = fx0 - ix, fy = fy0 - iy;
+    let r = 0, g = 0, b = 0, al = 0;
+    for (let k = 0; k < 4; k++) {
+      const px = ix + (k & 1), py = iy + (k >> 1); if (px < 0 || py < 0 || px >= sw || py >= sh) continue;
+      const wt = ((k & 1) ? fx : 1 - fx) * ((k >> 1) ? fy : 1 - fy), j = (py * sw + px) * 4, aa = s[j + 3] * wt;
+      r += s[j] * aa; g += s[j + 1] * aa; b += s[j + 2] * aa; al += aa;
+    }
+    if (al <= 0) continue;
+    const q = (y * ow + x) * 4; o[q] = r / al; o[q + 1] = g / al; o[q + 2] = b / al; o[q + 3] = al;
+  }
+  const c = makeCanvas(ow, oh); c.getContext('2d')!.putImageData(out, 0, 0); return c;
 }

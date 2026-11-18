@@ -19,6 +19,7 @@ export type OptionDef =
   | { key: string; label?: string; type: 'select'; choices: { value: string; label: string }[]; default: string }
   | { key: string; label: string; type: 'checkbox'; default: boolean }
   | { key: string; label?: string; type: 'selmode'; default: string }
+  | { key: string; label: string; type: 'number'; min?: number; max?: number; default: number; unit?: string; title?: string }
   | { key: string; label?: string; type: 'font'; default: string }
   | { key: string; label?: string; type: 'color'; default: string };
 
