@@ -1290,7 +1290,8 @@ export async function exportSet(d: EditorDocument, type: io.ExportType, quality:
 }
 
 /** Imagen › Rotación del lienzo › Arbitrario: gira todo el documento; el lienzo crece para que no se corte nada. */
-export function rotateImageArbitrary(deg: number, fillBottom: boolean) {
+export function rotateImageArbitrary(deg: number, fill: boolean | 'content') {
+  const fillBottom = fill === true;
   const d = doc(); if (!d || !deg) return;
   const W = d.width, H = d.height, a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   const nw = Math.max(1, Math.ceil(Math.abs(W * c) + Math.abs(H * s) - 1e-6)), nh = Math.max(1, Math.ceil(Math.abs(W * s) + Math.abs(H * c) - 1e-6));
@@ -1319,8 +1320,18 @@ export function rotateImageArbitrary(deg: number, fillBottom: boolean) {
   d.selection.setMask(null);
   d.guides = { h: [], v: [] };
   d.invalidate();
-  d.commit(`Rotar lienzo ${+deg.toFixed(1)}°`);
   app.viewport.fit(true);
+  const name = `Rotar lienzo ${+deg.toFixed(1)}°`;
+  if (fill === 'content' && isRaster(bottom) && !isParametric(bottom)) {
+    // las esquinas vacías de la capa de abajo se inventan a partir de la foto
+    const L = bottom as RasterLayer, hole = makeCanvas(nw, nh), hx = ctx2d(hole), id = ctx2d(L.canvas).getImageData(0, 0, nw, nh), hi = hx.createImageData(nw, nh);
+    for (let i = 3; i < id.data.length; i += 4) if (id.data[i] < 250) hi.data[i] = 255;
+    hx.putImageData(hi, 0, 0);
+    app.toast('Rellenando las esquinas…');
+    inpaintCanvas(L.canvas, hole, { x: 0, y: 0, w: nw, h: nh }).then(out => { if (out) { L.canvas = out; L.touch(); d.invalidate(); } d.commit(name); });
+    return;
+  }
+  d.commit(name);
 }
 
 /** Selección › Extender (contiguous) o Similar: añade los píxeles de colores parecidos a los seleccionados. */

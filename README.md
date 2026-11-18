@@ -279,7 +279,8 @@ Ya disponible:
 - **Selección de objetos** (con la selección rápida, `W`): arrastra un recuadro alrededor de algo y se selecciona solo
   ese objeto (Mayús añade, Alt resta).
 - **Recortar con «Rellenar según contenido»** (casilla en la barra de Recortar): si el marco sale fuera de la foto, los
-  bordes nuevos se inventan a partir de ella (cielo, suelo, texturas…).
+  bordes nuevos se inventan a partir de ella (cielo, suelo, texturas…). Lo mismo al girar el lienzo un ángulo o enderezar
+  con la Regla (opción «Esquinas: según el contenido»).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

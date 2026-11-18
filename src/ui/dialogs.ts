@@ -772,11 +772,11 @@ export function rotateArbitraryDialog() {
   if (!app.doc) return;
   const ang = h('input', { type: 'number', class: 'num', value: '15', step: '0.1', min: '-359.9', max: '359.9' });
   const dir = h('select', {}, h('option', { value: '1' }, 'Horario'), h('option', { value: '-1' }, 'Antihorario'));
-  const fill = h('input', { type: 'checkbox', checked: true });
+  const fill = h('select', {}, h('option', { value: 'bg' }, 'Con el color de fondo'), h('option', { value: 'content' }, 'Según el contenido (se inventan)'), h('option', { value: 'none' }, 'Transparentes')) as HTMLSelectElement;
   showDialog({
     title: 'Rotar lienzo', okLabel: 'Rotar',
-    body: [row('Ángulo', ang, '°'), row('Sentido', dir), row('', h('label', { class: 'check' }, fill, ' Rellenar las esquinas de la capa inferior con el color de fondo'))],
-    onOk: () => { const v = parseFloat(ang.value); if (!isFinite(v) || !v) return; ops.rotateImageArbitrary(v * +dir.value, fill.checked); },
+    body: [row('Ángulo', ang, '°'), row('Sentido', dir), row('Esquinas', fill)],
+    onOk: () => { const v = parseFloat(ang.value); if (!isFinite(v) || !v) return; ops.rotateImageArbitrary(v * +dir.value, fill.value === 'content' ? 'content' : fill.value === 'bg'); },
   });
 }
 

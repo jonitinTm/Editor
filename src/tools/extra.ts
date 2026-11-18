@@ -139,6 +139,7 @@ export class RedEyeTool implements Tool {
 /** Regla: mide distancia y ángulo; «Enderezar» gira la imagen para que la línea quede horizontal. */
 export class RulerTool implements Tool {
   id = 'ruler'; name = 'Regla'; icon = icon('ruler'); key = 'I'; group = 'eyedropper'; cursor = 'crosshair';
+  options = [{ key: 'fill', label: 'Esquinas', type: 'select', default: 'bg', choices: [{ value: 'bg', label: 'Color de fondo' }, { value: 'content', label: 'Según el contenido' }, { value: 'none', label: 'Transparentes' }] }] as any[];
   private a: { x: number; y: number } | null = null; private b: { x: number; y: number } | null = null; private dragging = false;
   private info: HTMLElement | null = null;
   extraOptions(bar: HTMLElement) {
@@ -163,7 +164,7 @@ export class RulerTool implements Tool {
     // el ángulo más cercano a horizontal o vertical
     let a = m.ang; while (a > 45) a -= 90; while (a < -45) a += 90;
     if (Math.abs(a) < 0.05) { app.toast('La línea ya está recta'); return; }
-    import('../ui/ops').then(o => { o.rotateImageArbitrary(a, true); this.a = this.b = null; this.sync(); });
+    import('../ui/ops').then(o => { const f = app.opt('fill', this.id); o.rotateImageArbitrary(a, f === 'content' ? 'content' : f !== 'none'); this.a = this.b = null; this.sync(); });
   }
   deactivate() { this.dragging = false; }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
