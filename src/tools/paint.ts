@@ -64,6 +64,8 @@ export function touchTarget(t: PaintTarget) {
 
 /** Sustituye el contenido del objetivo por un lienzo nuevo. */
 export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement) {
+  // el lienzo pasa a ser el de la capa: se deja su estado de dibujo como nuevo (modo normal, opacidad 1)
+  { const x = ctx2d(c); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; x.setTransform(1, 0, 0, 1, 0, 0); }
   if (t.quick) { app.doc!.selection.setMask(c); t.canvas = app.doc!.selection.mask ?? c; return; }
   if (t.isMask) t.layer.mask!.canvas = c; else (t.layer as RasterLayer).canvas = c;
   t.canvas = c;

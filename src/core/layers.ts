@@ -58,7 +58,7 @@ export class LayerMask {
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); ctx.restore();
     this.touch();
   }
-  touch() { this.version++; }
+  touch() { resetDrawState(this.canvas); this.version++; }
 }
 
 export interface TextProps {
@@ -166,6 +166,9 @@ export function effectiveMask(l: Layer, pixel: HTMLCanvasElement | null | undefi
   return c;
 }
 
+/** Deja el estado de dibujo de un lienzo como nuevo (lo que se guarda en una capa no debe arrastrar modos de fusión). */
+export function resetDrawState(c: HTMLCanvasElement) { const x = ctx2d(c); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; x.shadowColor = 'transparent'; x.shadowBlur = 0; x.setTransform(1, 0, 0, 1, 0, 0); }
+
 export abstract class Layer {
   id = newLayerId();
   /** Máscara vectorial (opcional, además de la de píxeles). */
@@ -218,6 +221,7 @@ export class RasterLayer extends Layer {
    * moverla). Solo es válido mientras los píxeles no se editen (misma versión).
    */
   full: { canvas: HTMLCanvasElement; x: number; y: number; version: number } | null = null;
+  touch() { resetDrawState(this.canvas); super.touch(); }
   constructor(name: string, w: number, h: number) {
     super(name);
     this.canvas = makeCanvas(w, h);

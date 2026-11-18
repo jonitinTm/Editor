@@ -24,6 +24,8 @@ export class Selection {
   private changed() {
     this.version++;
     if (this.mask) {
+      // la máscara no debe quedarse con un modo de fusión de la operación anterior
+      { const x = ctx2d(this.mask); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; }
       this.bounds = contentBounds(this.mask, 0);
       if (!this.bounds) this.mask = null;
     } else this.bounds = null;

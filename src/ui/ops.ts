@@ -591,7 +591,7 @@ export function invertMask(l: Layer) {
   const d = doc(); if (!d || !l.mask) return;
   const inv = makeCanvas(d.width, d.height); const c = ctx2d(inv);
   c.fillStyle = '#fff'; c.fillRect(0, 0, d.width, d.height);
-  c.globalCompositeOperation = 'destination-out'; c.drawImage(l.mask.canvas, 0, 0);
+  c.globalCompositeOperation = 'destination-out'; c.drawImage(l.mask.canvas, 0, 0); c.globalCompositeOperation = 'source-over';
   l.mask.canvas = inv; l.mask.touch(); d.commit('Invertir máscara');
 }
 

@@ -84,9 +84,9 @@ export class MoveTool implements Tool {
       const layer = a as RasterLayer;
       const sel = doc.selection.mask!;
       const pixels = cloneCanvas(layer.canvas);
-      const pc = ctx2d(pixels); pc.globalCompositeOperation = 'destination-in'; pc.drawImage(sel, 0, 0);
+      const pc = ctx2d(pixels); pc.globalCompositeOperation = 'destination-in'; pc.drawImage(sel, 0, 0); pc.globalCompositeOperation = 'source-over';
       const hole = cloneCanvas(layer.canvas);
-      const hc = ctx2d(hole); hc.globalCompositeOperation = 'destination-out'; hc.drawImage(sel, 0, 0);
+      const hc = ctx2d(hole); hc.globalCompositeOperation = 'destination-out'; hc.drawImage(sel, 0, 0); hc.globalCompositeOperation = 'source-over';
       this.floating = { layer, hole, pixels };
       doc.overrides.set(layer, { canvas: hole, extra: ctx => ctx.drawImage(pixels, this.offset.x, this.offset.y) });
       this.layers = [layer];
@@ -146,7 +146,7 @@ export class MoveTool implements Tool {
       doc.overrides.delete(layer);
       (doc as any).selectionOffset = null;
       if (dx || dy) {
-        ctx2d(hole).drawImage(pixels, dx, dy);
+        const fc = ctx2d(hole); fc.globalCompositeOperation = 'source-over'; fc.globalAlpha = 1; fc.drawImage(pixels, dx, dy);
         layer.canvas = hole; layer.touch();
         doc.selection.setMask(shiftCanvas(doc.selection.mask!, dx, dy));
       }

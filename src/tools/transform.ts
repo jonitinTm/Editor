@@ -74,14 +74,14 @@ function prepare(): Session | null {
     // Sin selección se usa el contenido completo (incluido lo que esté fuera del lienzo)
     const f = sel ? { canvas: l.canvas, x: 0, y: 0 } : l.fullContent();
     const pixels = cloneCanvas(f.canvas);
-    if (sel) { const c = ctx2d(pixels); c.globalCompositeOperation = 'destination-in'; c.drawImage(sel, 0, 0); }
+    if (sel) { const c = ctx2d(pixels); c.globalCompositeOperation = 'destination-in'; c.drawImage(sel, 0, 0); c.globalCompositeOperation = 'source-over'; }
     const b = contentBounds(pixels);
     if (!b) continue;
     const src = makeCanvas(b.w, b.h);
     ctx2d(src).drawImage(pixels, -b.x, -b.y);
     const hole = cloneCanvas(l.canvas);
     const hc = ctx2d(hole);
-    if (sel) { hc.globalCompositeOperation = 'destination-out'; hc.drawImage(sel, 0, 0); }
+    if (sel) { hc.globalCompositeOperation = 'destination-out'; hc.drawImage(sel, 0, 0); hc.globalCompositeOperation = 'source-over'; }
     else hc.clearRect(0, 0, hole.width, hole.height);
     const rect = { x: b.x + f.x, y: b.y + f.y, w: b.w, h: b.h };
     items.push({ layer: l, src, rect, hole });
@@ -198,7 +198,7 @@ function applySession(s: Session, name: string) {
     if (it.m0 && !s.quad && it.layer instanceof SmartLayer) { it.layer.applyMatrix(sessionMatrix(s)); continue; }
     let layer = it.layer;
     if (it.toRaster) layer = rasterizeLayer(layer);
-    drawItem(ctx2d(it.hole), it.src, it.rect, s, undefined, true);
+    { const hx = ctx2d(it.hole); hx.globalCompositeOperation = 'source-over'; hx.globalAlpha = 1; drawItem(hx, it.src, it.rect, s, undefined, true); }
     layer.canvas = it.hole; layer.touch();
   }
   if (s.selMask) {
