@@ -195,6 +195,8 @@ Ya disponible:
 - **Máscaras vectoriales editables** (*Capa › Máscara vectorial › Trazado actual*): la capa solo se ve dentro de un
   trazado, que se edita con la Selección directa (`A`) y se mueve con la capa. Se pueden desactivar, invertir,
   rasterizar o eliminar. Las de los PSD se importan como trazados editables y se guardan como tales.
+- **Motivos en PSD**: las capas de relleno de motivo (también las formas rellenas de motivo) y la superposición de motivo
+  se leen y se guardan con sus motivos dentro del archivo; los motivos importados quedan disponibles en el editor.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

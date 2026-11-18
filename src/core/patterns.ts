@@ -47,6 +47,14 @@ export function addPattern(name: string, canvas: HTMLCanvasElement): Pattern {
   try { localStorage.setItem(KEY, JSON.stringify(user.slice(0, 40).map(u => ({ id: u.id, name: u.name, data: u.canvas.toDataURL('image/png') })))); } catch { /* demasiado grande */ }
   return p;
 }
+/** Registra un motivo con un id fijo (p. ej. los que vienen dentro de un PSD); si ya existe, se reutiliza. */
+export function addPatternWithId(id: string, name: string, canvas: HTMLCanvasElement): Pattern {
+  const old = getPattern(id); if (old) return old;
+  const p = { id, name, canvas };
+  user.unshift(p);
+  try { localStorage.setItem(KEY, JSON.stringify(user.slice(0, 40).map(u => ({ id: u.id, name: u.name, data: u.canvas.toDataURL('image/png') })))); } catch { /* demasiado grande */ }
+  return p;
+}
 /** Lienzo del tamaño indicado rellenado con el motivo en mosaico. */
 export function patternFill(p: Pattern, w: number, h: number, scale = 1): HTMLCanvasElement {
   const c = makeCanvas(w, h), x = ctx2d(c);

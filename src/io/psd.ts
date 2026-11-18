@@ -7,6 +7,7 @@
 import { EditorDocument } from '../core/document';
 import { imageToCanvas } from './files';
 import { familyFromPostScript } from '../core/fonts';
+import { addPatternWithId, getPattern } from '../core/patterns';
 import { normalizeRuns, type TextRun } from '../core/textruns';
 import type { VectorMask, PathPoint } from '../core/layers';
 import { ShapeLayer, GroupLayer, Layer, LayerMask, LayerStyles, RasterLayer, TextLayer, TextProps, SmartLayer, Matrix, AdjustmentLayer, BlendMode, isRaster, hasStyles } from '../core/layers';
@@ -151,6 +152,8 @@ function parseEffects(bytes: Uint8Array): LayerStyles | null {
     if (gr.Rvrs) stops.forEach(x => x[0] = 1 - x[0]);
     st.gradientOverlay = { enabled: true, opacity: Math.round(gr.Opct ?? 100), angle: Math.round(gr.Angl ?? 90), stops: stops.sort((p, q) => p[0] - q[0]) };
   }
+  const pf = d.patternFill;
+  if (pf?.enab && pf.Ptrn?.Idnt && getPattern('psd:' + pf.Ptrn.Idnt)) st.patternOverlay = { enabled: true, pattern: 'psd:' + pf.Ptrn.Idnt, scale: Math.round(pf.Scl ?? 100), opacity: Math.round(pf.Opct ?? 100) };
   const bv = d.ebbl;
   if (bv?.enab) {
     const styleMap: Record<string, any> = { InrB: 'inner', OtrB: 'outer', Embs: 'emboss', PlEb: 'pillow' };
@@ -216,6 +219,56 @@ function fillLayer(l: RasterLayer, soco?: Uint8Array, gdfl?: Uint8Array, bounds?
 }
 
 /** Dibuja una máscara vectorial de Photoshop (curvas de Bézier) como máscara de píxeles. */
+/** Motivos guardados dentro del PSD (bloques Patt / Pat2 / Pat3): id → nombre e imagen. */
+function readPatterns(b: Uint8Array, out: Map<string, { name: string; canvas: HTMLCanvasElement }>) {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  let o = 0;
+  while (o + 4 <= b.length) {
+    const len = v.getUint32(o), start = o + 4, end = start + len; if (len < 16 || end > b.length) break;
+    try {
+      let p = start;
+      p += 4; const mode = v.getUint32(p); p += 4; const ph = v.getUint16(p), pw = v.getUint16(p + 2); p += 4;
+      const nl = v.getUint32(p); p += 4; let name = ''; for (let k = 0; k < nl; k++) { const c = v.getUint16(p + k * 2); if (c) name += String.fromCharCode(c); } p += nl * 2;
+      const il = b[p]; p += 1; let id = ''; for (let k = 0; k < il; k++) id += String.fromCharCode(b[p + k]); p += il;
+      let table: Uint8Array | null = null; if (mode === 2) { table = b.subarray(p, p + 768); p += 768 + 4; }
+      // lista de canales (memoria virtual)
+      p += 4; p += 4; const top = v.getInt32(p), left = v.getInt32(p + 4), bottom = v.getInt32(p + 8), right = v.getInt32(p + 12); p += 16;
+      const nch = v.getUint32(p); p += 4;
+      const w = right - left || pw, hgt = bottom - top || ph, planes: (Uint8Array | null)[] = [];
+      for (let c = 0; c < nch + 2 && p + 8 <= end; c++) {
+        const written = v.getUint32(p); p += 4; if (!written) { planes.push(null); continue; }
+        const clen = v.getUint32(p); p += 4; if (!clen) { planes.push(null); continue; }
+        const cEnd = p + clen; p += 4; // profundidad
+        const ct = v.getInt32(p), cl = v.getInt32(p + 4), cb = v.getInt32(p + 8), cr = v.getInt32(p + 12); p += 16; void ct; void cl; void cb; void cr;
+        p += 2; const comp = b[p]; p += 1;
+        const plane = new Uint8Array(w * hgt);
+        if (comp === 0) plane.set(b.subarray(p, p + w * hgt));
+        else {
+          // RLE por filas (PackBits)
+          const counts: number[] = []; for (let r = 0; r < hgt; r++) { counts.push(v.getUint16(p)); p += 2; }
+          for (let r = 0; r < hgt; r++) {
+            let q = p, x = 0; const rowEnd = p + counts[r];
+            while (q < rowEnd && x < w) { const n = (b[q] << 24) >> 24; q++; if (n >= 0) { for (let k = 0; k <= n && x < w; k++) plane[r * w + x++] = b[q++]; } else if (n !== -128) { const val = b[q++]; for (let k = 0; k < 1 - n && x < w; k++) plane[r * w + x++] = val; } }
+            p = rowEnd;
+          }
+        }
+        planes.push(plane); p = cEnd;
+      }
+      const c = makeCanvas(w, hgt), x = ctx2d(c), img = x.createImageData(w, hgt), d = img.data;
+      const col = mode === 1 || mode === 2 ? 1 : 3, alpha = planes[nch + 1] ?? (nch > col ? planes[col] : null);
+      for (let k = 0; k < w * hgt; k++) {
+        if (mode === 2 && table && planes[0]) { const ix = planes[0][k]; d[k * 4] = table[ix * 3]; d[k * 4 + 1] = table[ix * 3 + 1]; d[k * 4 + 2] = table[ix * 3 + 2]; }
+        else if (col === 1) d[k * 4] = d[k * 4 + 1] = d[k * 4 + 2] = planes[0]?.[k] ?? 0;
+        else { d[k * 4] = planes[0]?.[k] ?? 0; d[k * 4 + 1] = planes[1]?.[k] ?? 0; d[k * 4 + 2] = planes[2]?.[k] ?? 0; }
+        d[k * 4 + 3] = alpha ? alpha[k] : 255;
+      }
+      x.putImageData(img, 0, 0);
+      if (id) out.set(id, { name: name || 'Motivo', canvas: c });
+    } catch { /* motivo dañado */ }
+    o = end + ((4 - (len % 4)) % 4);
+  }
+}
+
 /** Máscara vectorial de Photoshop → trazados editables (null si usa combinaciones que no se pueden representar). */
 function vectorPaths(b: Uint8Array, W: number, H: number): VectorMask | null {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength), flags = v.getUint32(4);
@@ -493,7 +546,7 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
       else if (key === 'iOpa') fillOpacity = r.u8();
       else if (key === 'lspf') protect = r.u32();
       else if (key === 'lclr') labelIdx = r.u16();
-      else if (ADJ_KEYS.includes(key) || ['vstk', 'lfx2', 'SoCo', 'GdFl', 'vmsk', 'vsms', 'CgEd', 'TySh', 'SoLd', 'PlLd', 'artb', 'artd'].includes(key)) blocks[key] = new Uint8Array(r.buf, start, len);
+      else if (ADJ_KEYS.includes(key) || ['vstk', 'lfx2', 'SoCo', 'GdFl', 'vmsk', 'vsms', 'CgEd', 'TySh', 'SoLd', 'PlLd', 'artb', 'artd', 'PtFl'].includes(key)) blocks[key] = new Uint8Array(r.buf, start, len);
       // El relleno tras cada bloque varía según el programa: se busca la siguiente firma
       r.pos = start + len;
       for (let pad = 0; pad < 4; pad++) { r.pos = start + len + pad; if (r.pos >= extraEnd || r.isSig()) break; }
@@ -535,6 +588,11 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
       let adj: ReturnType<typeof parseAdjustment> = null;
       try { adj = adjKey ? parseAdjustment(adjKey, rec.blocks[adjKey], rec.blocks.CgEd) : null; } catch { /* formato inesperado */ }
       if (adj) layer = new AdjustmentLayer(rec.name || 'Ajuste', adj.id, adj.params);
+      else if (rec.blocks.PtFl && (() => { try { const dd = descOf(rec.blocks.PtFl, 4); return !!getPattern('psd:' + (dd.Ptrn?.Idnt ?? '')); } catch { return false; } })()) {
+        // capa de relleno de motivo (el motivo viene dentro del PSD)
+        const dd = descOf(rec.blocks.PtFl, 4);
+        layer = new AdjustmentLayer(rec.name || 'Motivo', 'patternfill', { pattern: 'psd:' + dd.Ptrn.Idnt, scale: Math.round(dd.Scl ?? 100) });
+      }
       else if (rec.keys.some(k => ADJ_OTHER.includes(k) || ADJ_KEYS.includes(k))) { skippedAdj++; continue; }
       else if ((rec.blocks.SoCo || rec.blocks.GdFl) && !rec.blocks.vmsk && !rec.blocks.vsms && editableFill(rec.blocks.SoCo, rec.blocks.GdFl)) {
         const ef = editableFill(rec.blocks.SoCo, rec.blocks.GdFl)!;
@@ -629,7 +687,7 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
   if (skippedAdj) warnings.push(`${skippedAdj} capa(s) de ajuste de un tipo aún no admitido no se han importado`);
   if (recs.some(x => x.keys.includes('TySh'))) warnings.push('El texto es editable: se ve como en Photoshop hasta que lo cambies; al editarlo se redibuja con las fuentes de tu equipo' + (textAsPixels ? ` (${textAsPixels} texto(s) girados o especiales se quedan como píxeles)` : ''));
   // de los efectos de capa solo falta la superposición de motivo (necesitaría los motivos del PSD)
-  const hasPatternFx = recs.some(x => { const b = x.blocks.lfx2; if (!b) return false; const t = new TextDecoder('latin1').decode(b); return t.includes('patternFill'); });
+  const hasPatternFx = recs.some(x => { const b = x.blocks.lfx2; if (!b) return false; const t = new TextDecoder('latin1').decode(b); if (!t.includes('patternFill')) return false; try { const dd = parseEffects(b); return !dd?.patternOverlay; } catch { return true; } });
   if (hasPatternFx) warnings.push('La superposición de motivo de los efectos de capa no se importa');
 }
 
@@ -669,6 +727,17 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
   if (lmLen > 0) {
     try {
       const liLen = r.len(); const liEnd = r.pos + liLen;
+      // Primero se buscan los motivos del archivo (van después de las capas, pero las capas los usan)
+      { const back = r.pos; try {
+        r.pos = liEnd; if (r.pos + 4 <= lmEnd) r.skipBlock();
+        const found = new Map<string, { name: string; canvas: HTMLCanvasElement }>();
+        while (r.pos + 12 <= lmEnd && r.isSig()) {
+          r.pos += 4; const key = r.str(4); const len = r.big && BIG_KEYS.has(key) ? r.u64() : r.u32(); const start = r.pos;
+          if (key === 'Patt' || key === 'Pat2' || key === 'Pat3') readPatterns(new Uint8Array(r.buf, start, len), found);
+          for (let pad = 0; pad < 4; pad++) { r.pos = start + len + pad; if (r.pos >= lmEnd || r.isSig()) break; }
+        }
+        for (const [id, p] of found) addPatternWithId('psd:' + id, p.name, p.canvas);
+      } catch { /* sin motivos */ } r.pos = back; }
       if (liLen > 0) await readLayers(r, doc, depth, mode, warnings, pending);
       r.pos = liEnd;
       if (r.pos + 4 <= lmEnd) r.skipBlock(); // máscara global
@@ -823,6 +892,7 @@ function adjustmentBlock(l: AdjustmentLayer): { key: string; bytes: Uint8Array }
   const i16 = (v: number) => w.u16(Math.round(v) & 0xffff);
   switch (l.filterId) {
     case 'solidfill': w.u32(16); writeDescriptor(w, 'null', { 'Clr ': rgbDV(p.color) }); return done('SoCo');
+    case 'patternfill': if (!getPattern(p.pattern)) return null; w.u32(16); writeDescriptor(w, 'null', { Ptrn: ptrnDV(p.pattern), 'Scl ': ['UntF', '#Prc', p.scale ?? 100], Algn: ['bool', true] }); return done('PtFl');
     case 'gradfill': { const gstops: { t: number; color: string; a: number }[] = (p.grad ?? [{ t: 0, color: p.c1 ?? '#000000', a: 1 }, { t: 1, color: p.c2 ?? '#ffffff', a: 1 }]).slice().sort((x: any, y: any) => x.t - y.t);
       w.u32(16); writeDescriptor(w, 'null', {
       Angl: ['UntF', '#Ang', p.angle], Type: ['enum', 'GrdT', p.radial ? 'Rdl ' : 'Lnr '], Algn: ['bool', false], 'Scl ': ['UntF', '#Prc', p.scale],
@@ -878,6 +948,8 @@ function effectsBlock(st: LayerStyles): Uint8Array {
   const pc = (v: number): DV => ['UntF', '#Prc', v], px = (v: number): DV => ['UntF', '#Pxl', v], ang = (v: number): DV => ['UntF', '#Ang', v];
   const md = (m: string): DV => ['enum', 'BlnM', m];
   const items: Record<string, DV> = { 'Scl ': pc(100), masterFXSwitch: ['bool', true] };
+  const po = st.patternOverlay;
+  if (po?.enabled && getPattern(po.pattern)) items.patternFill = ['Objc', 'patternFill', { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Nrml'), Opct: pc(po.opacity), Ptrn: ptrnDV(po.pattern), 'Scl ': pc(po.scale), Algn: ['bool', true], phase: ['Objc', 'Pnt ', { Hrzn: ['doub', 0], Vrtc: ['doub', 0] }] }];
   const shadow = (s: NonNullable<LayerStyles['shadow']>, cls: string): DV => ['Objc', cls, { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Mltp'), 'Clr ': rgbDV(s.color), Opct: pc(s.opacity), uglg: ['bool', false], lagl: ang(s.angle), Dstn: px(s.distance), Ckmt: pc(s.spread ?? 0), blur: px(s.blur), Nose: pc(0), AntA: ['bool', false] }];
   const glow = (g: NonNullable<LayerStyles['glow']>, cls: string, inner: boolean): DV => ['Objc', cls, { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Scrn'), 'Clr ': rgbDV(g.color), Opct: pc(g.opacity), GlwT: ['enum', 'BETE', 'SfBL'], Ckmt: pc(g.spread ?? 0), blur: px(g.size), Nose: pc(0), ShdN: pc(0), AntA: ['bool', false], ...(inner ? { glwS: ['enum', 'IGSr', 'SrcE'] as DV } : {}) }];
   if (st.shadow?.enabled) items.DrSh = shadow(st.shadow, 'DrSh');
@@ -944,6 +1016,40 @@ function shapeBlocks(l: ShapeLayer, W: number, H: number): { soco: Uint8Array; v
 }
 
 interface OutRec { extra?: [string, Uint8Array][]; name: string; layer: Layer | null; section: number; rect: { x: number; y: number; w: number; h: number }; chans: { id: number; bytes: Uint8Array }[]; hasMask: boolean; }
+
+/** Identificador de un motivo del editor para guardarlo en el PSD. */
+function psdPatternId(id: string) {
+  if (id.startsWith('psd:')) return id.slice(4);
+  let h = 0; for (let k = 0; k < id.length; k++) h = (h * 31 + id.charCodeAt(k)) | 0;
+  const hx = (h >>> 0).toString(16).padStart(8, '0');
+  return `${hx}-ed17-4e00-8000-${hx}${hx.slice(0, 4)}`;
+}
+const ptrnDV = (id: string): DV => { const p = getPattern(id); return ['Objc', 'Ptrn', { 'Nm  ': ['TEXT', p?.name ?? 'Motivo'], Idnt: ['TEXT', psdPatternId(id)] }]; };
+/** Bloque Patt con las imágenes de los motivos usados. */
+function patternsBlock(ids: string[]): Uint8Array | null {
+  const recs: Uint8Array[] = [];
+  for (const id of ids) {
+    const pat = getPattern(id); if (!pat) continue;
+    const c = pat.canvas, w = c.width, h = c.height, d = ctx2d(c).getImageData(0, 0, w, h).data;
+    const r = new Writer();
+    r.u32(1); r.u32(3); r.u16(h); r.u16(w);
+    const name = pat.name; r.u32(name.length + 1); for (let k = 0; k < name.length; k++) r.u16(name.charCodeAt(k)); r.u16(0);
+    const pid = psdPatternId(id); r.u8(pid.length); r.str(pid);
+    // lista de canales: R, G, B y la transparencia
+    const chans: Uint8Array[] = [0, 1, 2, 3].map(k => { const pl = new Uint8Array(w * h); for (let q = 0; q < w * h; q++) pl[q] = d[q * 4 + k]; return pl; });
+    const vm = new Writer(); vm.i32(0); vm.i32(0); vm.i32(h); vm.i32(w); vm.u32(3);
+    const chan = (pl: Uint8Array | null) => {
+      if (!pl) { vm.u32(0); return; }
+      vm.u32(1); vm.u32(4 + 16 + 2 + 1 + pl.length); vm.u32(8); vm.i32(0); vm.i32(0); vm.i32(h); vm.i32(w); vm.u16(8); vm.u8(0); vm.bytes(pl);
+    };
+    chan(chans[0]); chan(chans[1]); chan(chans[2]); chan(null); chan(chans[3]);
+    r.u32(3); r.u32(vm.size); r.writer(vm);
+    const body = r.flat(), rec = new Writer(); rec.u32(body.length); rec.bytes(body); while (rec.size % 4) rec.u8(0);
+    recs.push(rec.flat());
+  }
+  if (!recs.length) return null;
+  const all = new Writer(); for (const x of recs) all.bytes(x); return all.flat();
+}
 
 export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] } {
   const W = doc.width, H = doc.height;
@@ -1045,7 +1151,13 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
   // recursos de imagen: resolución (1005)
   { const fx16 = Math.round(doc.ppi * 65536); out.u32(28); out.str('8BIM'); out.u16(1005); out.u8(0); out.u8(0); out.u32(16);
     out.u32(fx16); out.u16(1); out.u16(2); out.u32(fx16); out.u16(1); out.u16(2); }
-  out.u32(4 + li.size + 4); out.u32(li.size); out.writer(li); out.u32(0);
+  // motivos usados por capas de relleno y superposiciones de motivo
+  const usedPat = new Set<string>();
+  for (const l of doc.allLayers()) { if (l instanceof AdjustmentLayer && l.filterId === 'patternfill' && l.params.pattern) usedPat.add(l.params.pattern); if (l.styles?.patternOverlay?.enabled) usedPat.add(l.styles.patternOverlay.pattern); }
+  const patt = usedPat.size ? patternsBlock([...usedPat]) : null;
+  const pattLen = patt ? 12 + patt.length + ((4 - patt.length % 4) % 4) : 0;
+  out.u32(4 + li.size + 4 + pattLen); out.u32(li.size); out.writer(li); out.u32(0);
+  if (patt) { out.str('8BIM'); out.str('Patt'); out.u32(patt.length + ((4 - patt.length % 4) % 4)); out.bytes(patt); for (let k = 0; k < (4 - patt.length % 4) % 4; k++) out.u8(0); }
   // Imagen combinada (sobre blanco), para los programas que no leen capas
   const flat = makeCanvas(W, H), fx = ctx2d(flat);
   fx.fillStyle = '#fff'; fx.fillRect(0, 0, W, H); fx.drawImage(doc.flatten(), 0, 0);
