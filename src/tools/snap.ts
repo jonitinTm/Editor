@@ -24,6 +24,8 @@ export function snapTargets(exclude: Layer[], withLayers = true): { x: number[];
   const d = app.doc!;
   const x = [0, d.width / 2, d.width], y = [0, d.height / 2, d.height];
   if (app.showGuides) { x.push(...d.guides.v); y.push(...d.guides.h); }
+  // con la cuadrícula visible también se ajusta a sus líneas
+  if (app.showGrid) { const g = Math.max(2, prefs.gridSize || 50); if (d.width / g < 400) for (let v = g; v < d.width; v += g) x.push(v); if (d.height / g < 400) for (let v = g; v < d.height; v += g) y.push(v); }
   if (withLayers) for (const l of d.allLayers()) {
     if (exclude.includes(l) || !l.isVisibleInTree()) continue;
     const b = layerBounds(l); if (!b || (b.w >= d.width && b.h >= d.height)) continue;

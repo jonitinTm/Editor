@@ -232,6 +232,8 @@ Ya disponible:
   uno de sus canales: rojo, verde, azul, gris o transparencia, invertido si quieres) con un modo de fusión y opacidad.
 - **Filtro › Interpretar › Efectos de iluminación…**: foco, luz omnidireccional o direccional, con color, alcance, luz
   ambiente y relieve a partir de la propia imagen.
+- **Cuadrícula y guías a tu gusto** (*Edición › Preferencias*): tamaño de la cuadrícula y color de cuadrícula y guías; con la
+  cuadrícula visible, las selecciones, el recorte y lo que mueves se ajustan a sus líneas.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

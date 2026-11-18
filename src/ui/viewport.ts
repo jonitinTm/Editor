@@ -2,6 +2,7 @@
 // la selección ("hormigas en marcha") y lo que dibuje la herramienta activa.
 
 import { app } from './app';
+import { prefs } from './prefs';
 import type { ToolEvent } from '../tools/tool';
 import { h } from './dom';
 import { drawSnap } from '../tools/snap';
@@ -267,10 +268,10 @@ export class Viewport {
     }
 
     // Cuadrícula
-    if (app.showGrid && app.gridSize * zoom >= 6) {
-      const g = app.gridSize;
+    if (app.showGrid && (prefs.gridSize || app.gridSize) * zoom >= 6) {
+      const g = prefs.gridSize || app.gridSize;
       ctx.save(); this.docPath(ctx); ctx.clip();
-      ctx.strokeStyle = 'rgba(120,120,120,.55)'; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.strokeStyle = prefs.gridColor || '#787878'; ctx.globalAlpha = 0.6; ctx.lineWidth = 1; ctx.beginPath();
       for (let x = Math.ceil(vx0 / g) * g; x <= vx1; x += g) this.docLine(ctx, x, vy0, x, vy1);
       for (let y = Math.ceil(vy0 / g) * g; y <= vy1; y += g) this.docLine(ctx, vx0, y, vx1, y);
       ctx.stroke(); ctx.restore();
@@ -307,7 +308,7 @@ export class Viewport {
 
     // Guías
     if (app.showGuides) {
-      ctx.save(); ctx.strokeStyle = '#19d3f0'; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.save(); ctx.strokeStyle = prefs.guideColor || '#19d3f0'; ctx.lineWidth = 1; ctx.beginPath();
       const far = 1e6;
       const list = [...d.guides.v.map(g => ['v', g] as const), ...d.guides.h.map(g => ['h', g] as const)];
       if (this.guideDrag) list.push([this.guideDrag.axis, this.guideDrag.pos]);

@@ -255,14 +255,16 @@ export function prefsDialog() {
   const hist = numberSlider({ min: 10, max: 300, value: prefs.historySteps, onInput: v => histV = v });
   const snapTol = numberSlider({ min: 1, max: 20, value: prefs.snapTolerance, unit: 'px', onInput: v => snapV = v });
   const auto = h('input', { type: 'checkbox', checked: prefs.autosave });
+  const gsize = h('input', { type: 'number', class: 'num', min: 2, max: 2000, value: prefs.gridSize, style: 'width:80px' }) as HTMLInputElement;
+  const gcol = h('input', { type: 'color', class: 'color-input', value: prefs.gridColor }) as HTMLInputElement, gdcol = h('input', { type: 'color', class: 'color-input', value: prefs.guideColor }) as HTMLInputElement;
   showDialog({
     title: 'Preferencias', width: 420,
     body: [h('div', { class: 'dlg-section' }, 'Interfaz'), row('Tema', theme), row('Tamaño de la interfaz', scale),
       h('div', { class: 'dlg-section' }, 'Rendimiento'), row('Pasos de historial', hist.el),
-      h('div', { class: 'dlg-section' }, 'Guías y ajuste'), row('Distancia de ajuste', snapTol.el),
+      h('div', { class: 'dlg-section' }, 'Guías, cuadrícula y ajuste'), row('Distancia de ajuste', snapTol.el), row('Cuadrícula cada', gsize, ' px'), row('Color de la cuadrícula', gcol), row('Color de las guías', gdcol),
       h('div', { class: 'dlg-section' }, 'Archivos'), row('', h('label', { class: 'check' }, auto, ' Guardar copia de recuperación cada 15 s'))],
     onOk: () => {
-      Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked });
+      Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked, gridSize: Math.max(2, Math.round(+gsize.value) || 50), gridColor: gcol.value, guideColor: gdcol.value });
       savePrefs(); app.viewport.requestRender(); app.toast('Preferencias guardadas');
     },
     onCancel: () => { document.body.dataset.theme = before.theme; app.viewport.requestRender(); },
