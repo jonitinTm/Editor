@@ -249,6 +249,8 @@ Ya disponible:
   zoom con dos dedos.
 - **Vista › Extras** (`Ctrl+H`): oculta por un momento la selección, las guías, la cuadrícula y las muestras para ver la
   imagen limpia (la selección sigue activa).
+- **Dinámica de color del pincel** (en «Más» de la barra del pincel): variar entre color frontal y de fondo, variar el tono
+  y variar el brillo en cada pincelada (follaje, confeti, texturas).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

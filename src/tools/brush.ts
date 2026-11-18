@@ -6,6 +6,7 @@ import { icon } from '../ui/icons';
 import { Stroke, getPaintTarget, brushTip, strokeSetup, PaintTarget } from './paint';
 import { ctx2d, makeCanvas, cloneCanvas, getPixels, putPixels } from '../core/canvas';
 import { heal } from '../filters/heal';
+import { rgb2hsl, hsl2rgb } from '../filters/adjustments';
 import { allPatterns, getPattern, patternFill } from '../core/patterns';
 import { healHole } from '../ui/ops';
 import type { Viewport } from '../ui/viewport';
@@ -21,6 +22,9 @@ const PRESS_OP = { key: 'pressureOpacity', label: 'Presión = opacidad', type: '
 const SMOOTH = { key: 'smoothing', label: 'Suavizar', type: 'range' as const, min: 0, max: 100, default: 10, unit: '%' };
 const ANGLE = { key: 'angle', label: 'Ángulo', type: 'range' as const, min: -180, max: 180, default: 0, unit: '°' };
 const ROUND = { key: 'roundness', label: 'Redondez', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
+const FGBG_JIT = { key: 'fgbgJitter', label: 'Variar frontal/fondo', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const HUE_JIT = { key: 'hueJitter', label: 'Variar tono', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const BRI_JIT = { key: 'briJitter', label: 'Variar brillo', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
 const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, min: 0, max: 500, default: 0, unit: '%' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
@@ -73,10 +77,27 @@ abstract class StrokeTool implements Tool {
     const ctx = ctx2d(this.stroke!.buffer);
     const round = (app.opt<number>('roundness', this.id) ?? 100) / 100, angle = app.opt<number>('angle', this.id) ?? 0, scatter = (app.opt<number>('scatter', this.id) ?? 0) / 100;
     const tipId = this.aliased ? '' : (app.opt<string>('tip', this.id) ?? ''), jitter = !!app.opt('tipJitter', this.id);
+    // dinámica de color: cada pincelada con un color algo distinto
+    const fj = (app.opt<number>('fgbgJitter', this.id) ?? 0) / 100, hj = (app.opt<number>('hueJitter', this.id) ?? 0) / 100, bj = (app.opt<number>('briJitter', this.id) ?? 0) / 100;
+    const dyn = !this.erase && (fj > 0 || hj > 0 || bj > 0) && /^#[0-9a-f]{6}$/i.test(color);
+    const c0 = dyn ? [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)) : [0, 0, 0];
+    const c1 = dyn ? [1, 3, 5].map(i => parseInt((app.bg || '#ffffff').slice(i, i + 2), 16)) : [0, 0, 0];
+    const tintC = makeCanvas(4, 4);
+    const dynColor = () => {
+      const t = Math.random() * fj; let r = c0[0] + (c1[0] - c0[0]) * t, g = c0[1] + (c1[1] - c0[1]) * t, b = c0[2] + (c1[2] - c0[2]) * t;
+      if (hj > 0) { const [hh, ss, ll] = rgb2hsl(r, g, b); const [r2, g2, b2] = hsl2rgb((hh + (Math.random() * 2 - 1) * hj * 0.5 + 1) % 1, ss, ll); r = r2; g = g2; b = b2; }
+      if (bj > 0) { const k = 1 + (Math.random() * 2 - 1) * bj * 0.6; r *= k; g *= k; b *= k; }
+      return `rgb(${Math.max(0, Math.min(255, r)) | 0},${Math.max(0, Math.min(255, g)) | 0},${Math.max(0, Math.min(255, b)) | 0})`;
+    };
     return (x, y, p) => {
       const size = this.size(p);
       // punta con imagen (si hay) o la redonda de siempre
-      const tip = (tipId && sampledTip(tipId, size, color, jitter ? Math.random() * 360 : angle, round)) || brushTip(size, hard, color, this.aliased, round, angle);
+      let tip = (tipId && sampledTip(tipId, size, dyn ? '#ffffff' : color, jitter ? Math.random() * 360 : angle, round)) || brushTip(size, hard, dyn ? '#ffffff' : color, this.aliased, round, angle);
+      if (dyn) {
+        if (tintC.width !== tip.width || tintC.height !== tip.height) { tintC.width = tip.width; tintC.height = tip.height; }
+        const tc = ctx2d(tintC); tc.globalCompositeOperation = 'copy'; tc.drawImage(tip, 0, 0); tc.globalCompositeOperation = 'source-in'; tc.fillStyle = dynColor(); tc.fillRect(0, 0, tip.width, tip.height); tc.globalCompositeOperation = 'source-over';
+        tip = tintC;
+      }
       if (scatter > 0) { x += (Math.random() * 2 - 1) * scatter * size; y += (Math.random() * 2 - 1) * scatter * size; }
       let dx = x - tip.width / 2, dy = y - tip.height / 2;
       if (this.aliased) { dx = Math.round(dx); dy = Math.round(dy); }
@@ -143,6 +164,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
+  options = [SIZE, HARD, OPAC, FLOW, SMOOTH, SPACING, ANGLE, ROUND, SCATTER, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
 }
