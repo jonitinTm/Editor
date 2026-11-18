@@ -197,6 +197,10 @@ Ya disponible:
   rasterizar o eliminar. Las de los PSD se importan como trazados editables y se guardan como tales.
 - **Motivos en PSD**: las capas de relleno de motivo (también las formas rellenas de motivo) y la superposición de motivo
   se leen y se guardan con sus motivos dentro del archivo; los motivos importados quedan disponibles en el editor.
+- **Revelado de RAW en DNG**: los archivos DNG (móviles como iPhone ProRAW o Android, muchas cámaras y cualquier RAW
+  convertido con el conversor gratuito de Adobe) se revelan desde los datos del sensor: negros y blancos, balance de
+  blancos de la cámara, color del mosaico de Bayer, matriz de color, orientación y curva de tono. Después se puede
+  ajustar todo con *Filtro › Revelado*. De los demás RAW (CR2, NEF, ARW…) se abre la vista previa que guarda la cámara.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

@@ -57,11 +57,25 @@ export async function openFiles(files: File[], asLayers = false) {
         continue;
       }
       if (io.isRawFile(f)) {
+        // DNG: revelado completo de los datos del sensor
+        const bytes = new Uint8Array(await f.arrayBuffer());
+        const { isDng, decodeDng } = await import('../io/dng');
+        if (isDng(bytes)) {
+          try {
+            app.toast('Revelando el RAW…'); await new Promise(r => setTimeout(r, 30));
+            const img = decodeDng(bytes);
+            const rd = new EditorDocument(io.baseName(f.name), img.width, img.height);
+            const rl = new RasterLayer('Fondo', img.width, img.height); ctx2d(rl.canvas).putImageData(img, 0, 0); rd.root.add(rl); rd.setActive(rl, false);
+            app.addDocument(rd);
+            app.toast('RAW revelado. Para ajustar exposición, blancos y color: Filtro › Revelado (Mayús+Ctrl+A)');
+            continue;
+          } catch (er: any) { app.toast('No se pudo revelar este DNG (' + (er?.message ?? er) + '); se abre su vista previa', 'warn'); }
+        }
         const c = await io.rawPreview(f);
         const rd = new EditorDocument(io.baseName(f.name), c.width, c.height);
         const rl = new RasterLayer('Fondo', c.width, c.height); rl.canvas = c; rd.root.add(rl); rd.setActive(rl, false);
         app.addDocument(rd);
-        alertDialog('Archivo RAW', `Se ha abierto la vista previa JPEG que la cámara guardó dentro del RAW (${c.width} × ${c.height} px). Editor todavía no revela los datos en bruto del sensor, así que no hay margen extra de exposición ni de balance de blancos.`);
+        alertDialog('Archivo RAW', `Se ha abierto la vista previa JPEG que la cámara guardó dentro del RAW (${c.width} × ${c.height} px). Editor revela por completo los archivos DNG; de este formato de cámara se usa la vista previa, así que no hay margen extra de exposición ni de balance de blancos. (Consejo: si conviertes tus RAW a DNG con el conversor gratuito de Adobe, Editor los revela por completo.)`);
         continue;
       }
       if (!io.isImageFile(f)) { app.toast(`Formato no admitido: ${f.name}`, 'warn'); continue; }
