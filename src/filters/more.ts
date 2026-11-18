@@ -215,6 +215,29 @@ export function tiltShift(img: ImageData, p: any) {
   }
 }
 
+// ---- Desenfoque de iris: una elipse nítida y el resto desenfocado (como un retrato con mucho fondo borroso)
+export function irisBlur(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img;
+  const blurred = new ImageData(new Uint8ClampedArray(d), w, h); gaussianBlur(blurred, p.blur ?? 20);
+  const b = blurred.data;
+  const cx = (p.x ?? 50) / 100 * w, cy = (p.y ?? 50) / 100 * h, R = (p.size ?? 30) / 100 * Math.min(w, h);
+  const rx = R * Math.sqrt(p.ratio ?? 1) , ry = R / Math.sqrt(p.ratio ?? 1);
+  const a = (p.angle ?? 0) * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), sharp = (p.focus ?? 60) / 100;
+  // brillo de las luces desenfocadas (bokeh)
+  const lights = (p.lights ?? 0) / 100;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const u = ((x - cx) * ca + (y - cy) * sa) / rx, v = (-(x - cx) * sa + (y - cy) * ca) / ry, r = Math.hypot(u, v);
+    let t = (r - sharp) / Math.max(0.01, 1 - sharp); t = t < 0 ? 0 : t > 1 ? 1 : t * t * (3 - 2 * t);
+    if (!t) continue;
+    const i = (y * w + x) * 4;
+    for (let c = 0; c < 4; c++) {
+      let v2 = b[i + c];
+      if (lights && c < 3) { const l = (b[i] + b[i + 1] + b[i + 2]) / 765; if (l > 0.7) v2 = clamp(v2 + (v2 * (l - 0.7) / 0.3) * lights * 0.8); }
+      d[i + c] += (v2 - d[i + c]) * t;
+    }
+  }
+}
+
 // ---- Enfoque suavizado -------------------------------------------------------------------
 export function smartSharpen(img: ImageData, amount: number, radius: number, noise: number) {
   const d = img.data, blurred = new ImageData(new Uint8ClampedArray(d), img.width, img.height); gaussianBlur(blurred, radius);

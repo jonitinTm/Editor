@@ -199,6 +199,8 @@ Ya disponible:
   blanco y negro o retro) con tramado por difusión o por motivo; útil para pixel art, GIF y efectos de impresión.
 - **Quitar fondo** (*Capa › Quitar fondo* o el botón en *Propiedades*): detecta el sujeto y oculta el fondo con una
   máscara, sin borrar nada (pinta en la máscara para retocar el borde).
+- **Desenfoque de iris** (*Filtro › Desenfocar*): elipse nítida con el resto desenfocado (posición, tamaño, alargamiento,
+  ángulo, transición y brillo de las luces tipo bokeh).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
