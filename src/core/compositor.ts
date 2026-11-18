@@ -1,5 +1,6 @@
 // Compositor: combina todas las capas visibles en una sola imagen.
 
+import { isCustomBlend, drawCustomBlend } from './blend';
 import { borrowCanvas, returnCanvas, ctx2d, Rect } from './canvas';
 import { canvasBlend, GroupLayer, Layer, AdjustmentLayer, LayerStyles, hasStyles, isRaster, blendIfActive, effectiveMask } from './layers';
 import { FILTERS } from '../filters/registry';
@@ -107,8 +108,8 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
       const t = borrowCanvas(w, h), tc = ctx2d(t);
       tc.drawImage(cs.canvas, cs.off.x, cs.off.y);
       tc.globalCompositeOperation = 'destination-in'; tc.drawImage(surface, off.x, off.y); tc.globalCompositeOperation = 'source-over';
-      gctx.globalAlpha = c.opacity; gctx.globalCompositeOperation = canvasBlend(c.blendMode);
-      gctx.drawImage(t, 0, 0);
+      if (isCustomBlend(c.blendMode)) drawCustomBlend(gctx, t, 0, 0, c.blendMode, c.opacity, opts.rect);
+      else { gctx.globalAlpha = c.opacity; gctx.globalCompositeOperation = canvasBlend(c.blendMode); gctx.drawImage(t, 0, 0); }
       gctx.globalAlpha = 1; gctx.globalCompositeOperation = 'source-over';
       returnCanvas(t); if (cs.temp) returnCanvas(cs.temp);
     }
@@ -153,11 +154,15 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
       surface = t; off = { x: 0, y: 0 };
     }
   }
-  ctx.save();
-  ctx.globalAlpha = layer.opacity * (hasStyles(layer.styles) ? 1 : layer.fillOpacity);
-  ctx.globalCompositeOperation = canvasBlend(layer.blendMode);
-  ctx.drawImage(surface, off.x, off.y);
-  ctx.restore();
+  const alpha = layer.opacity * (hasStyles(layer.styles) ? 1 : layer.fillOpacity);
+  if (isCustomBlend(layer.blendMode)) drawCustomBlend(ctx, surface, off.x, off.y, layer.blendMode, alpha, opts.rect);
+  else {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.globalCompositeOperation = canvasBlend(layer.blendMode);
+    ctx.drawImage(surface, off.x, off.y);
+    ctx.restore();
+  }
   for (const c of extra) returnCanvas(c);
 }
 
@@ -332,14 +337,15 @@ function applyAdjustment(l: AdjustmentLayer, ctx: CanvasRenderingContext2D, w: n
   if (x1 <= x || y1 <= y) return;
   const mc = effectiveMask(l, opts.overrides?.get(l)?.mask ?? (l.mask?.enabled ? l.mask.canvas : null), w, h);
   const params = def.fill ? { ...l.params, _x: x, _y: y, _W: w, _H: h } : l.params;
-  if (def.fill || canvasBlend(l.blendMode) !== 'source-over') {
+  if (def.fill || canvasBlend(l.blendMode) !== 'source-over' || isCustomBlend(l.blendMode)) {
     // Relleno o ajuste con modo de fusión: el resultado se dibuja encima con su máscara, opacidad y modo
     const rw = x1 - x, rh = y1 - y;
     const img2 = def.fill ? new ImageData(rw, rh) : ctx.getImageData(x, y, rw, rh);
     def.apply(img2, params);
     const t = makeCanvas(rw, rh), tc = ctx2d(t); tc.putImageData(img2, 0, 0);
     if (mc) { tc.globalCompositeOperation = 'destination-in'; tc.drawImage(mc, -x, -y); }
-    ctx.save(); ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode); ctx.drawImage(t, x, y); ctx.restore();
+    if (isCustomBlend(l.blendMode)) drawCustomBlend(ctx, t, x, y, l.blendMode, l.opacity, opts.rect);
+    else { ctx.save(); ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode); ctx.drawImage(t, x, y); ctx.restore(); }
     return;
   }
   const img = ctx.getImageData(x, y, x1 - x, y1 - y);

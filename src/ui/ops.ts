@@ -4,6 +4,7 @@
 import { app } from './app';
 import { EditorDocument, type LayerComp } from '../core/document';
 import { effectiveMask } from '../core/layers';
+import { isCustomBlend, drawCustomBlend } from '../core/blend';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, SmartFilter, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, composeStyled } from '../core/compositor';
@@ -419,8 +420,7 @@ export function mergeDown() {
     const plain = cloneCanvas(c), cc = ctx2d(c);
     cc.clearRect(0, 0, d.width, d.height); composeStyled(cc, plain, layer.styles, 0, 0, d.width, d.height, undefined, layer.fillOpacity);
   }
-  ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode);
-  if (l.visible) ctx.drawImage(top, 0, 0);
+  if (l.visible) { if (isCustomBlend(l.blendMode)) drawCustomBlend(ctx, top, 0, 0, l.blendMode, l.opacity); else { ctx.globalAlpha = l.opacity; ctx.globalCompositeOperation = canvasBlend(l.blendMode); ctx.drawImage(top, 0, 0); } }
   let target = below as RasterLayer;
   if (isParametric(target)) target = rasterizeLayer(target);
   target.canvas = base; target.mask = null; target.styles = null; target.touch();
@@ -1929,4 +1929,27 @@ export async function inpaintCanvas(src: HTMLCanvasElement, holeCanvas: HTMLCanv
   // borde suave: donde el hueco es parcial se mezcla con el original
   for (let i = 0; i < hole.length; i++) { const a = ha[i * 4 + 3] / 255; if (a > 0 && a < 1) for (let c = 0; c < 4; c++) R.data[i * 4 + c] = O.data[i * 4 + c] * (1 - a) + R.data[i * 4 + c] * a; }
   const out = cloneCanvas(src); putPixels(out, R, reg.x, reg.y); return out;
+}
+
+/**
+ * Separación de frecuencias (retoque de piel): la capa se divide en «baja frecuencia» (color y luz, desenfocada) y
+ * «alta frecuencia» (textura, en Luz lineal). Juntas se ven igual que el original; se retoca cada una por separado.
+ */
+export async function frequencySeparation(radius: number) {
+  const d = doc(); const l = d?.active; if (!d || !l || !isRaster(l)) { app.toast('Elige una capa de imagen', 'warn'); return; }
+  const { gaussianBlur } = await import('../filters/blur');
+  const W = d.width, H = d.height, src = ctx2d(bakeLayer(l, d)).getImageData(0, 0, W, H);
+  const low = new ImageData(new Uint8ClampedArray(src.data), W, H); gaussianBlur(low, radius);
+  const high = new ImageData(W, H);
+  for (let i = 0; i < src.data.length; i += 4) {
+    for (let c = 0; c < 3; c++) high.data[i + c] = (src.data[i + c] - low.data[i + c]) / 2 + 128;
+    high.data[i + 3] = src.data[i + 3];
+  }
+  const g = new GroupLayer('Separación de frecuencias');
+  const lo = new RasterLayer('Baja frecuencia (color y luz)', W, H); ctx2d(lo.canvas).putImageData(low, 0, 0); lo.touch();
+  const hi = new RasterLayer('Alta frecuencia (textura)', W, H); ctx2d(hi.canvas).putImageData(high, 0, 0); hi.touch(); hi.blendMode = 'linear-light';
+  g.add(lo); g.add(hi);
+  l.parent!.add(g, l.parent!.children.indexOf(l) + 1); l.visible = false;
+  d.setActive(lo, false); d.invalidate(); d.commit('Separación de frecuencias');
+  app.toast('Suaviza manchas en «Baja frecuencia» (pincel corrector, desenfoque) y la textura en «Alta frecuencia» se conserva');
 }

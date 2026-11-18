@@ -2,6 +2,7 @@
 // (capas de ajuste, objetos inteligentes, formas vectoriales…) consiste en
 // crear otra subclase con su propio `kind` y enseñarle al compositor a pintarla.
 
+import { isCustomBlend } from './blend';
 import { makeCanvas, ctx2d, clearCanvas, Rect } from './canvas';
 import { FILTERS } from '../filters/registry';
 import { drawMeshExact, styledMesh } from '../tools/warpmesh';
@@ -11,24 +12,35 @@ import { segments, type TextRun, type RunStyle } from './textruns';
 
 
 /** 'pass-through' solo vale para grupos: sus capas se mezclan directamente con lo de debajo. */
-export type BlendMode = GlobalCompositeOperation | 'pass-through';
-export const canvasBlend = (b: BlendMode): GlobalCompositeOperation => b === 'pass-through' ? 'source-over' : b;
+export type BlendMode = GlobalCompositeOperation | 'pass-through' | import('./blend').CustomBlend;
+/** Modo para el lienzo del navegador (los modos propios se calculan aparte y aquí cuentan como normal). */
+export const canvasBlend = (b: BlendMode): GlobalCompositeOperation => b === 'pass-through' || isCustomBlend(b) ? 'source-over' : b as GlobalCompositeOperation;
 
 export const BLEND_MODES: { id: BlendMode; label: string }[] = [
   { id: 'pass-through', label: 'Pasar (solo grupos)' },
   { id: 'source-over', label: 'Normal' },
+  { id: 'dissolve', label: 'Disolver' },
   { id: 'darken', label: 'Oscurecer' },
   { id: 'multiply', label: 'Multiplicar' },
   { id: 'color-burn', label: 'Subexponer color' },
+  { id: 'linear-burn', label: 'Subexposición lineal' },
+  { id: 'darker-color', label: 'Color más oscuro' },
   { id: 'lighten', label: 'Aclarar' },
   { id: 'screen', label: 'Trama' },
   { id: 'color-dodge', label: 'Sobreexponer color' },
   { id: 'lighter', label: 'Sumar (lineal)' },
+  { id: 'lighter-color', label: 'Color más claro' },
   { id: 'overlay', label: 'Superponer' },
   { id: 'soft-light', label: 'Luz suave' },
   { id: 'hard-light', label: 'Luz fuerte' },
+  { id: 'vivid-light', label: 'Luz intensa' },
+  { id: 'linear-light', label: 'Luz lineal' },
+  { id: 'pin-light', label: 'Luz focal' },
+  { id: 'hard-mix', label: 'Mezcla definida' },
   { id: 'difference', label: 'Diferencia' },
   { id: 'exclusion', label: 'Exclusión' },
+  { id: 'subtract', label: 'Restar' },
+  { id: 'divide', label: 'Dividir' },
   { id: 'hue', label: 'Tono' },
   { id: 'saturation', label: 'Saturación' },
   { id: 'color', label: 'Color' },

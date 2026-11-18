@@ -284,6 +284,11 @@ Ya disponible:
 - **Ajustes predefinidos** en los diálogos de filtros y ajustes («Predefinido», abajo): guarda tus valores con un nombre y
   recupéralos con un clic. Curvas, Niveles y Tono/Saturación traen algunos de serie (más contraste, aclarar, película,
   tono cálido o frío, proceso cruzado, sepia…).
+- **Todos los modos de fusión de Photoshop**: además de los de antes, Disolver, Subexposición lineal, Color más oscuro y más
+  claro, Luz intensa, Luz lineal, Luz focal, Mezcla definida, Restar y Dividir (en capas, grupos y capas de ajuste; se
+  leen y guardan en PSD).
+- **Imagen › Separación de frecuencias…** (retoque de piel): divide la capa en color/luz y textura; juntas se ven igual, y
+  se suavizan manchas en una sin perder los poros de la otra.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

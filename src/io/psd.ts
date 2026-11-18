@@ -17,7 +17,8 @@ const BLEND_KEYS: [string, BlendMode][] = [
   ['pass', 'pass-through'], ['norm', 'source-over'], ['dark', 'darken'], ['mul ', 'multiply'], ['idiv', 'color-burn'], ['lite', 'lighten'],
   ['scrn', 'screen'], ['div ', 'color-dodge'], ['lddg', 'lighter'], ['over', 'overlay'], ['sLit', 'soft-light'],
   ['hLit', 'hard-light'], ['diff', 'difference'], ['smud', 'exclusion'], ['hue ', 'hue'], ['sat ', 'saturation'],
-  ['colr', 'color'], ['lum ', 'luminosity'],
+  ['colr', 'color'], ['lum ', 'luminosity'], ['diss', 'dissolve'], ['lbrn', 'linear-burn'], ['dkCl', 'darker-color'], ['lgCl', 'lighter-color'],
+  ['vLit', 'vivid-light'], ['lLit', 'linear-light'], ['pLit', 'pin-light'], ['hMix', 'hard-mix'], ['fsub', 'subtract'], ['fdiv', 'divide'],
 ];
 const keyToBlend = new Map(BLEND_KEYS);
 /** Etiquetas de color en el orden que usa Photoshop. */
