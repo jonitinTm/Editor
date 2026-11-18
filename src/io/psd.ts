@@ -1123,7 +1123,8 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
         recs.push({ extra, name: l.name, layer: l, section: 0, rect: b, chans, hasMask: !!m });
       } else if (l instanceof AdjustmentLayer && adjustmentBlock(l)) {
         const m = maskChan(l);
-        recs.push({ name: l.name, layer: l, section: -1, rect: { x: 0, y: 0, w: 0, h: 0 }, chans: [...[-1, 0, 1, 2].map(id => ({ id, bytes: new Uint8Array([0, 0]) })), ...(m ? [m] : [])], hasMask: !!m });
+        const ex: [string, Uint8Array][] = l.vmask?.subpaths.length ? [['vmsk', vectorMaskBlock(l.vmask, W, H)]] : [];
+        recs.push({ extra: ex, name: l.name, layer: l, section: -1, rect: { x: 0, y: 0, w: 0, h: 0 }, chans: [...[-1, 0, 1, 2].map(id => ({ id, bytes: new Uint8Array([0, 0]) })), ...(m ? [m] : [])], hasMask: !!m });
       } else skipped++;
     }
   };
