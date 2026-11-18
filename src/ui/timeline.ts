@@ -17,6 +17,20 @@ export function applyFrame(d: EditorDocument, i: number) {
   for (const l of d.allLayers()) l.visible = set.has(l.id);
   d.invalidate(); d.changed();
 }
+/** Papel cebolla: imagen del cuadro anterior (se guarda mientras no cambie nada). */
+let onionOn = false;
+let onionCache: { key: string; c: HTMLCanvasElement } | null = null;
+(app as any).onionCanvas = (d: EditorDocument) => {
+  if (!onionOn || d.frames.length < 2) return null;
+  const prev = (d.frameIndex - 1 + d.frames.length) % d.frames.length, key = `${d.name}|${prev}|${d.frameIndex}|${d.history.index}|${d.width}x${d.height}`;
+  if (onionCache?.key === key) return onionCache.c;
+  // solo lo que se ve en el cuadro anterior y no en el actual (el fondo común no tapa el dibujo)
+  const vis = new Map(d.allLayers().map(l => [l, l.visible])), set = new Set(d.frames[prev].visible), now = new Set(d.frames[d.frameIndex]?.visible ?? []);
+  for (const l of d.allLayers()) l.visible = l.kind === 'group' ? set.has(l.id) || now.has(l.id) : set.has(l.id) && !now.has(l.id);
+  const c = d.flatten();
+  for (const [l, v] of vis) l.visible = v;
+  onionCache = { key, c }; return c;
+};
 /** Imagen de cada cuadro, para exportar. */
 export function renderFrames(d: EditorDocument): { canvas: HTMLCanvasElement; delay: number }[] {
   const keep = d.frameIndex, out = [];
@@ -48,6 +62,7 @@ export function buildTimeline(parent: HTMLElement) {
     btn('+ Cuadro', 'Duplicar el cuadro actual', () => { const d = app.doc; if (!d) return; if (!d.frames.length) d.frames.push({ delay: 100, visible: visibleIds(d) }); d.frames.splice(d.frameIndex + 1, 0, { delay: d.frames[d.frameIndex].delay, visible: visibleIds(d) }); applyFrame(d, d.frameIndex + 1); }),
     btn('Eliminar', 'Eliminar el cuadro actual', () => { const d = app.doc; if (!d || !d.frames.length) return; d.frames.splice(d.frameIndex, 1); if (d.frames.length) applyFrame(d, Math.min(d.frameIndex, d.frames.length - 1)); else d.changed(); }),
     btn('Cuadros desde capas', 'Crea un cuadro por cada capa', () => { if (app.doc) framesFromLayers(app.doc); }),
+    (() => { const b = btn('Papel cebolla', 'Ver el cuadro anterior en transparencia mientras dibujas', () => { onionOn = !onionOn; b.classList.toggle('on', onionOn); app.viewport.requestRender(); }); return b; })(),
     h('span', { class: 'hint' }, 'Cada cuadro recuerda qué capas se ven. Exporta con Archivo › Exportar como (GIF animado o vídeo WebM).'));
   const el = h('div', { class: 'timeline closed', 'data-group': 'timeline' }, bar, strip);
   parent.append(el);

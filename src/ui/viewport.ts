@@ -252,6 +252,9 @@ export class Viewport {
     ctx.imageSmoothingEnabled = zoom < 1 || (rot !== 0 && zoom < 4);
     ctx.imageSmoothingQuality = 'high';
     this.drawComposite(ctx, comp);
+    // papel cebolla: el cuadro anterior de la animación, en transparencia
+    const onion = (app as any).onionCanvas?.(d) as HTMLCanvasElement | null;
+    if (onion) { ctx.save(); ctx.globalAlpha = 0.3; this.docTransform(ctx); ctx.drawImage(onion, 0, 0); ctx.restore(); }
     ctx.restore();
 
     // Zona visible en coordenadas del documento

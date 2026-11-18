@@ -294,6 +294,8 @@ Ya disponible:
   hechas girando con cuidado.
 - **Exportar la animación como vídeo WebM** (*Exportar como*, además del GIF): mejor calidad y archivos más pequeños para
   redes; se graba en tiempo real.
+- **Papel cebolla** (botón de la Línea de tiempo): mientras dibujas un cuadro se ve el anterior en transparencia, para
+  animar a mano.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
