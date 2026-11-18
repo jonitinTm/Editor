@@ -259,6 +259,8 @@ Ya disponible:
   creados según el formato; falta probarlo con paquetes reales descargados.
 - **Muestras propias** (panel Muestras): «＋» guarda el color frontal, clic derecho la quita, e «Importar…» lee paletas de
   Adobe `.aco` y `.ase` (RGB, CMYK, gris, HSB y Lab). Se guardan en este navegador.
+- **Archivo › Abrir como capas…**: varias imágenes a la vez en un mismo documento, una capa por imagen con su nombre
+  (si no hay documento abierto, se crea uno del tamaño de la mayor).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

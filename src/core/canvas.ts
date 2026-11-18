@@ -85,18 +85,15 @@ export function rectInt(r: Rect): Rect {
 export function contentBounds(c: HTMLCanvasElement, threshold = 0): Rect | null {
   const { width: w, height: h } = c;
   const d = getPixels(c).data;
-  let minX = w, minY = h, maxX = -1, maxY = -1;
-  for (let y = 0; y < h; y++) {
-    let row = y * w * 4 + 3;
-    for (let x = 0; x < w; x++, row += 4) {
-      if (d[row] > threshold) {
-        if (x < minX) minX = x; if (x > maxX) maxX = x;
-        if (y < minY) minY = y; if (y > maxY) maxY = y;
-      }
-    }
-  }
-  if (maxX < 0) return null;
-  return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+  // se busca desde cada borde hacia dentro y se para en cuanto aparece algo (rápido en imágenes llenas)
+  const rowHas = (y: number) => { for (let i = y * w * 4 + 3, e = i + w * 4; i < e; i += 4) if (d[i] > threshold) return true; return false; };
+  let top = 0; while (top < h && !rowHas(top)) top++;
+  if (top === h) return null;
+  let bottom = h - 1; while (bottom > top && !rowHas(bottom)) bottom--;
+  const colHas = (x: number) => { for (let y = top, i = (top * w + x) * 4 + 3; y <= bottom; y++, i += w * 4) if (d[i] > threshold) return true; return false; };
+  let left = 0; while (left < w && !colHas(left)) left++;
+  let right = w - 1; while (right > left && !colHas(right)) right--;
+  return { x: left, y: top, w: right - left + 1, h: bottom - top + 1 };
 }
 
 export function canvasToBlob(c: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {

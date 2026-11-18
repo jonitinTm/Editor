@@ -34,6 +34,7 @@ export const ACTIONS: Action[] = [
   // Archivo
   { id: 'new', label: 'Nuevo…', keys: ['Alt+Ctrl+N', 'Ctrl+N'], run: dlg.newDocumentDialog },
   { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles(io.OPEN_ACCEPT)) },
+  { id: 'openLayers', label: 'Abrir como capas…', run: async () => ops.openAsLayers(await io.pickFiles('image/*,.tif,.tiff,.tga')) },
   { id: 'recent', label: 'Abrir reciente…', run: () => dlg.recentDialog() },
   { id: 'place', label: 'Colocar imagen como objeto inteligente…', keys: ['Shift+Ctrl+P'], enabled: hasDoc, run: async () => ops.openFiles(await io.pickFiles('image/*'), true) },
   { id: 'save', label: 'Guardar proyecto (.edp)', keys: ['Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(false) },

@@ -1753,3 +1753,30 @@ export async function importPresets(f: File) {
     app.toast(`${list.length} motivo${list.length === 1 ? '' : 's'} importado${list.length === 1 ? '' : 's'}`);
   }
 }
+
+/** Archivo › Abrir como capas: varias imágenes en un mismo documento, una capa por imagen (con su nombre). */
+export async function openAsLayers(files: File[]) {
+  const imgs = files.filter(f => io.isImageFile(f) || io.isTiffTga(f));
+  if (!imgs.length) return;
+  const canv: { name: string; c: HTMLCanvasElement }[] = [];
+  for (const f of imgs) {
+    try {
+      if (io.isTiffTga(f)) { const r = await import('../io/raster'), b = new Uint8Array(await f.arrayBuffer()); const pg = /\.tiff?$/i.test(f.name) ? (await r.decodeTiff(b))[0].img : r.decodeTga(b); const c = makeCanvas(pg.width, pg.height); ctx2d(c).putImageData(pg, 0, 0); canv.push({ name: io.baseName(f.name), c }); }
+      else canv.push({ name: io.baseName(f.name), c: await io.imageToCanvas(f) });
+    } catch { app.toast(`No se pudo leer ${f.name}`, 'warn'); }
+  }
+  if (!canv.length) return;
+  let d = doc();
+  if (!d) {
+    const W = Math.max(...canv.map(x => x.c.width)), H = Math.max(...canv.map(x => x.c.height));
+    d = new EditorDocument(canv.length > 1 ? 'Capas' : canv[0].name, W, H);
+    app.addDocument(d);
+  }
+  for (const { name, c } of canv) {
+    const l = new RasterLayer(name, d.width, d.height);
+    ctx2d(l.canvas).drawImage(c, Math.round((d.width - c.width) / 2), Math.round((d.height - c.height) / 2)); l.touch();
+    d.insertAboveActive(l); d.setActive(l, false);
+  }
+  d.invalidate(); d.commit(canv.length > 1 ? `Abrir ${canv.length} imágenes como capas` : 'Abrir como capa');
+  app.toast(`${canv.length} capa${canv.length === 1 ? '' : 's'} añadida${canv.length === 1 ? '' : 's'}`);
+}
