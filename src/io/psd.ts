@@ -861,7 +861,18 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
         recs.push({ name: '</Layer group>', layer: null, section: 3, rect: { x: 0, y: 0, w: 0, h: 0 }, chans: [], hasMask: false });
         visit(l);
         const m = maskChan(l);
-        recs.push({ name: l.name, layer: l, section: l.expanded ? 1 : 2, rect: { x: 0, y: 0, w: 0, h: 0 }, chans: m ? [m] : [], hasMask: !!m });
+        const gx: [string, Uint8Array][] = [];
+        if (l.artboard) {
+          // Mesa de trabajo: rectángulo y fondo, como los guarda Photoshop
+          const a = l.artboard, w = new Writer(); w.u32(16);
+          const type = a.bg === '#ffffff' ? 1 : a.bg === '#000000' ? 2 : a.bg ? 4 : 3;
+          writeDescriptor(w, 'artboard', { artboardRect: ['Objc', 'classFloatRect', { 'Top ': ['doub', a.y], Left: ['doub', a.x], Btom: ['doub', a.y + a.h], Rght: ['doub', a.x + a.w] }],
+            guideIndeces: ['VlLs', []], artboardPresetName: ['TEXT', ''], 'Clr ': rgbDV(a.bg ?? '#ffffff'), artboardBackgroundType: ['long', type] });
+          if (w.size & 1) w.u8(0);
+          const parts = w.parts(), out = new Uint8Array(w.size); let o = 0; for (const c of parts) { out.set(c, o); o += c.length; }
+          gx.push(['artb', out]);
+        }
+        recs.push({ extra: gx, name: l.name, layer: l, section: l.expanded ? 1 : 2, rect: { x: 0, y: 0, w: 0, h: 0 }, chans: m ? [m] : [], hasMask: !!m });
       } else if (isRaster(l)) {
         const extra: [string, Uint8Array][] = [];
         const sb = l instanceof ShapeLayer ? shapeBlocks(l, W, H) : null;

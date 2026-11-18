@@ -96,6 +96,18 @@ export class EditorDocument {
     }
   }
 
+  /** Zonas de la imagen combinada que han cambiado desde la última vez que la vista las pidió. */
+  private viewChanges: Rect | true | null = true;
+  takeCompositeChanges(): Rect | true | null { const c = this.viewChanges; this.viewChanges = null; return c; }
+  private noteChange(r: Rect | null) {
+    if (this.viewChanges === true) return;
+    if (!r) { this.viewChanges = true; return; }
+    const v = this.viewChanges;
+    if (!v) { this.viewChanges = { ...r }; return; }
+    const x = Math.min(v.x, r.x), y = Math.min(v.y, r.y);
+    this.viewChanges = { x, y, w: Math.max(v.x + v.w, r.x + r.w) - x, h: Math.max(v.y + v.h, r.y + r.h) - y };
+  }
+
   /** Devuelve la imagen combinada actualizada. */
   getComposite(): HTMLCanvasElement {
     if (this.composite.width !== this.width || this.composite.height !== this.height) {
@@ -108,6 +120,7 @@ export class EditorDocument {
       };
       const big = !rect || rect.w * rect.h > this.width * this.height / 4;
       if (!this.renderWithCache(rect, big)) renderComposite(this.root, this.composite, { overrides: this.overrides, rect });
+      this.noteChange(rect);
       this.compositeDirty = null;
     }
     return this.composite;

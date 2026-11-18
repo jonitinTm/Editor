@@ -113,6 +113,48 @@ export class Viewport {
   private docImage(ctx: CanvasRenderingContext2D, img: CanvasImageSource) {
     ctx.save(); this.docTransform(ctx); ctx.drawImage(img, 0, 0); ctx.restore();
   }
+  /** Copia reducida de la imagen combinada para cuando se ve alejada: dibujar la imagen grande
+   *  reducida en cada fotograma es lo más caro; así solo se reduce la zona que cambia. */
+  private mipTmp: HTMLCanvasElement | null = null;
+  private bgCache: { key: string; canvas: HTMLCanvasElement } | null = null;
+  private mip: { doc: object; canvas: HTMLCanvasElement; s: number; comp: HTMLCanvasElement } | null = null;
+  private drawComposite(ctx: CanvasRenderingContext2D, comp: HTMLCanvasElement) {
+    const d = this.doc!, eff = d.view.zoom * this.dpr;
+    const changes = d.takeCompositeChanges();
+    let s = 1; while (s / 2 >= eff && s > 1 / 32) s /= 2;
+    if (s === 1 || comp.width * comp.height < 1.5e6) { this.mip = null; this.docImage(ctx, comp); return; }
+    const W = Math.max(1, Math.ceil(comp.width * s)), H = Math.max(1, Math.ceil(comp.height * s));
+    let m = this.mip;
+    const huge = changes && (changes === true || changes.w * changes.h > comp.width * comp.height / 3);
+    if (!m || huge || m.doc !== d || m.s !== s || m.comp !== comp || m.canvas.width !== W || m.canvas.height !== H) {
+      // se reconstruye entera, reduciendo a la mitad en cada paso para que quede nítida
+      let cur: HTMLCanvasElement = comp, k = 1;
+      while (k / 2 >= s) { k /= 2; const n = document.createElement('canvas'); n.width = Math.max(1, Math.ceil(comp.width * k)); n.height = Math.max(1, Math.ceil(comp.height * k)); const c = n.getContext('2d')!; c.imageSmoothingQuality = 'high'; c.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
+      m = this.mip = { doc: d, canvas: cur, s, comp };
+    } else if (changes) {
+      const c = m.canvas.getContext('2d')!;
+      const r = changes as { x: number; y: number; w: number; h: number };
+      // zona en la copia reducida (alineada a píxeles enteros de la copia)
+      const x0 = Math.max(0, Math.floor(r.x * s) - 1), y0 = Math.max(0, Math.floor(r.y * s) - 1);
+      const x1 = Math.min(W, Math.ceil((r.x + r.w) * s) + 1), y1 = Math.min(H, Math.ceil((r.y + r.h) * s) + 1);
+      if (x1 > x0 && y1 > y0) {
+        c.save(); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'medium';
+        c.clearRect(x0, y0, x1 - x0, y1 - y0);
+        // se lee solo la zona cambiada: dibujar directamente desde la imagen grande recién
+        // modificada obliga al navegador a copiarla entera en cada fotograma
+        const sx = Math.floor(x0 / s), sy = Math.floor(y0 / s), sw = Math.min(comp.width - sx, Math.ceil((x1 - x0) / s)), sh = Math.min(comp.height - sy, Math.ceil((y1 - y0) / s));
+        if (sw > 0 && sh > 0) {
+          if (!this.mipTmp || this.mipTmp.width < sw || this.mipTmp.height < sh) { this.mipTmp = document.createElement('canvas'); this.mipTmp.width = Math.max(sw, 256); this.mipTmp.height = Math.max(sh, 256); }
+          const t = this.mipTmp.getContext('2d', { willReadFrequently: false })!;
+          t.putImageData(comp.getContext('2d')!.getImageData(sx, sy, sw, sh), 0, 0);
+          c.drawImage(this.mipTmp, 0, 0, sw, sh, sx * s, sy * s, sw * s, sh * s);
+        }
+        c.restore();
+      }
+    }
+    // la copia ya está prefiltrada: basta el suavizado normal (mucho más rápido que el de máxima calidad)
+    ctx.save(); ctx.imageSmoothingQuality = 'low'; this.docTransform(ctx); ctx.drawImage(m.canvas, 0, 0, m.canvas.width / s, m.canvas.height / s); ctx.restore();
+  }
 
   resize() {
     const wrap = this.canvas.parentElement!;
@@ -182,21 +224,25 @@ export class Viewport {
   render() {
     const ctx = this.ctx, d = this.doc;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--canvas-bg') || '#1b1c1f';
-    ctx.fillRect(0, 0, this.width, this.height);
-    if (!d) { this.renderRulers(); return; }
+    const bgColor = getComputedStyle(document.body).getPropertyValue('--canvas-bg') || '#1b1c1f';
+    if (!d) { ctx.fillStyle = bgColor; ctx.fillRect(0, 0, this.width, this.height); this.renderRulers(); return; }
     const { zoom } = d.view;
     const rot = this.rot;
 
-    // Sombra + cuadrícula de transparencia (en el polígono del documento, que puede estar girado)
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 12;
-    ctx.fillStyle = '#fff'; this.areaPath(ctx); ctx.fill();
-    ctx.restore();
-    ctx.save();
-    this.areaPath(ctx); ctx.clip();
-    ctx.fillStyle = this.checkerPattern(); ctx.fillRect(0, 0, this.width, this.height);
-    ctx.restore();
+    // Fondo, sombra y cuadrícula de transparencia: solo cambian al mover la vista, así que se
+    // preparan una vez (la sombra difuminada es cara de pintar en cada fotograma)
+    const areas = d.root.children.map(g => (g as any).artboard && g.visible ? `${(g as any).artboard.x},${(g as any).artboard.y},${(g as any).artboard.w},${(g as any).artboard.h}` : '').join('|');
+    const bgKey = `${zoom}|${d.view.panX}|${d.view.panY}|${rot}|${this.width}|${this.height}|${this.dpr}|${bgColor}|${d.width}|${d.height}|${areas}`;
+    if (!this.bgCache || this.bgCache.key !== bgKey) {
+      const c = this.bgCache?.canvas ?? document.createElement('canvas');
+      c.width = this.canvas.width; c.height = this.canvas.height;
+      const b = c.getContext('2d')!; b.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      b.fillStyle = bgColor; b.fillRect(0, 0, this.width, this.height);
+      b.save(); b.shadowColor = 'rgba(0,0,0,.5)'; b.shadowBlur = 12; b.fillStyle = '#fff'; this.areaPath(b); b.fill(); b.restore();
+      b.save(); this.areaPath(b); b.clip(); b.fillStyle = this.checkerPattern(); b.fillRect(0, 0, this.width, this.height); b.restore();
+      this.bgCache = { key: bgKey, canvas: c };
+    }
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.bgCache.canvas, 0, 0); ctx.restore();
 
     // Imagen combinada
     const comp = d.getComposite();
@@ -204,7 +250,7 @@ export class Viewport {
     this.areaPath(ctx); ctx.clip();
     ctx.imageSmoothingEnabled = zoom < 1 || (rot !== 0 && zoom < 4);
     ctx.imageSmoothingQuality = 'high';
-    this.docImage(ctx, comp);
+    this.drawComposite(ctx, comp);
     ctx.restore();
 
     // Zona visible en coordenadas del documento
