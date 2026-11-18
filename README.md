@@ -192,6 +192,11 @@ Ya disponible:
   (modo «Extender» para duplicarlo).
 - **Recorte con perspectiva** (con Recortar, `C`): coloca las cuatro esquinas sobre un documento, cartel o cuadro
   fotografiado de lado y sale enderezado; tamaño automático o el que indiques.
+- **Panel Estilos** (junto a Color, Muestras y Pinceles): 20 estilos de capa listos con un clic (sombra suave, contorno,
+  pegatina, neón, oro, plata, relieve, cristal, fuego, hielo, retro 3D…) y los tuyos con «＋». *Capa › Copiar / Pegar
+  estilo de capa* lo pasa a otras capas (también a varias seleccionadas).
+- **Color indexado** (*Imagen › Modo › Color indexado…*): reduce la capa a 2–256 colores (paleta adaptable, web, grises,
+  blanco y negro o retro) con tramado por difusión o por motivo; útil para pixel art, GIF y efectos de impresión.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

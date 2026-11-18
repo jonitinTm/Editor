@@ -18,7 +18,7 @@ import { newDocumentDialog, quickGuideDialog } from './ui/dialogs';
 import { keyString } from './ui/keys';
 import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
-import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildActionsPanel } from './ui/panels2';
+import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
@@ -93,7 +93,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
   parent.append(group);
   return group;
 }
-tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel]]);
+tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel], ['Estilos', buildStylesPanel]]);
 tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel]]);
 tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Trazados', buildPathsPanel], ['Composiciones', buildCompsPanel], ['Acciones', buildActionsPanel]]);
 root.append(h('div', { id: 'toasts' }));

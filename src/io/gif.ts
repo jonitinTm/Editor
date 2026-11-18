@@ -4,7 +4,7 @@
 export interface GifFrame { canvas: HTMLCanvasElement; delay: number; }
 
 /** Paleta común a todos los cuadros (corte de mediana sobre un histograma de 15 bits). */
-function buildPalette(frames: ImageData[], maxColors: number): { palette: number[][]; lookup: Int16Array } {
+export function buildPalette(frames: ImageData[], maxColors: number): { palette: number[][]; lookup: Int16Array } {
   const hist = new Uint32Array(32768);
   const sr = new Float64Array(32768), sg = new Float64Array(32768), sb = new Float64Array(32768); // suma del color real de cada casilla
   for (const f of frames) { const d = f.data, step = Math.max(1, Math.floor(d.length / 4 / 200000)) * 4; for (let i = 0; i < d.length; i += step) if (d[i + 3] >= 128) { const k = (d[i] >> 3) << 10 | (d[i + 1] >> 3) << 5 | d[i + 2] >> 3; hist[k]++; sr[k] += d[i]; sg[k] += d[i + 1]; sb[k] += d[i + 2]; } }

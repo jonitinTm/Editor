@@ -11,7 +11,7 @@ import { promptDialog } from './dialog';
 import { liquifyDialog } from './liquify';
 import { recordAction } from './macros';
 import { refineDialog } from './refine';
-import { isParametric } from '../core/layers';
+import { isParametric, hasStyles } from '../core/layers';
 
 export interface Action {
   id: string;
@@ -28,6 +28,7 @@ const hasLayer = () => !!app.doc?.active;
 const hasSel = () => !!app.doc?.selection.active;
 const hasMask = () => !!app.doc?.active?.mask;
 
+let styleClipboard: string | null = null;
 export const ACTIONS: Action[] = [
   // Archivo
   { id: 'new', label: 'Nuevo…', keys: ['Alt+Ctrl+N', 'Ctrl+N'], run: dlg.newDocumentDialog },
@@ -123,6 +124,8 @@ export const ACTIONS: Action[] = [
   { id: 'label:none', label: 'Sin etiqueta', enabled: hasLayer, run: () => ops.setLayerLabel(null) },
   { id: 'snapshot', label: 'Nueva instantánea', enabled: hasDoc, run: ops.newSnapshot },
   { id: 'layerStyle', label: 'Estilo de capa (sombra, trazo, resplandor)…', enabled: hasLayer, run: dlg.layerStyleDialog },
+  { id: 'copyStyle', label: 'Copiar estilo de capa', enabled: () => hasStyles(app.doc?.active?.styles), run: () => { styleClipboard = JSON.stringify(app.doc!.active!.styles); app.toast('Estilo copiado'); } },
+  { id: 'pasteStyle', label: 'Pegar estilo de capa', enabled: () => !!styleClipboard && !!app.doc?.active, run: () => { const d = app.doc!; const sel = d.allLayers().filter(l => d.selectedIds.has(l.id) || l === d.active); for (const l of sel) if (l.kind !== 'group' && l.kind !== 'adjust') l.styles = JSON.parse(styleClipboard!); d.invalidate(); d.commit('Pegar estilo de capa'); } },
   { id: 'clearStyle', label: 'Quitar estilo de capa', enabled: () => !!app.doc?.active?.styles, run: () => ops.setLayerStyles(app.doc!.active!, null, true) },
   { id: 'align:left', label: 'Bordes izquierdos', enabled: hasLayer, run: () => ops.alignLayer('left') },
   { id: 'align:hcenter', label: 'Centros horizontales', enabled: hasLayer, run: () => ops.alignLayer('hcenter') },
@@ -206,6 +209,7 @@ export const ACTIONS: Action[] = [
   })),
   { id: 'panel:Capas', label: 'Capas', run: () => showPanel('Capas') },
   { id: 'panel:Canales', label: 'Canales', run: () => showPanel('Canales') },
+  { id: 'panel:Estilos', label: 'Estilos', run: () => showPanel('Estilos') },
   { id: 'panel:Composiciones', label: 'Composiciones de capas', run: () => showPanel('Composiciones') },
   { id: 'panel:Trazados', label: 'Trazados', run: () => showPanel('Trazados') },
   { id: 'panel:Acciones', label: 'Acciones', run: () => showPanel('Acciones') },

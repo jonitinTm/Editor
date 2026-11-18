@@ -7,7 +7,7 @@ import { FILTERS } from '../filters/registry';
 type Item = string | '-' | { label: string; items: Item[] };
 
 const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
-  const list = FILTERS.filter(f => f.group === group);
+  const list = FILTERS.filter(f => f.group === group && f.inMenu !== false);
   if (group === 'ajuste') return list.map(f => 'filter:' + f.id);
   const subs = new Map<string, Item[]>();
   for (const f of list) { if (!f.submenu) continue; const k = f.submenu; if (!subs.has(k)) subs.set(k, []); subs.get(k)!.push('filter:' + f.id); }
@@ -20,19 +20,19 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fade', '-', 'fill', 'contentFill', '-', 'caScale', 'puppet', 'stroke', '-', 'defineBrush', 'definePattern', '-', 'freeTransform',
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'prefs'] },
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'dupDoc', '-', 'imageSize', 'canvasSize',
-    { label: 'Modo', items: ['modeRgb', 'modeGray'] },
+    { label: 'Modo', items: ['modeRgb', 'modeGray', '-', 'filter:indexed'] },
     { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', 'imgRotArb', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll'] },
   { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
     'artboard',
     { label: 'Nueva capa de relleno', items: ['fill:solid', 'fill:gradient', 'fill:pattern'] },
-    { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste' && !f.noLayer).map(f => 'adjust:' + f.id) }, 'layerStyle', 'clearStyle', 'clip',
+    { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste' && !f.noLayer).map(f => 'adjust:' + f.id) }, 'layerStyle', 'copyStyle', 'pasteStyle', 'clearStyle', 'clip',
     { label: 'Objeto inteligente', items: ['toSmart', 'smartCopy', 'editSmart', 'replaceSmart', 'exportSmart', 'rasterize'] }, { label: 'Texto', items: ['warpText', 'textOnPath', 'textVertical'] }, '-', 'group', 'ungroup', '-',
     { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] }, { label: 'Máscara vectorial', items: ['vmPath', '-', 'vmToggle', 'vmInvert', 'vmRaster', 'vmDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, { label: 'Alinear', items: ['align:left', 'align:hcenter', 'align:right', '-', 'align:top', 'align:vcenter', 'align:bottom'] }, { label: 'Distribuir', items: ['dist:left', 'dist:hcenter', 'dist:right', '-', 'dist:top', 'dist:vcenter', 'dist:bottom', '-', 'dist:hspace', 'dist:vspace'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten'] },
   { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'selToPath', 'selectSubject', 'colorRange', 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['border', 'smoothSel', 'expand', 'contract', 'feather'] }, 'growSel', 'similarSel', 'transformSel'] },
   { label: 'Filtro', items: ['lastFilter', '-', 'filter:develop', 'liquify', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'clearGuides'] },
-  { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Color', 'panel:Composiciones', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },
+  { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },
   { label: 'Ayuda', items: ['guide', 'shortcuts', '-', 'about'] },
 ];
 

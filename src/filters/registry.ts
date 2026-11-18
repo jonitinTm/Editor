@@ -8,6 +8,7 @@ import { develop, DEVELOP_DEFAULTS } from './develop';
 import * as M from './more';
 import * as L from './lut';
 import * as N from './more2';
+import { indexColors } from './indexed';
 
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string; showIf?: [string, string] }
@@ -22,6 +23,8 @@ export interface FilterDef {
   id: string;
   name: string;
   group: 'ajuste' | 'filtro' | 'relleno';
+  /** Si es false, no se lista en los menús de Ajustes / Filtro (va en otro sitio). */
+  inMenu?: boolean;
   submenu?: string;
   shortcut?: string;
   /** Sin parámetros = se aplica directamente sin diálogo. */
@@ -127,6 +130,16 @@ export const FILTERS: FilterDef[] = [
       { key: 'mono', label: 'Monocromo (usa la fila del rojo)', type: 'checkbox', default: false },
     ],
     apply: (img, p) => A.channelMixer(img, p),
+  },
+  {
+    id: 'indexed', name: 'Color indexado…', group: 'ajuste', inMenu: false, noLayer: true,
+    params: [
+      { key: 'palette', label: 'Paleta', type: 'select', default: 'adaptive', choices: [['adaptive', 'Adaptable (a partir de la imagen)'], ['web', 'Web (216 colores)'], ['gray', 'Grises'], ['bw', 'Blanco y negro'], ['retro', 'Consola retro (16 colores)'], ['gameboy', 'Portátil clásica (4 verdes)']] },
+      { key: 'colors', label: 'Colores (adaptable y grises)', type: 'range', min: 2, max: 256, default: 16 },
+      { key: 'dither', label: 'Tramado', type: 'select', default: 'diffusion', choices: [['none', 'Ninguno'], ['diffusion', 'Difusión'], ['pattern', 'Motivo']] },
+      { key: 'amount', label: 'Intensidad del tramado', type: 'range', min: 0, max: 100, default: 100, unit: '%' },
+    ],
+    apply: (img, p) => indexColors(img, p as any),
   },
   {
     id: 'posterize', name: 'Posterizar…', group: 'ajuste',

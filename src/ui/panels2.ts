@@ -2,7 +2,10 @@
 
 import { app } from './app';
 import { h } from './dom';
-import { ctx2d } from '../core/canvas';
+import { ctx2d, makeCanvas, cloneCanvas } from '../core/canvas';
+import { composeStyled } from '../core/compositor';
+import { STYLE_PRESETS, userStyles, saveUserStyles } from '../core/stylepresets';
+import { hasStyles, type LayerStyles } from '../core/layers';
 import * as ops from './ops';
 import * as M from './macros';
 import { icon } from './icons';
@@ -264,5 +267,48 @@ export function buildCompsPanel(parent: HTMLElement) {
     if (!d.layerComps.length) list.append(h('div', { class: 'hint ch-empty' }, 'Guarda variantes del diseño (qué capas se ven, dónde están y su aspecto) y cambia entre ellas con un clic. Pulsa ＋ para crear la primera.'));
   };
   app.on('doc', () => setTimeout(render, 0)); app.on('docs', () => { sel = -1; render(); });
+  new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}
+
+// ---- Estilos (estilos de capa predefinidos y guardados) ------------------------------------------
+
+export function buildStylesPanel(parent: HTMLElement) {
+  const grid = h('div', { class: 'style-grid' });
+  const thumbs = new Map<string, HTMLCanvasElement>();
+  const thumb = (st: LayerStyles) => {
+    const key = JSON.stringify(st); const c0 = thumbs.get(key); if (c0) return cloneCanvas(c0);
+    const S = 56, src = makeCanvas(S, S), x = ctx2d(src);
+    x.fillStyle = '#9aa4b4'; x.beginPath(); x.roundRect(12, 12, S - 24, S - 24, 7); x.fill();
+    const out = makeCanvas(S, S); composeStyled(ctx2d(out), src, st, 0, 0, S, S);
+    thumbs.set(key, out); return cloneCanvas(out);
+  };
+  const apply = (st: LayerStyles, name: string) => {
+    const d = app.doc, l = d?.active; if (!d || !l) { app.toast('Selecciona una capa', 'warn'); return; }
+    if (l.kind === 'group' || l.kind === 'adjust') { app.toast('Los estilos se aplican a capas de píxeles, texto o forma', 'warn'); return; }
+    l.styles = JSON.parse(JSON.stringify(st)); d.invalidate(); d.commit(`Estilo: ${name}`);
+  };
+  const foot = h('div', { class: 'panel-foot' },
+    h('button', { class: 'btn icon-btn', title: 'Quitar el estilo de la capa', onclick: () => { const l = app.doc?.active; if (l?.styles) ops.setLayerStyles(l, null, true); } }, '⊘'),
+    h('button', { class: 'btn icon-btn', title: 'Guardar el estilo de la capa activa como estilo nuevo', onclick: async () => {
+      const l = app.doc?.active; if (!l?.styles || !hasStyles(l.styles)) { app.toast('La capa activa no tiene estilo que guardar', 'warn'); return; }
+      const n = await promptDialog('Nuevo estilo', 'Nombre', 'Mi estilo'); if (!n) return;
+      saveUserStyles([...userStyles(), { name: n, styles: JSON.parse(JSON.stringify(l.styles)) }]); render();
+    } }, '＋'));
+  const body = h('div', { class: 'brush-panel' }, grid, foot);
+  parent.append(body);
+  const render = () => {
+    if (!visible(body)) return;
+    grid.innerHTML = '';
+    const mine = userStyles();
+    const item = (p: { name: string; styles: LayerStyles }, user: number) => {
+      const el = h('button', { class: 'style-item', title: p.name + (user >= 0 ? ' · clic derecho: eliminar' : '') }, thumb(p.styles), h('span', {}, p.name));
+      el.onclick = () => apply(p.styles, p.name);
+      if (user >= 0) el.oncontextmenu = ev => { ev.preventDefault(); const l = userStyles(); l.splice(user, 1); saveUserStyles(l); render(); };
+      return el;
+    };
+    mine.forEach((p, i) => grid.append(item(p, i)));
+    STYLE_PRESETS.forEach(p => grid.append(item(p, -1)));
+  };
+  render();
   new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
 }

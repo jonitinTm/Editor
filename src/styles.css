@@ -456,3 +456,9 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 .key-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; border-bottom: 1px solid var(--line); }
 .key-row:hover { background: var(--hover); }
 .key-btn { min-width: 130px; font-family: inherit; } .key-btn.wait { background: var(--accent); color: #fff; }
+
+.style-grid { min-height: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; padding: 8px; overflow: auto; flex: 1; align-content: start; }
+.style-item { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 4px 2px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--muted); font-size: 10.5px; cursor: pointer; }
+.style-item:hover { border-color: var(--accent); background: var(--hover); color: var(--text); }
+.style-item canvas { width: 56px; height: 56px; background: repeating-conic-gradient(#5a5a5a 0 25%, #4a4a4a 0 50%) 0 0/10px 10px; border-radius: 4px; }
+.style-item span { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
