@@ -452,3 +452,7 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 .guide-sec li { margin: 3px 0; }
 .guide kbd { background: var(--input); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; font-size: 11px; }
 .link-btn { background: none; border: 0; color: var(--accent); cursor: pointer; margin-top: 10px; font-size: 12px; } .link-btn:hover { text-decoration: underline; }
+.keys-list { max-height: 52vh; overflow: auto; margin: 8px 0; border: 1px solid var(--border); border-radius: 3px; }
+.key-row { display: flex; justify-content: space-between; align-items: center; padding: 3px 8px; border-bottom: 1px solid var(--line); }
+.key-row:hover { background: var(--hover); }
+.key-btn { min-width: 130px; font-family: inherit; } .key-btn.wait { background: var(--accent); color: #fff; }

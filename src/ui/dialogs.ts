@@ -9,6 +9,8 @@ import { FilterDef, defaultParams } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
 import { SmartLayer, TextLayer, blendIfActive, type LayerStyles } from '../core/layers';
 import { WARP_STYLES } from '../tools/warpmesh';
+import { ACTIONS, setActionKey, resetKeys } from './actions';
+import { keyString } from './keys';
 import { gradientEditor, type GradStop } from './gradienteditor';
 import { layerCanvasIn } from '../core/history';
 import { cloneCanvas, ctx2d } from '../core/canvas';
@@ -831,4 +833,40 @@ export function contentAwareScaleDialog() {
       h('div', { class: 'hint' }, 'Se quitan o se repiten las franjas con menos detalle: el fondo se estira o encoge y las personas y objetos importantes no se deforman.')],
     onOk: () => { ops.contentAwareScaleOp(wp, hp, skin.checked, sel.checked); },
   });
+}
+
+// ---- Atajos de teclado personalizables ---------------------------------------------------
+
+export function keysDialog() {
+  const search = h('input', { type: 'search', class: 'wide', placeholder: 'Buscar orden…' });
+  const list = h('div', { class: 'keys-list' });
+  const pretty = (k: string) => k.replace('Shift', 'Mayús').replace('Delete', 'Supr').replace('Backspace', 'Retroceso');
+  const render = () => {
+    list.innerHTML = '';
+    const q = search.value.trim().toLowerCase();
+    for (const a of ACTIONS) {
+      if (q && !a.label.toLowerCase().includes(q) && !(a.keys ?? []).some(k => k.toLowerCase().includes(q))) continue;
+      const btn = h('button', { class: 'btn key-btn', type: 'button', title: 'Pulsa para cambiar (Retroceso: quitar)' }, a.keys?.length ? pretty(a.keys[0]) : '—');
+      btn.onclick = () => {
+        btn.textContent = 'Pulsa la combinación…'; btn.classList.add('wait');
+        const onKey = (e: KeyboardEvent) => {
+          e.preventDefault(); e.stopPropagation();
+          if (['Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) return;
+          window.removeEventListener('keydown', onKey, true);
+          if (e.key === 'Escape') { render(); return; }
+          const combo = e.key === 'Backspace' || e.key === 'Delete' ? null : keyString(e);
+          const taken = setActionKey(a.id, combo);
+          if (taken) app.toast(`«${combo}» se ha quitado de «${taken}»`);
+          render();
+        };
+        window.addEventListener('keydown', onKey, true);
+      };
+      list.append(h('div', { class: 'key-row' }, h('span', {}, a.label.replace('…', '')), btn));
+    }
+  };
+  search.addEventListener('input', render);
+  render();
+  const reset = h('button', { class: 'btn', type: 'button', onclick: () => { resetKeys(); render(); app.toast('Atajos restablecidos'); } }, 'Restablecer los de fábrica');
+  showDialog({ title: 'Atajos de teclado', cancelLabel: null, okLabel: 'Cerrar', width: 520, body: [search, list, reset] });
+  setTimeout(() => search.focus(), 0);
 }

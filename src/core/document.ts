@@ -10,6 +10,8 @@ export interface ViewState { zoom: number; panX: number; panY: number; /** Giro 
 
 export interface DocPath { name: string; subpaths: { closed: boolean; pts: import('./layers').PathPoint[] }[] }
 
+export interface LayerComp { name: string; visibility: boolean; position: boolean; appearance: boolean; states: Record<number, { visible: boolean; x?: number; y?: number; opacity?: number; blendMode?: string; styles?: string | null }> }
+
 export class EditorDocument {
   name: string;
   width: number;
@@ -32,6 +34,8 @@ export class EditorDocument {
   channels: { id: number; name: string; canvas: HTMLCanvasElement }[] = [];
   /** Trazados guardados (panel Trazados): cada uno puede tener varios subtrazados. */
   paths: DocPath[] = [];
+  /** Composiciones de capas: variantes guardadas (visibilidad, posición y aspecto de cada capa). */
+  layerComps: LayerComp[] = [];
   /** Resolución para imprimir (píxeles por pulgada). */
   ppi = 72;
   /** Modo de color: en «gris» se trabaja en escala de grises. */

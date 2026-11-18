@@ -84,6 +84,7 @@ interface ProjFile {
   guides: { h: number[]; v: number[] }; activeId: number | null; layers: ProjLayer[]; frames?: { delay: number; visible: number[] }[];
   channels?: { name: string; image: string }[];
   paths?: any[];
+  layerComps?: any[];
   ppi?: number;
 }
 
@@ -115,6 +116,7 @@ async function projectData(doc: EditorDocument): Promise<ProjFile> {
     guides: doc.guides, activeId: doc.active?.id ?? null, frames: doc.frames,
     channels: await Promise.all(doc.channels.map(async c => ({ name: c.name, image: await canvasToDataURL(c.canvas) }))),
     paths: doc.paths,
+    layerComps: doc.layerComps,
     layers: await Promise.all(doc.root.children.map(layerToProj)),
   };
 }
@@ -158,6 +160,7 @@ async function docFromData(data: ProjFile): Promise<EditorDocument> {
   doc.guides = data.guides ?? { h: [], v: [] };
   doc.frames = data.frames ?? [];
   doc.paths = Array.isArray(data.paths) ? data.paths : [];
+  if (Array.isArray((data as any).layerComps)) doc.layerComps = (data as any).layerComps;
   if ((data as any).ppi > 0) doc.ppi = (data as any).ppi;
   for (const [i, c] of (data.channels ?? []).entries()) { const cv = makeCanvas(data.width, data.height); ctx2d(cv).drawImage(await loadImage(c.image), 0, 0); doc.channels.push({ id: i + 1, name: c.name, canvas: cv }); }
   doc.setActive(doc.findLayer(data.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);

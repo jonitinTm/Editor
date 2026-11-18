@@ -15,9 +15,10 @@ import { ACTIONS } from './ui/actions';
 import * as ops from './ui/ops';
 import { dialogOpen } from './ui/dialog';
 import { newDocumentDialog, quickGuideDialog } from './ui/dialogs';
+import { keyString } from './ui/keys';
 import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
-import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildActionsPanel } from './ui/panels2';
+import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
 
@@ -93,7 +94,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
 }
 tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel]]);
 tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel]]);
-tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Trazados', buildPathsPanel], ['Acciones', buildActionsPanel]]);
+tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Trazados', buildPathsPanel], ['Composiciones', buildCompsPanel], ['Acciones', buildActionsPanel]]);
 root.append(h('div', { id: 'toasts' }));
 
 // Separador ajustable entre paneles
@@ -180,26 +181,11 @@ function buildWelcome() {
 }
 
 // ---- Teclado -----------------------------------------------------------------------------
-function keyString(e: KeyboardEvent) {
-  const parts: string[] = [];
-  if (e.altKey) parts.push('Alt');
-  if (e.shiftKey) parts.push('Shift');
-  if (e.ctrlKey || e.metaKey) parts.push('Ctrl');
-  let k = e.key;
-  if (e.code.startsWith('Numpad') && (e.code === 'NumpadAdd' || e.code === 'NumpadSubtract')) k = e.code;
-  else if (k.length === 1) k = k.toUpperCase();
-  // Con Mayús, algunas teclas cambian de símbolo; usamos el código físico
-  if (e.code === 'BracketRight') k = ']'; if (e.code === 'BracketLeft') k = '[';
-  if (e.code === 'Equal' && (e.ctrlKey || e.metaKey)) k = '=';
-  if (e.code === 'Minus') k = '-';
-  if (e.code.startsWith('Digit')) k = e.code.slice(5);
-  if (/^Key[A-Z]$/.test(e.code)) k = e.code.slice(3);
-  parts.push(k);
-  return parts.join('+');
-}
 
 const keymap = new Map<string, (typeof ACTIONS)[number]>();
-for (const a of ACTIONS) for (const k of a.keys ?? []) keymap.set(k, a);
+const buildKeymap = () => { keymap.clear(); for (const a of ACTIONS) for (const k of a.keys ?? []) keymap.set(k, a); };
+buildKeymap();
+window.addEventListener('editor-keys', buildKeymap);
 
 /** Tecla de herramienta mantenida: al soltarla se vuelve a la herramienta anterior. */
 let held: { key: string; prev: string; t: number } | null = null;

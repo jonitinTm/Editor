@@ -124,6 +124,20 @@ export const ACTIONS: Action[] = [
   { id: 'snapshot', label: 'Nueva instantánea', enabled: hasDoc, run: ops.newSnapshot },
   { id: 'layerStyle', label: 'Estilo de capa (sombra, trazo, resplandor)…', enabled: hasLayer, run: dlg.layerStyleDialog },
   { id: 'clearStyle', label: 'Quitar estilo de capa', enabled: () => !!app.doc?.active?.styles, run: () => ops.setLayerStyles(app.doc!.active!, null, true) },
+  { id: 'align:left', label: 'Bordes izquierdos', enabled: hasLayer, run: () => ops.alignLayer('left') },
+  { id: 'align:hcenter', label: 'Centros horizontales', enabled: hasLayer, run: () => ops.alignLayer('hcenter') },
+  { id: 'align:right', label: 'Bordes derechos', enabled: hasLayer, run: () => ops.alignLayer('right') },
+  { id: 'align:top', label: 'Bordes superiores', enabled: hasLayer, run: () => ops.alignLayer('top') },
+  { id: 'align:vcenter', label: 'Centros verticales', enabled: hasLayer, run: () => ops.alignLayer('vcenter') },
+  { id: 'align:bottom', label: 'Bordes inferiores', enabled: hasLayer, run: () => ops.alignLayer('bottom') },
+  { id: 'dist:left', label: 'Bordes izquierdos', enabled: hasLayer, run: () => ops.distributeLayers('left') },
+  { id: 'dist:hcenter', label: 'Centros horizontales', enabled: hasLayer, run: () => ops.distributeLayers('hcenter') },
+  { id: 'dist:right', label: 'Bordes derechos', enabled: hasLayer, run: () => ops.distributeLayers('right') },
+  { id: 'dist:top', label: 'Bordes superiores', enabled: hasLayer, run: () => ops.distributeLayers('top') },
+  { id: 'dist:vcenter', label: 'Centros verticales', enabled: hasLayer, run: () => ops.distributeLayers('vcenter') },
+  { id: 'dist:bottom', label: 'Bordes inferiores', enabled: hasLayer, run: () => ops.distributeLayers('bottom') },
+  { id: 'dist:hspace', label: 'Espacio horizontal', enabled: hasLayer, run: () => ops.distributeLayers('hspace') },
+  { id: 'dist:vspace', label: 'Espacio vertical', enabled: hasLayer, run: () => ops.distributeLayers('vspace') },
   { id: 'bringFront', label: 'Traer al frente', keys: ['Shift+Ctrl+]'], enabled: hasLayer, run: () => ops.arrangeLayer('top') },
   { id: 'bringForward', label: 'Hacia delante', keys: ['Ctrl+]'], enabled: hasLayer, run: () => ops.arrangeLayer('up') },
   { id: 'sendBackward', label: 'Hacia atrás', keys: ['Ctrl+['], enabled: hasLayer, run: () => ops.arrangeLayer('down') },
@@ -136,6 +150,7 @@ export const ACTIONS: Action[] = [
   { id: 'exportSmart', label: 'Exportar contenido…', enabled: () => app.doc?.active?.kind === 'smart', run: ops.exportSmartContents },
   { id: 'replaceSmart', label: 'Reemplazar contenido…', enabled: () => app.doc?.active?.kind === 'smart', run: async () => { const fs = await io.pickFiles('image/*,.psd', false); if (fs[0]) ops.replaceSmartContents(fs[0]); } },
   { id: 'prefs', label: 'Preferencias…', keys: ['Ctrl+K'], run: dlg.prefsDialog },
+  { id: 'keysEdit', label: 'Atajos de teclado…', keys: ['Alt+Shift+Ctrl+K'], run: () => dlg.keysDialog() },
   { id: 'toSmart', label: 'Convertir en objeto inteligente', enabled: hasLayer, run: ops.convertToSmart },
   { id: 'editSmart', label: 'Editar contenido', enabled: () => app.doc?.active?.kind === 'smart', run: () => ops.editSmartContents() },
   { id: 'rasterize', label: 'Rasterizar capa (texto, forma u objeto inteligente)', enabled: () => isParametric(app.doc?.active), run: ops.rasterize },
@@ -191,6 +206,7 @@ export const ACTIONS: Action[] = [
   })),
   { id: 'panel:Capas', label: 'Capas', run: () => showPanel('Capas') },
   { id: 'panel:Canales', label: 'Canales', run: () => showPanel('Canales') },
+  { id: 'panel:Composiciones', label: 'Composiciones de capas', run: () => showPanel('Composiciones') },
   { id: 'panel:Trazados', label: 'Trazados', run: () => showPanel('Trazados') },
   { id: 'panel:Acciones', label: 'Acciones', run: () => showPanel('Acciones') },
   { id: 'panel:Propiedades', label: 'Propiedades', run: () => showPanel('Propiedades') },
@@ -208,7 +224,7 @@ export const ACTIONS: Action[] = [
 
   // Ayuda
   { id: 'guide', label: 'Guía rápida', keys: ['F1'], run: dlg.quickGuideDialog },
-  { id: 'shortcuts', label: 'Atajos de teclado', keys: ['Alt+Shift+Ctrl+K'], run: () => dlg.shortcutsDialog(shortcutList()) },
+  { id: 'shortcuts', label: 'Lista de atajos de teclado', run: () => dlg.shortcutsDialog(shortcutList()) },
   { id: 'about', label: 'Acerca de Editor', run: dlg.aboutDialog },
 ];
 
@@ -254,3 +270,24 @@ function showPanel(name: string) {
   tab.click();
   requestAnimationFrame(() => app.viewport.resize());
 }
+
+// ---- Atajos personalizados ----------------------------------------------------------------
+const KEYS_STORE = 'editor.keys';
+const factoryKeys = new Map(ACTIONS.map(a => [a.id, a.keys ? [...a.keys] : undefined]));
+/** Atajos cambiados por el usuario (id de la acción → combinaciones). */
+export function customKeys(): Record<string, string[]> { try { return JSON.parse(localStorage.getItem(KEYS_STORE) || '{}'); } catch { return {}; } }
+export function applyCustomKeys() {
+  const c = customKeys();
+  for (const a of ACTIONS) { const k = c[a.id] ?? factoryKeys.get(a.id); a.keys = k && k.length ? [...k] : undefined; }
+  window.dispatchEvent(new Event('editor-keys'));
+}
+/** Asigna una combinación a una acción (se la quita a la que la tuviera). Devuelve el nombre de esa otra acción. */
+export function setActionKey(id: string, combo: string | null): string | null {
+  const c = customKeys(); let taken: string | null = null;
+  if (combo) for (const a of ACTIONS) if (a.id !== id && (a.keys ?? []).includes(combo)) { c[a.id] = (a.keys ?? []).filter(k => k !== combo); taken = a.label.replace('…', ''); }
+  c[id] = combo ? [combo] : [];
+  try { localStorage.setItem(KEYS_STORE, JSON.stringify(c)); } catch { /* */ }
+  applyCustomKeys(); return taken;
+}
+export function resetKeys() { try { localStorage.removeItem(KEYS_STORE); } catch { /* */ } applyCustomKeys(); }
+applyCustomKeys();

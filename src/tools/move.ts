@@ -5,7 +5,7 @@ import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import { GroupLayer, Layer, RasterLayer, isRaster, isParametric, walkLayers } from '../core/layers';
-import { selectedLayers, alignLayer } from '../ui/ops';
+import { selectedLayers, alignLayer, distributeLayers } from '../ui/ops';
 import { snapRect, snapTargets, layerBounds, clearSnap } from './snap';
 import type { Rect } from '../core/canvas';
 import { rasterizeLayer } from './paint';
@@ -38,10 +38,17 @@ export class MoveTool implements Tool {
     const lbl = document.createElement('span'); lbl.className = 'lbl hint'; lbl.textContent = 'Alinear:'; bar.append(lbl);
     const g = document.createElement('div'); g.className = 'btn-group';
     for (const [m, t, title] of [['left', '⇤', 'Bordes izquierdos'], ['hcenter', '↔', 'Centros horizontales'], ['right', '⇥', 'Bordes derechos'], ['top', '⤒', 'Bordes superiores'], ['vcenter', '↕', 'Centros verticales'], ['bottom', '⤓', 'Bordes inferiores']] as const) {
-      const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; b.title = title + ' (respecto a la selección o al lienzo)'; b.dataset.align = m;
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; b.title = title + ' (varias capas: entre sí; una: respecto a la selección o al lienzo)'; b.dataset.align = m;
       b.onclick = () => alignLayer(m); g.append(b);
     }
     bar.append(g);
+    const l2 = document.createElement('span'); l2.className = 'lbl hint'; l2.textContent = 'Distribuir:'; bar.append(l2);
+    const g2 = document.createElement('div'); g2.className = 'btn-group';
+    for (const [m, t, title] of [['hcenter', '⫼', 'Centros horizontales'], ['vcenter', '☰', 'Centros verticales'], ['hspace', '↔|', 'Mismo espacio horizontal'], ['vspace', '↕|', 'Mismo espacio vertical']] as const) {
+      const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; b.title = 'Distribuir: ' + title + ' (3 o más capas seleccionadas)'; b.dataset.dist = m;
+      b.onclick = () => distributeLayers(m); g2.append(b);
+    }
+    bar.append(g2);
   }
   private start: { x: number; y: number } | null = null;
   private offset = { x: 0, y: 0 };

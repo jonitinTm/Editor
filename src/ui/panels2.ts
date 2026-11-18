@@ -7,7 +7,7 @@ import * as ops from './ops';
 import * as M from './macros';
 import { icon } from './icons';
 import { actionById } from './actions';
-import { promptDialog } from './dialog';
+import { promptDialog, showDialog, row } from './dialog';
 
 const visible = (el: HTMLElement) => el.offsetParent !== null;
 
@@ -229,5 +229,40 @@ export function buildPathsPanel(parent: HTMLElement) {
   };
   let t = 0;
   app.on('doc', () => { clearTimeout(t); t = window.setTimeout(render, 150); }); app.on('docs', render);
+  new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
+}
+
+// ---- Composiciones de capas ------------------------------------------------------------------
+
+export function buildCompsPanel(parent: HTMLElement) {
+  const list = h('div', { class: 'layer-list' });
+  let sel = -1;
+  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn }, label);
+  const newComp = async () => {
+    const d = app.doc; if (!d) return;
+    const name = h('input', { type: 'text', class: 'wide', value: `Composición ${d.layerComps.length + 1}` });
+    const cb = (label: string, on = true) => { const c = h('input', { type: 'checkbox', checked: on }); return [c, h('label', { class: 'check' }, c, ' ' + label)] as const; };
+    const [vis, visL] = cb('Visibilidad'), [pos, posL] = cb('Posición'), [app2, appL] = cb('Aspecto (opacidad, modo y estilos)');
+    showDialog({ title: 'Nueva composición de capas', body: [row('Nombre', name), row('Guardar', h('div', {}, visL, posL, appL))],
+      onOk: () => { ops.captureLayerComp(name.value.trim() || 'Composición', { visibility: vis.checked, position: pos.checked, appearance: app2.checked }); sel = d.layerComps.length - 1; render(); } });
+  };
+  const foot = h('div', { class: 'panel-foot' },
+    btn('Actualizar la composición seleccionada con el estado actual', '⟳', () => { const d = app.doc; const c = d?.layerComps[sel]; if (c) { ops.captureLayerComp(c.name, c, sel); app.toast('Composición actualizada'); } else app.toast('Selecciona una composición', 'warn'); }),
+    btn('Nueva composición a partir del estado actual', '＋', newComp),
+    btn('Eliminar la composición seleccionada', '🗑', () => { if (sel >= 0) { ops.deleteLayerComp(sel); sel = -1; render(); } }));
+  const body = h('div', { class: 'panel-body layers' }, list, foot);
+  parent.append(body);
+  const render = () => {
+    const d = app.doc; list.innerHTML = ''; if (!d || !visible(body)) return;
+    d.layerComps.forEach((c, i) => {
+      const what = [c.visibility && 'visibilidad', c.position && 'posición', c.appearance && 'aspecto'].filter(Boolean).join(', ');
+      const row2 = h('div', { class: 'layer-row' + (i === sel ? ' active' : ''), title: `Clic: aplicar · Guarda: ${what} · Doble clic en el nombre: renombrar` }, h('span', { class: 'eye' }, i === sel ? '▸' : ''), h('span', { class: 'lname' }, c.name), h('span', { class: 'hint' }, what));
+      row2.onclick = () => { sel = i; ops.applyLayerComp(i); render(); };
+      row2.querySelector('.lname')!.addEventListener('dblclick', async ev => { ev.stopPropagation(); const n = await promptDialog('Cambiar nombre', 'Nombre', c.name); if (n) { c.name = n; d.changed(); render(); } });
+      list.append(row2);
+    });
+    if (!d.layerComps.length) list.append(h('div', { class: 'hint ch-empty' }, 'Guarda variantes del diseño (qué capas se ven, dónde están y su aspecto) y cambia entre ellas con un clic. Pulsa ＋ para crear la primera.'));
+  };
+  app.on('doc', () => setTimeout(render, 0)); app.on('docs', () => { sel = -1; render(); });
   new MutationObserver(() => render()).observe(parent, { attributes: true, attributeFilter: ['class'] });
 }

@@ -2,7 +2,7 @@
 // Los menús y los atajos de teclado llaman a estas funciones.
 
 import { app } from './app';
-import { EditorDocument } from '../core/document';
+import { EditorDocument, type LayerComp } from '../core/document';
 import { effectiveMask } from '../core/layers';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, SmartFilter, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
@@ -598,21 +598,60 @@ export function colorRange(tolerance: number, record: boolean) {
   if (record) d.commit('Gama de colores'); else d.changed();
 }
 
-/** Alinea la capa activa respecto a la selección (si hay) o al lienzo. */
-export function alignLayer(mode: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom') {
-  const d = doc(); const l = d?.active; if (!d || !l) return;
-  if (!isRaster(l)) { app.toast('Selecciona una capa (no un grupo ni un ajuste)', 'warn'); return; }
-  if (l.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return; }
-  const f = l.fullContent(), cb = contentBounds(f.canvas); if (!cb) return;
-  const b = { x: cb.x + f.x, y: cb.y + f.y, w: cb.w, h: cb.h }, box = d.selection.bounds ?? { x: 0, y: 0, w: d.width, h: d.height };
-  let dx = 0, dy = 0;
-  if (mode === 'left') dx = box.x - b.x; if (mode === 'right') dx = box.x + box.w - b.x - b.w; if (mode === 'hcenter') dx = box.x + (box.w - b.w) / 2 - b.x;
-  if (mode === 'top') dy = box.y - b.y; if (mode === 'bottom') dy = box.y + box.h - b.y - b.h; if (mode === 'vcenter') dy = box.y + (box.h - b.h) / 2 - b.y;
-  dx = Math.round(dx); dy = Math.round(dy);
-  if (!dx && !dy) return;
-  if (isParametric(l)) l.translate(dx, dy); else l.placeFull(f.canvas, f.x + dx, f.y + dy);
+type AlignMode = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
+/** Caja del contenido de una capa (coordenadas del documento). */
+function layerBox(l: Layer): Rect | null {
+  if (!isRaster(l)) return null;
+  const f = l.fullContent(), cb = contentBounds(f.canvas); if (!cb) return null;
+  return { x: cb.x + f.x, y: cb.y + f.y, w: cb.w, h: cb.h };
+}
+/** Desplaza una capa con su máscara de píxeles y su máscara vectorial. */
+function shiftLayer(l: Layer, dx: number, dy: number) {
+  const d = doc()!; dx = Math.round(dx); dy = Math.round(dy); if (!dx && !dy) return;
+  if (isParametric(l)) l.translate(dx, dy); else if (isRaster(l)) { const f = l.fullContent(); l.placeFull(f.canvas, f.x + dx, f.y + dy); }
   if (l.mask) { const m = makeCanvas(d.width, d.height), mc = ctx2d(m); mc.fillStyle = '#fff'; mc.fillRect(0, 0, d.width, d.height); mc.clearRect(dx, dy, d.width, d.height); mc.drawImage(l.mask.canvas, dx, dy); l.mask.canvas = m; l.mask.touch(); }
-  d.commit('Alinear capa');
+  if (l.vmask) for (const sp of l.vmask.subpaths) for (const q of sp.pts) { q.x += dx; q.y += dy; q.ix += dx; q.iy += dy; q.ox += dx; q.oy += dy; }
+}
+/** Alinear: una capa respecto a la selección o al lienzo; varias, entre sí (o a la selección si la hay). */
+export function alignLayer(mode: AlignMode) {
+  const d = doc(); if (!d || !d.active) return;
+  const layers = (selectedLayers().includes(d.active) ? selectedLayers() : [d.active]).filter(l => isRaster(l) && !l.isLocked());
+  if (!layers.length) { app.toast('Selecciona capas de píxeles, texto o formas (no bloqueadas)', 'warn'); return; }
+  const boxes = layers.map(layerBox);
+  let box = d.selection.bounds;
+  if (!box) {
+    if (layers.length > 1) { const bs = boxes.filter(Boolean) as Rect[]; if (!bs.length) return; const x = Math.min(...bs.map(b => b.x)), y = Math.min(...bs.map(b => b.y)); box = { x, y, w: Math.max(...bs.map(b => b.x + b.w)) - x, h: Math.max(...bs.map(b => b.y + b.h)) - y }; }
+    else box = { x: 0, y: 0, w: d.width, h: d.height };
+  }
+  layers.forEach((l, k) => {
+    const b = boxes[k]; if (!b) return;
+    let dx = 0, dy = 0;
+    if (mode === 'left') dx = box!.x - b.x; if (mode === 'right') dx = box!.x + box!.w - b.x - b.w; if (mode === 'hcenter') dx = box!.x + (box!.w - b.w) / 2 - b.x;
+    if (mode === 'top') dy = box!.y - b.y; if (mode === 'bottom') dy = box!.y + box!.h - b.y - b.h; if (mode === 'vcenter') dy = box!.y + (box!.h - b.h) / 2 - b.y;
+    shiftLayer(l, dx, dy);
+  });
+  d.invalidate(); d.commit(layers.length > 1 ? 'Alinear capas' : 'Alinear capa');
+}
+/** Distribuir (3 o más capas): mismos intervalos entre bordes o centros, o el mismo espacio entre ellas. */
+export function distributeLayers(mode: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' | 'hspace' | 'vspace') {
+  const d = doc(); if (!d) return;
+  const items = selectedLayers().filter(l => isRaster(l) && !l.isLocked()).map(l => ({ l, b: layerBox(l)! })).filter(x => x.b);
+  if (items.length < 3) { app.toast('Selecciona al menos tres capas (Ctrl+clic en el panel Capas)', 'warn'); return; }
+  const horiz = ['left', 'hcenter', 'right', 'hspace'].includes(mode);
+  const key = (b: Rect) => mode === 'left' ? b.x : mode === 'right' ? b.x + b.w : mode === 'top' ? b.y : mode === 'bottom' ? b.y + b.h : horiz ? b.x + b.w / 2 : b.y + b.h / 2;
+  items.sort((p, q) => key(p.b) - key(q.b));
+  const n = items.length;
+  if (mode === 'hspace' || mode === 'vspace') {
+    // mismo hueco entre una capa y la siguiente
+    const pos = (b: Rect) => horiz ? b.x : b.y, size = (b: Rect) => horiz ? b.w : b.h;
+    const total = pos(items[n - 1].b) + size(items[n - 1].b) - pos(items[0].b), used = items.reduce((a, x) => a + size(x.b), 0), gap = (total - used) / (n - 1);
+    let cur = pos(items[0].b) + size(items[0].b) + gap;
+    for (let k = 1; k < n - 1; k++) { const b = items[k].b, delta = cur - pos(b); shiftLayer(items[k].l, horiz ? delta : 0, horiz ? 0 : delta); cur += size(b) + gap; }
+  } else {
+    const a = key(items[0].b), z = key(items[n - 1].b);
+    for (let k = 1; k < n - 1; k++) { const target = a + (z - a) * k / (n - 1), delta = target - key(items[k].b); shiftLayer(items[k].l, horiz ? delta : 0, horiz ? 0 : delta); }
+  }
+  d.invalidate(); d.commit('Distribuir capas');
 }
 
 /** Convierte el trazado de la capa activa en selección. */
@@ -1453,3 +1492,33 @@ export function vectorMaskOp(kind: 'toggle' | 'invert' | 'delete' | 'rasterize')
   d.invalidate();
   d.commit({ toggle: 'Activar/desactivar máscara vectorial', invert: 'Invertir máscara vectorial', delete: 'Eliminar máscara vectorial', rasterize: 'Rasterizar máscara vectorial' }[kind]);
 }
+
+// ---- Composiciones de capas ----------------------------------------------------------------
+
+/** Guarda el estado actual como composición nueva (o actualiza una existente). */
+export function captureLayerComp(name: string, opts: { visibility: boolean; position: boolean; appearance: boolean }, index = -1) {
+  const d = doc(); if (!d) return;
+  const states: LayerComp['states'] = {};
+  for (const l of d.allLayers()) {
+    const st: LayerComp['states'][number] = { visible: l.visible };
+    if (opts.position) { const b = layerBox(l); if (b) { st.x = b.x; st.y = b.y; } }
+    if (opts.appearance) { st.opacity = l.opacity; st.blendMode = l.blendMode; st.styles = l.styles ? JSON.stringify(l.styles) : null; }
+    states[l.id] = st;
+  }
+  const comp: LayerComp = { name, ...opts, states };
+  if (index >= 0 && d.layerComps[index]) d.layerComps[index] = { ...comp, name: d.layerComps[index].name };
+  else d.layerComps.push(comp);
+  d.changed(); app.emit('doc');
+}
+/** Aplica una composición: visibilidad, posición y aspecto de cada capa según lo guardado. */
+export function applyLayerComp(i: number) {
+  const d = doc(), c = d?.layerComps[i]; if (!d || !c) return;
+  for (const l of d.allLayers()) {
+    const st = c.states[l.id]; if (!st) continue;
+    if (c.visibility) l.visible = st.visible;
+    if (c.position && st.x !== undefined && st.y !== undefined) { const b = layerBox(l); if (b) shiftLayer(l, st.x - b.x, st.y! - b.y); }
+    if (c.appearance) { if (st.opacity !== undefined) l.opacity = st.opacity; if (st.blendMode) l.blendMode = st.blendMode as any; if (st.styles !== undefined) l.styles = st.styles ? JSON.parse(st.styles) : null; }
+  }
+  d.invalidate(); d.commit(`Composición: ${c.name}`);
+}
+export function deleteLayerComp(i: number) { const d = doc(); if (!d) return; d.layerComps.splice(i, 1); d.changed(); app.emit('doc'); }
