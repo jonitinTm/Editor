@@ -1575,3 +1575,53 @@ export async function perspectiveCrop(quad: { x: number; y: number }[], ow: numb
   d.guides = { h: [], v: [] };
   d.invalidate(); d.commit('Recorte con perspectiva'); app.viewport.fit(true);
 }
+
+// ---- Cielo -------------------------------------------------------------------------------------
+
+/** Selección › Cielo. */
+export async function selectSkyOp() {
+  const d = doc(); if (!d) return;
+  app.toast('Buscando el cielo…'); await new Promise(r => setTimeout(r, 30));
+  const { selectSky } = await import('../filters/sky');
+  const m = selectSky(d.getComposite());
+  if (!m) { app.toast('No se ha encontrado un cielo claro en la parte de arriba', 'warn'); return; }
+  d.selection.setMask(m); d.commit('Seleccionar cielo');
+}
+
+/**
+ * Edición › Sustituir cielo: crea un grupo con el cielo nuevo (enmascarado) y un ajuste de color del
+ * primer plano para que la luz encaje. Todo queda editable.
+ */
+export async function replaceSky(sky: HTMLCanvasElement, opt: { shift: number; fade: number; brightness: number; lighting: number; flip: boolean; mask?: HTMLCanvasElement | null }) {
+  const d = doc(); if (!d) return;
+  const { selectSky } = await import('../filters/sky');
+  const m0 = opt.mask ?? selectSky(d.getComposite());
+  if (!m0) { app.toast('No se ha encontrado un cielo claro en la parte de arriba', 'warn'); return; }
+  const W = d.width, H = d.height;
+  // máscara: desplazar borde (+ crece hacia abajo) y difuminar
+  const m = makeCanvas(W, H), mx = ctx2d(m);
+  const blur = Math.max(0, opt.fade);
+  mx.filter = blur ? `blur(${blur}px)` : 'none'; mx.drawImage(m0, 0, opt.shift); if (opt.shift > 0) mx.drawImage(m0, 0, 0); mx.filter = 'none';
+  // el cielo cubre la zona de cielo (de arriba hasta el horizonte más bajo)
+  const b = contentBounds(m0) ?? { x: 0, y: 0, w: W, h: H };
+  const skyH = Math.min(H, b.y + b.h + Math.max(20, opt.shift + 20));
+  const k = Math.max(W / sky.width, skyH / sky.height);
+  const sl = new RasterLayer('Cielo', W, H), sx = ctx2d(sl.canvas);
+  sx.imageSmoothingQuality = 'high';
+  if (opt.flip) { sx.translate(W, 0); sx.scale(-1, 1); }
+  sx.drawImage(sky, (W - sky.width * k) / 2, 0, sky.width * k, sky.height * k);
+  sx.setTransform(1, 0, 0, 1, 0, 0);
+  if (opt.brightness) { const id = sx.getImageData(0, 0, W, H), a = id.data, f = 1 + opt.brightness / 100; for (let i = 0; i < a.length; i += 4) { a[i] = a[i] * f; a[i + 1] = a[i + 1] * f; a[i + 2] = a[i + 2] * f; } sx.putImageData(id, 0, 0); }
+  const skyMask = new LayerMask(W, H, 'black'); skyMask.canvas = m; skyMask.touch(); sl.mask = skyMask;
+  // color medio del cielo nuevo para teñir un poco el primer plano
+  const t = makeCanvas(1, 1), tx = ctx2d(t); tx.drawImage(sky, 0, 0, 1, 1); const [r, g, bb] = tx.getImageData(0, 0, 1, 1).data;
+  const fl = new RasterLayer('Iluminación del primer plano', W, H), fx = ctx2d(fl.canvas); fx.fillStyle = `rgb(${r},${g},${bb})`; fx.fillRect(0, 0, W, H);
+  fl.blendMode = 'soft-light'; fl.opacity = Math.max(0, Math.min(1, opt.lighting / 100));
+  const inv = makeCanvas(W, H), ix = ctx2d(inv); ix.fillStyle = '#fff'; ix.fillRect(0, 0, W, H); ix.globalCompositeOperation = 'destination-out'; ix.drawImage(m, 0, 0);
+  const fm = new LayerMask(W, H, 'black'); fm.canvas = inv; fm.touch(); fl.mask = fm;
+  const g2 = new GroupLayer('Sustitución de cielo'); g2.add(fl); g2.add(sl);
+  // el grupo va encima de todo para que tape el cielo original
+  d.root.add(g2); d.setActive(sl, false);
+  d.selection.setMask(null);
+  d.invalidate(); d.commit('Sustituir cielo');
+}

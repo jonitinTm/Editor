@@ -205,6 +205,10 @@ Ya disponible:
   (para que fotos de distintas cámaras o momentos combinen), con luminancia, intensidad, transición y neutralizar.
 - **Vista › Nueva disposición de guías…**: columnas, filas, medianiles y márgenes con vista previa.
 - **Edición › Buscar y reemplazar texto…**: en todas las capas de texto a la vez (conserva los estilos de cada trozo).
+- **Selección › Cielo** y **Edición › Sustituir cielo…**: detecta el cielo (también con nubes) y lo cambia por uno de
+  serie (despejado, con nubes, atardecer, hora dorada, tormenta, noche…) o por una foto tuya, con vista previa, borde
+  ajustable y la luz del primer plano adaptada. Queda en un grupo con máscaras editables. Funciona mejor cuando el cielo
+  ocupa la parte de arriba y se distingue del resto.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

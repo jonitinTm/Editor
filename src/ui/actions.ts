@@ -178,6 +178,8 @@ export const ACTIONS: Action[] = [
   { id: 'contentFill', label: 'Rellenar según contenido', keys: ['Shift+Backspace', 'Shift+Delete'], enabled: hasSel, run: () => ops.contentAwareFill() },
   { id: 'refine', label: 'Seleccionar y aplicar máscara…', keys: ['Alt+Ctrl+R'], enabled: hasSel, run: refineDialog },
   { id: 'removeBg', label: 'Quitar fondo', enabled: hasLayer, run: () => ops.removeBackground() },
+  { id: 'selectSky', label: 'Cielo', enabled: hasDoc, run: ops.selectSkyOp },
+  { id: 'skyReplace', label: 'Sustituir cielo…', enabled: hasDoc, run: () => dlg.skyReplaceDialog() },
   { id: 'selectSubject', label: 'Sujeto', enabled: hasDoc, run: ops.selectSubjectOp },
   { id: 'colorRange', label: 'Gama de colores…', enabled: hasDoc, run: dlg.colorRangeDialog },
   { id: 'border', label: 'Borde…', enabled: () => !!app.doc?.selection.active, run: () => dlg.modifySelectionDialog('border') },

@@ -13,7 +13,7 @@ import { ACTIONS, setActionKey, resetKeys } from './actions';
 import { keyString } from './keys';
 import { gradientEditor, type GradStop } from './gradienteditor';
 import { layerCanvasIn } from '../core/history';
-import { cloneCanvas, ctx2d } from '../core/canvas';
+import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import { allPatterns } from '../core/patterns';
 import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
@@ -952,4 +952,47 @@ export function findReplaceDialog() {
     },
   });
   setTimeout(() => find.focus(), 50);
+}
+
+// ---- Edición › Sustituir cielo ----------------------------------------------------------------
+
+export async function skyReplaceDialog() {
+  const d = app.doc; if (!d) return;
+  app.toast('Buscando el cielo…'); await new Promise(r => setTimeout(r, 30));
+  const { selectSky, SKY_PRESETS, renderSky } = await import('../filters/sky');
+  const base = d.getComposite();
+  const mask = d.selection.mask ?? selectSky(base);
+  if (!mask) { app.toast('No se ha encontrado un cielo claro en la parte de arriba (puedes seleccionarlo tú y volver a probar)', 'warn'); return; }
+  const o = { shift: 3, fade: 2, brightness: 0, lighting: 30, flip: false };
+  let custom: HTMLCanvasElement | null = null;
+  const sel = h('select', {}, ...SKY_PRESETS.map(s => h('option', { value: s.id }, s.name)), h('option', { value: 'custom' }, 'Imagen propia…')) as HTMLSelectElement;
+  sel.value = 'clouds';
+  const skyCanvas = () => sel.value === 'custom' && custom ? custom : renderSky(sel.value === 'custom' ? 'clouds' : sel.value, 1200, 800);
+  let sky = skyCanvas();
+  const pw = 360, ph = Math.max(1, Math.round(pw * d.height / d.width));
+  const pv = h('canvas', { width: pw, height: ph, style: 'width:100%;border-radius:4px;background:#000' }) as HTMLCanvasElement;
+  const draw = () => {
+    const x = ctx2d(pv); x.clearRect(0, 0, pw, ph); x.drawImage(base, 0, 0, pw, ph);
+    const k = pw / d.width, s = makeCanvas(pw, ph), sx = ctx2d(s);
+    const sc = Math.max(pw / sky.width, ph / sky.height);
+    if (o.flip) { sx.translate(pw, 0); sx.scale(-1, 1); }
+    sx.drawImage(sky, (pw - sky.width * sc) / 2, 0, sky.width * sc, sky.height * sc); sx.setTransform(1, 0, 0, 1, 0, 0);
+    if (o.brightness) sx.filter = `brightness(${1 + o.brightness / 100})`;
+    const m = makeCanvas(pw, ph), mx = ctx2d(m); mx.filter = o.fade ? `blur(${o.fade * k}px)` : 'none'; mx.drawImage(mask, 0, o.shift * k, pw, ph); if (o.shift > 0) mx.drawImage(mask, 0, 0, pw, ph);
+    sx.filter = 'none'; sx.globalCompositeOperation = 'destination-in'; sx.drawImage(m, 0, 0);
+    x.drawImage(s, 0, 0);
+  };
+  const slider = (label: string, key: keyof typeof o, min: number, max: number, unit = '') => row(label, numberSlider({ min, max, value: o[key] as number, unit, onInput: v => { (o as any)[key] = v; draw(); } }).el);
+  const flip = h('input', { type: 'checkbox' }) as HTMLInputElement; flip.addEventListener('change', () => { o.flip = flip.checked; draw(); });
+  sel.addEventListener('change', async () => {
+    if (sel.value === 'custom') { const [f] = await io.pickFiles('image/*', false); if (f) { custom = await io.imageToCanvas(f); } else sel.value = 'clouds'; }
+    sky = skyCanvas(); draw();
+  });
+  draw();
+  showDialog({
+    title: 'Sustituir cielo', okLabel: 'Aplicar', side: true,
+    body: [pv, row('Cielo', sel), slider('Desplazar borde', 'shift', -30, 80, ' px'), slider('Difuminar borde', 'fade', 0, 40, ' px'), slider('Brillo del cielo', 'brightness', -60, 60, ' %'), slider('Luz en el primer plano', 'lighting', 0, 100, ' %'), row('', h('label', { class: 'check' }, flip, ' Voltear el cielo')),
+      h('div', { class: 'hint' }, 'Se crea un grupo con el cielo y la luz del primer plano; sus máscaras se pueden retocar después.')],
+    onOk: () => ops.replaceSky(sky, { ...o, mask }),
+  });
 }
