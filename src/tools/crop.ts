@@ -198,3 +198,85 @@ export class PerspectiveCropTool implements Tool {
     ctx.restore();
   }
 }
+
+/** Sector: divide el diseño en zonas que se exportan cada una en su archivo (Archivo › Exportar sectores). */
+export class SliceTool implements Tool {
+  id = 'slice'; name = 'Sector'; icon = icon('slice'); key = 'C'; group = 'crop'; cursor = 'crosshair';
+  sel = -1;
+  private drag: { mode: 'new' | 'move' | Handle; start: { x: number; y: number }; orig: Rect } | null = null;
+  extraOptions(bar: HTMLElement) {
+    bar.append(
+      h('span', { class: 'hint' }, 'Arrastra para crear un sector · clic para elegirlo · Supr lo borra · doble clic para cambiar el nombre.'),
+      h('button', { class: 'btn', onclick: () => this.fromGuides() }, 'Sectores desde guías'),
+      h('button', { class: 'btn', onclick: () => { const d = app.doc; if (d) { d.slices = []; this.sel = -1; d.changed(); app.viewport.requestRender(); } } }, 'Borrar todos'),
+      h('button', { class: 'btn primary', onclick: async () => { const { exportSlicesDialog } = await import('../ui/dialogs'); exportSlicesDialog(); } }, 'Exportar…'),
+    );
+  }
+  private fromGuides() {
+    const d = app.doc; if (!d) return;
+    const xs = [0, ...d.guides.v.filter(v => v > 0 && v < d.width), d.width].sort((a, b) => a - b), ys = [0, ...d.guides.h.filter(v => v > 0 && v < d.height), d.height].sort((a, b) => a - b);
+    if (xs.length < 3 && ys.length < 3) { app.toast('Primero pon guías (Vista › Nueva disposición de guías)', 'warn'); return; }
+    d.slices = [];
+    for (let j = 0; j < ys.length - 1; j++) for (let i = 0; i < xs.length - 1; i++) if (xs[i + 1] - xs[i] >= 1 && ys[j + 1] - ys[j] >= 1)
+      d.slices.push({ x: Math.round(xs[i]), y: Math.round(ys[j]), w: Math.round(xs[i + 1] - xs[i]), h: Math.round(ys[j + 1] - ys[j]), name: `${d.name}_${String(d.slices.length + 1).padStart(2, '0')}` });
+    d.changed(); app.viewport.requestRender(); app.toast(`${d.slices.length} sectores`);
+  }
+  private hitSlice(e: ToolEvent) { const L = app.doc!.slices; for (let i = L.length - 1; i >= 0; i--) { const s = L[i]; if (e.x >= s.x && e.x < s.x + s.w && e.y >= s.y && e.y < s.y + s.h) return i; } return -1; }
+  private hitHandle(e: ToolEvent): Handle | null {
+    const s = app.doc!.slices[this.sel]; if (!s) return null;
+    for (const [n, x, y] of handlePoints(s)) { const p = app.viewport.toScreen(x, y); if (Math.abs(p.x - e.sx) < 7 && Math.abs(p.y - e.sy) < 7) return n; }
+    return null;
+  }
+  hover(e: ToolEvent) { const hnd = this.hitHandle(e); this.cursor = hnd ? CURSORS[hnd] : this.hitSlice(e) >= 0 ? 'move' : 'crosshair'; }
+  down(e: ToolEvent) {
+    const d = app.doc!;
+    const hnd = this.hitHandle(e);
+    if (hnd) { this.drag = { mode: hnd, start: { x: e.x, y: e.y }, orig: { ...d.slices[this.sel] } }; return; }
+    const k = this.hitSlice(e);
+    if (k >= 0) {
+      this.sel = k;
+      if (e.detail >= 2) { import('../ui/dialog').then(async m => { const n = await m.promptDialog('Nombre del sector', 'Nombre del archivo', d.slices[k].name); if (n) { d.slices[k].name = n.trim(); d.changed(); app.viewport.requestRender(); } }); return; }
+      this.drag = { mode: 'move', start: { x: e.x, y: e.y }, orig: { ...d.slices[k] } }; app.viewport.requestRender(); return;
+    }
+    d.slices.push({ x: Math.round(e.x), y: Math.round(e.y), w: 0, h: 0, name: `${d.name}_${String(d.slices.length + 1).padStart(2, '0')}` });
+    this.sel = d.slices.length - 1;
+    this.drag = { mode: 'new', start: { x: e.x, y: e.y }, orig: { x: Math.round(e.x), y: Math.round(e.y), w: 0, h: 0 } };
+  }
+  move(e: ToolEvent) {
+    const g = this.drag, d = app.doc!, s = d.slices[this.sel]; if (!g || !s) return;
+    const sp = snapPoint(e.x, e.y, true), dx = Math.round(sp.x - g.start.x), dy = Math.round(sp.y - g.start.y);
+    let { x, y, w, h: hh } = g.orig;
+    if (g.mode === 'new') { x = Math.round(g.start.x); y = Math.round(g.start.y); w = Math.round(sp.x) - x; hh = Math.round(sp.y) - y; }
+    else if (g.mode === 'move') { x += dx; y += dy; }
+    else { if (g.mode.includes('w')) { x += dx; w -= dx; } if (g.mode.includes('e')) w += dx; if (g.mode.includes('n')) { y += dy; hh -= dy; } if (g.mode.includes('s')) hh += dy; }
+    if (w < 0) { x += w; w = -w; } if (hh < 0) { y += hh; hh = -hh; }
+    // dentro del documento
+    const x0 = Math.max(0, x), y0 = Math.max(0, y), x1 = Math.min(d.width, x + w), y1 = Math.min(d.height, y + hh);
+    Object.assign(s, { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) });
+  }
+  up() {
+    clearSnap(); const d = app.doc!, s = d.slices[this.sel];
+    if (this.drag?.mode === 'new' && s && (s.w < 2 || s.h < 2)) { d.slices.splice(this.sel, 1); this.sel = -1; }
+    if (this.drag) d.changed();
+    this.drag = null;
+  }
+  key_(e: KeyboardEvent) {
+    const d = app.doc; if (!d) return false;
+    if ((e.key === 'Delete' || e.key === 'Backspace') && d.slices[this.sel]) { d.slices.splice(this.sel, 1); this.sel = -1; d.changed(); app.viewport.requestRender(); return true; }
+    return false;
+  }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    const d = app.doc; if (!d) return;
+    ctx.save(); ctx.font = '11px system-ui';
+    d.slices.forEach((s, i) => {
+      const a = vp.toScreen(s.x, s.y), b = vp.toScreen(s.x + s.w, s.y + s.h), on = i === this.sel;
+      ctx.fillStyle = on ? 'rgba(61,139,253,.12)' : 'rgba(0,0,0,.05)'; ctx.fillRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      ctx.strokeStyle = on ? '#3d8bfd' : '#58a6ff'; ctx.lineWidth = on ? 2 : 1; ctx.strokeRect(a.x + .5, a.y + .5, b.x - a.x - 1, b.y - a.y - 1);
+      const label = `${String(i + 1).padStart(2, '0')} ${s.name}`, tw = ctx.measureText(label).width + 8;
+      ctx.fillStyle = on ? '#3d8bfd' : 'rgba(30,60,110,.85)'; ctx.fillRect(a.x + 1, a.y + 1, Math.min(tw, Math.max(20, b.x - a.x - 2)), 16);
+      ctx.fillStyle = '#fff'; ctx.save(); ctx.beginPath(); ctx.rect(a.x + 1, a.y + 1, Math.max(20, b.x - a.x - 2), 16); ctx.clip(); ctx.fillText(label, a.x + 5, a.y + 13); ctx.restore();
+      if (on) for (const [, x, y] of handlePoints(s)) { const p = vp.toScreen(x, y); ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 4, p.y - 4, 8, 8); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1; ctx.strokeRect(p.x - 4, p.y - 4, 8, 8); }
+    });
+    ctx.restore();
+  }
+}

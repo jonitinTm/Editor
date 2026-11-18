@@ -36,6 +36,8 @@ export class EditorDocument {
   paths: DocPath[] = [];
   /** Composiciones de capas: variantes guardadas (visibilidad, posición y aspecto de cada capa). */
   layerComps: LayerComp[] = [];
+  /** Sectores (zonas que se exportan cada una en su archivo, para la web). */
+  slices: { x: number; y: number; w: number; h: number; name: string }[] = [];
   /** Resolución para imprimir (píxeles por pulgada). */
   ppi = 72;
   /** Modo de color: en «gris» se trabaja en escala de grises. */

@@ -1631,3 +1631,23 @@ export async function replaceSky(sky: HTMLCanvasElement, opt: { shift: number; f
   d.selection.setMask(null);
   d.invalidate(); d.commit('Sustituir cielo');
 }
+
+/** Exporta cada sector en su archivo (ZIP), con una página HTML opcional que los coloca en su sitio. */
+export async function exportSlices(type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number, scale: number, withHtml: boolean) {
+  const d = doc(); if (!d) return 0;
+  const flat = d.flatten(), ext = io.EXPORT_EXT[type];
+  const files: { name: string; data: Uint8Array }[] = [], used = new Set<string>();
+  const parts: string[] = [];
+  for (const s of d.slices) {
+    const c = makeCanvas(s.w, s.h); ctx2d(c).drawImage(flat, -s.x, -s.y);
+    const blob = await io.exportImage(d, type, quality, scale, c);
+    let base = (s.name || 'sector').replace(/[\\/:*?"<>|]/g, '_'), n = base, k = 2; while (used.has(n)) n = `${base}_${k++}`; used.add(n);
+    const fname = n + (blob.type === type ? ext : '.png');
+    files.push({ name: 'images/' + fname, data: new Uint8Array(await blob.arrayBuffer()) });
+    parts.push(`<img src="images/${fname}" alt="" style="position:absolute;left:${Math.round(s.x * scale)}px;top:${Math.round(s.y * scale)}px;width:${Math.round(s.w * scale)}px;height:${Math.round(s.h * scale)}px">`);
+  }
+  if (withHtml) files.push({ name: (d.name || 'pagina') + '.html', data: new TextEncoder().encode(`<!doctype html>\n<html lang="es"><head><meta charset="utf-8"><title>${d.name}</title></head>\n<body style="margin:0"><div style="position:relative;width:${Math.round(d.width * scale)}px;height:${Math.round(d.height * scale)}px">\n${parts.join('\n')}\n</div></body></html>\n`) });
+  const { makeZip } = await import('../io/zip');
+  await io.saveBlob(makeZip(files), (d.name || 'sectores') + '-sectores.zip');
+  return files.length;
+}

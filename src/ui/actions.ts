@@ -39,6 +39,7 @@ export const ACTIONS: Action[] = [
   { id: 'save', label: 'Guardar proyecto (.edp)', keys: ['Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(false) },
   { id: 'saveAs', label: 'Guardar proyecto como…', keys: ['Alt+Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(true) },
   { id: 'export', label: 'Exportar como (PNG, JPG, TIFF, PSD, PDF…)…', keys: ['Shift+Ctrl+S', 'Alt+Shift+Ctrl+W'], enabled: hasDoc, run: dlg.exportDialog },
+  { id: 'exportSlices', label: 'Exportar sectores…', enabled: hasDoc, run: () => dlg.exportSlicesDialog() },
   { id: 'exportLayers', label: 'Exportar capas a archivos…', enabled: hasDoc, run: dlg.exportLayersDialog },
   { id: 'batch', label: 'Automatizar › Lote…', enabled: () => true, run: dlg.batchDialog },
   { id: 'print', label: 'Imprimir…', keys: ['Ctrl+P'], enabled: hasDoc, run: ops.printImage },

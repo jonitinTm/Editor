@@ -1023,3 +1023,23 @@ export async function recentDialog() {
   const dlg = showDialog({ title: 'Abrir reciente', okLabel: 'Cerrar', cancelLabel: null, width: 520, body: list.length ? [body, clear] : [body] });
   close = dlg.close;
 }
+
+// ---- Archivo › Exportar sectores -------------------------------------------------------------
+
+export function exportSlicesDialog() {
+  const d = app.doc; if (!d) return;
+  if (!d.slices.length) { app.toast('No hay sectores: créalos con la herramienta Sector (en el grupo de Recortar, C)', 'warn'); return; }
+  const fmt = h('select', {}, h('option', { value: 'image/png' }, 'PNG'), h('option', { value: 'image/jpeg' }, 'JPG'), h('option', { value: 'image/webp' }, 'WebP')) as HTMLSelectElement;
+  let quality = 85, scale = 100;
+  const q = numberSlider({ min: 1, max: 100, value: quality, unit: '%', onInput: v => { quality = v; } });
+  const sc = numberSlider({ min: 10, max: 400, value: scale, unit: '%', onInput: v => { scale = v; } });
+  const html = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  showDialog({
+    title: 'Exportar sectores', okLabel: 'Exportar',
+    body: [h('div', { class: 'hint' }, `${d.slices.length} sector${d.slices.length === 1 ? '' : 'es'}; cada uno sale en su archivo dentro de un ZIP.`), row('Formato', fmt), row('Calidad', q.el), row('Tamaño', sc.el), row('', h('label', { class: 'check' }, html, ' Incluir una página HTML que los recompone'))],
+    onOk: async () => {
+      try { const n = await ops.exportSlices(fmt.value as any, quality / 100, scale / 100, html.checked); app.toast(`${n} archivos exportados (ZIP)`); }
+      catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); }
+    },
+  });
+}
