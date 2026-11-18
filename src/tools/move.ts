@@ -167,7 +167,7 @@ export class MoveTool implements Tool {
 
   up() { clearSnap(); if (this.start) this.finish(); }
   cancel() {
-    const doc = app.doc!;
+    const doc = app.doc; if (!doc) { this.layers = []; this.start = null; this.floating = null; return; }
     for (const l of this.layers) doc.overrides.delete(l);
     for (const b of this.boards) { b.g.artboard!.x = b.x; b.g.artboard!.y = b.y; } this.boards = [];
     (doc as any).selectionOffset = null;

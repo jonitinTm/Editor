@@ -12,7 +12,7 @@ export interface LayerSnap {
   blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; clip: boolean; label?: string | null;
   canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
-  children?: LayerSnap[]; expanded?: boolean; artboard?: any; vmask?: string;
+  children?: LayerSnap[]; expanded?: boolean; artboard?: any; vmask?: string; frame?: boolean;
 }
 export interface DocSnap {
   width: number; height: number; root: LayerSnap; activeId: number | null;
@@ -42,7 +42,7 @@ function snapLayer(l: Layer): LayerSnap {
   s.styles = l.styles ? JSON.stringify(l.styles) : null;
   s.vmask = l.vmask ? JSON.stringify(l.vmask) : undefined;
   if (l instanceof AdjustmentLayer) s.adjust = JSON.stringify({ filterId: l.filterId, params: l.params });
-  if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; s.artboard = l.artboard ? { ...l.artboard } : undefined; }
+  if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; s.artboard = l.artboard ? { ...l.artboard } : undefined; s.frame = l.frame; }
   else if (l instanceof RasterLayer) {
     s.canvas = freeze(l, l.version, l.canvas);
     if (isParametric(l)) s.props = JSON.parse(JSON.stringify(l.props)); // copia completa (los trazados tienen puntos anidados)
@@ -78,7 +78,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
   if (s.kind === 'group') {
     const g = old instanceof GroupLayer ? old : new GroupLayer(s.name);
     g.children = [];
-    g.expanded = s.expanded ?? true; g.artboard = s.artboard ? { ...s.artboard } : undefined;
+    g.expanded = s.expanded ?? true; g.artboard = s.artboard ? { ...s.artboard } : undefined; g.frame = s.frame;
     for (const c of s.children ?? []) g.add(restoreLayer(c, w, h, olds));
     l = g;
   } else if (s.kind === 'adjust') {

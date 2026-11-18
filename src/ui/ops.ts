@@ -124,6 +124,20 @@ export async function openFiles(files: File[], asLayers = false, remember = true
 export async function placeImage(src: Blob | HTMLCanvasElement, name: string, pos?: { x: number; y: number }, smart = false) {
   const d = doc(); if (!d) return;
   const c = src instanceof HTMLCanvasElement ? src : await io.imageToCanvas(src);
+  // Con un marco seleccionado, la imagen va dentro y lo cubre entero
+  const { activeFrame } = await import('../tools/shape');
+  const fr = activeFrame();
+  if (fr && fr.vmask) {
+    const P = fr.vmask.subpaths.flatMap(s => s.pts), x0 = Math.min(...P.map(p => p.x)), y0 = Math.min(...P.map(p => p.y)), x1 = Math.max(...P.map(p => p.x)), y1 = Math.max(...P.map(p => p.y));
+    const k = Math.max((x1 - x0) / c.width, (y1 - y0) / c.height), ox = (x0 + x1 - c.width * k) / 2, oy = (y0 + y1 - c.height * k) / 2;
+    for (const ch of [...fr.children]) if (ch.name === 'Vacío') fr.remove(ch);
+    const inner = new EditorDocument(name, c.width, c.height);
+    const il = new RasterLayer('Fondo', c.width, c.height); il.canvas = c; inner.root.add(il); inner.setActive(il, false); inner.embedded = true;
+    const sl = new SmartLayer(name, d.width, d.height, inner, [k, 0, 0, k, ox, oy]);
+    fr.add(sl); d.setActive(sl, false);
+    d.commit('Colocar en el marco');
+    return;
+  }
   if (smart) {
     // Como objeto inteligente: conserva la imagen original y se ajusta al lienzo si es más grande
     const inner = new EditorDocument(name, c.width, c.height);

@@ -617,6 +617,8 @@ export class GroupLayer extends Layer {
   expanded = true;
   /** Mesa de trabajo: el grupo se recorta a este rectángulo y tiene fondo propio. */
   artboard?: { x: number; y: number; w: number; h: number; bg: string | null };
+  /** Marco: grupo con máscara vectorial donde se colocan imágenes (se ajustan a su forma). */
+  frame?: boolean;
   add(layer: Layer, index = this.children.length) {
     layer.parent?.remove(layer);
     layer.parent = this;

@@ -5,7 +5,10 @@ import { CUSTOM_SHAPES } from '../core/customshapes';
 import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
-import { ShapeLayer, ShapeProps } from '../core/layers';
+import { ShapeLayer, ShapeProps, GroupLayer, RasterLayer, type PathPoint } from '../core/layers';
+import { h } from '../ui/dom';
+import { ctx2d } from '../core/canvas';
+import type { Viewport } from '../ui/viewport';
 
 export class ShapeTool implements Tool {
   id = 'shape'; name = 'Forma'; icon = icon('shape'); key = 'U'; cursor = 'crosshair';
@@ -67,4 +70,61 @@ export class ShapeTool implements Tool {
     this.a = null; this.layer = null;
   }
   cancel() { if (this.layer) { this.layer.parent?.remove(this.layer); app.doc?.invalidate(); } this.a = null; this.layer = null; }
+}
+
+/** Marco: dibuja un hueco (rectangular o elíptico) donde luego se colocan imágenes, que se recortan a su forma. */
+export class FrameTool implements Tool {
+  id = 'frame'; name = 'Marco'; icon = icon('frame'); key = 'K'; cursor = 'crosshair';
+  options = [{ key: 'shape', label: 'Forma', type: 'select', default: 'rect', choices: [{ value: 'rect', label: 'Rectángulo' }, { value: 'ellipse', label: 'Elipse' }] }] as any[];
+  private a: { x: number; y: number } | null = null; private b: { x: number; y: number } | null = null;
+  extraOptions(bar: HTMLElement) { bar.append(h('span', { class: 'hint' }, 'Arrastra para crear un marco. Después, con el marco seleccionado, arrastra una imagen o usa Archivo › Colocar: se ajusta dentro.')); }
+  down(e: ToolEvent) { this.a = { x: e.x, y: e.y }; this.b = { ...this.a }; }
+  move(e: ToolEvent) { if (!this.a) return; this.b = { x: e.x, y: e.y }; if (e.shift) { const s = Math.max(Math.abs(this.b.x - this.a.x), Math.abs(this.b.y - this.a.y)); this.b = { x: this.a.x + Math.sign(this.b.x - this.a.x || 1) * s, y: this.a.y + Math.sign(this.b.y - this.a.y || 1) * s }; } app.viewport.requestRender(); }
+  up() {
+    const a = this.a, b = this.b; this.a = this.b = null; if (!a || !b) return;
+    const x0 = Math.round(Math.min(a.x, b.x)), y0 = Math.round(Math.min(a.y, b.y)), x1 = Math.round(Math.max(a.x, b.x)), y1 = Math.round(Math.max(a.y, b.y));
+    if (x1 - x0 < 4 || y1 - y0 < 4) { app.viewport.requestRender(); return; }
+    createFrame(app.opt('shape', this.id) === 'ellipse' ? 'ellipse' : 'rect', { x: x0, y: y0, w: x1 - x0, h: y1 - y0 });
+  }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (!this.a || !this.b) return;
+    const p = vp.toScreen(Math.min(this.a.x, this.b.x), Math.min(this.a.y, this.b.y)), q = vp.toScreen(Math.max(this.a.x, this.b.x), Math.max(this.a.y, this.b.y));
+    ctx.save(); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1.5; ctx.beginPath();
+    if (app.opt('shape', this.id) === 'ellipse') ctx.ellipse((p.x + q.x) / 2, (p.y + q.y) / 2, (q.x - p.x) / 2, (q.y - p.y) / 2, 0, 0, 7); else ctx.rect(p.x, p.y, q.x - p.x, q.y - p.y);
+    ctx.stroke(); ctx.restore();
+  }
+}
+
+/** Puntos Bézier de un rectángulo o una elipse (para la máscara vectorial del marco). */
+function framePath(kind: 'rect' | 'ellipse', r: { x: number; y: number; w: number; h: number }): PathPoint[] {
+  if (kind === 'rect') return [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]].map(([x, y]) => ({ x, y, ix: x, iy: y, ox: x, oy: y }));
+  const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rx = r.w / 2, ry = r.h / 2, k = 0.5523;
+  return [
+    { x: cx, y: cy - ry, ix: cx - rx * k, iy: cy - ry, ox: cx + rx * k, oy: cy - ry },
+    { x: cx + rx, y: cy, ix: cx + rx, iy: cy - ry * k, ox: cx + rx, oy: cy + ry * k },
+    { x: cx, y: cy + ry, ix: cx + rx * k, iy: cy + ry, ox: cx - rx * k, oy: cy + ry },
+    { x: cx - rx, y: cy, ix: cx - rx, iy: cy + ry * k, ox: cx - rx, oy: cy - ry * k },
+  ];
+}
+
+export function createFrame(kind: 'rect' | 'ellipse', r: { x: number; y: number; w: number; h: number }) {
+  const d = app.doc; if (!d) return;
+  let n = 1; const names = new Set(d.allLayers().map(l => l.name)); while (names.has(`Marco ${n}`)) n++;
+  const g = new GroupLayer(`Marco ${n}`); g.frame = true;
+  g.vmask = { subpaths: [{ closed: true, pts: framePath(kind, r) }], enabled: true };
+  // relleno provisional (gris con una cruz) hasta que se coloque una imagen
+  const ph = new RasterLayer('Vacío', d.width, d.height), x = ctx2d(ph.canvas);
+  x.fillStyle = '#d9dce1'; x.fillRect(r.x, r.y, r.w, r.h);
+  x.strokeStyle = '#9aa0a8'; x.lineWidth = Math.max(1, Math.min(r.w, r.h) / 120); x.beginPath(); x.moveTo(r.x, r.y); x.lineTo(r.x + r.w, r.y + r.h); x.moveTo(r.x + r.w, r.y); x.lineTo(r.x, r.y + r.h); x.stroke();
+  ph.touch(); (ph as any).framePlaceholder = true;
+  g.add(ph);
+  d.insertAboveActive(g); d.setActive(g, false);
+  d.commit('Crear marco');
+}
+
+/** Si la capa activa es un marco (o está dentro de uno), devuelve el marco. */
+export function activeFrame(): GroupLayer | null {
+  let l = app.doc?.active ?? null;
+  while (l) { if (l instanceof GroupLayer && l.frame) return l; l = l.parent; }
+  return null;
 }

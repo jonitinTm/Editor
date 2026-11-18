@@ -224,6 +224,8 @@ Ya disponible:
   suaves con pocos puntos, editable con la Selección directa.
 - **Pincel mezclador** (con el pincel, `B`): la pintura se mezcla con los colores de la imagen y los arrastra, como
   pintura húmeda (humedad, carga, mezcla, limpiar tras cada trazo y «solo mezclar»).
+- **Marco** (`K`): dibuja huecos rectangulares o elípticos; con el marco seleccionado, arrastra una foto o usa *Colocar* y
+  se mete dentro, cubriéndolo (como objeto inteligente, se puede mover y escalar dentro del marco). Ideal para plantillas.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

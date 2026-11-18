@@ -9,8 +9,8 @@ import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
-  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso', 'magLasso'], ['quickSel', 'wand'], ['crop'], ['eyedropper', 'ruler'],
-  ['spotHeal', 'heal', 'redEye'], ['clone'], ['historyBrush'], ['brush', 'pencil', 'colorReplace'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text'], ['pen', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
+  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso', 'magLasso'], ['quickSel', 'wand'], ['crop', 'perspCrop', 'slice'], ['frame'], ['eyedropper', 'colorSampler', 'ruler'],
+  ['spotHeal', 'heal', 'patch', 'contentMove', 'redEye'], ['clone', 'patternStamp'], ['historyBrush'], ['brush', 'pencil', 'colorReplace', 'mixer'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text'], ['pen', 'freePen', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
 ];
 
 export function buildToolbar(parent: HTMLElement) {
@@ -21,7 +21,12 @@ export function buildToolbar(parent: HTMLElement) {
 
   const toolOf = (ids: string[]) => app.tools.get(ids.includes(app.tool?.id) ? app.tool.id : (ids.find(i => i === app.groupChoice[app.tools.get(ids[0])!.group ?? '']) ?? ids[0]))!;
 
-  for (const ids of LAYOUT) {
+  // Cualquier herramienta registrada que no esté en la lista va en su grupo o en un botón propio al final
+  const layout = LAYOUT.map(ids => ids.filter(id => app.tools.has(id))).filter(ids => ids.length);
+  const placed = new Set(layout.flat());
+  // (transformar y posición libre son modos temporales que se abren desde el menú Edición)
+  for (const t of app.tools.values()) if (!placed.has(t.id) && !['transform', 'puppet', 'warp'].includes(t.id)) { const g = layout.find(ids => app.tools.get(ids[0])!.group && app.tools.get(ids[0])!.group === t.group); if (g) g.push(t.id); else layout.push([t.id]); placed.add(t.id); }
+  for (const ids of layout) {
     const el = h('button', { class: 'tool-btn' + (ids.length > 1 ? ' grouped' : '') });
     const showFly = () => {
       closeFly();

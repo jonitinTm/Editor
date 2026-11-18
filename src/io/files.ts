@@ -81,7 +81,7 @@ export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith
 
 interface ProjLayer {
   id: number; type: string; name: string; visible: boolean; opacity: number; blendMode: string; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; clip?: boolean; label?: string | null;
-  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile; filters?: any[] }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean; artboard?: any;
+  image?: string; mask?: { image: string; enabled: boolean } | null; text?: any; shape?: any; smart?: { m: number[]; doc: ProjFile; filters?: any[] }; styles?: any; adjust?: { filterId: string; params: any }; children?: ProjLayer[]; expanded?: boolean; artboard?: any; frame?: boolean;
 }
 interface ProjFile {
   format: 'editor-proyecto'; version: 1; name: string; width: number; height: number;
@@ -106,7 +106,7 @@ async function layerToProj(l: Layer): Promise<ProjLayer> {
   if (l.styles) p.styles = l.styles;
   if (l.vmask) (p as any).vmask = l.vmask;
   if (l instanceof AdjustmentLayer) p.adjust = { filterId: l.filterId, params: l.params };
-  if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; if (l.artboard) p.artboard = l.artboard; }
+  if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; if (l.artboard) p.artboard = l.artboard; if (l.frame) p.frame = true; }
   else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument), filters: l.filters };
   else if (isRaster(l)) { p.image = await canvasToDataURL(l.canvas); if (l instanceof TextLayer) p.text = { ...l.props }; if (l instanceof ShapeLayer) p.shape = { ...l.props }; }
   return p;
@@ -130,7 +130,7 @@ async function projectData(doc: EditorDocument): Promise<ProjFile> {
 async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
   let l: Layer;
   if (p.type === 'group') {
-    const g = new GroupLayer(p.name); g.expanded = p.expanded ?? true; if (p.artboard) g.artboard = { ...p.artboard };
+    const g = new GroupLayer(p.name); g.expanded = p.expanded ?? true; if (p.artboard) g.artboard = { ...p.artboard }; if (p.frame) g.frame = true;
     for (const c of p.children ?? []) g.add(await projToLayer(c, w, h));
     l = g;
   } else if (p.type === 'smart') {
