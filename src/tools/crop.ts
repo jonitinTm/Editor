@@ -5,7 +5,8 @@ import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
 import { h } from '../ui/dom';
-import { Rect } from '../core/canvas';
+import { Rect, makeCanvas, ctx2d } from '../core/canvas';
+import { isRaster, isParametric, type RasterLayer } from '../core/layers';
 import { snapPoint, clearSnap } from './snap';
 import { homography } from './transform';
 
@@ -21,6 +22,7 @@ const CURSORS: Record<string, string> = { nw: 'nwse-resize', se: 'nwse-resize', 
 
 export class CropTool implements Tool {
   id = 'crop'; name = 'Recortar'; icon = icon('crop'); key = 'C'; group = 'crop'; cursor = 'crosshair';
+  options = [{ key: 'fill', label: 'Rellenar según contenido', type: 'checkbox', default: false }] as any[];
   rect: Rect | null = null;
   private drag: { h: Handle; start: { x: number; y: number }; orig: Rect } | null = null;
 
@@ -80,10 +82,23 @@ export class CropTool implements Tool {
     const doc = app.doc, r = this.rect;
     if (!doc || !r || r.w < 1 || r.h < 1) return;
     if (r.x === 0 && r.y === 0 && r.w === doc.width && r.h === doc.height) return;
+    const grows = r.x < 0 || r.y < 0 || r.x + r.w > doc.width || r.y + r.h > doc.height;
     doc.resizeCanvas(Math.round(r.w), Math.round(r.h), -Math.round(r.x), -Math.round(r.y));
-    doc.commit('Recortar');
     this.reset();
     app.viewport.fit(true);
+    const base = doc.root.children[0];
+    if (grows && app.opt('fill', this.id) && base && isRaster(base) && !isParametric(base)) {
+      // la zona nueva (vacía) de la capa de abajo se inventa a partir de la foto
+      const L = base as RasterLayer, hole = makeCanvas(doc.width, doc.height), hx = ctx2d(hole), id = ctx2d(L.canvas).getImageData(0, 0, doc.width, doc.height), hi = hx.createImageData(doc.width, doc.height);
+      let any = false; for (let i = 3; i < id.data.length; i += 4) if (id.data[i] < 250) { hi.data[i] = 255; any = true; }
+      if (any) {
+        hx.putImageData(hi, 0, 0);
+        app.toast('Rellenando los bordes nuevos…');
+        import('../ui/ops').then(async o => { const out = await o.inpaintCanvas(L.canvas, hole, { x: 0, y: 0, w: doc.width, h: doc.height }); if (out) { L.canvas = out; L.touch(); doc.invalidate(); } doc.commit('Recortar (rellenar según contenido)'); });
+        return;
+      }
+    }
+    doc.commit('Recortar');
   }
   key_(e: KeyboardEvent) {
     if (e.key === 'Enter') { this.apply(); return true; }
