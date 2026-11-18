@@ -190,6 +190,8 @@ Ya disponible:
   de las demás (Alt+clic quita una chincheta, Intro aplica).
 - **Escala según el contenido** (*Edición*): estrecha o ensancha una foto sin deformar a las personas ni los objetos
   importantes (protege tonos de piel o lo seleccionado).
+- **Texto sobre trazado y texto vertical** (*Capa › Texto*): dibuja un trazado con la Pluma (modo «Trazado»), elige
+  el texto y «Texto sobre trazado»; en *Propiedades* se ajusta dónde empieza y de qué lado va. Sigue siendo editable.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

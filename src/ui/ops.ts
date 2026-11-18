@@ -1372,3 +1372,26 @@ export async function contentAwareScaleOp(wPct: number, hPct: number, protectSki
   d.commit('Escala según el contenido');
   app.toast(`Hecho en ${((performance.now() - t0) / 1000).toFixed(1)} s`);
 }
+
+/** Capa › Texto › Texto sobre trazado: el texto activo sigue el trazado activo del panel Trazados. */
+export function textOnPath() {
+  const d = doc(), l = d?.active;
+  if (!d || !(l instanceof TextLayer)) { app.toast('Selecciona una capa de texto', 'warn'); return; }
+  const path = d.paths[d.activePath];
+  let sp = path?.subpaths[0];
+  if (!sp) {
+    // también vale una capa de trazado hecha con la pluma
+    const shp = d.allLayers().find(x => x instanceof ShapeLayer && x.props.shape === 'path' && x.props.path) as ShapeLayer | undefined;
+    if (shp) sp = shp.props.path!;
+  }
+  if (!sp || sp.pts.length < 2) { app.toast('Dibuja un trazado con la Pluma (modo «Trazado») y selecciónalo en el panel Trazados', 'warn'); return; }
+  l.props.onPath = { pts: JSON.parse(JSON.stringify(sp.pts)), closed: sp.closed, offset: 0 };
+  delete l.props.vertical; delete l.props.warp;
+  l.render(); d.commit('Texto sobre trazado');
+}
+export function toggleVerticalText() {
+  const d = doc(), l = d?.active;
+  if (!d || !(l instanceof TextLayer)) { app.toast('Selecciona una capa de texto', 'warn'); return; }
+  l.props.vertical = !l.props.vertical; if (l.props.vertical) delete l.props.onPath;
+  l.render(); d.commit(l.props.vertical ? 'Texto vertical' : 'Texto horizontal');
+}

@@ -365,6 +365,14 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('div', { class: 'prop-row' }, chk('Subrayado', !!p.underline, v => p.underline = v), chk('Tachado', !!p.strike, v => p.strike = v), chk('MAYÚS', !!p.caps, v => p.caps = v)),
         h('div', { class: 'prop-row' }, h('span', {}, 'Caja'), num(Math.round(p.boxWidth ?? 0), v => p.boxWidth = v > 0 ? v : undefined), h('span', { class: 'hint' }, 'px de ancho (0 = texto de punto)')));
       body.append(h('div', { class: 'prop-btns' }, warpBtn));
+      const vert = h('input', { type: 'checkbox', checked: !!p.vertical }); vert.onchange = () => upd(() => { p.vertical = vert.checked; if (vert.checked) delete p.onPath; });
+      body.append(h('label', { class: 'check' }, vert, ' Texto vertical'));
+      if (p.onPath) {
+        const op = p.onPath;
+        body.append(formRow('Inicio en el trazado', numberSlider({ min: 0, max: 100, value: op.offset ?? 0, unit: '%', onInput: v => { op.offset = v; l.render(); d.invalidate(); app.viewport.requestRender(); clearTimeout((op as any)._t); (op as any)._t = window.setTimeout(() => { delete (op as any)._t; d.commit('Texto sobre trazado'); }, 400); } }).el));
+        const flip = h('input', { type: 'checkbox', checked: !!op.flip }); flip.onchange = () => upd(() => { op.flip = flip.checked; });
+        body.append(h('label', { class: 'check' }, flip, ' Al otro lado del trazado'), h('div', { class: 'prop-btns' }, h('button', { class: 'btn', onclick: () => upd(() => { delete p.onPath; }) }, 'Quitar del trazado')));
+      }
       if (p.runs?.length) body.append(h('div', { class: 'hint' }, 'Este texto tiene partes con otro estilo. Para cambiar solo una parte, edítalo y selecciónala antes de cambiar el color, la fuente o el tamaño.'), h('div', { class: 'prop-btns' }, h('button', { class: 'btn', onclick: () => upd(() => { delete p.runs; }) }, 'Quitar estilos parciales')));
     }
     if (l instanceof AdjustmentLayer) {

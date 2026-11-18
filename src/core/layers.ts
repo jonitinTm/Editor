@@ -88,6 +88,10 @@ export interface TextProps {
   warp?: { style: string; bend: number };
   /** Partes del texto con estilo propio (color, fuente, tamaño…). */
   runs?: TextRun[];
+  /** Texto sobre un trazado: las letras siguen la curva; `offset` = dónde empieza (0-100 %). */
+  onPath?: { pts: PathPoint[]; closed: boolean; offset: number; flip?: boolean };
+  /** Texto vertical (columnas de arriba abajo, de derecha a izquierda). */
+  vertical?: boolean;
 }
 
 export interface LayerStyles {
@@ -263,18 +267,50 @@ export class TextLayer extends RasterLayer {
   }
   /** Caja que ocupa el texto (coordenadas del documento). */
   bounds() {
-    const p = this.props, L = this.layout();
+    const p = this.props;
+    if (p.onPath || p.vertical) { const b = this.specialBounds(); if (b) return b; }
+    const L = this.layout();
     const x = p.boxWidth ? p.x : p.align === 'left' ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.x - L.width;
     return { x, y: p.y, w: L.width, h: L.lh * Math.max(1, L.lines.length) };
   }
   translate(dx: number, dy: number) {
     this.props.x += dx; this.props.y += dy;
+    if (this.props.onPath) for (const q of this.props.onPath.pts) { q.x += dx; q.y += dy; q.ix += dx; q.iy += dy; q.ox += dx; q.oy += dy; }
     if (!this.props.keepPixels) { this.render(); return; }
     const c = makeCanvas(this.canvas.width, this.canvas.height); ctx2d(c).drawImage(this.canvas, dx, dy); this.canvas = c; this.touch();
   }
   scale(sx: number, sy: number) {
     const p = this.props; p.x *= sx; p.y *= sy; p.size *= Math.min(sx, sy);
+    if (p.onPath) for (const q of p.onPath.pts) { q.x *= sx; q.y *= sy; q.ix *= sx; q.iy *= sy; q.ox *= sx; q.oy *= sy; }
     if (p.keepPixels) this.touch(); else this.render();
+  }
+  /** Puntos del trazado del texto, aplanado en tramos rectos, con su longitud acumulada. */
+  private pathPoly(): { pts: { x: number; y: number }[]; acc: number[] } {
+    const op = this.props.onPath!, src = op.pts, pts: { x: number; y: number }[] = [];
+    const seg = (a: PathPoint, b: PathPoint) => { for (let t = (pts.length ? 1 : 0); t <= 24; t++) { const u = t / 24, v = 1 - u; pts.push({ x: v * v * v * a.x + 3 * v * v * u * a.ox + 3 * v * u * u * b.ix + u * u * u * b.x, y: v * v * v * a.y + 3 * v * v * u * a.oy + 3 * v * u * u * b.iy + u * u * u * b.y }); } };
+    for (let i = 1; i < src.length; i++) seg(src[i - 1], src[i]);
+    if (op.closed && src.length > 1) seg(src[src.length - 1], src[0]);
+    if (op.flip) pts.reverse();
+    const acc = [0]; for (let i = 1; i < pts.length; i++) acc.push(acc[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+    return { pts, acc };
+  }
+  /** Posición y ángulo a una distancia `d` a lo largo del trazado. */
+  private along(P: { pts: { x: number; y: number }[]; acc: number[] }, d: number) {
+    const { pts, acc } = P; let i = 1; while (i < acc.length - 1 && acc[i] < d) i++;
+    const a = pts[i - 1], b = pts[i], f = (d - acc[i - 1]) / Math.max(1e-6, acc[i] - acc[i - 1]);
+    return { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, ang: Math.atan2(b.y - a.y, b.x - a.x) };
+  }
+  /** Caja aproximada del texto sobre trazado o vertical. */
+  private specialBounds() {
+    const p = this.props;
+    if (p.onPath) {
+      const P = this.pathPoly(); if (P.pts.length < 2) return null;
+      const xs = P.pts.map(q => q.x), ys = P.pts.map(q => q.y), m = p.size * 1.1;
+      return { x: Math.min(...xs) - m, y: Math.min(...ys) - m, w: Math.max(...xs) - Math.min(...xs) + 2 * m, h: Math.max(...ys) - Math.min(...ys) + 2 * m };
+    }
+    const lines = (p.caps ? p.text.toUpperCase() : p.text).split('\n'), colW = p.size * p.lineHeight, step = p.size * (1 + (p.tracking ?? 0) / 1000);
+    const h = Math.max(1, ...lines.map(l => [...l].length)) * step;
+    return { x: p.x - colW * lines.length, y: p.y, w: colW * lines.length, h };
   }
   render() {
     clearCanvas(this.canvas);
@@ -286,6 +322,33 @@ export class TextLayer extends RasterLayer {
     // Con deformación, el texto se dibuja aparte y luego se pasa por la malla
     const target = warped ? makeCanvas(this.canvas.width, this.canvas.height) : this.canvas;
     const ctx = ctx2d(target);
+    if (p.onPath || p.vertical) {
+      ctx.save(); this.setupCtx(ctx); ctx.fillStyle = p.color; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      const txt = p.caps ? p.text.toUpperCase() : p.text;
+      if (p.onPath) {
+        // cada letra en su sitio del trazado, girada según la dirección de la curva
+        const P = this.pathPoly(), total = P.acc[P.acc.length - 1] ?? 0;
+        let d = (p.onPath.offset ?? 0) / 100 * total;
+        const flat = txt.replace(/\n/g, ' ');
+        for (const ch of flat) {
+          const w = ctx.measureText(ch).width;
+          if (d + w / 2 > total) break;
+          const at = this.along(P, d + w / 2);
+          ctx.save(); ctx.translate(at.x, at.y); ctx.rotate(at.ang); ctx.fillText(ch, 0, 0); ctx.restore();
+          d += w;
+        }
+      } else {
+        // vertical: cada línea es una columna, de derecha a izquierda
+        const colW = p.size * p.lineHeight, step = p.size * (1 + (p.tracking ?? 0) / 1000);
+        txt.split('\n').forEach((line, c) => {
+          const cx = p.x - colW * c - colW / 2;
+          [...line].forEach((ch, k) => ctx.fillText(ch, cx, p.y + (k + 1) * step - step * 0.2));
+        });
+      }
+      ctx.restore();
+      if (target !== this.canvas) ctx2d(this.canvas).drawImage(target, 0, 0);
+      this.touch(); return;
+    }
     const L = this.layout(), lh = L.lh;
     ctx.save();
     this.setupCtx(ctx);
