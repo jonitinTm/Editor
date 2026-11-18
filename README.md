@@ -181,6 +181,9 @@ Ya disponible:
 - **18 filtros más**: corrección de lente (barril/cojín, aberración cromática, viñeta), destello de lente, desenfoque de
   lente (bokeh), de caja y promediar, solarizar, viento, difusión, azulejos, trazar contorno, recortes, semitono de
   color, puntillista, fragmentar, nubes de diferencia, fibras, zigzag y vidrio.
+- **Alinear y distribuir varias capas** (*Capa › Alinear* y *Capa › Distribuir*, o los botones de la herramienta Mover)
+- **Atajos de teclado personalizables** (*Edición › Atajos de teclado…*, se guardan en el navegador)
+- **Composiciones de capas** (*Ventana › Composiciones*): guarda variantes del diseño —visibilidad, posición y aspecto de cada capa— y cambia entre ellas con un clic
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
