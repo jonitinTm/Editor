@@ -7,6 +7,8 @@ import { canvasToBlob, ctx2d, makeCanvas } from '../core/canvas';
 import { decodeGifFrames } from './gif';
 
 export const PROJECT_EXT = '.edp';
+/** Lo que se ofrece en «Abrir». */
+export const OPEN_ACCEPT = 'image/*,.tif,.tiff,.tga,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,.edp';
 export const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/bmp', 'image/svg+xml'];
 
 export function loadImage(src: Blob | string): Promise<HTMLImageElement> {

@@ -14,7 +14,7 @@ import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel, buildColorPa
 import { ACTIONS } from './ui/actions';
 import * as ops from './ui/ops';
 import { dialogOpen } from './ui/dialog';
-import { newDocumentDialog, quickGuideDialog } from './ui/dialogs';
+import { newDocumentDialog, quickGuideDialog, recentGrid } from './ui/dialogs';
 import { keyString } from './ui/keys';
 import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
@@ -164,12 +164,21 @@ renderStatus();
 // ---- Pantalla de bienvenida ------------------------------------------------------------
 function buildWelcome() {
   const openBtn = h('button', { class: 'btn primary big', html: icon('open') + '<span>Abrir desde el equipo</span>' });
-  openBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,' + io.PROJECT_EXT));
+  openBtn.onclick = async () => ops.openFiles(await io.pickFiles(io.OPEN_ACCEPT));
   const newBtn = h('button', { class: 'btn big', html: icon('plus') + '<span>Nuevo documento</span>' });
   newBtn.onclick = newDocumentDialog;
   const presets = h('div', { class: 'welcome-presets' }, ...[[1920, 1080], [1080, 1080], [1280, 720], [800, 600]].map(([w, hh]) =>
     h('button', { class: 'preset', onclick: () => ops.newDocument('Sin título', w, hh, '#ffffff') },
       h('span', { class: 'preset-shape', style: { aspectRatio: `${w}/${hh}` } }), `${w} × ${hh}`)));
+  const recentBox = h('div', { class: 'recent-box' });
+  const fillRecent = async () => {
+    const { listRecent } = await import('./io/recent');
+    const list = (await listRecent()).slice(0, 8);
+    recentBox.innerHTML = '';
+    if (!list.length) return;
+    recentBox.append(h('div', { class: 'hint' }, 'Recientes:'), recentGrid(list));
+  };
+  fillRecent(); window.addEventListener('editor-recent', fillRecent);
   return h('div', { class: 'welcome' },
     h('div', { class: 'welcome-card' },
       h('div', { class: 'welcome-logo', html: icon('logo') }),
@@ -177,7 +186,8 @@ function buildWelcome() {
       h('p', {}, 'Editor de imágenes por capas. Todo se procesa en tu equipo: tus imágenes no salen de él.'),
       h('div', { class: 'welcome-actions' }, openBtn, newBtn),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,
-      h('div', { class: 'drop-hint' }, 'También puedes arrastrar imágenes (PNG, JPG, WebP, GIF) PSD o proyectos .edp aquí, o pegar con Ctrl+V.'),
+      recentBox,
+      h('div', { class: 'drop-hint' }, 'También puedes arrastrar aquí imágenes (PNG, JPG, WebP, GIF, TIFF…), PSD, RAW o proyectos .edp, o pegar con Ctrl+V.'),
       h('button', { class: 'link-btn', onclick: () => quickGuideDialog() }, '¿Primera vez aquí? Lee la guía rápida (F1)')));
 }
 

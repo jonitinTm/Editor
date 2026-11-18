@@ -209,6 +209,8 @@ Ya disponible:
   serie (despejado, con nubes, atardecer, hora dorada, tormenta, noche…) o por una foto tuya, con vista previa, borde
   ajustable y la luz del primer plano adaptada. Queda en un grupo con máscaras editables. Funciona mejor cuando el cielo
   ocupa la parte de arriba y se distingue del resto.
+- **Archivos recientes** (*Archivo › Abrir reciente…* y en la pantalla de inicio): los últimos 12 archivos abiertos, con
+  miniatura, se reabren con un clic. Se guardan solo en este navegador.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

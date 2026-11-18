@@ -45,8 +45,9 @@ export function newDocument(name: string, w: number, h: number, bg: string | nul
   app.addDocument(d, 'Nuevo');
 }
 
-export async function openFiles(files: File[], asLayers = false) {
+export async function openFiles(files: File[], asLayers = false, remember = true) {
   for (const f of files) {
+    const before = app.docs.length;
     try {
       if (io.isProjectFile(f)) { app.addDocument(await io.openProject(f)); continue; }
       if (io.isPsdFile(f)) {
@@ -110,6 +111,11 @@ export async function openFiles(files: File[], asLayers = false) {
       else app.addDocument(await io.documentFromImage(f, f.name));
     } catch (e: any) {
       alertDialog('No se pudo abrir', `${f.name}: ${e?.message ?? e}`);
+    } finally {
+      // se recuerda en «Recientes» (solo archivos abiertos como documento nuevo)
+      if (remember && app.docs.length > before && app.doc) {
+        const d = app.doc!; import('../io/recent').then(r => r.addRecent(f, d.getComposite(), `${d.width} × ${d.height}`));
+      }
     }
   }
 }

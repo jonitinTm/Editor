@@ -462,3 +462,12 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 .style-item:hover { border-color: var(--accent); background: var(--hover); color: var(--text); }
 .style-item canvas { width: 56px; height: 56px; background: repeating-conic-gradient(#5a5a5a 0 25%, #4a4a4a 0 50%) 0 0/10px 10px; border-radius: 4px; }
 .style-item span { max-width: 64px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-box { margin: 4px 0 14px; }
+.recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin-top: 6px; max-height: 300px; overflow: auto; }
+.recent-item { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-2); cursor: pointer; font-size: 11px; color: var(--text); }
+.recent-item:hover { border-color: var(--accent); }
+.recent-item img, .recent-noimg { width: 92px; height: 66px; object-fit: contain; background: repeating-conic-gradient(#5a5a5a 0 25%, #4a4a4a 0 50%) 0 0/10px 10px; border-radius: 3px; }
+.recent-noimg { display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--muted); background: var(--panel-3); }
+.recent-item span { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; padding: 0; line-height: 16px; border: none; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; opacity: 0; cursor: pointer; }
+.recent-item:hover .recent-del { opacity: 1; }

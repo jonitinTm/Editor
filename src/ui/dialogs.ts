@@ -996,3 +996,30 @@ export async function skyReplaceDialog() {
     onOk: () => ops.replaceSky(sky, { ...o, mask }),
   });
 }
+
+// ---- Archivo › Abrir reciente --------------------------------------------------------------
+
+/** Cuadrícula de archivos recientes (miniatura, nombre y tamaño); clic para abrir, × para quitar. */
+export function recentGrid(list: import('../io/recent').Recent[], after?: () => void): HTMLElement {
+  const grid = h('div', { class: 'recent-grid' });
+  for (const r of list) {
+    const del = h('button', { class: 'recent-del', type: 'button', title: 'Quitar de la lista' }, '×');
+    const it = h('button', { class: 'recent-item', type: 'button', title: `${r.name}\n${r.dims} px · ${(r.bytes / 1024 / 1024).toFixed(1)} MB · ${new Date(r.date).toLocaleString('es')}` },
+      r.thumb ? h('img', { src: r.thumb, alt: '' }) : h('div', { class: 'recent-noimg' }, r.name.split('.').pop()!.toUpperCase()),
+      h('span', {}, r.name), del);
+    it.onclick = async () => { const { recentFile } = await import('../io/recent'); after?.(); await ops.openFiles([recentFile(r)]); };
+    del.onclick = async ev => { ev.stopPropagation(); const { removeRecent } = await import('../io/recent'); await removeRecent(r.key); it.remove(); };
+    grid.append(it);
+  }
+  return grid;
+}
+
+export async function recentDialog() {
+  const { listRecent, clearRecent } = await import('../io/recent');
+  const list = await listRecent();
+  let close = () => {};
+  const body = list.length ? recentGrid(list, () => close()) : h('div', { class: 'hint' }, 'Todavía no has abierto ningún archivo. Los últimos que abras aparecerán aquí (se guardan solo en este navegador).');
+  const clear = h('button', { class: 'btn', type: 'button', onclick: async () => { await clearRecent(); body.replaceWith(h('div', { class: 'hint' }, 'Lista vaciada.')); } }, 'Vaciar la lista');
+  const dlg = showDialog({ title: 'Abrir reciente', okLabel: 'Cerrar', cancelLabel: null, width: 520, body: list.length ? [body, clear] : [body] });
+  close = dlg.close;
+}

@@ -16,7 +16,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
 };
 
 const MENUS: { label: string; items: Item[] }[] = [
-  { label: 'Archivo', items: ['new', 'open', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', '-', 'batch', '-', 'print', 'close'] },
+  { label: 'Archivo', items: ['new', 'open', 'recent', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', '-', 'batch', '-', 'print', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fade', '-', 'fill', 'contentFill', '-', 'caScale', 'puppet', 'stroke', '-', 'findReplace', 'skyReplace', '-', 'defineBrush', 'definePattern', '-', 'freeTransform',
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'prefs'] },
   { label: 'Imagen', items: [{ label: 'Ajustes', items: filterItems('ajuste') }, '-', 'dupDoc', '-', 'imageSize', 'canvasSize',
