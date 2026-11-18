@@ -87,6 +87,7 @@ export const ACTIONS: Action[] = [
   { id: 'canvasSize', label: 'Tamaño de lienzo…', keys: ['Alt+Ctrl+C'], enabled: hasDoc, run: dlg.canvasSizeDialog },
   { id: 'modeRgb', label: 'Color RGB', enabled: hasDoc, checked: () => app.doc?.mode !== 'gray', run: () => ops.setColorMode('rgb') },
   { id: 'modeGray', label: 'Escala de grises', enabled: hasDoc, checked: () => app.doc?.mode === 'gray', run: () => ops.setColorMode('gray') },
+  { id: 'applyImage', label: 'Aplicar imagen…', enabled: hasLayer, run: () => dlg.applyImageDialog() },
   { id: 'imgRotArb', label: 'Rotar lienzo un ángulo…', enabled: hasDoc, run: dlg.rotateArbitraryDialog },
   { id: 'imgRot90', label: 'Rotar lienzo 90° horario', enabled: hasDoc, run: () => ops.transformImage('rot90') },
   { id: 'imgRot-90', label: 'Rotar lienzo 90° antihorario', enabled: hasDoc, run: () => ops.transformImage('rot-90') },

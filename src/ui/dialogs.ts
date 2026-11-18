@@ -1052,3 +1052,67 @@ export function exportSlicesDialog() {
     },
   });
 }
+
+// ---- Imagen › Aplicar imagen -----------------------------------------------------------------
+
+export async function applyImageDialog() {
+  const d = app.doc; if (!d) return;
+  const { getPaintTarget, setPreview, setTargetCanvas } = await import('../tools/paint');
+  const t = getPaintTarget(); if (!t) return;
+  const sources: [string, string, () => HTMLCanvasElement][] = [['merged', 'Combinado (todo el documento)', () => d.getComposite()]];
+  for (const l of [...d.allLayers()].reverse()) if ((l as any).canvas && l !== t.layer) sources.push(['l' + l.id, `Capa: ${l.name}`, () => (l as any).canvas]);
+  for (const o of app.docs) if (o !== d && o.width === d.width && o.height === d.height) sources.push(['d' + o.name, `Documento: ${o.name}`, () => o.getComposite()]);
+  const src = h('select', {}, ...sources.map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement;
+  const chan = h('select', {}, ...[['rgb', 'RGB'], ['r', 'Rojo'], ['g', 'Verde'], ['b', 'Azul'], ['gray', 'Gris (luminosidad)'], ['a', 'Transparencia']].map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement;
+  const modes: [string, string][] = [['source-over', 'Normal'], ['multiply', 'Multiplicar'], ['screen', 'Trama'], ['overlay', 'Superponer'], ['soft-light', 'Luz suave'], ['hard-light', 'Luz fuerte'], ['color-dodge', 'Sobreexponer color'], ['color-burn', 'Subexponer color'], ['darken', 'Oscurecer'], ['lighten', 'Aclarar'], ['difference', 'Diferencia'], ['lighter', 'Añadir'], ['subtract', 'Restar']];
+  const mode = h('select', {}, ...modes.map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement; mode.value = 'multiply';
+  const inv = h('input', { type: 'checkbox' }) as HTMLInputElement, keepA = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement;
+  let opacity = 100;
+  const op = numberSlider({ min: 0, max: 100, value: 100, unit: '%', onInput: v => { opacity = v; preview(); } });
+  const W = t.canvas.width, H = t.canvas.height;
+  const build = () => {
+    const s0 = sources.find(s => s[0] === src.value)![2](), c = makeCanvas(W, H), x = ctx2d(c); x.drawImage(s0, 0, 0);
+    if (chan.value !== 'rgb' || inv.checked) {
+      const id = x.getImageData(0, 0, W, H), a = id.data, ch = chan.value;
+      for (let i = 0; i < a.length; i += 4) {
+        let v = -1;
+        if (ch === 'r') v = a[i]; else if (ch === 'g') v = a[i + 1]; else if (ch === 'b') v = a[i + 2]; else if (ch === 'gray') v = a[i] * 0.3 + a[i + 1] * 0.59 + a[i + 2] * 0.11; else if (ch === 'a') { v = a[i + 3]; a[i + 3] = 255; }
+        if (v >= 0) { a[i] = a[i + 1] = a[i + 2] = v; }
+        if (inv.checked) { a[i] = 255 - a[i]; a[i + 1] = 255 - a[i + 1]; a[i + 2] = 255 - a[i + 2]; }
+      }
+      x.putImageData(id, 0, 0);
+    }
+    const out = cloneCanvas(t.canvas), ox = ctx2d(out);
+    if (mode.value === 'subtract') {
+      const A = ox.getImageData(0, 0, W, H), B = x.getImageData(0, 0, W, H), k = opacity / 100;
+      for (let i = 0; i < A.data.length; i += 4) for (let c2 = 0; c2 < 3; c2++) A.data[i + c2] = A.data[i + c2] * (1 - k) + Math.max(0, A.data[i + c2] - B.data[i + c2]) * k;
+      ox.putImageData(A, 0, 0);
+    } else {
+      ox.globalAlpha = opacity / 100; ox.globalCompositeOperation = mode.value as GlobalCompositeOperation;
+      if (keepA.checked) {
+        // solo donde la capa ya tiene píxeles
+        const tmp = cloneCanvas(t.canvas), tx = ctx2d(tmp); tx.globalAlpha = opacity / 100; tx.globalCompositeOperation = mode.value as GlobalCompositeOperation; tx.drawImage(c, 0, 0);
+        tx.globalAlpha = 1; tx.globalCompositeOperation = 'destination-in'; tx.drawImage(t.canvas, 0, 0);
+        return tmp;
+      }
+      ox.drawImage(c, 0, 0);
+    }
+    if (keepA.checked) { ox.globalAlpha = 1; ox.globalCompositeOperation = 'destination-in'; ox.drawImage(t.canvas, 0, 0); }
+    return out;
+  };
+  // con selección, solo se aplica dentro
+  const withSel = (c: HTMLCanvasElement) => {
+    const m = d.selection.mask; if (!m) return c;
+    const r = cloneCanvas(t.canvas), rx = ctx2d(r), sel = cloneCanvas(c), sx = ctx2d(sel); sx.globalCompositeOperation = 'destination-in'; sx.drawImage(m, 0, 0);
+    rx.globalCompositeOperation = 'destination-out'; rx.drawImage(m, 0, 0); rx.globalCompositeOperation = 'source-over'; rx.drawImage(sel, 0, 0); return r;
+  };
+  const preview = () => { setPreview(t, withSel(build())); d.invalidate(); };
+  for (const el of [src, chan, mode, inv, keepA]) el.addEventListener('change', preview);
+  preview();
+  showDialog({
+    title: 'Aplicar imagen', side: true,
+    body: [row('Origen', src), row('Canal', chan), row('', h('label', { class: 'check' }, inv, ' Invertir')), row('Fusión', mode), row('Opacidad', op.el), row('', h('label', { class: 'check' }, keepA, ' Conservar transparencia'))],
+    onOk: () => { const r = withSel(build()); setPreview(t, null); setTargetCanvas(t, r); d.commit('Aplicar imagen'); },
+    onCancel: () => { setPreview(t, null); d.invalidate(); },
+  });
+}
