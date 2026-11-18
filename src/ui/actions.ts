@@ -31,11 +31,11 @@ const hasMask = () => !!app.doc?.active?.mask;
 export const ACTIONS: Action[] = [
   // Archivo
   { id: 'new', label: 'Nuevo…', keys: ['Alt+Ctrl+N', 'Ctrl+N'], run: dlg.newDocumentDialog },
-  { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,' + io.PROJECT_EXT)) },
+  { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles('image/*,.tif,.tiff,.tga,.psd,.psb,.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.raf,.pef,' + io.PROJECT_EXT)) },
   { id: 'place', label: 'Colocar imagen como objeto inteligente…', keys: ['Shift+Ctrl+P'], enabled: hasDoc, run: async () => ops.openFiles(await io.pickFiles('image/*'), true) },
   { id: 'save', label: 'Guardar proyecto (.edp)', keys: ['Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(false) },
   { id: 'saveAs', label: 'Guardar proyecto como…', keys: ['Alt+Ctrl+S'], enabled: hasDoc, run: () => ops.saveProject(true) },
-  { id: 'export', label: 'Exportar como (PNG, JPG, WebP, PSD, PDF…)…', keys: ['Shift+Ctrl+S', 'Alt+Shift+Ctrl+W'], enabled: hasDoc, run: dlg.exportDialog },
+  { id: 'export', label: 'Exportar como (PNG, JPG, TIFF, PSD, PDF…)…', keys: ['Shift+Ctrl+S', 'Alt+Shift+Ctrl+W'], enabled: hasDoc, run: dlg.exportDialog },
   { id: 'exportLayers', label: 'Exportar capas a archivos…', enabled: hasDoc, run: dlg.exportLayersDialog },
   { id: 'batch', label: 'Automatizar › Lote…', enabled: () => true, run: dlg.batchDialog },
   { id: 'print', label: 'Imprimir…', keys: ['Ctrl+P'], enabled: hasDoc, run: ops.printImage },

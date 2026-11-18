@@ -93,6 +93,18 @@ export async function openFiles(files: File[], asLayers = false) {
         alertDialog('Archivo RAW', `Se ha abierto la vista previa JPEG que la cámara guardó dentro del RAW (${c.width} × ${c.height} px). Editor revela por completo los archivos DNG; de este formato de cámara se usa la vista previa, así que no hay margen extra de exposición ni de balance de blancos. (Consejo: si conviertes tus RAW a DNG con el conversor gratuito de Adobe, Editor los revela por completo.)`);
         continue;
       }
+      if (io.isTiffTga(f)) {
+        const r = await import('../io/raster'), bytes = new Uint8Array(await f.arrayBuffer());
+        const pages = /\.tiff?$/i.test(f.name) || r.isTiff(bytes) ? await r.decodeTiff(bytes) : [{ name: 'Fondo', img: r.decodeTga(bytes) }];
+        const canv = pages.map(pg => { const c = makeCanvas(pg.img.width, pg.img.height); ctx2d(c).putImageData(pg.img, 0, 0); return { name: pg.name, c }; });
+        if (asLayers && app.doc) { await placeImage(canv[0].c, io.baseName(f.name), undefined, true); continue; }
+        const W = Math.max(...canv.map(p => p.c.width)), H = Math.max(...canv.map(p => p.c.height));
+        const td = new EditorDocument(io.baseName(f.name), W, H);
+        canv.forEach((pg, i) => { const l = new RasterLayer(canv.length > 1 ? pg.name : 'Fondo', W, H); ctx2d(l.canvas).drawImage(pg.c, 0, 0); if (i) l.visible = false; td.root.add(l); td.setActive(l, false); });
+        app.addDocument(td);
+        if (canv.length > 1) app.toast(`TIFF de ${canv.length} páginas: cada una es una capa (solo la primera visible)`);
+        continue;
+      }
       if (!io.isImageFile(f)) { app.toast(`Formato no admitido: ${f.name}`, 'warn'); continue; }
       if (asLayers && app.doc) await placeImage(f, io.baseName(f.name), undefined, true);
       else app.addDocument(await io.documentFromImage(f, f.name));
@@ -1167,8 +1179,8 @@ export function newArtboard(w: number, h: number, bg: string | null, name?: stri
 }
 
 /** Exporta la imagen (o cada mesa de trabajo) en uno o varios tamaños; si salen varios archivos van en un ZIP. */
-export async function exportSet(d: EditorDocument, type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number, scale: number, extra: number[], perBoard: boolean, base: string) {
-  const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[type];
+export async function exportSet(d: EditorDocument, type: io.ExportType, quality: number, scale: number, extra: number[], perBoard: boolean, base: string) {
+  const ext = io.EXPORT_EXT[type];
   const flat = d.flatten();
   const regions: { name: string; c: HTMLCanvasElement }[] = [];
   const boards = artboards(d).filter(b => b.visible);

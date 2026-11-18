@@ -64,6 +64,10 @@ export function exportDialog() {
     h('option', { value: 'image/png' }, 'PNG (sin pérdida, con transparencia)'),
     h('option', { value: 'image/jpeg' }, 'JPG (fotografías, sin transparencia)'),
     h('option', { value: 'image/webp' }, 'WebP (moderno, ligero)'),
+    h('option', { value: 'image/tiff' }, 'TIFF (sin pérdida, para imprenta y fotografía)'),
+    h('option', { value: 'image/bmp' }, 'BMP (mapa de bits de Windows)'),
+    h('option', { value: 'image/x-tga' }, 'TGA (Targa, para juegos y vídeo)'),
+    h('option', { value: 'image/x-icon' }, 'ICO (icono de Windows o favicon, varios tamaños)'),
     h('option', { value: 'gif' }, 'GIF (animado si hay cuadros en la línea de tiempo)'),
     h('option', { value: 'pdf' }, 'PDF (para imprimir o enviar)'),
     h('option', { value: 'svg' }, 'SVG (imagen incrustada, se puede ampliar en diseño web)'),
@@ -113,7 +117,7 @@ export function exportDialog() {
       if (fmt.value === 'psd') { await ops.savePsd(name.value || d.name); return; }
       if (fmt.value === 'gif') { await ops.saveGif(name.value || d.name); return; }
       if (fmt.value === 'pdf' || fmt.value === 'svg') { try { await ops.exportVector(fmt.value, name.value || d.name, quality / 100, scale / 100); app.toast('Exportado'); } catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); } return; }
-      const ext = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp' }[fmt.value]!;
+      const ext = io.EXPORT_EXT[fmt.value as io.ExportType];
       const extra = extraChecks.filter(e => e.c.checked).map(e => e.k);
       if (extra.length || (hasBoards && perBoard.checked)) {
         try { const n = await ops.exportSet(d, fmt.value as any, quality / 100, scale / 100, extra, hasBoards && perBoard.checked, name.value || d.name); app.toast(n > 1 ? `${n} imágenes exportadas (ZIP)` : 'Imagen exportada'); }

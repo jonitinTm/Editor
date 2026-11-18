@@ -69,7 +69,9 @@ export async function documentFromImage(file: File | Blob, name = 'Sin título')
 
 export function isProjectFile(f: File) { return f.name.toLowerCase().endsWith(PROJECT_EXT); }
 export function isPsdFile(f: File) { return /\.ps[db]$/i.test(f.name); }
-export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(f.name); }
+/** TIFF y TGA: los abre Editor por su cuenta (el navegador no sabe). */
+export function isTiffTga(f: File) { return /\.(tiff?|tga|icb|vda|vst)$/i.test(f.name); }
+export function isImageFile(f: File) { return !isPsdFile(f) && f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|bmp|svg|ico|avif)$/i.test(f.name); }
 
 // ---- Formato de proyecto (.edp) ---------------------------------------------
 // Un archivo JSON con la estructura de capas; los píxeles de cada capa van como
@@ -193,7 +195,11 @@ export async function saveBlob(blob: Blob, filename: string, handle?: any): Prom
   return null;
 }
 
-export async function exportImage(doc: EditorDocument, type: 'image/png' | 'image/jpeg' | 'image/webp', quality: number, scale = 1, src?: HTMLCanvasElement): Promise<Blob> {
+/** Formatos de imagen plana que se pueden exportar. */
+export type ExportType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/tiff' | 'image/x-tga' | 'image/bmp' | 'image/x-icon';
+export const EXPORT_EXT: Record<ExportType, string> = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/tiff': '.tif', 'image/x-tga': '.tga', 'image/bmp': '.bmp', 'image/x-icon': '.ico' };
+
+export async function exportImage(doc: EditorDocument, type: ExportType, quality: number, scale = 1, src?: HTMLCanvasElement): Promise<Blob> {
   let c = src ?? doc.flatten();
   if (scale !== 1) { // Cambio de tamaño en pasos de como mucho ½ para que quede nítido
     let cur = c, w = c.width, hh = c.height; const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(hh * scale));
@@ -204,6 +210,11 @@ export async function exportImage(doc: EditorDocument, type: 'image/png' | 'imag
     // JPG no admite transparencia: se pone fondo blanco
     const bg = makeCanvas(c.width, c.height); const x = ctx2d(bg);
     x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(c, 0, 0); c = bg;
+  }
+  if (type === 'image/x-icon') { const { encodeIco } = await import('./raster'); return encodeIco(c, [16, 24, 32, 48, 64, 128, 256].filter(s => s <= Math.max(16, Math.max(c.width, c.height)))); }
+  if (type === 'image/tiff' || type === 'image/x-tga' || type === 'image/bmp') {
+    const r = await import('./raster'), id = ctx2d(c).getImageData(0, 0, c.width, c.height);
+    return type === 'image/tiff' ? r.encodeTiff(id, doc.ppi || 72) : type === 'image/x-tga' ? r.encodeTga(id) : r.encodeBmp(id);
   }
   return canvasToBlob(c, type, quality);
 }

@@ -63,8 +63,8 @@ Ya disponible:
 - **Herramientas de retoque**: lazo poligonal, desenfocar, enfocar, dedo, sobreexponer y subexponer.
 - **Animación**: *Ventana › Línea de tiempo*. Cada cuadro recuerda qué capas se ven; se reproduce en el editor y se
   exporta como **GIF animado**. Los GIF animados se abren con una capa y un cuadro por fotograma.
-- **RAW de cámara** (CR2, NEF, ARW, DNG…): se abre la vista previa JPEG que la cámara guarda dentro del archivo.
-  Todavía no se revelan los datos en bruto del sensor.
+- **RAW de cámara**: DNG, Canon CR2, Sony ARW y Nikon NEF se revelan desde los datos del sensor (ver más abajo); de
+  los demás (CR3, ORF, RW2, RAF…) se abre la vista previa JPEG que la cámara guarda dentro del archivo.
 - **Interfaz**: selector de color propio, paneles *Color* y *Muestras*, paneles agrupados en pestañas, menú *Ventana*,
   menú contextual en las capas, teclas numéricas para la opacidad, `Tab` para ocultar paneles y `F` para pantalla completa.
 - **Retoque profesional**: pincel corrector puntual (`J`: pinta sobre la imperfección y desaparece), pincel corrector
@@ -184,6 +184,9 @@ Ya disponible:
 - **Alinear y distribuir varias capas** (*Capa › Alinear* y *Capa › Distribuir*, o los botones de la herramienta Mover)
 - **Atajos de teclado personalizables** (*Edición › Atajos de teclado…*, se guardan en el navegador)
 - **Composiciones de capas** (*Ventana › Composiciones*): guarda variantes del diseño —visibilidad, posición y aspecto de cada capa— y cambia entre ellas con un clic
+- **TIFF, TGA, BMP e ICO**: se abren TIFF (sin comprimir, LZW, ZIP o PackBits; 8, 16 y 32 bits; RGB, grises, paleta y
+  CMYK; con transparencia; por bandas o mosaicos; los de varias páginas, una capa por página) y TGA; se exportan TIFF
+  (sin pérdida, con transparencia y resolución), BMP, TGA e ICO con varios tamaños (16 a 256 px, para favicons).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
@@ -218,7 +221,7 @@ Ya disponible:
 - **Formas vectoriales** editables (color, trazo, tamaño) y **transformación de grupos** y de varias capas a la vez.
 - Al mover una capa se conserva lo que queda fuera del lienzo (*Imagen › Revelar todo* lo muestra).
 
-Pendiente: revelado real de RAW, y en PSD los efectos y ajustes que aún no existen en el editor (biselado, motivos, mapa de degradado…).
+Pendiente: revelado de CR3, ORF, RW2 y RAF, y en PSD los efectos y ajustes que aún no existen en el editor (biselado, motivos, mapa de degradado…).
 
 ### Atajos principales
 
