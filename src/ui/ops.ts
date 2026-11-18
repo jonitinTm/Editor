@@ -1886,3 +1886,18 @@ export async function fuseExposures() {
   const top = list[list.length - 1]; top.parent!.add(l, top.parent!.children.indexOf(top) + 1);
   d.setActive(l, false); d.selectedIds = new Set([l.id]); d.invalidate(); d.commit('Fusión de exposiciones');
 }
+
+/** Selección › Luminosidad: selección suave según lo claro de la imagen (o lo oscuro, invertida). */
+export function selectLuminosity(kind: 'lights' | 'darks' | 'mids') {
+  const d = doc(); if (!d) return;
+  const src = ctx2d(d.getComposite()).getImageData(0, 0, d.width, d.height).data;
+  const m = makeCanvas(d.width, d.height), x = ctx2d(m), img = x.createImageData(d.width, d.height), o = img.data;
+  for (let i = 0; i < src.length; i += 4) {
+    const L = (src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114) / 255;
+    const v = kind === 'lights' ? L : kind === 'darks' ? 1 - L : 1 - Math.abs(L - 0.5) * 2;
+    o[i] = o[i + 1] = o[i + 2] = 255; o[i + 3] = Math.round(v * 255 * (src[i + 3] / 255));
+  }
+  x.putImageData(img, 0, 0);
+  d.selection.setMask(m);
+  d.commit(kind === 'lights' ? 'Seleccionar luces' : kind === 'darks' ? 'Seleccionar sombras' : 'Seleccionar medios tonos');
+}
