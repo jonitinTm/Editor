@@ -303,6 +303,8 @@ Ya disponible:
   (vectorial en Photoshop); al reabrir ese PSD aquí se ve igual pero queda como píxeles.
 - **Selección › Gama de colores** ampliada: además del color frontal, tonos de piel, rojos, amarillos, verdes, cianes,
   azules, magentas, luces, medios tonos y sombras, con tolerancia e «Invertir».
+- **Curvas: ajustar haciendo clic en la imagen**: con Curvas abierto, haz clic en un tono de la foto y arrastra hacia
+  arriba para aclararlo o hacia abajo para oscurecerlo; se añade el punto justo en ese tono.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

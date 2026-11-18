@@ -537,8 +537,31 @@ export function curvesBody(src: ImageData, p: any, update: () => void): HTMLElem
     const list = pts();
     if (active > 0 && active < list.length - 1) { list.splice(active, 1); active = -1; draw(); update(); }
   });
+  // Ajuste en la imagen: clic sobre un tono de la foto y arrastrar arriba/abajo para aclararlo u oscurecerlo
+  const onImg = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement;
+  const vc = app.viewport.canvas;
+  let imgDrag: { y0: number; v0: number } | null = null;
+  const onDown = (e: PointerEvent) => {
+    if (!cv.isConnected) { vc.removeEventListener('pointerdown', onDown, true); return; }
+    if (!onImg.checked || e.button !== 0) return;
+    const d = app.doc; if (!d) return;
+    const pt = app.viewport.toDoc(e.offsetX, e.offsetY), x = Math.floor(pt.x), y = Math.floor(pt.y);
+    if (x < 0 || y < 0 || x >= d.width || y >= d.height) return;
+    e.preventDefault(); e.stopPropagation();
+    const px = d.getComposite().getContext('2d')!.getImageData(x, y, 1, 1).data;
+    const v = Math.round(ch === 'rgb' ? px[0] * 0.299 + px[1] * 0.587 + px[2] * 0.114 : px[{ r: 0, g: 1, b: 2 }[ch]]);
+    const list = pts(), lut = curveLut(list);
+    let i = list.findIndex(q => Math.abs(q[0] - v) < 6);
+    if (i < 0) { list.push([v, lut[v]]); list.sort((a, b) => a[0] - b[0]); i = list.findIndex(q => q[0] === v); }
+    active = i; imgDrag = { y0: e.clientY, v0: list[i][1] }; draw(); update();
+    const mv = (ev: PointerEvent) => { if (!imgDrag || active < 0) return; pts()[active][1] = Math.max(0, Math.min(255, Math.round(imgDrag.v0 + (imgDrag.y0 - ev.clientY) * 0.6))); draw(); update(); };
+    const up = () => { imgDrag = null; window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
+  };
+  vc.addEventListener('pointerdown', onDown, true);
   draw();
-  return [row('Canal', sel), cv, h('div', { class: 'hint' }, 'Clic para añadir un punto; arrástralo fuera o haz doble clic para quitarlo.'), readout];
+  return [row('Canal', sel), cv, h('div', { class: 'hint' }, 'Clic para añadir un punto; arrástralo fuera o haz doble clic para quitarlo.'), readout,
+    row('', h('label', { class: 'check', title: 'Haz clic en un tono de la foto y arrastra hacia arriba para aclararlo o hacia abajo para oscurecerlo' }, onImg, ' Ajustar haciendo clic en la imagen'))];
 }
 
 // ---- Estilo de capa -------------------------------------------------------------------
