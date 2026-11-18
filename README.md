@@ -254,6 +254,9 @@ Ya disponible:
 - **Capa › Rasterizar estilo de capa**: la sombra, el contorno y demás efectos pasan a ser píxeles para retocarlos a mano.
 - **Modo de fusión del pincel y del degradado** (en su barra): Normal, Detrás, Multiplicar, Trama, Superponer, Luz suave, Color,
   Luminosidad… para sombrear, iluminar o colorear sin tapar lo que hay.
+- **Importar pinceles y motivos de Photoshop** (*Edición › Importar pinceles o motivos…*, o abriéndolos/arrastrándolos):
+  pinceles `.abr` (versiones 1, 2 y 6 a 10, las puntas con imagen) y motivos `.pat`. Comprobado con archivos de prueba
+  creados según el formato; falta probarlo con paquetes reales descargados.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

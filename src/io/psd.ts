@@ -220,53 +220,68 @@ function fillLayer(l: RasterLayer, soco?: Uint8Array, gdfl?: Uint8Array, bounds?
 
 /** Dibuja una máscara vectorial de Photoshop (curvas de Bézier) como máscara de píxeles. */
 /** Motivos guardados dentro del PSD (bloques Patt / Pat2 / Pat3): id → nombre e imagen. */
+/** Lee un motivo (versión, modo, tamaño, nombre, id y canales) desde `start`; `end` < 0 = se calcula. */
+function parsePattern(b: Uint8Array, v: DataView, start: number, end: number): { id: string; name: string; canvas: HTMLCanvasElement; end: number } {
+  let p = start;
+  p += 4; const mode = v.getUint32(p); p += 4; const ph = v.getUint16(p), pw = v.getUint16(p + 2); p += 4;
+  const nl = v.getUint32(p); p += 4; let name = ''; for (let k = 0; k < nl; k++) { const c = v.getUint16(p + k * 2); if (c) name += String.fromCharCode(c); } p += nl * 2;
+  const il = b[p]; p += 1; let id = ''; for (let k = 0; k < il; k++) id += String.fromCharCode(b[p + k]); p += il;
+  let table: Uint8Array | null = null; if (mode === 2) { table = b.subarray(p, p + 768); p += 768 + 4; }
+  // lista de canales (memoria virtual)
+  p += 4; const vmLen = v.getUint32(p); p += 4; if (end < 0) end = p + vmLen; const top = v.getInt32(p), left = v.getInt32(p + 4), bottom = v.getInt32(p + 8), right = v.getInt32(p + 12); p += 16;
+  const nch = v.getUint32(p); p += 4;
+  const w = right - left || pw, hgt = bottom - top || ph, planes: (Uint8Array | null)[] = [];
+  for (let c = 0; c < nch + 2 && p + 8 <= end; c++) {
+    const written = v.getUint32(p); p += 4; if (!written) { planes.push(null); continue; }
+    const clen = v.getUint32(p); p += 4; if (!clen) { planes.push(null); continue; }
+    const cEnd = p + clen; p += 4; // profundidad
+    const ct = v.getInt32(p), cl = v.getInt32(p + 4), cb = v.getInt32(p + 8), cr = v.getInt32(p + 12); p += 16; void ct; void cl; void cb; void cr;
+    p += 2; const comp = b[p]; p += 1;
+    const plane = new Uint8Array(w * hgt);
+    if (comp === 0) plane.set(b.subarray(p, p + w * hgt));
+    else {
+      // RLE por filas (PackBits)
+      const counts: number[] = []; for (let r = 0; r < hgt; r++) { counts.push(v.getUint16(p)); p += 2; }
+      for (let r = 0; r < hgt; r++) {
+    let q = p, x = 0; const rowEnd = p + counts[r];
+    while (q < rowEnd && x < w) { const n = (b[q] << 24) >> 24; q++; if (n >= 0) { for (let k = 0; k <= n && x < w; k++) plane[r * w + x++] = b[q++]; } else if (n !== -128) { const val = b[q++]; for (let k = 0; k < 1 - n && x < w; k++) plane[r * w + x++] = val; } }
+    p = rowEnd;
+      }
+    }
+    planes.push(plane); p = cEnd;
+  }
+  const c = makeCanvas(w, hgt), x = ctx2d(c), img = x.createImageData(w, hgt), d = img.data;
+  const col = mode === 1 || mode === 2 ? 1 : 3, alpha = planes[nch + 1] ?? (nch > col ? planes[col] : null);
+  for (let k = 0; k < w * hgt; k++) {
+    if (mode === 2 && table && planes[0]) { const ix = planes[0][k]; d[k * 4] = table[ix * 3]; d[k * 4 + 1] = table[ix * 3 + 1]; d[k * 4 + 2] = table[ix * 3 + 2]; }
+    else if (col === 1) d[k * 4] = d[k * 4 + 1] = d[k * 4 + 2] = planes[0]?.[k] ?? 0;
+    else { d[k * 4] = planes[0]?.[k] ?? 0; d[k * 4 + 1] = planes[1]?.[k] ?? 0; d[k * 4 + 2] = planes[2]?.[k] ?? 0; }
+    d[k * 4 + 3] = alpha ? alpha[k] : 255;
+  }
+  x.putImageData(img, 0, 0);
+  return { id: id || name || 'motivo', name: name || 'Motivo', canvas: c, end };
+}
+
 function readPatterns(b: Uint8Array, out: Map<string, { name: string; canvas: HTMLCanvasElement }>) {
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
   let o = 0;
   while (o + 4 <= b.length) {
     const len = v.getUint32(o), start = o + 4, end = start + len; if (len < 16 || end > b.length) break;
-    try {
-      let p = start;
-      p += 4; const mode = v.getUint32(p); p += 4; const ph = v.getUint16(p), pw = v.getUint16(p + 2); p += 4;
-      const nl = v.getUint32(p); p += 4; let name = ''; for (let k = 0; k < nl; k++) { const c = v.getUint16(p + k * 2); if (c) name += String.fromCharCode(c); } p += nl * 2;
-      const il = b[p]; p += 1; let id = ''; for (let k = 0; k < il; k++) id += String.fromCharCode(b[p + k]); p += il;
-      let table: Uint8Array | null = null; if (mode === 2) { table = b.subarray(p, p + 768); p += 768 + 4; }
-      // lista de canales (memoria virtual)
-      p += 4; p += 4; const top = v.getInt32(p), left = v.getInt32(p + 4), bottom = v.getInt32(p + 8), right = v.getInt32(p + 12); p += 16;
-      const nch = v.getUint32(p); p += 4;
-      const w = right - left || pw, hgt = bottom - top || ph, planes: (Uint8Array | null)[] = [];
-      for (let c = 0; c < nch + 2 && p + 8 <= end; c++) {
-        const written = v.getUint32(p); p += 4; if (!written) { planes.push(null); continue; }
-        const clen = v.getUint32(p); p += 4; if (!clen) { planes.push(null); continue; }
-        const cEnd = p + clen; p += 4; // profundidad
-        const ct = v.getInt32(p), cl = v.getInt32(p + 4), cb = v.getInt32(p + 8), cr = v.getInt32(p + 12); p += 16; void ct; void cl; void cb; void cr;
-        p += 2; const comp = b[p]; p += 1;
-        const plane = new Uint8Array(w * hgt);
-        if (comp === 0) plane.set(b.subarray(p, p + w * hgt));
-        else {
-          // RLE por filas (PackBits)
-          const counts: number[] = []; for (let r = 0; r < hgt; r++) { counts.push(v.getUint16(p)); p += 2; }
-          for (let r = 0; r < hgt; r++) {
-            let q = p, x = 0; const rowEnd = p + counts[r];
-            while (q < rowEnd && x < w) { const n = (b[q] << 24) >> 24; q++; if (n >= 0) { for (let k = 0; k <= n && x < w; k++) plane[r * w + x++] = b[q++]; } else if (n !== -128) { const val = b[q++]; for (let k = 0; k < 1 - n && x < w; k++) plane[r * w + x++] = val; } }
-            p = rowEnd;
-          }
-        }
-        planes.push(plane); p = cEnd;
-      }
-      const c = makeCanvas(w, hgt), x = ctx2d(c), img = x.createImageData(w, hgt), d = img.data;
-      const col = mode === 1 || mode === 2 ? 1 : 3, alpha = planes[nch + 1] ?? (nch > col ? planes[col] : null);
-      for (let k = 0; k < w * hgt; k++) {
-        if (mode === 2 && table && planes[0]) { const ix = planes[0][k]; d[k * 4] = table[ix * 3]; d[k * 4 + 1] = table[ix * 3 + 1]; d[k * 4 + 2] = table[ix * 3 + 2]; }
-        else if (col === 1) d[k * 4] = d[k * 4 + 1] = d[k * 4 + 2] = planes[0]?.[k] ?? 0;
-        else { d[k * 4] = planes[0]?.[k] ?? 0; d[k * 4 + 1] = planes[1]?.[k] ?? 0; d[k * 4 + 2] = planes[2]?.[k] ?? 0; }
-        d[k * 4 + 3] = alpha ? alpha[k] : 255;
-      }
-      x.putImageData(img, 0, 0);
-      if (id) out.set(id, { name: name || 'Motivo', canvas: c });
-    } catch { /* motivo dañado */ }
+    try { const r = parsePattern(b, v, start, end); if (r.id) out.set(r.id, { name: r.name, canvas: r.canvas }); } catch { /* motivo dañado */ }
     o = end + ((4 - (len % 4)) % 4);
   }
+}
+
+/** Archivo de motivos de Photoshop (.pat): «8BPT», versión, número de motivos y los motivos seguidos. */
+export function readPatFile(buf: ArrayBuffer): { name: string; canvas: HTMLCanvasElement }[] {
+  const b = new Uint8Array(buf), v = new DataView(buf);
+  if (String.fromCharCode(...b.subarray(0, 4)) !== '8BPT') throw new Error('no es un archivo de motivos de Photoshop');
+  const n = v.getUint32(6), out: { name: string; canvas: HTMLCanvasElement }[] = [];
+  let o = 10;
+  for (let i = 0; i < n && o < b.length; i++) {
+    const r = parsePattern(b, v, o, -1); out.push({ name: r.name, canvas: r.canvas }); o = r.end;
+  }
+  return out;
 }
 
 /** Máscara vectorial de Photoshop → trazados editables (null si usa combinaciones que no se pueden representar). */

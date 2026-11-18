@@ -57,6 +57,7 @@ export const ACTIONS: Action[] = [
   { id: 'clear', label: 'Borrar', keys: ['Delete', 'Backspace'], enabled: hasSel, run: () => ops.clearSelection() },
   { id: 'fade', label: 'Transición…', keys: ['Shift+Ctrl+F'], enabled: () => !!app.doc?.history.canUndo(), run: dlg.fadeDialog },
   { id: 'findReplace', label: 'Buscar y reemplazar texto…', enabled: () => !!app.doc?.allLayers().some(l => l.kind === 'text'), run: () => dlg.findReplaceDialog() },
+  { id: 'importPresets', label: 'Importar pinceles o motivos (.abr, .pat)…', run: async () => { for (const f of await io.pickFiles('.abr,.pat')) await ops.importPresets(f); } },
   { id: 'defineBrush', label: 'Definir pincel…', enabled: hasDoc, run: ops.defineBrush },
   { id: 'definePattern', label: 'Definir motivo…', enabled: hasDoc, run: async () => { const n = await promptDialog('Definir motivo', 'Nombre', 'Motivo ' + new Date().toLocaleTimeString('es')); if (n !== null) ops.definePattern(n || 'Motivo'); } },
   { id: 'stroke', label: 'Contornear…', enabled: hasSel, run: dlg.strokeDialog },

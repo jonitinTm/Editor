@@ -94,6 +94,7 @@ export async function openFiles(files: File[], asLayers = false, remember = true
         alertDialog('Archivo RAW', `Se ha abierto la vista previa JPEG que la cámara guardó dentro del RAW (${c.width} × ${c.height} px). Editor revela por completo los archivos DNG; de este formato de cámara se usa la vista previa, así que no hay margen extra de exposición ni de balance de blancos. (Consejo: si conviertes tus RAW a DNG con el conversor gratuito de Adobe, Editor los revela por completo.)`);
         continue;
       }
+      if (/\.(abr|pat)$/i.test(f.name)) { await importPresets(f); continue; }
       if (io.isTiffTga(f)) {
         const r = await import('../io/raster'), bytes = new Uint8Array(await f.arrayBuffer());
         const pages = /\.tiff?$/i.test(f.name) || r.isTiff(bytes) ? await r.decodeTiff(bytes) : [{ name: 'Fondo', img: r.decodeTga(bytes) }];
@@ -1727,4 +1728,27 @@ export async function layerToPath() {
   const subpaths = await layerOutlines(l);
   if (!subpaths.length) { app.toast('La capa está vacía', 'warn'); return; }
   newDocPath(subpaths);
+}
+
+/** Importa pinceles (.abr) o motivos (.pat) de Photoshop. */
+export async function importPresets(f: File) {
+  const buf = await f.arrayBuffer();
+  if (/\.abr$/i.test(f.name)) {
+    const { readAbr } = await import('../io/abr'); const { addUserTip } = await import('../core/brushtips');
+    const list = readAbr(buf);
+    if (!list.length) { app.toast('El archivo no tiene pinceles con imagen que se puedan usar', 'warn'); return; }
+    for (const t of list.reverse()) {
+      // se guardan como máximo a 512 px de lado (suficiente para pintar y para no llenar el almacenamiento)
+      const k = Math.min(1, 512 / Math.max(t.canvas.width, t.canvas.height)), c = makeCanvas(Math.max(1, Math.round(t.canvas.width * k)), Math.max(1, Math.round(t.canvas.height * k)));
+      const x = ctx2d(c); x.imageSmoothingQuality = 'high'; x.drawImage(t.canvas, 0, 0, c.width, c.height);
+      addUserTip(t.name, c);
+    }
+    app.emit('options');
+    app.toast(`${list.length} pincel${list.length === 1 ? '' : 'es'} importado${list.length === 1 ? '' : 's'}: elígelos en la punta del pincel`);
+  } else {
+    const { readPatFile } = await import('../io/psd');
+    const list = readPatFile(buf);
+    for (const p of list.reverse()) addPattern(p.name, p.canvas);
+    app.toast(`${list.length} motivo${list.length === 1 ? '' : 's'} importado${list.length === 1 ? '' : 's'}`);
+  }
 }
