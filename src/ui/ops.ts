@@ -232,7 +232,7 @@ function cloneLayer(l: Layer, d: EditorDocument): Layer {
   else if (l instanceof ShapeLayer) { c = new ShapeLayer(l.name, d.width, d.height, { ...l.props }); }
   else { const r = new RasterLayer(l.name, d.width, d.height); r.canvas = cloneCanvas((l as RasterLayer).canvas); c = r; }
   c.visible = l.visible; c.opacity = l.opacity; c.blendMode = l.blendMode;
-  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip; c.lockAlpha = l.lockAlpha; c.label = l.label;
+  c.styles = l.styles ? JSON.parse(JSON.stringify(l.styles)) : null; c.clip = l.clip; c.lockAlpha = l.lockAlpha; c.lockPos = l.lockPos; c.lockPixels = l.lockPixels; c.label = l.label;
   if (l.vmask) c.vmask = JSON.parse(JSON.stringify(l.vmask));
   if (l.mask) { const m = new LayerMask(d.width, d.height, 'black'); m.canvas = cloneCanvas(l.mask.canvas); m.enabled = l.mask.enabled; c.mask = m; }
   return c;
@@ -329,11 +329,11 @@ export function moveLayerTo(layer: Layer, parent: GroupLayer, index: number) {
   d.commit('Mover capa');
 }
 
-export function setLayerProp(l: Layer, prop: 'opacity' | 'blendMode' | 'visible' | 'locked' | 'lockAlpha', value: any, record = true) {
+export function setLayerProp(l: Layer, prop: 'opacity' | 'blendMode' | 'visible' | 'locked' | 'lockAlpha' | 'lockPos' | 'lockPixels', value: any, record = true) {
   const d = doc(); if (!d) return;
   (l as any)[prop] = value;
   d.invalidate();
-  if (record) d.commit({ opacity: 'Opacidad de capa', blendMode: 'Modo de fusión', visible: value ? 'Mostrar capa' : 'Ocultar capa', locked: value ? 'Bloquear capa' : 'Desbloquear capa', lockAlpha: value ? 'Bloquear transparencia' : 'Desbloquear transparencia' }[prop]);
+  if (record) d.commit({ opacity: 'Opacidad de capa', blendMode: 'Modo de fusión', visible: value ? 'Mostrar capa' : 'Ocultar capa', locked: value ? 'Bloquear capa' : 'Desbloquear capa', lockAlpha: value ? 'Bloquear transparencia' : 'Desbloquear transparencia', lockPos: value ? 'Bloquear posición' : 'Desbloquear posición', lockPixels: value ? 'Bloquear píxeles' : 'Desbloquear píxeles' }[prop]);
   else d.changed();
 }
 
@@ -633,7 +633,7 @@ function shiftLayer(l: Layer, dx: number, dy: number) {
 /** Alinear: una capa respecto a la selección o al lienzo; varias, entre sí (o a la selección si la hay). */
 export function alignLayer(mode: AlignMode) {
   const d = doc(); if (!d || !d.active) return;
-  const layers = (selectedLayers().includes(d.active) ? selectedLayers() : [d.active]).filter(l => isRaster(l) && !l.isLocked());
+  const layers = (selectedLayers().includes(d.active) ? selectedLayers() : [d.active]).filter(l => isRaster(l) && !l.posLocked());
   if (!layers.length) { app.toast('Selecciona capas de píxeles, texto o formas (no bloqueadas)', 'warn'); return; }
   const boxes = layers.map(layerBox);
   let box = d.selection.bounds;
@@ -653,7 +653,7 @@ export function alignLayer(mode: AlignMode) {
 /** Distribuir (3 o más capas): mismos intervalos entre bordes o centros, o el mismo espacio entre ellas. */
 export function distributeLayers(mode: 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom' | 'hspace' | 'vspace') {
   const d = doc(); if (!d) return;
-  const items = selectedLayers().filter(l => isRaster(l) && !l.isLocked()).map(l => ({ l, b: layerBox(l)! })).filter(x => x.b);
+  const items = selectedLayers().filter(l => isRaster(l) && !l.posLocked()).map(l => ({ l, b: layerBox(l)! })).filter(x => x.b);
   if (items.length < 3) { app.toast('Selecciona al menos tres capas (Ctrl+clic en el panel Capas)', 'warn'); return; }
   const horiz = ['left', 'hcenter', 'right', 'hspace'].includes(mode);
   const key = (b: Rect) => mode === 'left' ? b.x : mode === 'right' ? b.x + b.w : mode === 'top' ? b.y : mode === 'bottom' ? b.y + b.h : horiz ? b.x + b.w / 2 : b.y + b.h / 2;

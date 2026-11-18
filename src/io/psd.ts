@@ -628,7 +628,9 @@ async function readLayers(r: Reader, doc: EditorDocument, depth: number, mode: n
     layer.visible = !(rec.flags & 2);
     layer.blendMode = keyToBlend.get(rec.blend) ?? 'source-over';
     layer.clip = rec.clip;
-    if (rec.protect & 0x80000000 || rec.protect & 2) layer.locked = true;
+    if (rec.protect & 0x80000000) layer.locked = true;
+    if (rec.protect & 2) layer.lockPixels = true;
+    if (rec.protect & 4) layer.lockPos = true;
     if (rec.protect & 1) layer.lockAlpha = true;
     if (rec.labelIdx > 0 && rec.labelIdx < 8) layer.label = LABELS[rec.labelIdx];
     if (rec.blocks.lfx2 && layer.kind !== 'adjust') {
@@ -1136,7 +1138,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
     if (rc.section === 3) { ex.str('8BIM'); ex.str('lsct'); ex.u32(4); ex.u32(3); }
     if (rc.section > 0 && rc.section < 3) { ex.str('8BIM'); ex.str('lsct'); ex.u32(12); ex.u32(rc.section); ex.str('8BIM'); ex.str(blendToKey.get(l!.blendMode) ?? 'norm'); }
     if (l?.label && LABELS.indexOf(l.label) > 0) { ex.str('8BIM'); ex.str('lclr'); ex.u32(8); ex.u16(LABELS.indexOf(l.label)); ex.u16(0); ex.u32(0); }
-    if (l && (l.locked || l.lockAlpha)) { ex.str('8BIM'); ex.str('lspf'); ex.u32(4); ex.u32((l.locked ? 0x80000000 : 0) | (l.lockAlpha ? 1 : 0)); }
+    if (l && (l.locked || l.lockAlpha || l.lockPos || l.lockPixels)) { ex.str('8BIM'); ex.str('lspf'); ex.u32(4); ex.u32((l.locked ? 0x80000000 : 0) | (l.lockAlpha ? 1 : 0) | (l.lockPixels ? 2 : 0) | (l.lockPos ? 4 : 0)); }
     for (const [k, bytes] of rc.extra ?? []) { ex.str('8BIM'); ex.str(k); ex.u32(bytes.length); ex.bytes(bytes); }
     if (rc.section === -1) { const ab = adjustmentBlock(l as AdjustmentLayer)!; ex.str('8BIM'); ex.str(ab.key); ex.u32(ab.bytes.length); ex.bytes(ab.bytes); }
     li.u32(ex.size); li.writer(ex);

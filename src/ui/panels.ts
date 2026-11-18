@@ -139,7 +139,11 @@ export function buildLayersPanel(parent: HTMLElement) {
     footBtn('trash', 'Eliminar capa', ops.deleteLayers));
   const lockA = h('button', { class: 'btn icon-btn', title: 'Bloquear transparencia (solo se pinta donde ya hay píxeles)', html: icon('lockAlpha') });
   lockA.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockAlpha', !l.lockAlpha); };
-  const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint' }, 'Bloquear:'), lockA, lockBtn));
+  const lockPx = h('button', { class: 'btn icon-btn', title: 'Bloquear píxeles (no se puede pintar en la capa)', html: icon('brush') });
+  lockPx.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockPixels', !l.lockPixels); };
+  const lockPs = h('button', { class: 'btn icon-btn', title: 'Bloquear posición (no se puede mover ni transformar)', html: icon('move') });
+  lockPs.onclick = () => { const l = app.doc?.active; if (l) ops.setLayerProp(l, 'lockPos', !l.lockPos); };
+  const top = h('div', { class: 'layer-controls' }, h('div', { class: 'lc-row' }, blend, opacity.el), h('div', { class: 'lc-row' }, h('span', { class: 'hint' }, 'Bloquear:'), lockA, lockPx, lockPs, lockBtn));
   const body = h('div', { class: 'panel-body layers' }, top, search, list, foot);
   parent.append(panel('Capas', body));
 
@@ -188,7 +192,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const kindTag = l instanceof GroupLayer && l.artboard ? h('span', { class: 'ltag', title: 'Mesa de trabajo' }, '▭') : l instanceof TextLayer ? h('span', { class: 'ltag', title: 'Capa de texto' }, 'T') : l instanceof ShapeLayer ? h('span', { class: 'ltag', title: 'Forma vectorial' }, '◇') : l instanceof SmartLayer ? h('span', { class: 'ltag', title: 'Objeto inteligente (doble clic en la miniatura para editar su contenido)' }, '▣') : null;
     const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
-    const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
+    const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockPos || l.lockPixels ? h('span', { class: 'llock', title: [l.lockPixels && 'Píxeles bloqueados', l.lockPos && 'Posición bloqueada'].filter(Boolean).join(' · '), html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
     if (l.label) eye.style.background = LABEL_COLORS[l.label] ?? '';
     // miniatura de la máscara vectorial
     let vmEl: HTMLElement | null = null;
@@ -271,6 +275,8 @@ export function buildLayersPanel(parent: HTMLElement) {
     if (!opacityChanging) opacity.set(Math.round((l?.opacity ?? 1) * 100));
     lockBtn.classList.toggle('on', !!l?.locked);
     lockA.classList.toggle('on', !!l?.lockAlpha);
+    lockPx.classList.toggle('on', !!l?.lockPixels);
+    lockPs.classList.toggle('on', !!l?.lockPos);
   };
   app.on('doc', render); app.on('docs', render);
   render();

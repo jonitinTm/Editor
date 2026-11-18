@@ -23,7 +23,7 @@ export function rasterizeLayer(l: RasterLayer): RasterLayer {
   const doc = app.doc!;
   const r = new RasterLayer(l.name, doc.width, doc.height);
   r.canvas = cloneCanvas(l.canvas);
-  r.id = l.id; r.visible = l.visible; r.opacity = l.opacity; r.blendMode = l.blendMode; r.locked = l.locked; r.mask = l.mask;
+  r.id = l.id; r.visible = l.visible; r.opacity = l.opacity; r.blendMode = l.blendMode; r.locked = l.locked; r.lockPos = l.lockPos; r.lockPixels = l.lockPixels; r.mask = l.mask;
   const parent = l.parent!;
   const i = parent.children.indexOf(l);
   parent.remove(l); parent.add(r, i);
@@ -47,6 +47,7 @@ export function getPaintTarget(opts: { allowText?: boolean } = {}): PaintTarget 
   if (layer.isLocked()) { app.toast('La capa está bloqueada', 'warn'); return null; }
   if (!layer.isVisibleInTree()) { app.toast('La capa está oculta', 'warn'); return null; }
   if (doc.editMask && layer.mask) return { layer, isMask: true, canvas: layer.mask.canvas };
+  if (layer.lockPixels) { app.toast('Los píxeles de la capa están bloqueados', 'warn'); return null; }
   if (!isRaster(layer)) { app.toast(layer.kind === 'group' ? 'Selecciona una capa de píxeles (no un grupo)' : 'Las capas de ajuste no tienen píxeles: pinta en su máscara', 'warn'); return null; }
   if (isParametric(layer) && !opts.allowText) {
     app.toast(layer.kind === 'text' ? 'Capa de texto rasterizada para poder editarla' : layer.kind === 'smart' ? 'Objeto inteligente rasterizado para poder pintar en él (para conservarlo, edita su contenido con doble clic)' : 'Forma rasterizada para poder editarla');

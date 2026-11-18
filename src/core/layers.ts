@@ -167,6 +167,9 @@ export abstract class Layer {
   locked = false;
   /** Bloquear transparencia: solo se puede pintar donde ya hay píxeles. */
   lockAlpha = false;
+  /** Bloquear posición (no se mueve ni se transforma) y bloquear píxeles (no se pinta). */
+  lockPos = false;
+  lockPixels = false;
   /** Etiqueta de color en el panel de capas (rojo, naranja, amarillo, verde, azul, violeta, gris). */
   label: string | null = null;
   /** Máscara de recorte: la capa solo se ve donde la capa de debajo tiene píxeles. */
@@ -186,6 +189,8 @@ export abstract class Layer {
     while (l) { if (l.locked) return true; l = l.parent; }
     return false;
   }
+  posLocked(): boolean { return this.isLocked() || this.lockPos; }
+  pixelsLocked(): boolean { return this.isLocked() || this.lockPixels; }
   isVisibleInTree(): boolean {
     let l: Layer | null = this;
     while (l) { if (!l.visible) return false; l = l.parent; }

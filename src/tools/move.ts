@@ -77,7 +77,7 @@ export class MoveTool implements Tool {
     if (!a) { app.toast('No hay ninguna capa seleccionada', 'warn'); return false; }
     let sel = selectedLayers();
     if (!sel.includes(a)) sel = [a];
-    if (sel.some(l => l.isLocked())) { app.toast('La capa está bloqueada', 'warn'); return false; }
+    if (sel.some(l => l.posLocked())) { app.toast(sel.some(l => l.isLocked()) ? 'La capa está bloqueada' : 'La posición de la capa está bloqueada', 'warn'); return false; }
     this.offset = { x: 0, y: 0 };
     if (doc.selection.active && sel.length === 1 && !(a instanceof GroupLayer) && !doc.editMask) {
       if (isParametric(a)) a = rasterizeLayer(a);
