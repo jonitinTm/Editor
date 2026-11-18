@@ -480,7 +480,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           h('button', { class: 'btn', onclick: () => ops.deleteMask(false) }, 'Eliminar')),
         h('div', { class: 'hint' }, 'Pinta en negro para ocultar y en blanco para mostrar.'));
     } else {
-      body.append(h('div', { class: 'prop-btns' }, h('button', { class: 'btn', onclick: () => ops.addMask('reveal') }, 'Añadir máscara')));
+      body.append(h('div', { class: 'prop-btns' }, h('button', { class: 'btn', onclick: () => ops.addMask('reveal') }, 'Añadir máscara'), h('button', { class: 'btn', title: 'Detecta el sujeto y oculta el fondo con una máscara', onclick: () => ops.removeBackground() }, 'Quitar fondo')));
     }
   };
   app.on('doc', render); app.on('docs', render);

@@ -1146,6 +1146,24 @@ export async function selectSubjectOp() {
   d.selection.setMask(m);
   d.commit('Seleccionar sujeto');
 }
+/** Quitar fondo: detecta el sujeto de la capa activa y oculta el resto con una máscara (no destructivo). */
+export async function removeBackground() {
+  const d = doc(); const l = d?.active; if (!d || !l) return;
+  if (l instanceof GroupLayer || l.kind === 'adjust') { app.toast('Elige una capa con la imagen', 'warn'); return; }
+  app.toast('Quitando el fondo…');
+  await new Promise(r => setTimeout(r, 30));
+  const { selectSubject } = await import('../filters/subject');
+  const src = isRaster(l) ? l.canvas : d.getComposite();
+  const m = selectSubject(src);
+  if (!m) { app.toast('No se ha encontrado un sujeto claro: prueba con Selección rápida', 'warn'); return; }
+  // borde algo suavizado para que no quede dentado
+  const soft = makeCanvas(m.width, m.height), sx = ctx2d(soft); sx.filter = 'blur(0.8px)'; sx.drawImage(m, 0, 0); sx.filter = 'none';
+  if (l.mask) { const mc = ctx2d(l.mask.canvas); mc.globalCompositeOperation = 'destination-in'; mc.drawImage(soft, 0, 0); mc.globalCompositeOperation = 'source-over'; l.mask.enabled = true; l.mask.touch(); }
+  else { const mk = new LayerMask(d.width, d.height, 'white'); mk.canvas = soft; mk.touch(); l.mask = mk; }
+  d.editMask = false; d.invalidate();
+  d.commit('Quitar fondo');
+  app.toast('Fondo quitado con una máscara: pinta en ella en blanco o negro para retocar el borde');
+}
 function hasTransparency(c: HTMLCanvasElement) {
   const k = Math.min(1, 200 / Math.max(c.width, c.height)), w = Math.max(1, Math.round(c.width * k)), h = Math.max(1, Math.round(c.height * k));
   const t = makeCanvas(w, h); ctx2d(t).drawImage(c, 0, 0, w, h);
