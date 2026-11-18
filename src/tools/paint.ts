@@ -159,13 +159,15 @@ export class Stroke {
     public opacity: number,
     /** Valor de gris (0-1) al pintar en máscaras. */
     public maskValue = 1,
+    /** Modo de fusión de la pintura (Multiplicar, Color…); «source-over» = normal. */
+    public blend: GlobalCompositeOperation = 'source-over',
   ) {
     const w = target.canvas.width, h = target.canvas.height;
     this.buffer = makeCanvas(w, h);
     // El lienzo de la capa no se modifica durante el trazo (se pinta sobre la vista previa), así que no hace falta copiarlo
     this.original = target.canvas;
     this.sel = clipMask(target);
-    this.fast = mode === 'paint' && !target.lockAlpha && !target.quick && !target.isMask;
+    this.fast = mode === 'paint' && !target.lockAlpha && !target.quick && !target.isMask && blend === 'source-over';
     if (this.fast) {
       const doc = app.doc!, ov = doc.overrides.get(target.layer) ?? {};
       ov.extra = ctx => { ctx.save(); ctx.globalAlpha = this.opacity; ctx.drawImage(this.sel ? this.tmp! : this.buffer, 0, 0); ctx.restore(); };
@@ -249,7 +251,14 @@ export class Stroke {
     if (this.sel) { this.clipToSelection(r); src = this.tmp!; }
     ctx.globalAlpha = this.opacity;
     if (this.mode === 'paint') {
-      ctx.globalCompositeOperation = this.target.lockAlpha ? 'source-atop' : 'source-over'; ctx.drawImage(src, 0, 0);
+      if (this.blend !== 'source-over' && !this.target.isMask && !this.target.quick) {
+        // con modo de fusión: la pintura se mezcla con lo que ya hay (solo en la zona que cambia)
+        const rx = Math.floor(r.x), ry = Math.floor(r.y), rw = Math.ceil(r.w) + 1, rh = Math.ceil(r.h) + 1;
+        const k = makeCanvas(rw, rh), kx = ctx2d(k);
+        kx.drawImage(this.original, -rx, -ry); kx.globalAlpha = this.opacity; kx.globalCompositeOperation = this.blend; kx.drawImage(src, -rx, -ry);
+        if (this.target.lockAlpha) { kx.globalAlpha = 1; kx.globalCompositeOperation = 'destination-in'; kx.drawImage(this.original, -rx, -ry); }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'copy'; ctx.drawImage(k, rx, ry);
+      } else { ctx.globalCompositeOperation = this.target.lockAlpha ? 'source-atop' : 'source-over'; ctx.drawImage(src, 0, 0); }
     } else if (this.mode === 'erase') {
       ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(src, 0, 0);
     } else {

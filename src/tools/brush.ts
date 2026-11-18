@@ -25,6 +25,11 @@ const ROUND = { key: 'roundness', label: 'Redondez', type: 'range' as const, min
 const FGBG_JIT = { key: 'fgbgJitter', label: 'Variar frontal/fondo', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
 const HUE_JIT = { key: 'hueJitter', label: 'Variar tono', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
 const BRI_JIT = { key: 'briJitter', label: 'Variar brillo', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const BLEND = { key: 'blendMode', label: 'Modo', type: 'select' as const, default: 'source-over', choices: [
+  { value: 'source-over', label: 'Normal' }, { value: 'destination-over', label: 'Detrás' }, { value: 'multiply', label: 'Multiplicar' }, { value: 'screen', label: 'Trama' }, { value: 'overlay', label: 'Superponer' },
+  { value: 'soft-light', label: 'Luz suave' }, { value: 'hard-light', label: 'Luz fuerte' }, { value: 'color-dodge', label: 'Sobreexponer color' }, { value: 'color-burn', label: 'Subexponer color' },
+  { value: 'darken', label: 'Oscurecer' }, { value: 'lighten', label: 'Aclarar' }, { value: 'difference', label: 'Diferencia' }, { value: 'hue', label: 'Tono' }, { value: 'saturation', label: 'Saturación' },
+  { value: 'color', label: 'Color' }, { value: 'luminosity', label: 'Luminosidad' }] };
 const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, min: 0, max: 500, default: 0, unit: '%' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
@@ -124,7 +129,7 @@ abstract class StrokeTool implements Tool {
     if (!t) return;
     this.target = t;
     const s = strokeSetup(t, this.erase);
-    this.stroke = new Stroke(t, s.mode, app.opt<number>('opacity', this.id) / 100, s.maskValue);
+    this.stroke = new Stroke(t, s.mode, app.opt<number>('opacity', this.id) / 100, s.maskValue, (s.mode === 'paint' ? app.opt<string>('blendMode', this.id) : undefined) as GlobalCompositeOperation || 'source-over');
     this.dab = this.makeDab(s.color);
     this.sm = { x: e.x, y: e.y, p: e.pressure };
     const sp = this.spacing(e.pressure);
@@ -164,7 +169,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, OPAC, FLOW, SMOOTH, SPACING, ANGLE, ROUND, SCATTER, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SPACING, ANGLE, ROUND, SCATTER, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
 }
