@@ -60,6 +60,18 @@ export async function openFiles(files: File[], asLayers = false) {
         // DNG: revelado completo de los datos del sensor
         const bytes = new Uint8Array(await f.arrayBuffer());
         const { isDng, decodeDng } = await import('../io/dng');
+        const { isCr2, decodeCr2 } = await import('../io/cr2');
+        if (isCr2(bytes)) {
+          try {
+            app.toast('Revelando el RAW de Canon…'); await new Promise(r => setTimeout(r, 30));
+            const img = decodeCr2(bytes);
+            const rd = new EditorDocument(io.baseName(f.name), img.width, img.height);
+            const rl = new RasterLayer('Fondo', img.width, img.height); ctx2d(rl.canvas).putImageData(img, 0, 0); rd.root.add(rl); rd.setActive(rl, false);
+            app.addDocument(rd);
+            app.toast('RAW revelado. Ajusta exposición, blancos y color con Filtro › Revelado (Mayús+Ctrl+A)');
+            continue;
+          } catch (er: any) { app.toast('No se pudo revelar este CR2 (' + (er?.message ?? er) + '); se abre su vista previa', 'warn'); }
+        }
         if (isDng(bytes)) {
           try {
             app.toast('Revelando el RAW…'); await new Promise(r => setTimeout(r, 30));

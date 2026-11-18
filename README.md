@@ -200,7 +200,9 @@ Ya disponible:
 - **Revelado de RAW en DNG**: los archivos DNG (móviles como iPhone ProRAW o Android, muchas cámaras y cualquier RAW
   convertido con el conversor gratuito de Adobe) se revelan desde los datos del sensor: negros y blancos, balance de
   blancos de la cámara, color del mosaico de Bayer, matriz de color, orientación y curva de tono. Después se puede
-  ajustar todo con *Filtro › Revelado*. De los demás RAW (CR2, NEF, ARW…) se abre la vista previa que guarda la cámara.
+  ajustar todo con *Filtro › Revelado*.
+- **Revelado de Canon CR2**: desde los datos del sensor, recortando los márgenes tapados, con el nivel de negro medido
+  y el balance de blancos de la toma guardado por la cámara. De los RAW aún no admitidos se abre la vista previa.
 - **Reemplazar contenido** de un objeto inteligente (*Capa › Objeto inteligente*): pone otra imagen en la misma caja.
 - **Objetos inteligentes**: *Capa › Objeto inteligente › Convertir*, o al colocar/soltar una imagen sobre un documento.
   Se escalan y giran sin perder calidad, y con doble clic en su miniatura se edita su contenido en otra pestaña

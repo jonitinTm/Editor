@@ -3,9 +3,9 @@
 // blanco como la cámara, reconstruye el color del mosaico de Bayer, aplica la matriz de color de la
 // cámara hacia sRGB, la orientación y una curva de tono suave.
 
-interface Ifd { [tag: number]: number[] | string; }
+export interface Ifd { [tag: number]: number[] | string; }
 
-class Tiff {
+export class Tiff {
   v: DataView; le: boolean;
   constructor(public b: Uint8Array) { this.v = new DataView(b.buffer, b.byteOffset, b.byteLength); this.le = b[0] === 0x49; }
   u16(o: number) { return this.v.getUint16(o, this.le); }
@@ -31,7 +31,7 @@ class Tiff {
 }
 
 /** Descompresor JPEG sin pérdida (ITU T.81, proceso 14), el que usan los DNG comprimidos. */
-function ljpeg(b: Uint8Array, start: number, end: number): { w: number; h: number; comps: number; data: Uint16Array } {
+export function ljpeg(b: Uint8Array, start: number, end: number): { w: number; h: number; comps: number; data: Uint16Array } {
   let p = start;
   const huff: { [id: number]: { maxcode: Int32Array; valptr: Int32Array; mincode: Int32Array; vals: Uint8Array } } = {};
   let w = 0, h = 0, comps = 0, bits = 0, pred = 1; const compTable: number[] = [];
