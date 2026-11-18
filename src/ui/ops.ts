@@ -1780,3 +1780,32 @@ export async function openAsLayers(files: File[]) {
   d.invalidate(); d.commit(canv.length > 1 ? `Abrir ${canv.length} imágenes como capas` : 'Abrir como capa');
   app.toast(`${canv.length} capa${canv.length === 1 ? '' : 's'} añadida${canv.length === 1 ? '' : 's'}`);
 }
+
+/** Capa › Combinar en pila: mezcla píxel a píxel las capas seleccionadas (mediana, media, máximo o mínimo). */
+export function stackLayers(mode: 'median' | 'mean' | 'max' | 'min') {
+  const d = doc(); if (!d) return;
+  const order = d.allLayers();
+  const list = selectedLayers().filter(l => isRaster(l) && l.visible).sort((a, b) => order.indexOf(a) - order.indexOf(b)) as RasterLayer[];
+  if (list.length < 2) { app.toast('Selecciona al menos dos capas de imagen (Ctrl+clic en el panel Capas)', 'warn'); return; }
+  const W = d.width, H = d.height, n = list.length;
+  const data = list.map(l => ctx2d(l.canvas).getImageData(0, 0, W, H).data);
+  const out = new ImageData(W, H), o = out.data, vals = new Float32Array(n);
+  for (let i = 0; i < W * H * 4; i += 4) {
+    // solo cuentan las capas que tienen algo en ese píxel
+    let m = 0; for (let k = 0; k < n; k++) if (data[k][i + 3] > 0) m++;
+    if (!m) continue;
+    for (let c = 0; c < 4; c++) {
+      let j = 0; for (let k = 0; k < n; k++) if (data[k][i + 3] > 0) vals[j++] = data[k][i + c];
+      let v: number;
+      if (mode === 'mean') { let s = 0; for (let k = 0; k < m; k++) s += vals[k]; v = s / m; }
+      else if (mode === 'max') { v = 0; for (let k = 0; k < m; k++) if (vals[k] > v) v = vals[k]; }
+      else if (mode === 'min') { v = 255; for (let k = 0; k < m; k++) if (vals[k] < v) v = vals[k]; }
+      else { for (let x = 1; x < m; x++) { const t = vals[x]; let y = x - 1; while (y >= 0 && vals[y] > t) { vals[y + 1] = vals[y]; y--; } vals[y + 1] = t; } v = m % 2 ? vals[(m - 1) / 2] : (vals[m / 2 - 1] + vals[m / 2]) / 2; }
+      o[i + c] = v;
+    }
+  }
+  const names = { median: 'Mediana', mean: 'Media', max: 'Máximo', min: 'Mínimo' };
+  const l = new RasterLayer(`Pila (${names[mode].toLowerCase()})`, W, H); ctx2d(l.canvas).putImageData(out, 0, 0); l.touch();
+  const top = list[n - 1]; top.parent!.add(l, top.parent!.children.indexOf(top) + 1);
+  d.setActive(l, false); d.selectedIds = new Set([l.id]); d.invalidate(); d.commit(`Combinar en pila: ${names[mode]}`);
+}
