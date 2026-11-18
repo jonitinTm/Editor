@@ -216,6 +216,8 @@ Ya disponible:
 - **Sectores** (herramienta *Sector*, con Recortar `C`, y *Archivo › Exportar sectores…*): divide un diseño en zonas (a mano
   o desde las guías) y exporta cada una en su archivo PNG, JPG o WebP dentro de un ZIP, con una página HTML opcional
   que las recompone. Se guardan en el proyecto.
+- **Filtro › Otro › Personalizado…**: tu propio filtro con una matriz de 5 × 5 (con ejemplos de enfocar, desenfocar,
+  bordes y relieve), escala automática y desplazamiento.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

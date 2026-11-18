@@ -471,3 +471,6 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 .recent-item span { max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .recent-del { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; padding: 0; line-height: 16px; border: none; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; opacity: 0; cursor: pointer; }
 .recent-item:hover .recent-del { opacity: 1; }
+
+.matrix-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 4px 0 8px; }
+.matrix-grid input { width: 100%; text-align: center; }

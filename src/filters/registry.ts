@@ -18,7 +18,8 @@ export type ParamDef =
   | { key: string; label: string; type: 'gradient'; default: A.Stop[] }
   | { key: string; label: string; type: 'checkbox'; default: boolean }
   | { key: string; label: string; type: 'color'; default: string }
-  | { key: string; label: string; type: 'pattern'; default: string };
+  | { key: string; label: string; type: 'pattern'; default: string }
+  | { key: string; label: string; type: 'matrix'; default: number[] };
 
 export interface FilterDef {
   id: string;
@@ -155,6 +156,15 @@ export const FILTERS: FilterDef[] = [
     ],
     // las opciones de «source» (con las estadísticas de color ya calculadas) las rellena la interfaz al abrir el diálogo
     apply: (img, p) => matchColor(img, p.source ? JSON.parse(p.source) : null, p),
+  },
+  {
+    id: 'custom', name: 'Personalizado…', group: 'filtro', submenu: 'Otro',
+    params: [
+      { key: 'm', label: 'Matriz (5 × 5)', type: 'matrix', default: [0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, -1, 5, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0] },
+      { key: 'scale', label: 'Escala (0 = automática)', type: 'range', min: 0, max: 100, default: 0 },
+      { key: 'offset', label: 'Desplazamiento', type: 'range', min: -255, max: 255, default: 0 },
+    ],
+    apply: (img, p) => customConvolve(img, p.m, p.scale, p.offset),
   },
   {
     id: 'posterize', name: 'Posterizar…', group: 'ajuste',
@@ -313,4 +323,18 @@ export function defaultParams(f: FilterDef): any {
   const p: any = {};
   for (const d of f.params ?? []) p[d.key] = typeof d.default === 'object' ? JSON.parse(JSON.stringify(d.default)) : d.default;
   return p;
+}
+
+/** Filtro › Otro › Personalizado: convolución con una matriz de 5 × 5. */
+function customConvolve(img: ImageData, m: number[], scale: number, offset: number) {
+  const sum = m.reduce((a, v) => a + (+v || 0), 0);
+  const { width: w, height: h, data: d } = img, src = new Uint8ClampedArray(d), k = 1 / (scale || (sum > 0 ? sum : 1));
+  const taps: [number, number, number][] = [];
+  for (let j = 0; j < 5; j++) for (let i = 0; i < 5; i++) { const v = +m[j * 5 + i] || 0; if (v) taps.push([i - 2, j - 2, v]); }
+  if (!taps.length) return;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let r = 0, g = 0, b = 0;
+    for (const [dx, dy, v] of taps) { const xx = x + dx < 0 ? 0 : x + dx >= w ? w - 1 : x + dx, yy = y + dy < 0 ? 0 : y + dy >= h ? h - 1 : y + dy, q = (yy * w + xx) * 4; r += src[q] * v; g += src[q + 1] * v; b += src[q + 2] * v; }
+    const o = (y * w + x) * 4; d[o] = r * k + offset; d[o + 1] = g * k + offset; d[o + 2] = b * k + offset;
+  }
 }

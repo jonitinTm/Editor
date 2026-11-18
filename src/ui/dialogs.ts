@@ -346,6 +346,15 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
       c.addEventListener('input', () => { params[p.key] = c.value; update(); });
       return row(p.label, c);
     }
+    if (p.type === 'matrix') {
+      const vals: number[] = [...(params[p.key] ?? p.default)]; params[p.key] = vals;
+      const grid = h('div', { class: 'matrix-grid' });
+      const inputs = vals.map((v, i) => { const inp = h('input', { type: 'number', class: 'num', value: v, step: 1 }) as HTMLInputElement; inp.addEventListener('input', () => { vals[i] = +inp.value || 0; params[p.key] = [...vals]; update(); }); grid.append(inp); return inp; });
+      const presets: [string, number[]][] = [['Enfocar', [0, 0, 0, 0, 0, 0, 0, -1, 0, 0, 0, -1, 5, -1, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0]], ['Desenfocar', [0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0]], ['Desenfoque amplio', [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]], ['Bordes', [0, 0, 0, 0, 0, 0, -1, -1, -1, 0, 0, -1, 8, -1, 0, 0, -1, -1, -1, 0, 0, 0, 0, 0, 0]], ['Relieve', [0, 0, 0, 0, 0, 0, -2, -1, 0, 0, 0, -1, 1, 1, 0, 0, 0, 1, 2, 0, 0, 0, 0, 0, 0]]];
+      const pre = h('select', {}, h('option', { value: '' }, 'Ejemplos…'), ...presets.map(([n], i) => h('option', { value: String(i) }, n))) as HTMLSelectElement;
+      pre.addEventListener('change', () => { const ps = presets[+pre.value]; if (!ps) return; ps[1].forEach((v, i) => { vals[i] = v; inputs[i].value = String(v); }); params[p.key] = [...vals]; update(); pre.value = ''; });
+      return h('div', {}, row(p.label, pre), grid);
+    }
     if (p.type === 'pattern') return row(p.label, patternSelect(params[p.key], v => { params[p.key] = v; update(); }));
     if (p.type === 'lut') return row(p.label, lutPicker(params, update));
     if (p.type === 'gradient') return row(p.label, gradientButton(params[p.key], s => { params[p.key] = s; update(); }));
