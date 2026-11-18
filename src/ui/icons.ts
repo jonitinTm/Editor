@@ -52,6 +52,8 @@ export const ICONS: Record<string, string> = {
   freePen: S('<path d="M12 19l7-7 3 3-7 7z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18z"/><path d="M2 2l7.6 7.6"/><circle cx="11" cy="11" r="2"/><path d="M3 21c3-1 4-4 7-3"/>'),
   mixer: S('<path d="M20 3.5c-3 1.5-8 6-10 9l2 2c3-2 7.5-7 9-10z"/><path d="M9.5 13c-2 0-3.5 1.5-3.5 3.5 0 1.2-.8 2.3-2.5 3 3.5 1 7.5 0 8-3.5z"/><circle cx="18" cy="18" r="3"/><path d="M15.5 16.5l5 3"/>'),
   frame: S('<rect x="4" y="4" width="16" height="16" rx="1"/><path d="M4 4l16 16M20 4L4 20" stroke-dasharray="2 2"/>'),
+  remove: S('<path d="M15 4l5 5-9 9H6v-5z"/><path d="M4 20h16"/><path d="M8 11l5 5" stroke-dasharray="2 2"/>'),
+  objectSel: S('<rect x="3" y="3" width="18" height="18" rx="1" stroke-dasharray="3 2"/><path d="M8 16c0-4 2-8 4-8s4 4 4 8z"/>'),
   patch: S('<path d="M5 7c3-3 8-3 11 0s2 8-2 9-9 1-10-3 0-5 1-6z" stroke-dasharray="2.5 2"/><path d="M14 14l6 6M20 15v5h-5"/>'),
   contentMove: S('<rect x="3" y="3" width="9" height="9" rx="1.5" stroke-dasharray="2.5 2"/><path d="M12 12l8 8M20 14v6h-6"/><path d="M5 8l2-2 3 3"/>'),
   spotHeal: S('<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><circle cx="18.5" cy="18.5" r="2.5" stroke-dasharray="1.5 1.5"/>'),

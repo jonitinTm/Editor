@@ -20,14 +20,14 @@ import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
-(app as any).debug = { readPsd, writePsd }; // para pruebas automáticas
+(app as any).debug = { readPsd, writePsd, ops }; // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
 import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool } from './tools/select';
 import { retouchTools } from './tools/retouch';
-import { QuickSelectTool } from './tools/quicksel';
+import { QuickSelectTool, ObjectSelectTool } from './tools/quicksel';
 import { CropTool, PerspectiveCropTool, SliceTool } from './tools/crop';
-import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool, PatternStampTool, MixerBrushTool } from './tools/brush';
+import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool, PatternStampTool, MixerBrushTool, RemoveTool } from './tools/brush';
 import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool, RotateViewTool } from './tools/misc';
 import { TextTool } from './tools/text';
 import { ShapeTool, FrameTool } from './tools/shape';
@@ -54,7 +54,7 @@ app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
 // Las herramientas añadidas después van al final: la tecla de cada grupo sigue eligiendo la de siempre
-for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool, MixerBrushTool, FrameTool]) app.registerTool(new T());
+for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool, MixerBrushTool, FrameTool, RemoveTool, ObjectSelectTool]) app.registerTool(new T());
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;

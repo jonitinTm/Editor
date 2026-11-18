@@ -365,8 +365,9 @@ export class SpotHealTool implements Tool {
     const x = Math.max(0, Math.floor(b.x0)), y = Math.max(0, Math.floor(b.y0));
     const box = { x, y, w: Math.min(d.width, Math.ceil(b.x1)) - x, h: Math.min(d.height, Math.ceil(b.y1)) - y };
     if (box.w < 1 || box.h < 1) return;
-    healHole(t, hole, box, 'Pincel corrector puntual');
+    this.finishHole(t, hole, box);
   }
+  protected finishHole(t: PaintTarget, hole: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }) { healHole(t, hole, box, 'Pincel corrector puntual'); }
   cancel() { this.t = null; this.hole = null; this.box = null; }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     if (this.hole) { const v = vp.doc!.view; ctx.save(); ctx.globalAlpha = 0.45; ctx.imageSmoothingEnabled = v.zoom < 1; vp.docTransform(ctx); ctx.drawImage(this.hole, 0, 0); ctx.restore(); }
@@ -471,4 +472,21 @@ export class MixerBrushTool extends StrokeTool {
     };
   }
   protected spacing(p: number) { return Math.max(1, this.size(p) * 0.1); }
+}
+
+/** Quitar: pinta sobre lo que sobra (una persona, un cable, una mancha grande) y se reconstruye con el entorno. */
+export class RemoveTool extends SpotHealTool {
+  id = 'remove'; name = 'Quitar'; icon = icon('remove'); key = 'J'; group = 'heal';
+  options = [{ ...SIZE, default: 60 }] as any[];
+  protected async finishHole(t: PaintTarget, hole: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }) {
+    const d = app.doc!;
+    // se agranda un poco lo pintado para no dejar restos del borde del objeto
+    const g = makeCanvas(hole.width, hole.height), gx = ctx2d(g); gx.filter = 'blur(2px)'; gx.drawImage(hole, 0, 0); gx.drawImage(hole, 0, 0); gx.filter = 'none';
+    const id = gx.getImageData(0, 0, g.width, g.height); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] > 10 ? 255 : 0; gx.putImageData(id, 0, 0);
+    app.toast('Quitando…');
+    const { inpaintCanvas } = await import('../ui/ops');
+    const out = await inpaintCanvas(t.canvas, g, { x: box.x - 3, y: box.y - 3, w: box.w + 6, h: box.h + 6 });
+    if (!out) return;
+    const { setTargetCanvas } = await import('./paint'); setTargetCanvas(t, out); d.commit('Quitar');
+  }
 }

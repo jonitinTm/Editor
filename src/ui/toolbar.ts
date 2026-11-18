@@ -9,8 +9,8 @@ import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
-  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso', 'magLasso'], ['quickSel', 'wand'], ['crop', 'perspCrop', 'slice'], ['frame'], ['eyedropper', 'colorSampler', 'ruler'],
-  ['spotHeal', 'heal', 'patch', 'contentMove', 'redEye'], ['clone', 'patternStamp'], ['historyBrush'], ['brush', 'pencil', 'colorReplace', 'mixer'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text'], ['pen', 'freePen', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
+  ['move'], ['marqueeRect', 'marqueeEllipse'], ['lasso', 'polyLasso', 'magLasso'], ['objectSel', 'quickSel', 'wand'], ['crop', 'perspCrop', 'slice'], ['frame'], ['eyedropper', 'colorSampler', 'ruler'],
+  ['spotHeal', 'remove', 'heal', 'patch', 'contentMove', 'redEye'], ['clone', 'patternStamp'], ['historyBrush'], ['brush', 'pencil', 'colorReplace', 'mixer'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text'], ['pen', 'freePen', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
 ];
 
 export function buildToolbar(parent: HTMLElement) {

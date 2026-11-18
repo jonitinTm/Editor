@@ -273,6 +273,11 @@ Ya disponible:
   inteligente que conserva sus capas (doble clic en su miniatura para editarlas). Soltado sobre las pestañas, se abre aparte.
 - **Selección › Luminosidad** (luces `Alt+Ctrl+2`, sombras y medios tonos): selección suave según lo claro u oscuro de la
   imagen, para ajustar solo el cielo, las luces o las sombras sin bordes visibles.
+- **Quitar** (con los correctores, `J`): pinta por encima de lo que sobra (una persona, un cable, un objeto grande) y se
+  reconstruye con trocitos del resto de la imagen, continuando texturas y bordes. *Rellenar según contenido* y
+  *Movimiento con detección de contenido* usan ahora el mismo método.
+- **Selección de objetos** (con la selección rápida, `W`): arrastra un recuadro alrededor de algo y se selecciona solo
+  ese objeto (Mayús añade, Alt resta).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

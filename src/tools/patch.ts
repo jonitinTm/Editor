@@ -10,7 +10,7 @@ import type { Viewport } from '../ui/viewport';
 import { cloneCanvas, ctx2d, getPixels, makeCanvas, putPixels, Rect } from '../core/canvas';
 import { getPaintTarget, setPreview, setTargetCanvas, PaintTarget } from './paint';
 import { heal } from '../filters/heal';
-import { healCanvas } from '../ui/ops';
+import { healCanvas, inpaintCanvas } from '../ui/ops';
 
 function insideSelection(e: ToolEvent) {
   const d = app.doc!, m = d.selection.mask; if (!m) return false;
@@ -98,7 +98,7 @@ abstract class LassoDragTool implements Tool {
   }
   /** Vista previa mientras se arrastra. */
   protected abstract preview(): void;
-  protected abstract apply(t: PaintTarget, dx: number, dy: number): void;
+  protected abstract apply(t: PaintTarget, dx: number, dy: number): void | Promise<void>;
 }
 
 export class PatchTool extends LassoDragTool {
@@ -138,13 +138,14 @@ export class ContentMoveTool extends LassoDragTool {
     x.globalAlpha = 0.85; x.drawImage(piece, dx, dy);
     setPreview(t, work);
   }
-  protected apply(t: PaintTarget, dx: number, dy: number) {
+  protected async apply(t: PaintTarget, dx: number, dy: number) {
     const d = app.doc!, sel = d.selection, b = sel.bounds!, src = t.canvas;
     let out: HTMLCanvasElement = cloneCanvas(src);
     if (app.opt('mode', this.id) === 'move') {
       // 1) el hueco que deja se rellena con textura del entorno
       const hole = softMask(sel.mask!, 0, 0, 3);
-      out = healCanvas(out, hole, { x: Math.max(0, b.x - 4), y: Math.max(0, b.y - 4), w: b.w + 8, h: b.h + 8 }) ?? out;
+      const box = { x: Math.max(0, b.x - 4), y: Math.max(0, b.y - 4), w: b.w + 8, h: b.h + 8 };
+      out = (b.w * b.h < 2500 * 2500 ? await inpaintCanvas(out, hole, box) : healCanvas(out, hole, box)) ?? out;
     }
     // 2) el objeto se coloca en el sitio nuevo; el borde se adapta al entorno y el interior se conserva
     const dest = makeCanvas(src.width, src.height), dc = ctx2d(dest);

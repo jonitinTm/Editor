@@ -7,6 +7,7 @@ import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
 import { makeCanvas, ctx2d, getPixels } from '../core/canvas';
 import { SelMode } from '../core/selection';
+import { isRaster } from '../core/layers';
 import { drawBrushCursor } from './brush';
 
 export class QuickSelectTool implements Tool {
@@ -111,5 +112,39 @@ export class QuickSelectTool implements Tool {
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     drawBrushCursor(ctx, vp, app.opt<number>('size', this.id));
     if (vp.mouseScreen) { const { x, y } = vp.mouseScreen; ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText(app.viewport.isSpaceDown() ? '' : '+', x + 6, y - 6); }
+  }
+}
+
+/** Selección de objetos: arrastra un rectángulo alrededor de algo y se selecciona solo el objeto de dentro. */
+export class ObjectSelectTool implements Tool {
+  id = 'objectSel'; name = 'Selección de objetos'; icon = icon('objectSel'); key = 'W'; group = 'wand'; cursor = 'crosshair';
+  options = [{ key: 'all', label: 'Todas las capas', type: 'checkbox', default: true }] as any[];
+  private a: { x: number; y: number } | null = null; private b: { x: number; y: number } | null = null; private mode: 'new' | 'add' | 'subtract' = 'new';
+  extraOptions(bar: HTMLElement) { bar.append(Object.assign(document.createElement('span'), { className: 'hint', textContent: 'Arrastra un rectángulo alrededor del objeto · Mayús: añadir · Alt: restar' })); }
+  down(e: ToolEvent) { this.a = { x: e.x, y: e.y }; this.b = { ...this.a }; this.mode = e.shift ? 'add' : e.alt ? 'subtract' : 'new'; }
+  move(e: ToolEvent) { if (this.a) { this.b = { x: e.x, y: e.y }; app.viewport.requestRender(); } }
+  async up() {
+    const a = this.a, b = this.b, d = app.doc; this.a = this.b = null; if (!a || !b || !d) return;
+    const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x))), y0 = Math.max(0, Math.floor(Math.min(a.y, b.y))), x1 = Math.min(d.width, Math.ceil(Math.max(a.x, b.x))), y1 = Math.min(d.height, Math.ceil(Math.max(a.y, b.y)));
+    if (x1 - x0 < 6 || y1 - y0 < 6) { app.viewport.requestRender(); return; }
+    app.toast('Buscando el objeto…'); await new Promise(r => setTimeout(r, 20));
+    const src = app.opt('all', this.id) || !d.active || !isRaster(d.active) ? d.getComposite() : d.active.canvas;
+    // un margen alrededor del rectángulo hace de «fondo» para distinguir el objeto
+    const mx = Math.round((x1 - x0) * 0.08) + 4, my = Math.round((y1 - y0) * 0.08) + 4;
+    const cx0 = Math.max(0, x0 - mx), cy0 = Math.max(0, y0 - my), cx1 = Math.min(d.width, x1 + mx), cy1 = Math.min(d.height, y1 + my);
+    const crop = makeCanvas(cx1 - cx0, cy1 - cy0); ctx2d(crop).drawImage(src, -cx0, -cy0);
+    const { selectSubject } = await import('../filters/subject');
+    const m = selectSubject(crop);
+    if (!m) { app.toast('No se ha encontrado un objeto claro dentro del rectángulo', 'warn'); app.viewport.requestRender(); return; }
+    const full = makeCanvas(d.width, d.height), fx = ctx2d(full);
+    fx.save(); fx.beginPath(); fx.rect(x0, y0, x1 - x0, y1 - y0); fx.clip(); fx.drawImage(m, cx0, cy0); fx.restore();
+    d.selection.combineCanvas(this.mode, full);
+    d.commit('Selección de objetos');
+  }
+  cancel() { this.a = this.b = null; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (!this.a || !this.b) return;
+    const p = vp.toScreen(Math.min(this.a.x, this.b.x), Math.min(this.a.y, this.b.y)), q = vp.toScreen(Math.max(this.a.x, this.b.x), Math.max(this.a.y, this.b.y));
+    ctx.save(); ctx.strokeStyle = '#3d8bfd'; ctx.setLineDash([5, 4]); ctx.lineWidth = 1.5; ctx.strokeRect(p.x, p.y, q.x - p.x, q.y - p.y); ctx.restore();
   }
 }

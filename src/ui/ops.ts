@@ -767,7 +767,11 @@ export function contentAwareFill() {
   // Se amplía un poco la selección para que el borde también se corrija
   const hole = cloneCanvas(d.selection.mask), b = d.selection.bounds;
   const g = ctx2d(hole); g.filter = 'blur(2px)'; g.drawImage(d.selection.mask, 0, 0); g.filter = 'none';
-  healHole(t, hole, { x: Math.max(0, b.x - 3), y: Math.max(0, b.y - 3), w: b.w + 6, h: b.h + 6 }, 'Rellenar según contenido');
+  // reconstrucción por parches (mejor con texturas y bordes); si la zona es enorme, se usa el corrector rápido
+  const box = { x: Math.max(0, b.x - 3), y: Math.max(0, b.y - 3), w: b.w + 6, h: b.h + 6 };
+  if (b.w * b.h > 2500 * 2500) { healHole(t, hole, box, 'Rellenar según contenido'); return; }
+  app.toast('Rellenando…');
+  inpaintCanvas(t.canvas, hole, box).then(out => { if (!out) return; setTargetCanvas(t, out); d.commit('Rellenar según contenido'); });
 }
 
 // ---- Canales alfa -----------------------------------------------------------------------
@@ -1900,4 +1904,18 @@ export function selectLuminosity(kind: 'lights' | 'darks' | 'mids') {
   x.putImageData(img, 0, 0);
   d.selection.setMask(m);
   d.commit(kind === 'lights' ? 'Seleccionar luces' : kind === 'darks' ? 'Seleccionar sombras' : 'Seleccionar medios tonos');
+}
+
+/** Rellena el hueco (alfa de `holeCanvas`) reconstruyéndolo con parches del entorno; devuelve el lienzo nuevo. */
+export async function inpaintCanvas(src: HTMLCanvasElement, holeCanvas: HTMLCanvasElement, box: Rect): Promise<HTMLCanvasElement | null> {
+  const { inpaint: inpaintFn } = await import('../filters/inpaint');
+  const W = src.width, H = src.height, m = Math.max(24, Math.round(Math.max(box.w, box.h) * 0.9));
+  const x0 = Math.max(0, box.x - m), y0 = Math.max(0, box.y - m), x1 = Math.min(W, box.x + box.w + m), y1 = Math.min(H, box.y + box.h + m);
+  const reg = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; if (reg.w < 8 || reg.h < 8) return null;
+  const O = getPixels(src, reg), ha = getPixels(holeCanvas, reg).data, hole = new Uint8Array(reg.w * reg.h);
+  for (let i = 0; i < hole.length; i++) hole[i] = ha[i * 4 + 3] > 8 ? 1 : 0;
+  const R = inpaintFn(O, hole, 960);
+  // borde suave: donde el hueco es parcial se mezcla con el original
+  for (let i = 0; i < hole.length; i++) { const a = ha[i * 4 + 3] / 255; if (a > 0 && a < 1) for (let c = 0; c < 4; c++) R.data[i * 4 + c] = O.data[i * 4 + c] * (1 - a) + R.data[i * 4 + c] * a; }
+  const out = cloneCanvas(src); putPixels(out, R, reg.x, reg.y); return out;
 }
