@@ -37,6 +37,7 @@ import { MagneticLassoTool } from './tools/maglasso';
 import { HistoryBrushTool } from './tools/brush';
 import { PuppetTool } from './tools/puppet';
 import { PatchTool, ContentMoveTool } from './tools/patch';
+import { buildCharacterPanel, buildParagraphPanel } from './ui/textpanels';
 import { ColorSamplerTool } from './tools/extra';
 import { ColorReplaceTool, MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool } from './tools/extra';
 import { buildBrushesPanel } from './ui/brushes';
@@ -95,7 +96,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
   return group;
 }
 tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel], ['Estilos', buildStylesPanel]]);
-tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel]]);
+tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel], ['Carácter', buildCharacterPanel], ['Párrafo', buildParagraphPanel]]);
 tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Trazados', buildPathsPanel], ['Composiciones', buildCompsPanel], ['Acciones', buildActionsPanel]]);
 root.append(h('div', { id: 'toasts' }));
 

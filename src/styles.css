@@ -474,3 +474,18 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
 
 .matrix-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 4px 0 8px; }
 .matrix-grid input { width: 100%; text-align: center; }
+
+.tp-body { padding: 8px 10px; }
+.tp-content { display: flex; flex-direction: column; gap: 6px; }
+.tp-row { display: flex; gap: 4px; align-items: center; }
+.tp-row > select, .tp-font, .tp-font > * { flex: 1; min-width: 0; }
+.tp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+.tp-field { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.tp-field input { width: 100%; min-width: 0; }
+.tp-ico { width: 24px; flex-shrink: 0; text-align: center; color: var(--muted); font-size: 11px; cursor: ew-resize; user-select: none; }
+.tp-unit { color: var(--muted); font-size: 10.5px; }
+.tp-toggles { flex-wrap: wrap; }
+.tp-tog { min-width: 28px; font-weight: 500; }
+.tp-tog.on { background: var(--accent-soft); color: var(--text); border-color: var(--accent); }
+.tp-color { width: 44px; height: 20px; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; }
+.tp-row-c { justify-content: space-between; }

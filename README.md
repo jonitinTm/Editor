@@ -234,6 +234,11 @@ Ya disponible:
   ambiente y relieve a partir de la propia imagen.
 - **Cuadrícula y guías a tu gusto** (*Edición › Preferencias*): tamaño de la cuadrícula y color de cuadrícula y guías; con la
   cuadrícula visible, las selecciones, el recorte y lo que mueves se ajustan a sus líneas.
+- **Paneles Carácter y Párrafo** (*Ventana*, o el botón «Carácter y párrafo» de la herramienta Texto): fuente, estilo,
+  tamaño, interlineado e interletraje en píxeles, escala horizontal y vertical, desplazamiento de la línea base, color,
+  negrita, cursiva, mayúsculas, versalitas, subrayado, tachado y suavizado; alineación (también justificado), sangrías
+  izquierda, derecha y de primera línea, y espacio antes y después de cada párrafo. Los números se cambian también
+  arrastrando sobre su icono.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

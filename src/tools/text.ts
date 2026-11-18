@@ -17,7 +17,7 @@ export class TextTool implements Tool {
     { key: 'bold', label: 'Negrita', type: 'checkbox', default: false },
     { key: 'italic', label: 'Cursiva', type: 'checkbox', default: false },
     { key: 'align', label: 'Alinear', type: 'select', default: 'left', choices: [
-      { value: 'left', label: 'Izquierda' }, { value: 'center', label: 'Centro' }, { value: 'right', label: 'Derecha' }] },
+      { value: 'left', label: 'Izquierda' }, { value: 'center', label: 'Centro' }, { value: 'right', label: 'Derecha' }, { value: 'justify', label: 'Justificar' }] },
     { key: 'tracking', label: 'Interletraje', type: 'range', min: -200, max: 1000, default: 0 },
     { key: 'leading', label: 'Interlineado', type: 'range', min: 50, max: 400, default: 120, unit: '%' },
     { key: 'underline', label: 'Subrayado', type: 'checkbox', default: false },
@@ -26,7 +26,9 @@ export class TextTool implements Tool {
   extraOptions(bar: HTMLElement) {
     const b = document.createElement('button'); b.className = 'btn icon-btn'; b.title = 'Deformar texto'; b.textContent = 'T͡';
     b.onclick = () => { const l = app.doc?.active; if (l instanceof TextLayer) import('../ui/dialogs').then(m => m.warpTextDialog(l)); else app.toast('Selecciona una capa de texto', 'warn'); };
-    bar.append(b);
+    const cp = document.createElement('button'); cp.className = 'btn'; cp.title = 'Abrir los paneles Carácter y Párrafo (escala, línea base, sangrías, justificado…)'; cp.textContent = 'Carácter y párrafo';
+    cp.onclick = () => import('../ui/actions').then(m => m.actionById.get('panel:Carácter')?.run());
+    bar.append(b, cp);
   }
   /** Clic: texto de punto. Arrastrar: caja de texto de párrafo. */
   private dragStart: { x: number; y: number } | null = null;

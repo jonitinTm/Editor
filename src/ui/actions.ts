@@ -220,6 +220,8 @@ export const ACTIONS: Action[] = [
   })),
   { id: 'panel:Capas', label: 'Capas', run: () => showPanel('Capas') },
   { id: 'panel:Canales', label: 'Canales', run: () => showPanel('Canales') },
+  { id: 'panel:Carácter', label: 'Carácter', run: () => showPanel('Carácter') },
+  { id: 'panel:Párrafo', label: 'Párrafo', run: () => showPanel('Párrafo') },
   { id: 'panel:Estilos', label: 'Estilos', run: () => showPanel('Estilos') },
   { id: 'panel:Composiciones', label: 'Composiciones de capas', run: () => showPanel('Composiciones') },
   { id: 'panel:Trazados', label: 'Trazados', run: () => showPanel('Trazados') },

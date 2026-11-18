@@ -68,8 +68,18 @@ export interface TextProps {
   color: string;
   bold: boolean;
   italic: boolean;
-  align: 'left' | 'center' | 'right';
+  align: 'left' | 'center' | 'right' | 'justify';
   lineHeight: number;
+  /** Escala horizontal y vertical de las letras (1 = 100 %). */
+  hScale?: number; vScale?: number;
+  /** Desplazamiento de la línea base (px, positivo = hacia arriba). */
+  baseline?: number;
+  /** Versalitas. */
+  smallCaps?: boolean;
+  /** Párrafo: sangrías (izquierda, derecha, primera línea) y espacio antes/después de cada párrafo, en px. */
+  indentLeft?: number; indentRight?: number; indentFirst?: number; spaceBefore?: number; spaceAfter?: number;
+  /** Suavizado de los bordes: 'none' = bordes duros (pixel art). */
+  antialias?: 'smooth' | 'none';
   x: number;
   y: number;
   /** Interletraje en milésimas de em (como en los editores profesionales). */
@@ -249,6 +259,7 @@ export class TextLayer extends RasterLayer {
     const p = this.props;
     ctx.font = this.fontString();
     if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${(p.tracking ?? 0) / 1000 * p.size}px`;
+    if ('fontVariantCaps' in ctx) (ctx as any).fontVariantCaps = p.smallCaps ? 'small-caps' : 'normal';
   }
   /** Reparte el texto en líneas (ajustando al ancho de la caja si es texto de párrafo). */
   /** Fuente de un trozo con estilo propio. */
@@ -288,35 +299,47 @@ export class TextLayer extends RasterLayer {
     const maxSize = Math.max(p.size, ...runs.map(r => r.size ?? 0));
     return { lines, lh: maxSize * p.lineHeight, width: p.boxWidth ?? Math.max(1, ...lines.map(l => l.w)), maxSize };
   }
-  layout(): { lines: { text: string; w: number }[]; lh: number; width: number } {
+  layout(): { lines: { text: string; w: number; para?: number; first?: boolean; last?: boolean }[]; lh: number; width: number } {
     if (this.props.runs?.length) return this.richLayout(this.props.runs);
     const p = this.props, ctx = ctx2d(this.canvas);
     ctx.save(); this.setupCtx(ctx);
-    const txt = p.caps ? p.text.toUpperCase() : p.text, lines: { text: string; w: number }[] = [];
+    const txt = p.caps ? p.text.toUpperCase() : p.text, lines: { text: string; w: number; para: number; first: boolean; last: boolean }[] = [];
     const m = (t: string) => ctx.measureText(t).width;
-    for (const para of txt.split('\n')) {
-      if (!p.boxWidth) { lines.push({ text: para, w: m(para) }); continue; }
+    const hs = p.hScale ?? 1, il = p.indentLeft ?? 0, ir = p.indentRight ?? 0, ifl = p.indentFirst ?? 0;
+    txt.split('\n').forEach((para, pi) => {
+      const start = lines.length;
+      if (!p.boxWidth) { lines.push({ text: para, w: m(para), para: pi, first: true, last: true }); return; }
+      // ancho útil (sin escalar) de cada línea: la caja menos las sangrías
+      const avail = (first: boolean) => Math.max(10, (p.boxWidth! - il - ir - (first ? ifl : 0)) / hs);
       let cur = '';
+      const push = (t: string) => lines.push({ text: t, w: m(t), para: pi, first: lines.length === start, last: false });
       for (const word of para.split(/(\s+)/)) {
-        const next = cur + word;
-        if (cur.trim() && m(next.trimEnd()) > p.boxWidth) { lines.push({ text: cur.trimEnd(), w: m(cur.trimEnd()) }); cur = word.trimStart(); }
+        const next = cur + word, bw = avail(lines.length === start);
+        if (cur.trim() && m(next.trimEnd()) > bw) { push(cur.trimEnd()); cur = word.trimStart(); }
         else cur = next;
         // palabras más largas que la caja: se cortan por letras
-        while (m(cur) > p.boxWidth && cur.length > 1) { let k = cur.length - 1; while (k > 1 && m(cur.slice(0, k)) > p.boxWidth) k--; lines.push({ text: cur.slice(0, k), w: m(cur.slice(0, k)) }); cur = cur.slice(k); }
+        while (m(cur) > avail(lines.length === start) && cur.length > 1) { const b2 = avail(lines.length === start); let k = cur.length - 1; while (k > 1 && m(cur.slice(0, k)) > b2) k--; push(cur.slice(0, k)); cur = cur.slice(k); }
       }
-      lines.push({ text: cur.trimEnd(), w: m(cur.trimEnd()) });
-    }
+      push(cur.trimEnd());
+      lines[lines.length - 1].last = true;
+    });
     ctx.restore();
-    const width = p.boxWidth ?? Math.max(1, ...lines.map(l => l.w));
+    const width = p.boxWidth ? p.boxWidth / hs : Math.max(1, ...lines.map(l => l.w));
     return { lines, lh: p.size * p.lineHeight, width };
+  }
+  /** Altura extra antes de cada línea (espacio entre párrafos). */
+  private paraOffsets(lines: { para?: number; first?: boolean }[]) {
+    const p = this.props, sb = p.spaceBefore ?? 0, sa = p.spaceAfter ?? 0, out: number[] = []; let acc = 0;
+    lines.forEach((l, i) => { if (i > 0 && l.first) acc += sb + sa; out.push(acc); });
+    return { off: out, total: acc };
   }
   /** Caja que ocupa el texto (coordenadas del documento). */
   bounds() {
     const p = this.props;
     if (p.onPath || p.vertical) { const b = this.specialBounds(); if (b) return b; }
-    const L = this.layout();
-    const x = p.boxWidth ? p.x : p.align === 'left' ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.x - L.width;
-    return { x, y: p.y, w: L.width, h: L.lh * Math.max(1, L.lines.length) };
+    const L = this.layout(), hs = p.hScale ?? 1, vs = p.vScale ?? 1, W = L.width * hs;
+    const x = p.boxWidth ? p.x : p.align === 'center' ? p.x - W / 2 : p.align === 'right' ? p.x - W : p.x;
+    return { x, y: p.y - (p.baseline ?? 0), w: W, h: (L.lh * Math.max(1, L.lines.length) + this.paraOffsets(L.lines).total) * vs };
   }
   translate(dx: number, dy: number) {
     this.props.x += dx; this.props.y += dy;
@@ -396,16 +419,19 @@ export class TextLayer extends RasterLayer {
     }
     const L = this.layout(), lh = L.lh;
     ctx.save();
+    // escala horizontal/vertical y línea base: se aplican alrededor del punto de anclaje
+    const hs = p.hScale ?? 1, vs = p.vScale ?? 1, blS = p.baseline ?? 0;
+    if (hs !== 1 || vs !== 1 || blS) { ctx.translate(p.x, p.y - blS); ctx.scale(hs, vs); ctx.translate(-p.x, -p.y); }
     this.setupCtx(ctx);
     ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
     ctx.textBaseline = 'top';
-    const left = p.boxWidth ? p.x : p.align === 'left' ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.x - L.width;
+    const left = p.boxWidth ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.align === 'right' ? p.x - L.width : p.x;
     if (p.runs?.length) {
       // Varios estilos: cada trozo con su fuente y color, sobre una línea base común
       const R = L as ReturnType<TextLayer['richLayout']>, txt = p.caps ? p.text.toUpperCase() : p.text;
       ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
       R.lines.forEach((line, i) => {
-        let x = p.align === 'left' ? left : p.align === 'center' ? left + (L.width - line.w) / 2 : left + L.width - line.w;
+        let x = p.align === 'center' ? left + (L.width - line.w) / 2 : p.align === 'right' ? left + L.width - line.w : left;
         const base = p.y + i * lh + (lh - R.maxSize) / 2 + R.maxSize * 0.8;
         for (const sg of segments(p.runs!, line.start, line.end)) {
           const size = sg.st.size ?? p.size, t = txt.slice(sg.a, sg.b);
@@ -419,21 +445,37 @@ export class TextLayer extends RasterLayer {
         }
       });
     } else
-    L.lines.forEach((line, i) => {
-      const lx = p.align === 'left' ? left : p.align === 'center' ? left + (L.width - line.w) / 2 : left + L.width - line.w;
-      const ty = p.y + i * lh + (lh - p.size) / 2;
-      ctx.textAlign = 'left';
-      ctx.fillText(line.text, lx, ty);
-      const thick = Math.max(1, p.size / 16);
-      if (p.underline) ctx.fillRect(lx, ty + p.size * 0.92, line.w, thick);
-      if (p.strike) ctx.fillRect(lx, ty + p.size * 0.52, line.w, thick);
-    });
+    {
+      const po = this.paraOffsets(L.lines), il = (p.indentLeft ?? 0) / hs, ir = (p.indentRight ?? 0) / hs, ifl = (p.indentFirst ?? 0) / hs;
+      L.lines.forEach((line, i) => {
+        const ind = il + (line.first ? ifl : 0), room = L.width - (p.boxWidth ? ind + ir : 0);
+        const x0 = left + (p.boxWidth ? ind : 0);
+        const lx = p.align === 'center' ? x0 + (room - line.w) / 2 : p.align === 'right' ? x0 + room - line.w : x0;
+        const ty = p.y + i * lh + (lh - p.size) / 2 + po.off[i];
+        ctx.textAlign = 'left';
+        let w = line.w;
+        if (p.align === 'justify' && p.boxWidth && !line.last && /\s/.test(line.text.trim())) {
+          // justificado: el espacio que sobra se reparte entre las palabras
+          const words = line.text.split(/\s+/).filter(Boolean), sw = words.reduce((a, t) => a + ctx.measureText(t).width, 0), gap = (room - sw) / Math.max(1, words.length - 1);
+          let x = x0; for (const t of words) { ctx.fillText(t, x, ty); x += ctx.measureText(t).width + gap; }
+          w = room;
+        } else ctx.fillText(line.text, lx, ty);
+        const thick = Math.max(1, p.size / 16), ux = p.align === 'justify' && p.boxWidth && !line.last ? x0 : lx;
+        if (p.underline) ctx.fillRect(ux, ty + p.size * 0.92, w, thick);
+        if (p.strike) ctx.fillRect(ux, ty + p.size * 0.52, w, thick);
+      });
+    }
     ctx.restore();
     if (warped) {
       const b = this.bounds(), pad = Math.ceil(p.size * 0.25);
       const box = { x: Math.floor(b.x) - pad, y: Math.floor(b.y) - pad, w: Math.ceil(b.w) + pad * 2, h: Math.ceil(b.h) + pad * 2 };
       const crop = makeCanvas(box.w, box.h); ctx2d(crop).drawImage(target, -box.x, -box.y);
       drawMeshExact(ctx2d(this.canvas), crop, 0, 0, box, styledMesh(p.warp!.style, box, p.warp!.bend), 40);
+    }
+    if (p.antialias === 'none') {
+      // sin suavizado: cada píxel es todo o nada (útil para pixel art)
+      const b = this.bounds(), x0 = Math.max(0, Math.floor(b.x - p.size)), y0 = Math.max(0, Math.floor(b.y - p.size)), x1 = Math.min(this.canvas.width, Math.ceil(b.x + b.w + p.size)), y1 = Math.min(this.canvas.height, Math.ceil(b.y + b.h + p.size));
+      if (x1 > x0 && y1 > y0) { const c = ctx2d(this.canvas), id = c.getImageData(x0, y0, x1 - x0, y1 - y0), a = id.data; for (let i = 3; i < a.length; i += 4) a[i] = a[i] >= 128 ? 255 : 0; c.putImageData(id, x0, y0); }
     }
     this.touch();
   }
