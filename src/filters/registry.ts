@@ -9,6 +9,7 @@ import * as M from './more';
 import * as L from './lut';
 import * as N from './more2';
 import * as R from './artistic';
+import * as MD from './modes';
 import { indexColors } from './indexed';
 import { matchColor } from './matchcolor';
 
@@ -335,6 +336,25 @@ export const FILTERS: FilterDef[] = [
   { id: 'smartblur', name: 'Desenfoque inteligente…', group: 'filtro', submenu: 'Desenfocar', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 20, default: 3, unit: 'px' }, { key: 'threshold', label: 'Umbral', type: 'range', min: 2, max: 100, default: 25 }, { key: 'mode', label: 'Modo', type: 'select', default: 'normal', choices: [['normal', 'Normal'], ['edges', 'Solo bordes'], ['overlay', 'Superponer bordes']] }], apply: (img, p) => R.smartBlur(img, p) },
   { id: 'shear', name: 'Cizalla…', group: 'filtro', submenu: 'Distorsionar', params: [{ key: 'amount', label: 'Cantidad', type: 'range', min: -100, max: 100, default: 30, unit: '%' }, { key: 'shape', label: 'Curva', type: 'select', default: 'arc', choices: [['arc', 'Arco'], ['wave', 'Onda'], ['line', 'Recta (inclinar)']] }, { key: 'edge', label: 'Zonas sin definir', type: 'select', default: 'wrap', choices: [['wrap', 'Dar la vuelta'], ['repeat', 'Repetir píxeles de borde']] }], apply: (img, p) => R.shear(img, p) },
   { id: 'despeckle', name: 'Destramar', group: 'filtro', submenu: 'Ruido', apply: img => R.despeckle(img) },
+  { id: 'duotone', name: 'Duotono…', group: 'ajuste', params: [
+    { key: 'inks', label: 'Tintas', type: 'select', default: '2', choices: [['1', 'Monotono (1 tinta)'], ['2', 'Duotono (2 tintas)'], ['3', 'Tritono (3 tintas)']] },
+    { key: 'ink1', label: 'Tinta 1 (sombras)', type: 'color', default: '#1a1a40' }, { key: 'ink2', label: 'Tinta 2', type: 'color', default: '#e0a040' }, { key: 'ink3', label: 'Tinta 3', type: 'color', default: '#f0e0c0' },
+    { key: 'paper', label: 'Papel', type: 'color', default: '#ffffff' },
+    { key: 'gamma', label: 'Densidad', type: 'range', min: 30, max: 300, default: 100, unit: '%' }], apply: (img, p) => MD.duotone(img, p) },
+  { id: 'bitmap', name: 'Mapa de bits (blanco y negro)…', group: 'ajuste', params: [
+    { key: 'method', label: 'Método', type: 'select', default: 'diffusion', choices: [['threshold', 'Umbral al 50 %'], ['pattern', 'Tramado de motivo'], ['diffusion', 'Tramado de difusión'], ['halftone', 'Trama de semitonos']] },
+    { key: 'threshold', label: 'Umbral', type: 'range', min: 1, max: 99, default: 50, unit: '%' },
+    { key: 'cell', label: 'Lineatura (semitono)', type: 'range', min: 3, max: 60, default: 8, unit: 'px' },
+    { key: 'angle', label: 'Ángulo (semitono)', type: 'range', min: 0, max: 90, default: 45, unit: '°' }], apply: (img, p) => MD.bitmap(img, p) },
+  { id: 'hdrtoning', name: 'Tonos HDR…', group: 'ajuste', params: [
+    { key: 'radius', label: 'Radio', type: 'range', min: 5, max: 300, default: 60, unit: 'px', section: 'Brillo de bordes' },
+    { key: 'strength', label: 'Intensidad', type: 'range', min: 0, max: 100, default: 50, unit: '%' },
+    { key: 'gamma', label: 'Gamma', type: 'range', min: 30, max: 300, default: 100, unit: '%', section: 'Tono y detalle' },
+    { key: 'exposure', label: 'Exposición', type: 'range', min: -100, max: 100, default: 0 },
+    { key: 'detail', label: 'Detalle', type: 'range', min: 0, max: 100, default: 30, unit: '%' },
+    { key: 'shadow', label: 'Sombras', type: 'range', min: -100, max: 100, default: 0, section: 'Avanzado' },
+    { key: 'highlight', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0 },
+    { key: 'saturation', label: 'Saturación', type: 'range', min: -100, max: 100, default: 20 }], apply: (img, p) => MD.hdrToning(img, p) },
 ];
 
 /** Los motivos se piden a quien los tenga (la página); en el hilo de fondo no existen. */

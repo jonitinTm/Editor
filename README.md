@@ -356,6 +356,11 @@ Ya disponible:
   *Textura* (Cuarteado, Texturizador —lienzo, arpillera, ladrillo, arenisca—, Vidriera), *Pixelizar › Grabado*,
   *Desenfocar › Desenfoque inteligente*, *Distorsionar › Cizalla* y *Ruido › Destramar*. Todos con vista previa, como
   capa de ajuste/filtro inteligente y deshacer.
+- **Filtro › Galería de filtros…**: miniaturas de tu imagen con cada efecto artístico, de boceto, de textura y de
+  estilizar; clic en uno para ajustarlo y aplicarlo.
+- **Ajustes nuevos**: *Duotono* (monotono, duotono o tritono con las tintas y el papel que elijas), *Mapa de bits* (solo
+  blanco y negro: umbral, tramado de motivo, difusión o trama de semitonos) y *Tonos HDR* (realce local de detalle, con
+  radio, intensidad, gamma, exposición, sombras, iluminaciones y saturación).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
