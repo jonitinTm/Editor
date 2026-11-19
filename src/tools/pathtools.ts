@@ -160,3 +160,12 @@ export class CurvaturePenTool extends PenTool {
     return false;
   }
 }
+
+/** Para la Pluma con «Añadir/eliminar automáticamente»: clic en un punto lo quita, clic en el trazado añade uno. */
+const autoAdd = new AddAnchorTool(), autoDel = new DeleteAnchorTool();
+(app as any).penAutoEdit = (e: ToolEvent) => {
+  const E = editable(); if (!E || E.locked) return false;
+  if (hitPoint(E, e)) { autoDel.down(e); return true; }
+  if (hitSegment(E, e)) { autoAdd.down(e); return true; }
+  return false;
+};

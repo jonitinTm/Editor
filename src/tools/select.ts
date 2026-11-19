@@ -243,6 +243,8 @@ export class WandTool implements Tool {
     { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 0, max: 255, default: 32 },
     { key: 'contiguous', label: 'Contiguo', type: 'checkbox', default: true },
     { key: 'all', label: 'Todas las capas', type: 'checkbox', default: false },
+    { key: 'sample', label: 'Muestra', type: 'select', default: '1', choices: [{ value: '1', label: 'Punto' }, { value: '3', label: 'Media 3×3' }, { value: '5', label: 'Media 5×5' }, { value: '11', label: 'Media 11×11' }] },
+    { key: 'antialias', label: 'Suavizar', type: 'checkbox', default: true },
   ] as any[];
   extraOptions(bar: HTMLElement) { const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Seleccionar sujeto'; b.onclick = () => import('../ui/ops').then(o => o.selectSubjectOp()); bar.append(b); }
   down(e: ToolEvent) {
@@ -250,9 +252,29 @@ export class WandTool implements Tool {
     const mode = selMode(this.id, e);
     const layer = doc.active;
     const src = app.opt('all', this.id) || !isRaster(layer) ? doc.flatten() : layer.canvas;
-    const res = floodMask(getPixels(src), e.x, e.y, app.opt('tolerance', this.id), app.opt('contiguous', this.id));
+    const px = getPixels(src), n = parseInt(app.opt('sample', this.id)) || 1;
+    const sx = Math.floor(e.x), sy = Math.floor(e.y);
+    if (n > 1 && sx >= 0 && sy >= 0 && sx < px.width && sy < px.height) {
+      // el color de referencia es la media de la zona, no solo el píxel
+      const acc = [0, 0, 0, 0]; let k = 0;
+      for (let y = Math.max(0, sy - (n >> 1)); y <= Math.min(px.height - 1, sy + (n >> 1)); y++) for (let x = Math.max(0, sx - (n >> 1)); x <= Math.min(px.width - 1, sx + (n >> 1)); x++) { const i = (y * px.width + x) * 4; for (let c = 0; c < 4; c++) acc[c] += px.data[i + c]; k++; }
+      const i = (sy * px.width + sx) * 4; for (let c = 0; c < 4; c++) px.data[i + c] = acc[c] / k;
+    }
+    const res = floodMask(px, e.x, e.y, app.opt('tolerance', this.id), app.opt('contiguous', this.id));
     if (!res) { if (mode === 'new') { doc.selection.clear(); doc.commit('Deseleccionar'); } return; }
-    doc.selection.combineCanvas(mode, res.canvas);
+    let m = res.canvas;
+    if (app.opt('antialias', this.id) !== false) {
+      // bordes suavizados: los píxeles de fuera que tocan el borde quedan a medias (según cuántos vecinos estén dentro)
+      const c = makeCanvas(m.width, m.height), x = ctx2d(c), W = m.width, H = m.height;
+      const md = ctx2d(m).getImageData(0, 0, W, H), d = x.createImageData(W, H), A = md.data, O = d.data;
+      for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
+        const i = (y * W + xx) * 4; if (A[i + 3] >= 128) { O[i + 3] = 255; continue; }
+        let n = 0; if (xx > 0 && A[i - 1] >= 128) n++; if (xx < W - 1 && A[i + 7] >= 128) n++; if (y > 0 && A[i - W * 4 + 3] >= 128) n++; if (y < H - 1 && A[i + W * 4 + 3] >= 128) n++;
+        O[i + 3] = n ? Math.min(160, 64 * n) : 0;
+      }
+      x.putImageData(d, 0, 0); m = c;
+    }
+    doc.selection.combineCanvas(mode, m);
     doc.commit('Varita mágica');
   }
 }

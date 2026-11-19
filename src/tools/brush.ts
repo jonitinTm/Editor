@@ -30,6 +30,40 @@ const BLEND = { key: 'blendMode', label: 'Modo', type: 'select' as const, defaul
   { value: 'soft-light', label: 'Luz suave' }, { value: 'hard-light', label: 'Luz fuerte' }, { value: 'color-dodge', label: 'Sobreexponer color' }, { value: 'color-burn', label: 'Subexponer color' },
   { value: 'darken', label: 'Oscurecer' }, { value: 'lighten', label: 'Aclarar' }, { value: 'difference', label: 'Diferencia' }, { value: 'hue', label: 'Tono' }, { value: 'saturation', label: 'Saturación' },
   { value: 'color', label: 'Color' }, { value: 'luminosity', label: 'Luminosidad' }] };
+const SYM = { key: 'symmetry', label: 'Simetría', type: 'select' as const, default: 'none', choices: [
+  { value: 'none', label: 'Sin simetría' }, { value: 'v', label: 'Vertical (espejo izq./der.)' }, { value: 'h', label: 'Horizontal (arriba/abajo)' }, { value: 'vh', label: 'Doble (4 partes)' },
+  { value: 'r3', label: 'Radial 3' }, { value: 'r4', label: 'Radial 4' }, { value: 'r6', label: 'Radial 6' }, { value: 'r8', label: 'Radial 8' }, { value: 'r12', label: 'Radial 12' },
+  { value: 'm6', label: 'Mandala 6 (radial + espejo)' }, { value: 'm8', label: 'Mandala 8 (radial + espejo)' }] };
+/** Centro de la simetría: el de la selección si hay una, si no el del documento. */
+function symCenter() { const d = app.doc!, b = d.selection.active ? d.selection.bounds : null; return b ? { x: b.x + b.w / 2, y: b.y + b.h / 2 } : { x: d.width / 2, y: d.height / 2 }; }
+/** Puntos simétricos de (x, y) según el modo. */
+export function symPoints(mode: string, x: number, y: number): { x: number; y: number }[] {
+  if (!mode || mode === 'none' || !app.doc) return [{ x, y }];
+  const c = symCenter(), dx = x - c.x, dy = y - c.y;
+  if (mode === 'v') return [{ x, y }, { x: c.x - dx, y }];
+  if (mode === 'h') return [{ x, y }, { x, y: c.y - dy }];
+  if (mode === 'vh') return [{ x, y }, { x: c.x - dx, y }, { x, y: c.y - dy }, { x: c.x - dx, y: c.y - dy }];
+  const n = +mode.slice(1), mirror = mode[0] === 'm', out: { x: number; y: number }[] = [];
+  for (let k = 0; k < n; k++) {
+    const a = k * 2 * Math.PI / n, ca = Math.cos(a), sa = Math.sin(a);
+    out.push({ x: c.x + dx * ca - dy * sa, y: c.y + dx * sa + dy * ca });
+    if (mirror) out.push({ x: c.x - dx * ca - dy * sa, y: c.y - dx * sa + dy * ca });
+  }
+  return out;
+}
+/** Líneas de los ejes de simetría (en coordenadas de pantalla). */
+export function drawSymAxes(ctx: CanvasRenderingContext2D, vp: Viewport, mode: string) {
+  if (!mode || mode === 'none' || !app.doc) return;
+  const c = symCenter(), R = Math.hypot(app.doc.width, app.doc.height);
+  const angs: number[] = mode === 'v' ? [Math.PI / 2] : mode === 'h' ? [0] : mode === 'vh' ? [0, Math.PI / 2] : Array.from({ length: +mode.slice(1) }, (_, k) => k * Math.PI / +mode.slice(1));
+  ctx.save(); ctx.setLineDash([6, 4]); ctx.lineWidth = 1;
+  for (const col of ['rgba(0,0,0,.5)', 'rgba(61,139,253,.9)']) {
+    ctx.strokeStyle = col; ctx.beginPath();
+    for (const a of angs) { const p = vp.toScreen(c.x - Math.cos(a) * R, c.y - Math.sin(a) * R), q = vp.toScreen(c.x + Math.cos(a) * R, c.y + Math.sin(a) * R); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); }
+    ctx.stroke(); ctx.lineDashOffset = 5;
+  }
+  ctx.restore();
+}
 const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, min: 0, max: 500, default: 0, unit: '%' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
@@ -130,7 +164,13 @@ abstract class StrokeTool implements Tool {
     this.target = t;
     const s = strokeSetup(t, this.erase);
     this.stroke = new Stroke(t, s.mode, app.opt<number>('opacity', this.id) / 100, s.maskValue, (s.mode === 'paint' ? app.opt<string>('blendMode', this.id) : undefined) as GlobalCompositeOperation || 'source-over');
-    this.dab = this.makeDab(s.color);
+    const dab0 = this.makeDab(s.color), sym = app.opt<string>('symmetry', this.id) || 'none';
+    // con simetría, cada pincelada se repite en los puntos reflejados o girados
+    this.dab = sym === 'none' ? dab0 : (x: number, y: number, p: number) => {
+      let r: any = null;
+      for (const q of symPoints(sym, x, y)) { const b = dab0(q.x, q.y, p); if (!b) continue; if (!r) r = { ...b }; else { const x1 = Math.max(r.x + r.w, b.x + b.w), y1 = Math.max(r.y + r.h, b.y + b.h); r.x = Math.min(r.x, b.x); r.y = Math.min(r.y, b.y); r.w = x1 - r.x; r.h = y1 - r.y; } }
+      return r;
+    };
     this.sm = { x: e.x, y: e.y, p: e.pressure };
     const sp = this.spacing(e.pressure);
     if (e.shift && this.lastPoint) {
@@ -169,7 +209,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SPACING, ANGLE, ROUND, SCATTER, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, SPACING, ANGLE, ROUND, SCATTER, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
 }
@@ -215,7 +255,7 @@ export function tipPicker(bar: HTMLElement, toolId: string) {
 export class PencilTool extends StrokeTool {
   id = 'pencil'; name = 'Lápiz'; icon = icon('pencil'); key = 'B'; group = 'brush'; historyName = 'Lápiz';
   aliased = true;
-  options = [{ ...SIZE, default: 1 }, OPAC, SMOOTH, { ...PRESS, default: false }] as any[];
+  options = [{ ...SIZE, default: 1 }, OPAC, SMOOTH, SYM, { ...PRESS, default: false }] as any[];
 }
 
 export class EraserTool extends StrokeTool {
@@ -223,6 +263,22 @@ export class EraserTool extends StrokeTool {
   extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
   erase = true;
+  options = [{ key: 'eraseMode', label: 'Modo', type: 'select', default: 'brush', choices: [{ value: 'brush', label: 'Pincel' }, { value: 'pencil', label: 'Lápiz' }, { value: 'block', label: 'Bloque' }] },
+    SIZE, HARD, OPAC, FLOW, SMOOTH, SYM, SPACING, ANGLE, ROUND, SCATTER, PRESS, PRESS_OP] as any[];
+  private mode() { return app.opt<string>('eraseMode', this.id) || 'brush'; }
+  down(e: ToolEvent) { this.aliased = this.mode() !== 'brush'; super.down(e); }
+  protected size(p: number) { return this.mode() === 'block' ? Math.max(1, Math.round(16 / (app.viewport?.zoom || 1))) : super.size(p); }
+  protected makeDab(color: string) {
+    if (this.mode() !== 'block') return super.makeDab(color);
+    // bloque: un cuadrado de 16 píxeles de pantalla, sin suavizado
+    const ctx = ctx2d(this.stroke!.buffer);
+    return (x: number, y: number) => { const s = this.size(1), dx = Math.round(x - s / 2), dy = Math.round(y - s / 2); ctx.globalAlpha = 1; ctx.fillStyle = color; ctx.fillRect(dx, dy, s, s); return { x: dx, y: dy, w: s, h: s }; };
+  }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (this.mode() !== 'block') { super.drawOverlay(ctx, vp); return; }
+    drawSymAxes(ctx, vp, app.opt<string>('symmetry', this.id));
+    const m = vp.mouseScreen; if (!m) return; ctx.save(); ctx.strokeStyle = '#000'; ctx.strokeRect(m.x - 8.5, m.y - 8.5, 17, 17); ctx.strokeStyle = '#fff'; ctx.strokeRect(m.x - 7.5, m.y - 7.5, 15, 15); ctx.restore();
+  }
 }
 
 /** Tampón de clonar: Alt + clic marca el origen; luego se pinta copiando de él. */
@@ -231,7 +287,21 @@ export class CloneTool extends StrokeTool {
   options = [SIZE, { ...HARD, default: 50 }, OPAC, FLOW,
     { key: 'aligned', label: 'Alineado', type: 'checkbox', default: true },
     { key: 'sample', label: 'Muestra', type: 'select', default: 'layer', choices: [{ value: 'layer', label: 'Capa actual' }, { value: 'all', label: 'Todas las capas' }] },
+    { key: 'overlay', label: 'Superposición', type: 'checkbox', default: true },
+    { key: 'srcScale', label: 'Escala', type: 'number', min: 10, max: 400, default: 100, unit: '%', title: 'Escala del origen (Fuente de clonación)' },
+    { key: 'srcAngle', label: 'Ángulo', type: 'number', min: -180, max: 180, default: 0, unit: '°', title: 'Giro del origen' },
+    { key: 'srcFlip', label: 'Voltear', type: 'checkbox', default: false },
   ] as any[];
+  /** Punto donde empezó a pintarse con el origen actual (centro del giro y la escala). */
+  private anchor: { x: number; y: number } | null = null;
+  /** Matriz que lleva el origen al destino, o null si es un simple desplazamiento. */
+  protected srcMatrix(dx: number, dy: number): DOMMatrix | null {
+    const sc = (app.opt<number>('srcScale', this.id) ?? 100) / 100, an = (app.opt<number>('srcAngle', this.id) ?? 0) * Math.PI / 180, fl = !!app.opt('srcFlip', this.id);
+    if (!this.source || !this.anchor || (sc === 1 && an === 0 && !fl)) return null;
+    const m = new DOMMatrix().translate(this.anchor.x - dx, this.anchor.y - dy).rotate(an * 180 / Math.PI).scale(fl ? -sc : sc, sc);
+    const srcPt = { x: this.anchor.x + this.offset!.x, y: this.anchor.y + this.offset!.y };
+    return m.translate(-srcPt.x, -srcPt.y);
+  }
   private source: { x: number; y: number } | null = null;
   protected offset: { x: number; y: number } | null = null;
   protected srcCanvas: HTMLCanvasElement | null = null;
@@ -240,12 +310,12 @@ export class CloneTool extends StrokeTool {
   down(e: ToolEvent) {
     if (e.alt) {
       this.source = { x: e.x, y: e.y }; this.offset = null;
-      app.toast('Origen del tampón fijado'); return;
+      this.anchor = null; app.toast('Origen del tampón fijado'); return;
     }
     if (!this.source) { app.toast('Mantén pulsado Alt y haz clic para elegir el origen', 'warn'); return; }
     const t = getPaintTarget();
     if (!t) return;
-    if (!this.offset || !app.opt('aligned', this.id)) this.offset = { x: this.source.x - e.x, y: this.source.y - e.y };
+    if (!this.offset || !app.opt('aligned', this.id)) { this.offset = { x: this.source.x - e.x, y: this.source.y - e.y }; this.anchor = { x: e.x, y: e.y }; }
     this.srcCanvas = app.opt('sample', this.id) === 'all' ? cloneCanvas(app.doc!.flatten()) : cloneCanvas(t.canvas);
     this.target = t;
     const s = strokeSetup(t, false);
@@ -269,7 +339,9 @@ export class CloneTool extends StrokeTool {
       const sc = ctx2d(scratch);
       const dx = Math.round(x - w / 2), dy = Math.round(y - hh / 2);
       sc.globalCompositeOperation = 'copy';
-      sc.drawImage(this.srcCanvas!, -(dx + this.offset!.x), -(dy + this.offset!.y));
+      const M = this.srcMatrix(dx, dy);
+      if (M) { sc.setTransform(M); sc.drawImage(this.srcCanvas!, 0, 0); sc.setTransform(1, 0, 0, 1, 0, 0); }
+      else sc.drawImage(this.srcCanvas!, -(dx + this.offset!.x), -(dy + this.offset!.y));
       sc.globalCompositeOperation = 'destination-in';
       sc.drawImage(tip, 0, 0);
       ctx.globalAlpha = flow;
@@ -291,6 +363,19 @@ export class CloneTool extends StrokeTool {
     if (this.offset && vp.mouse) p = { x: vp.mouse.x + this.offset.x, y: vp.mouse.y + this.offset.y };
     else if (this.source) p = this.source;
     if (!p) return;
+    // superposición: lo que se copiaría, visto bajo el pincel antes de pintar
+    if (!this.stroke && app.opt('overlay', this.id) !== false && vp.mouse && vp.mouseScreen && this.id === 'clone') {
+      const t = getPaintTarget(), src = t && !t.isMask ? (app.opt('sample', this.id) === 'all' ? app.doc!.getComposite() : t.canvas) : null;
+      if (src) {
+        const r = app.opt<number>('size', this.id) * vp.zoom / 2, m = vp.mouseScreen;
+        ctx.save(); ctx.beginPath(); ctx.arc(m.x, m.y, Math.max(4, r), 0, 7); ctx.clip(); ctx.globalAlpha = 0.6;
+        vp.docTransform(ctx);
+        const off = this.offset ?? { x: p.x - vp.mouse.x, y: p.y - vp.mouse.y };
+        const M = this.offset ? this.srcMatrix(0, 0) : null;
+        if (M) ctx.transform(M.a, M.b, M.c, M.d, M.e, M.f); else ctx.translate(-off.x, -off.y);
+        ctx.drawImage(src, 0, 0); ctx.restore();
+      }
+    }
     const s = vp.toScreen(p.x, p.y);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(s.x - 7, s.y); ctx.lineTo(s.x + 7, s.y); ctx.moveTo(s.x, s.y - 7); ctx.lineTo(s.x, s.y + 7); ctx.stroke();
@@ -488,5 +573,60 @@ export class RemoveTool extends SpotHealTool {
     const out = await inpaintCanvas(t.canvas, g, { x: box.x - 3, y: box.y - 3, w: box.w + 6, h: box.h + 6 });
     if (!out) return;
     const { setTargetCanvas } = await import('./paint'); setTargetCanvas(t, out); d.commit('Quitar');
+  }
+}
+
+/** Pincel histórico artístico: pinta con trazos estilizados cuyo color sale de un estado anterior (efecto de cuadro pintado). */
+export class ArtHistoryBrushTool extends StrokeTool {
+  id = 'artHistory'; name = 'Pincel histórico artístico'; icon = icon('artHistory'); key = 'Y'; group = 'history'; historyName = 'Pincel histórico artístico';
+  options = [{ ...SIZE, default: 6 }, OPAC,
+    { key: 'style', label: 'Estilo', type: 'select', default: 'tight', choices: [
+      { value: 'tight', label: 'Corto y apretado' }, { value: 'medium', label: 'Medio' }, { value: 'long', label: 'Largo' }, { value: 'dab', label: 'Toque' },
+      { value: 'curl', label: 'Rizado' }, { value: 'curlLong', label: 'Rizado largo' }] },
+    { key: 'area', label: 'Área', type: 'range', min: 1, max: 500, default: 50, unit: 'px' },
+    { key: 'tol', label: 'Tolerancia', type: 'range', min: 0, max: 100, default: 0, unit: '%' },
+    { key: 'origin', label: 'Origen', type: 'select', default: 'first', choices: [{ value: 'first', label: 'Estado inicial' }, { value: 'snapshot', label: 'Última instantánea' }] },
+  ] as any[];
+  private src: ImageData | null = null;
+  down(e: ToolEvent) {
+    if (e.alt) return;
+    const d = app.doc!, t = getPaintTarget(); if (!t || t.isMask) return;
+    const useSnap = app.opt('origin', this.id) === 'snapshot' && d.snapshots.length;
+    const snap = useSnap ? d.snapshots[d.snapshots.length - 1].snap : d.history.steps[0]?.snap;
+    const c = snap ? layerCanvasIn(snap, t.layer.id) : null;
+    if (!c) { app.toast('Esta capa no existía en ese estado', 'warn'); return; }
+    this.src = ctx2d(c).getImageData(0, 0, c.width, c.height);
+    super.down(e);
+  }
+  protected spacing() { return Math.max(2, app.opt<number>('size', this.id) * 1.5); }
+  protected makeDab(): (x: number, y: number, p: number) => any {
+    const ctx = ctx2d(this.stroke!.buffer), S = this.src!, W = S.width, H = S.height;
+    const size = Math.max(1, app.opt<number>('size', this.id)), area = app.opt<number>('area', this.id) || 50, style = app.opt<string>('style', this.id) || 'tight';
+    const tol = (app.opt<number>('tol', this.id) ?? 0) / 100 * 255 * 3;
+    const cur = ctx2d(this.target!.canvas).getImageData(0, 0, this.target!.canvas.width, this.target!.canvas.height).data;
+    const len = { tight: 2, medium: 4, long: 8, dab: 0.6, curl: 3, curlLong: 6 }[style] ?? 2;
+    const count = Math.max(1, Math.round(area / (size * 3)));
+    const col = (x: number, y: number) => { const i = (Math.max(0, Math.min(H - 1, y | 0)) * W + Math.max(0, Math.min(W - 1, x | 0))) * 4; return [S.data[i], S.data[i + 1], S.data[i + 2], S.data[i + 3], i] as const; };
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    return (x: number, y: number) => {
+      let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (let k = 0; k < count; k++) {
+        const r = Math.sqrt(Math.random()) * area / 2, a = Math.random() * Math.PI * 2, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+        const [cr, cg, cb, ca, i] = col(px, py); if (ca < 8) continue;
+        // con tolerancia, solo se pinta donde el estado actual se diferencia del origen
+        if (tol > 0 && Math.abs(cur[i] - cr) + Math.abs(cur[i + 1] - cg) + Math.abs(cur[i + 2] - cb) < tol) continue;
+        // los trazos siguen el borde: dirección perpendicular al gradiente del origen
+        const [lr] = col(px - 2, py), [rr] = col(px + 2, py), [ur] = col(px, py - 2), [dr] = col(px, py + 2);
+        const gx = rr - lr, gy = dr - ur, dir = gx || gy ? Math.atan2(gy, gx) + Math.PI / 2 : Math.random() * Math.PI * 2;
+        const L = size * len * (0.6 + Math.random() * 0.8), ex = px + Math.cos(dir) * L, ey = py + Math.sin(dir) * L;
+        ctx.globalAlpha = 1; ctx.strokeStyle = `rgba(${cr},${cg},${cb},${ca / 255})`; ctx.lineWidth = size * (0.6 + Math.random() * 0.5);
+        ctx.beginPath(); ctx.moveTo(px, py);
+        if (style.startsWith('curl')) { const n = Math.cos(dir + Math.PI / 2) * L * 0.8, m = Math.sin(dir + Math.PI / 2) * L * 0.8; ctx.bezierCurveTo(px + n, py + m, ex + n, ey + m, ex - n * 0.3, ey - m * 0.3); }
+        else { const bend = (Math.random() - 0.5) * L * 0.4; ctx.quadraticCurveTo((px + ex) / 2 - Math.sin(dir) * bend, (py + ey) / 2 + Math.cos(dir) * bend, ex, ey); }
+        ctx.stroke();
+        const m = L + size * 2; x0 = Math.min(x0, px - m); y0 = Math.min(y0, py - m); x1 = Math.max(x1, px + m); y1 = Math.max(y1, py + m);
+      }
+      return x1 < x0 ? null : { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    };
   }
 }

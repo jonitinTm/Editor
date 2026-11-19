@@ -6,9 +6,10 @@ import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import { GroupLayer, Layer, RasterLayer, isRaster, isParametric, walkLayers } from '../core/layers';
-import { selectedLayers, alignLayer, distributeLayers } from '../ui/ops';
+import { selectedLayers, alignLayer, distributeLayers, layerBox } from '../ui/ops';
 import { snapRect, snapTargets, layerBounds, clearSnap } from './snap';
 import type { Rect } from '../core/canvas';
+import type { Viewport } from '../ui/viewport';
 import { rasterizeLayer } from './paint';
 
 /** Desplaza el contenido de un lienzo (los bordes que quedan vacíos se rellenan con `fill`). */
@@ -32,8 +33,26 @@ function layerAt(x: number, y: number): RasterLayer | null {
 }
 
 export class MoveTool implements Tool {
-  id = 'move'; name = 'Mover'; icon = icon('move'); key = 'V'; cursor = 'move';
-  options = [{ key: 'autoSelect', label: 'Selección automática de capa', type: 'checkbox', default: false }] as any[];
+  id = 'move'; name = 'Mover'; icon = icon('move'); key = 'V'; group = 'move'; cursor = 'move';
+  options = [{ key: 'autoSelect', label: 'Selección automática de capa', type: 'checkbox', default: false },
+    { key: 'showTransform', label: 'Mostrar controles de transformación', type: 'checkbox', default: false }] as any[];
+  private boxCache: { l: Layer; v: number; b: Rect | null } | null = null;
+  /** Caja del contenido de la capa activa (para los controles de transformación). */
+  private activeBox(): Rect | null {
+    const l = app.doc?.active; if (!l || !isRaster(l)) return null;
+    const v = (l as any).version ?? 0;
+    if (!this.boxCache || this.boxCache.l !== l || this.boxCache.v !== v) this.boxCache = { l, v, b: layerBox(l) };
+    return this.boxCache.b;
+  }
+  private handleHit(e: ToolEvent) {
+    if (!app.opt('showTransform', this.id)) return false;
+    const b = this.activeBox(); if (!b) return false;
+    const vp = app.viewport;
+    for (const [x, y] of [[b.x, b.y], [b.x + b.w / 2, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h / 2], [b.x + b.w, b.y + b.h], [b.x + b.w / 2, b.y + b.h], [b.x, b.y + b.h], [b.x, b.y + b.h / 2]]) {
+      const s = vp.toScreen(x, y); if (Math.abs(s.x - e.sx) < 8 && Math.abs(s.y - e.sy) < 8) return true;
+    }
+    return false;
+  }
   extraOptions(bar: HTMLElement) {
     const sep = document.createElement('span'); sep.className = 'opt-sep'; bar.append(sep);
     const lbl = document.createElement('span'); lbl.className = 'lbl hint'; lbl.textContent = 'Alinear:'; bar.append(lbl);
@@ -61,6 +80,8 @@ export class MoveTool implements Tool {
 
   down(e: ToolEvent) {
     const doc = app.doc!;
+    // con los controles visibles, tirar de un tirador pasa directamente a Transformación libre
+    if (this.handleHit(e)) { app.setTool('transform', true); if (app.tool?.id === 'transform') app.tool.down?.(e); return; }
     // Doble clic sobre un texto: se pasa a editarlo (como en los editores profesionales)
     if (e.detail >= 2) {
       const hit = layerAt(e.x, e.y), l = hit instanceof TextLayer ? hit : doc.active instanceof TextLayer && doc.active.bounds && (() => { const b = (doc.active as TextLayer).bounds(); return e.x >= b.x && e.x <= b.x + b.w && e.y >= b.y && e.y <= b.y + b.h; })() ? doc.active : null;
@@ -172,6 +193,15 @@ export class MoveTool implements Tool {
   }
 
   up() { clearSnap(); if (this.start) this.finish(); }
+  hover(e: ToolEvent) { this.cursor = this.handleHit(e) ? 'nwse-resize' : 'move'; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (!app.opt('showTransform', this.id) || this.start) return;
+    const b = this.activeBox(); if (!b) return;
+    const a = vp.toScreen(b.x, b.y), c = vp.toScreen(b.x + b.w, b.y + b.h);
+    ctx.save(); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1; ctx.strokeRect(Math.round(a.x) + .5, Math.round(a.y) + .5, Math.round(c.x - a.x), Math.round(c.y - a.y));
+    for (const [x, y] of [[a.x, a.y], [(a.x + c.x) / 2, a.y], [c.x, a.y], [c.x, (a.y + c.y) / 2], [c.x, c.y], [(a.x + c.x) / 2, c.y], [a.x, c.y], [a.x, (a.y + c.y) / 2]]) { ctx.fillStyle = '#fff'; ctx.fillRect(x - 4, y - 4, 8, 8); ctx.strokeRect(x - 4, y - 4, 8, 8); }
+    ctx.restore();
+  }
   cancel() {
     const doc = app.doc; if (!doc) { this.layers = []; this.start = null; this.floating = null; return; }
     for (const l of this.layers) doc.overrides.delete(l);

@@ -37,6 +37,8 @@ export class PenTool implements Tool {
     { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
     { key: 'strokeColor', type: 'color', default: '#000000' },
     { key: 'strokeWidth', label: 'Grosor', type: 'range', min: 1, max: 200, default: 4, unit: 'px' },
+    { key: 'autoAdd', label: 'Añadir/eliminar automáticamente', type: 'checkbox', default: true },
+    { key: 'rubber', label: 'Banda elástica', type: 'checkbox', default: true },
   ] as any[];
   protected pts: PathPoint[] = [];
   protected dragging = false;
@@ -48,6 +50,8 @@ export class PenTool implements Tool {
     bar.append(h('span', { class: 'hint' }, 'Clic: punto recto · Arrastrar: curva · Clic en el primer punto: cerrar · Intro: terminar · Retroceso: quitar punto'));
   }
   down(e: ToolEvent) {
+    // sin trazado en curso: clic sobre el trazado de la capa = añadir punto; sobre un punto = quitarlo
+    if (!this.pts.length && this.id === 'pen' && app.opt('autoAdd', this.id) !== false && (app as any).penAutoEdit?.(e)) return;
     if (this.pts.length >= 2) {
       const f = app.viewport.toScreen(this.pts[0].x, this.pts[0].y);
       if (Math.hypot(f.x - e.sx, f.y - e.sy) < 8) { this.finish(true); return; }
@@ -98,7 +102,7 @@ export class PenTool implements Tool {
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     if (!this.pts.length) return;
     drawPathOverlay(ctx, vp, this.pts, false, this.pts.length - 1);
-    if (vp.mouseScreen && !this.dragging) { // línea elástica hasta el cursor
+    if (vp.mouseScreen && !this.dragging && app.opt('rubber', this.id) !== false) { // línea elástica hasta el cursor
       const l = this.pts[this.pts.length - 1], a = vp.toScreen(l.x, l.y), c = vp.toScreen(l.ox, l.oy);
       ctx.strokeStyle = 'rgba(61,139,253,.6)'; ctx.setLineDash([4, 3]); ctx.beginPath(); ctx.moveTo(a.x, a.y);
       ctx.bezierCurveTo(c.x, c.y, vp.mouseScreen.x, vp.mouseScreen.y, vp.mouseScreen.x, vp.mouseScreen.y); ctx.stroke(); ctx.setLineDash([]);

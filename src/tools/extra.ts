@@ -280,3 +280,72 @@ export class CountTool implements Tool {
     this.paint(ctx, this.list().map(p => vp.toScreen(p.x, p.y)), vp.zoom);
   }
 }
+
+// ---- Notas ------------------------------------------------------------------
+export type Note = { x: number; y: number; text: string; author: string; color: string; date: number };
+const notesOf = (): Note[] => { const d = app.doc as any; if (!d) return []; if (!d.notes) d.notes = []; return d.notes; };
+/** Dibuja las notas como pequeños papeles amarillos (se ven con cualquier herramienta; se guardan en el proyecto). */
+export function drawNotes(ctx: CanvasRenderingContext2D, vp: Viewport, active = -1) {
+  const L = (app.doc as any)?.notes as Note[] | undefined; if (!L?.length) return;
+  ctx.save();
+  L.forEach((n, i) => {
+    const s = vp.toScreen(n.x, n.y), x = Math.round(s.x), y = Math.round(s.y);
+    ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(x + 2, y + 2, 16, 18);
+    ctx.fillStyle = n.color || '#ffd84d'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 16, y); ctx.lineTo(x + 16, y + 13); ctx.lineTo(x + 11, y + 18); ctx.lineTo(x, y + 18); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = i === active ? '#3d8bfd' : 'rgba(0,0,0,.6)'; ctx.lineWidth = i === active ? 2 : 1; ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.lineWidth = 1; ctx.beginPath(); for (const k of [5, 9, 13]) { ctx.moveTo(x + 3, y + k + .5); ctx.lineTo(x + 13, y + k + .5); } ctx.stroke();
+  });
+  ctx.restore();
+}
+(app as any).drawNotes = drawNotes;
+
+/** Nota: clic para poner una nota de texto sobre la imagen; clic en una nota para leerla o editarla; arrastrar para moverla. */
+export class NoteTool implements Tool {
+  id = 'note'; name = 'Nota'; icon = icon('note'); key = 'I'; group = 'eyedropper'; cursor = 'crosshair';
+  options = [
+    { key: 'color', label: 'Color', type: 'color', default: '#ffd84d' },
+  ] as any[];
+  private active = -1; private drag: { i: number; dx: number; dy: number; moved: boolean } | null = null;
+  private pop: HTMLElement | null = null;
+  extraOptions(bar: HTMLElement) {
+    const who = h('input', { type: 'text', class: 'num', value: localStorage.getItem('editor.noteAuthor') ?? '', placeholder: 'Tu nombre' }) as HTMLInputElement;
+    who.style.width = '110px'; who.oninput = () => { try { localStorage.setItem('editor.noteAuthor', who.value); } catch { /* */ } };
+    bar.append(h('label', { class: 'opt' }, h('span', { class: 'lbl' }, 'Autor'), who),
+      h('span', { class: 'hint' }, `Notas: ${notesOf().length} · clic: nueva o abrir · arrastrar: mover`),
+      h('button', { class: 'btn', onclick: () => { if (!app.doc) return; (app.doc as any).notes = []; this.close(); app.doc.changed(); app.viewport.requestRender(); } }, 'Borrar todas'));
+  }
+  private hit(e: ToolEvent) { const L = notesOf(); for (let i = L.length - 1; i >= 0; i--) { const s = app.viewport.toScreen(L[i].x, L[i].y); if (e.sx >= s.x - 2 && e.sx <= s.x + 18 && e.sy >= s.y - 2 && e.sy <= s.y + 20) return i; } return -1; }
+  down(e: ToolEvent) {
+    const k = this.hit(e);
+    if (k >= 0) { const n = notesOf()[k]; this.drag = { i: k, dx: e.x - n.x, dy: e.y - n.y, moved: false }; return; }
+    this.close();
+    let author = ''; try { author = localStorage.getItem('editor.noteAuthor') ?? ''; } catch { /* */ }
+    notesOf().push({ x: Math.round(e.x), y: Math.round(e.y), text: '', author, color: app.opt<string>('color', this.id) || '#ffd84d', date: Date.now() });
+    this.open(notesOf().length - 1, true);
+  }
+  move(e: ToolEvent) { const g = this.drag; if (!g) return; const n = notesOf()[g.i]; n.x = Math.round(e.x - g.dx); n.y = Math.round(e.y - g.dy); g.moved = true; this.close(); app.viewport.requestRender(); }
+  up() { const g = this.drag; this.drag = null; if (!g) return; if (g.moved) app.doc!.changed(); else this.open(g.i, false); }
+  private open(i: number, isNew: boolean) {
+    this.close(); this.active = i; const n = notesOf()[i]; if (!n) return;
+    const ta = h('textarea', { placeholder: 'Escribe la nota…' }) as HTMLTextAreaElement; ta.value = n.text;
+    ta.addEventListener('keydown', ev => { ev.stopPropagation(); if (ev.key === 'Escape') this.close(); });
+    ta.oninput = () => { n.text = ta.value; };
+    const meta = `${n.author || 'Sin autor'} · ${new Date(n.date).toLocaleString()}`;
+    const pop = h('div', { class: 'note-pop' },
+      h('div', { class: 'note-head' }, h('span', {}, meta),
+        h('button', { class: 'btn', title: 'Borrar esta nota', onclick: () => { notesOf().splice(i, 1); this.close(); app.doc!.changed(); } }, 'Borrar'),
+        h('button', { class: 'btn', title: 'Cerrar', html: icon('close'), onclick: () => this.close() })), ta);
+    const s = app.viewport.toScreen(n.x, n.y); pop.style.left = (s.x + 22) + 'px'; pop.style.top = s.y + 'px';
+    app.viewport.canvas.parentElement!.append(pop); this.pop = pop; (pop as any).isNew = isNew;
+    setTimeout(() => ta.focus(), 0); app.viewport.requestRender();
+  }
+  private close() {
+    if (!this.pop) return; const n = notesOf()[this.active];
+    if (n && !n.text.trim() && (this.pop as any).isNew) notesOf().splice(this.active, 1);
+    this.pop.remove(); this.pop = null; this.active = -1; app.doc?.changed(); app.viewport?.requestRender();
+  }
+  deactivate() { this.close(); }
+  docChanged() { if (this.pop) { this.pop.remove(); this.pop = null; this.active = -1; } }
+  cancel() { this.close(); }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) { drawNotes(ctx, vp, this.active); }
+}

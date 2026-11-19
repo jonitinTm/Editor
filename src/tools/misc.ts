@@ -64,6 +64,20 @@ export class BucketTool implements Tool {
   }
 }
 
+/** Degradados predefinidos (posición, color, opacidad). */
+export const GRAD_PRESETS: Record<string, { name: string; stops: [number, string, number?][] }> = {
+  spectrum: { name: 'Espectro', stops: [[0, '#ff0000'], [0.17, '#ffff00'], [0.33, '#00ff00'], [0.5, '#00ffff'], [0.67, '#0000ff'], [0.83, '#ff00ff'], [1, '#ff0000']] },
+  chrome: { name: 'Cromado', stops: [[0, '#2b3a4a'], [0.45, '#ffffff'], [0.5, '#5e4a33'], [0.7, '#c9a77c'], [1, '#ffffff']] },
+  copper: { name: 'Cobre', stops: [[0, '#97462a'], [0.35, '#f2c9a0'], [0.65, '#8a3d22'], [1, '#f0d0b0']] },
+  gold: { name: 'Oro', stops: [[0, '#8a6212'], [0.3, '#f8e08e'], [0.6, '#b8862b'], [1, '#fff3c4']] },
+  sunset: { name: 'Puesta de sol', stops: [[0, '#2c1450'], [0.45, '#d9455f'], [0.75, '#f79a3e'], [1, '#ffe28a']] },
+  violetOrange: { name: 'Violeta → Naranja', stops: [[0, '#5a1aa0'], [1, '#ff8a00']] },
+  blueYellow: { name: 'Azul → Amarillo', stops: [[0, '#0a3bd6'], [1, '#ffe600']] },
+  sea: { name: 'Mar', stops: [[0, '#012a4a'], [0.5, '#2a9dc2'], [1, '#bdf0ff']] },
+  pastel: { name: 'Pastel', stops: [[0, '#ffb3c6'], [0.5, '#b8c0ff'], [1, '#b9fbc0']] },
+  stripes: { name: 'Bandas transparentes', stops: [[0, '#000000', 1], [0.2, '#000000', 1], [0.2, '#000000', 0], [0.4, '#000000', 0], [0.4, '#000000', 1], [0.6, '#000000', 1], [0.6, '#000000', 0], [0.8, '#000000', 0], [0.8, '#000000', 1], [1, '#000000', 1]] },
+};
+
 export class GradientTool implements Tool {
   id = 'gradient'; name = 'Degradado'; icon = icon('gradient'); key = 'G'; group = 'fill'; cursor = 'crosshair';
   options = [
@@ -71,10 +85,12 @@ export class GradientTool implements Tool {
       { value: 'linear', label: 'Lineal' }, { value: 'radial', label: 'Radial' }, { value: 'angle', label: 'Angular' },
       { value: 'reflected', label: 'Reflejado' }, { value: 'diamond', label: 'Diamante' }] },
     { key: 'colors', label: 'Colores', type: 'select', default: 'fgbg', choices: [
-      { value: 'fgbg', label: 'Frontal → Fondo' }, { value: 'fgtrans', label: 'Frontal → Transparente' }, { value: 'custom', label: 'Personalizado' }] },
+      { value: 'fgbg', label: 'Frontal → Fondo' }, { value: 'fgtrans', label: 'Frontal → Transparente' }, { value: 'bw', label: 'Negro → Blanco' },
+      ...Object.entries(GRAD_PRESETS).map(([value, g]) => ({ value, label: g.name })), { value: 'custom', label: 'Personalizado' }] },
     { key: 'blendMode', label: 'Modo', type: 'select', default: 'source-over', choices: [{ value: 'source-over', label: 'Normal' }, { value: 'destination-over', label: 'Detrás' }, { value: 'multiply', label: 'Multiplicar' }, { value: 'screen', label: 'Trama' }, { value: 'overlay', label: 'Superponer' }, { value: 'soft-light', label: 'Luz suave' }, { value: 'color', label: 'Color' }, { value: 'luminosity', label: 'Luminosidad' }, { value: 'difference', label: 'Diferencia' }] },
     { key: 'opacity', label: 'Opacidad', type: 'range', min: 1, max: 100, default: 100, unit: '%' },
     { key: 'reverse', label: 'Invertir', type: 'checkbox', default: false },
+    { key: 'dither', label: 'Tramado', type: 'checkbox', default: true },
   ] as any[];
   extraOptions(bar: HTMLElement) {
     const prev = document.createElement('canvas'); prev.width = 120; prev.height = 18; prev.className = 'grad-prev';
@@ -88,7 +104,10 @@ export class GradientTool implements Tool {
   stops(forMask: boolean): GradStop[] {
     const mode = app.opt('colors', this.id);
     let st: GradStop[] = mode === 'custom' && Array.isArray(app.opt('stops', this.id)) ? app.opt<GradStop[]>('stops', this.id).map(x => ({ ...x }))
-      : mode === 'fgtrans' ? [{ t: 0, color: app.fg, a: 1 }, { t: 1, color: app.fg, a: 0 }] : [{ t: 0, color: app.fg, a: 1 }, { t: 1, color: app.bg, a: 1 }];
+      : mode === 'fgtrans' ? [{ t: 0, color: app.fg, a: 1 }, { t: 1, color: app.fg, a: 0 }]
+      : mode === 'bw' ? [{ t: 0, color: '#000000', a: 1 }, { t: 1, color: '#ffffff', a: 1 }]
+      : GRAD_PRESETS[mode as string] ? GRAD_PRESETS[mode as string].stops.map(([t, color, a]) => ({ t, color, a: a ?? 1 }))
+      : [{ t: 0, color: app.fg, a: 1 }, { t: 1, color: app.bg, a: 1 }];
     if (forMask) st = st.map(x => { const [r, g, b] = hexToRgb(x.color); return { t: x.t, color: '#ffffff', a: x.a * (0.299 * r + 0.587 * g + 0.114 * b) / 255 }; });
     if (app.opt('reverse', this.id)) st = st.map(x => ({ ...x, t: 1 - x.t }));
     return st.sort((p, q) => p.t - q.t);
@@ -135,6 +154,12 @@ export class GradientTool implements Tool {
       if (type === 'reflected') for (const st of stops) { grad.addColorStop(0.5 + st.t / 2, rgba(st)); grad.addColorStop(0.5 - st.t / 2, rgba(st)); }
       else for (const st of stops) grad.addColorStop(st.t, rgba(st));
       ctx.fillStyle = grad; ctx.fillRect(0, 0, doc.width, doc.height);
+    }
+    // tramado: un poco de ruido para que no salgan bandas en degradados suaves
+    if (app.opt('dither', this.id) !== false && doc.width * doc.height <= 16e6) {
+      const id = ctx.getImageData(0, 0, doc.width, doc.height), o = id.data; let sd = 12345;
+      for (let i = 0; i < o.length; i += 4) { if (!o[i + 3]) continue; sd = (sd * 1103515245 + 12345) & 0x7fffffff; const n = ((sd >> 16) & 3) - 1.5; o[i] += n; o[i + 1] += n; o[i + 2] += n; }
+      ctx.putImageData(id, 0, 0);
     }
     const op = app.opt<number>('opacity', this.id) / 100;
     if (t.isMask) {
@@ -192,13 +217,25 @@ export class EyedropperTool implements Tool {
     { key: 'sampleSize', label: 'Muestra', type: 'select', default: '1', choices: [
       { value: '1', label: 'Punto' }, { value: '3', label: 'Media 3×3' }, { value: '5', label: 'Media 5×5' }, { value: '11', label: 'Media 11×11' }] },
     { key: 'source', label: 'De', type: 'select', default: 'all', choices: [
-      { value: 'all', label: 'Todas las capas' }, { value: 'layer', label: 'Capa actual' }] },
+      { value: 'all', label: 'Todas las capas' }, { value: 'layer', label: 'Capa actual' }, { value: 'below', label: 'Actual y por debajo' }] },
+    { key: 'ring', label: 'Mostrar anillo de muestra', type: 'checkbox', default: true },
   ] as any[];
   private alt = false;
+  /** Anillo: arriba el color nuevo, abajo el que había antes. */
+  private ring: { sx: number; sy: number; now: string; before: string } | null = null;
+  private belowCache: HTMLCanvasElement | null = null;
   private pick(e: ToolEvent) {
     const doc = app.doc!;
     const l = doc.activeRaster();
-    const src = app.opt('source', this.id) === 'layer' && l ? l.canvas : doc.getComposite();
+    const srcOpt = app.opt('source', this.id);
+    let src: HTMLCanvasElement = srcOpt === 'layer' && l ? l.canvas : doc.getComposite();
+    if (srcOpt === 'below' && this.belowCache) src = this.belowCache;
+    else if (srcOpt === 'below' && doc.active) {
+      // se combinan solo la capa actual y las que tiene debajo (ocultando temporalmente las de encima)
+      const all = doc.allLayers(), idx = all.indexOf(doc.active), above = all.slice(idx + 1).filter(x => x.visible && !all.slice(0, idx + 1).some(y => (y as any).parent === x));
+      above.forEach(x => x.visible = false);
+      try { doc.invalidate(); src = this.belowCache = cloneCanvas(doc.getComposite()); } finally { above.forEach(x => x.visible = true); doc.invalidate(); }
+    }
     const n = parseInt(app.opt('sampleSize', this.id)) || 1;
     const x0 = Math.floor(e.x) - (n >> 1), y0 = Math.floor(e.y) - (n >> 1);
     if (Math.floor(e.x) < 0 || Math.floor(e.y) < 0 || e.x >= doc.width || e.y >= doc.height) return;
@@ -207,10 +244,27 @@ export class EyedropperTool implements Tool {
     for (let i = 0; i < d.length; i += 4) { const al = d[i + 3]; r += d[i] * al; g += d[i + 1] * al; b += d[i + 2] * al; a += al; }
     if (a === 0) return;
     const hex = rgbToHex(r / a, g / a, b / a);
+    if (this.ring) { this.ring.now = hex; this.ring.sx = e.sx; this.ring.sy = e.sy; app.viewport.requestRender(); }
     if (this.alt) app.setColors(app.fg, hex); else app.setColors(hex, app.bg);
   }
-  down(e: ToolEvent) { this.alt = e.alt; this.pick(e); }
+  down(e: ToolEvent) {
+    this.alt = e.alt;
+    if (app.opt('ring', this.id) !== false) this.ring = { sx: e.sx, sy: e.sy, now: this.alt ? app.bg : app.fg, before: this.alt ? app.bg : app.fg };
+    this.pick(e);
+  }
   move(e: ToolEvent) { this.pick(e); }
+  up() { this.ring = null; this.belowCache = null; app.viewport.requestRender(); }
+  cancel() { this.ring = null; this.belowCache = null; }
+  drawOverlay(ctx: CanvasRenderingContext2D) {
+    const r = this.ring; if (!r) return;
+    const R = 46, w = 16;
+    ctx.save(); ctx.lineWidth = w;
+    ctx.strokeStyle = r.now; ctx.beginPath(); ctx.arc(r.sx, r.sy, R, Math.PI, 0); ctx.stroke();
+    ctx.strokeStyle = r.before; ctx.beginPath(); ctx.arc(r.sx, r.sy, R, 0, Math.PI); ctx.stroke();
+    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(128,128,128,.9)';
+    ctx.beginPath(); ctx.arc(r.sx, r.sy, R - w / 2, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(r.sx, r.sy, R + w / 2, 0, 7); ctx.stroke();
+    ctx.restore();
+  }
 }
 
 export class HandTool implements Tool {

@@ -30,6 +30,8 @@ export class TextTool implements Tool {
     cp.onclick = () => import('../ui/actions').then(m => m.actionById.get('panel:Carácter')?.run());
     bar.append(b, cp);
   }
+  /** Texto vertical (columnas de arriba abajo). */
+  protected vertical = false;
   /** Clic: texto de punto. Arrastrar: caja de texto de párrafo. */
   private dragStart: { x: number; y: number } | null = null;
   private dragNow: { x: number; y: number } | null = null;
@@ -151,6 +153,7 @@ export class TextTool implements Tool {
       x: Math.round(box ? Math.min(a.x, b.x) : a.x), y: Math.round(box ? Math.min(a.y, b.y) : a.y - size * 0.6),
       boxWidth: box ? Math.round(box) : undefined,
     });
+    if (this.vertical) { const lp = layer.props; lp.vertical = true; lp.boxWidth = undefined; lp.x = Math.round(a.x + size * lp.lineHeight / 2); lp.y = Math.round(a.y); layer.render(); }
     doc.insertAboveActive(layer);
     this.startEditing(layer, true);
     doc.changed();
@@ -198,6 +201,7 @@ export class TextTool implements Tool {
     s.fontFamily = JSON.stringify(tp.font) + ', sans-serif'; s.fontWeight = tp.bold ? 'bold' : 'normal'; s.fontStyle = tp.italic ? 'italic' : 'normal';
     s.letterSpacing = (tp.tracking ?? 0) / 1000 * tp.size * z + 'px'; s.lineHeight = String(tp.lineHeight); s.textTransform = tp.caps ? 'uppercase' : 'none';
     s.textAlign = tp.align; s.whiteSpace = tp.boxWidth ? 'pre-wrap' : 'pre';
+    s.writingMode = tp.vertical ? 'vertical-rl' : '';
     if (tp.boxWidth) s.width = tp.boxWidth * z + 6 + 'px';
   }
 
@@ -257,4 +261,15 @@ export class TypeMaskTool extends TextTool {
     }
     doc.invalidate(); doc.commit('Máscara de texto');
   }
+}
+
+/** Texto vertical: igual que Texto, pero las letras van de arriba abajo y las líneas de derecha a izquierda. */
+export class VerticalTextTool extends TextTool {
+  id = 'textV'; name = 'Texto vertical'; icon = icon('textV');
+  protected vertical = true;
+}
+/** Máscara de texto vertical. */
+export class VerticalTypeMaskTool extends TypeMaskTool {
+  id = 'typeMaskV'; name = 'Máscara de texto vertical'; icon = icon('typeMaskV');
+  protected vertical = true;
 }

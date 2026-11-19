@@ -317,6 +317,32 @@ Ya disponible:
   selección (nueva, añadir, restar o intersecar).
 - **Recuento** (con el cuentagotas, `I`): cada clic pone un número para contar objetos; Alt+clic quita; «Pasar a capa»
   los dibuja en una capa para exportarlos.
+- **Texto vertical** y **Máscara de texto vertical** (con el Texto, `T`): las letras van de arriba abajo y cada línea es
+  una columna.
+- **Notas** (con el cuentagotas, `I`): pega notas amarillas sobre la imagen con autor y fecha; clic para leerlas o
+  editarlas, arrastrar para moverlas. Se guardan en el proyecto (.edp), igual que los recuentos y los puntos de muestra.
+- **Pintar con simetría** (Pincel, Lápiz y Borrador): espejo vertical, horizontal o doble, radial de 3 a 12 partes y
+  mandala. El centro es el de la selección si hay una, si no el del documento; los ejes se ven mientras pintas.
+- **Borrador en modo Pincel, Lápiz o Bloque** (cuadrado fijo de 16 píxeles de pantalla).
+- **Pincel histórico artístico** (con el pincel de historia, `Y`): pinta trazos estilizados (corto, medio, largo, toque,
+  rizado…) con los colores de un estado anterior; los trazos siguen los bordes de la foto. Da efecto de cuadro pintado.
+- **Mesa de trabajo** (con Mover, `V`): arrastra en un hueco para crear una mesa (o elige un tamaño: Instagram, historia,
+  Full HD, móvil, web, A4…) y tira de sus tiradores para cambiar su tamaño.
+- **Mover › Mostrar controles de transformación**: se ve la caja de la capa con tiradores; al tirar de uno pasas a
+  Transformación libre (Intro aplica y vuelves a Mover).
+- **Degradados predefinidos**: negro → blanco, espectro, cromado, cobre, oro, puesta de sol, mar, pastel, bandas
+  transparentes…, y *Tramado* para que no salgan bandas.
+- **Formas con línea discontinua, punteada o de raya y punto** (opción *Línea* de la herramienta Forma y del panel
+  Propiedades).
+- **Ajustes predefinidos de herramienta**: el icono de la herramienta, a la izquierda de la barra de opciones, abre una lista
+  de ajustes (aerógrafo suave, tinta dura, rotulador, acuarela, mandala…, borradores, recortes para redes, títulos) y
+  permite guardar las opciones actuales con un nombre o volver a las de serie.
+- **Cuentagotas**: anillo de muestra (arriba el color nuevo, abajo el anterior) y muestreo «Actual y por debajo».
+- **Tampón de clonar**: superposición (ves bajo el pincel lo que vas a copiar) y origen con escala, ángulo y volteo,
+  para clonar más grande, girado o en espejo.
+- **Pluma**: «Añadir/eliminar automáticamente» (clic en el trazado de la capa añade un punto; en un punto lo quita) y
+  banda elástica opcional.
+- **Varita mágica**: muestra de un punto o media de 3×3, 5×5 u 11×11, y bordes suavizados.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

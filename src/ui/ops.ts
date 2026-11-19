@@ -697,7 +697,7 @@ export function colorRange(tolerance: number, record: boolean, kind: RangeKind =
 
 type AlignMode = 'left' | 'hcenter' | 'right' | 'top' | 'vcenter' | 'bottom';
 /** Caja del contenido de una capa (coordenadas del documento). */
-function layerBox(l: Layer): Rect | null {
+export function layerBox(l: Layer): Rect | null {
   if (!isRaster(l)) return null;
   const f = l.fullContent(), cb = contentBounds(f.canvas); if (!cb) return null;
   return { x: cb.x + f.x, y: cb.y + f.y, w: cb.w, h: cb.h };
@@ -1265,6 +1265,27 @@ function hasTransparency(c: HTMLCanvasElement) {
 export const artboards = (d: EditorDocument) => d.root.children.filter((l): l is GroupLayer => l instanceof GroupLayer && !!l.artboard);
 
 /** Capa › Nueva mesa de trabajo: se coloca a la derecha de las que haya (el lienzo crece si hace falta). */
+/** Mesa de trabajo nueva en un sitio concreto (herramienta Mesa de trabajo). */
+export function newArtboardAt(r: Rect, bg: string | null = '#ffffff') {
+  const d = doc(); if (!d) return;
+  let boards = artboards(d);
+  if (!boards.length && d.root.children.length) {
+    const g = new GroupLayer('Mesa de trabajo 1');
+    g.artboard = { x: 0, y: 0, w: d.width, h: d.height, bg: null };
+    for (const l of [...d.root.children]) g.add(l);
+    d.root.add(g); boards = [g];
+  }
+  const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y)), w = Math.max(1, Math.round(r.w)), h = Math.max(1, Math.round(r.h));
+  const W = Math.max(d.width, x + w), H = Math.max(d.height, y + h);
+  if (W !== d.width || H !== d.height) d.resizeCanvas(W, H, 0, 0);
+  const g = new GroupLayer(`Mesa de trabajo ${boards.length + 1}`);
+  g.artboard = { x, y, w, h, bg };
+  const l = new RasterLayer(d.nextLayerName(), d.width, d.height);
+  g.add(l); d.root.add(g); d.setActive(l, false);
+  d.commit('Nueva mesa de trabajo');
+  return g;
+}
+
 export function newArtboard(w: number, h: number, bg: string | null, name?: string) {
   const d = doc(); if (!d) return;
   let boards = artboards(d);

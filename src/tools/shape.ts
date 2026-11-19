@@ -24,6 +24,7 @@ export class ShapeTool implements Tool {
     { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
     { key: 'strokeColor', type: 'color', default: '#000000' },
     { key: 'strokeWidth', label: 'Grosor', type: 'range', min: 1, max: 200, default: 4, unit: 'px' },
+    { key: 'dash', label: 'Línea', type: 'select', default: 'solid', choices: [{ value: 'solid', label: 'Continua' }, { value: 'dash', label: 'Discontinua' }, { value: 'dot', label: 'Punteada' }, { value: 'dashdot', label: 'Raya y punto' }] },
     { key: 'radius', label: 'Radio', type: 'range', min: 0, max: 500, default: 20, unit: 'px' },
   ] as any[];
   private a: { x: number; y: number } | null = null;
@@ -38,7 +39,7 @@ export class ShapeTool implements Tool {
       shape, custom, x0: e.x, y0: e.y, x1: e.x, y1: e.y,
       fill: shape === 'line' ? null : app.opt('fill', this.id) ? app.fg : null,
       stroke: shape === 'line' ? app.fg : app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : null,
-      strokeWidth: app.opt('strokeWidth', this.id), radius: app.opt('radius', this.id),
+      strokeWidth: app.opt('strokeWidth', this.id), radius: app.opt('radius', this.id), dash: app.opt('dash', this.id) || 'solid',
       sides: app.opt('sides', this.id), inner: app.opt<number>('inner', this.id) / 100,
     });
     let n = 1; const names = new Set(doc.allLayers().map(l => l.name));

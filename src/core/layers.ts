@@ -179,7 +179,7 @@ export function effectiveMask(l: Layer, pixel: HTMLCanvasElement | null | undefi
 }
 
 /** Deja el estado de dibujo de un lienzo como nuevo (lo que se guarda en una capa no debe arrastrar modos de fusión). */
-export function resetDrawState(c: HTMLCanvasElement) { const x = ctx2d(c); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; x.shadowColor = 'transparent'; x.shadowBlur = 0; x.setTransform(1, 0, 0, 1, 0, 0); }
+export function resetDrawState(c: HTMLCanvasElement) { const x = ctx2d(c); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; x.shadowColor = 'transparent'; x.shadowBlur = 0; x.setTransform(1, 0, 0, 1, 0, 0); x.setLineDash([]); }
 
 export abstract class Layer {
   id = newLayerId();
@@ -524,6 +524,15 @@ export interface ShapeProps {
   stroke: string | null;
   strokeWidth: number;
   radius: number;
+  /** Estilo del trazo: continuo, discontinuo o punteado. */
+  dash?: 'solid' | 'dash' | 'dot' | 'dashdot';
+}
+/** Patrón de guiones del trazo según su grosor. */
+export function dashPattern(dash: ShapeProps['dash'], w: number): number[] {
+  if (dash === 'dash') return [w * 3, w * 2];
+  if (dash === 'dot') return [0.001, w * 2];
+  if (dash === 'dashdot') return [w * 3, w * 1.6, 0.001, w * 1.6];
+  return [];
 }
 
 /** Forma vectorial: se puede cambiar de color, trazo y tamaño sin perder calidad. */
@@ -584,15 +593,15 @@ export class ShapeLayer extends RasterLayer {
       const base = customShapePath(p.custom ?? ''), path = new Path2D();
       if (base && w > 0 && h > 0) path.addPath(base, new DOMMatrix([w / 100, 0, 0, h / 100, x, y]));
       if (p.fill) { ctx.fillStyle = p.fill; ctx.fill(path, 'evenodd'); }
-      if (p.stroke) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.lineJoin = 'round'; ctx.stroke(path); }
+      if (p.stroke) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.setLineDash(dashPattern(p.dash, p.strokeWidth)); if (p.dash === 'dot' || p.dash === 'dashdot') ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(path); }
       ctx.restore(); this.touch(); return;
     }
     else if (p.shape === 'round' && (ctx as any).roundRect) (ctx as any).roundRect(x, y, w, h, Math.min(p.radius, w / 2, h / 2));
     else ctx.rect(x, y, w, h);
-    if (p.shape === 'line') { ctx.strokeStyle = p.stroke ?? p.fill ?? '#000'; ctx.lineWidth = p.strokeWidth; ctx.lineCap = 'round'; ctx.stroke(); }
+    if (p.shape === 'line') { ctx.strokeStyle = p.stroke ?? p.fill ?? '#000'; ctx.lineWidth = p.strokeWidth; ctx.lineCap = 'round'; ctx.setLineDash(dashPattern(p.dash, p.strokeWidth)); ctx.stroke(); }
     else {
       if (p.fill) { ctx.fillStyle = p.fill; ctx.fill(); }
-      if (p.stroke) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.lineJoin = 'round'; ctx.stroke(); }
+      if (p.stroke) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.setLineDash(dashPattern(p.dash, p.strokeWidth)); if (p.dash === 'dot' || p.dash === 'dashdot') ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(); }
     }
     ctx.restore();
     this.touch();

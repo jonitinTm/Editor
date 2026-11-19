@@ -6,7 +6,7 @@ import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
 import { h } from '../ui/dom';
 import { Rect, makeCanvas, ctx2d } from '../core/canvas';
-import { isRaster, isParametric, type RasterLayer } from '../core/layers';
+import { isRaster, isParametric, GroupLayer, type RasterLayer } from '../core/layers';
 import { snapPoint, clearSnap } from './snap';
 import { homography } from './transform';
 
@@ -319,6 +319,76 @@ export class SliceTool implements Tool {
       ctx.fillStyle = '#fff'; ctx.save(); ctx.beginPath(); ctx.rect(a.x + 1, a.y + 1, Math.max(20, b.x - a.x - 2), 16); ctx.clip(); ctx.fillText(label, a.x + 5, a.y + 13); ctx.restore();
       if (on) for (const [, x, y] of handlePoints(s)) { const p = vp.toScreen(x, y); ctx.fillStyle = '#fff'; ctx.fillRect(p.x - 4, p.y - 4, 8, 8); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1; ctx.strokeRect(p.x - 4, p.y - 4, 8, 8); }
     });
+    ctx.restore();
+  }
+}
+
+/** Mesa de trabajo: arrastra en un hueco para crear una mesa nueva; clic en una para elegirla; arrastra sus tiradores para cambiar su tamaño. */
+export class ArtboardTool implements Tool {
+  id = 'artboardTool'; name = 'Mesa de trabajo'; icon = icon('artboardTool'); key = 'V'; group = 'move'; cursor = 'crosshair';
+  options = [
+    { key: 'size', label: 'Tamaño', type: 'select', default: 'free', choices: [['free', 'Libre (arrastra)'], ['1080x1080', 'Instagram 1080×1080'], ['1080x1350', 'Instagram vertical 1080×1350'], ['1080x1920', 'Historia 1080×1920'], ['1920x1080', 'Full HD 1920×1080'], ['1200x628', 'Anuncio 1200×628'], ['390x844', 'Móvil 390×844'], ['1440x1024', 'Web 1440×1024'], ['2480x3508', 'A4 300 ppp']].map(([value, label]) => ({ value, label })) },
+    { key: 'bg', label: 'Fondo', type: 'select', default: '#ffffff', choices: [{ value: '#ffffff', label: 'Blanco' }, { value: '#000000', label: 'Negro' }, { value: '', label: 'Transparente' }] },
+  ] as any[];
+  private sel: GroupLayer | null = null;
+  private drag: { h: Handle; start: { x: number; y: number }; orig: Rect } | null = null;
+  private boards() { const d = app.doc; return d ? d.allLayers().filter(l => l instanceof GroupLayer && l.artboard) as GroupLayer[] : []; }
+  extraOptions(bar: HTMLElement) { bar.append(h('span', { class: 'hint' }, 'Arrastra en un hueco: mesa nueva (con un tamaño elegido basta un clic) · tiradores: cambiar tamaño · para moverla usa Mover (V)')); }
+  activate() { const a = app.doc?.active; let p: any = a; while (p && !(p instanceof GroupLayer && p.artboard)) p = p.parent; this.sel = p ?? null; }
+  private boardAt(x: number, y: number) { return this.boards().reverse().find(b => { const a = b.artboard!; return x >= a.x && y >= a.y && x < a.x + a.w && y < a.y + a.h; }) ?? null; }
+  private handleAt(e: ToolEvent): Handle | null {
+    if (!this.sel) return null;
+    for (const [n, x, y] of handlePoints(this.sel.artboard!)) { const s = app.viewport.toScreen(x, y); if (Math.abs(s.x - e.sx) < 8 && Math.abs(s.y - e.sy) < 8) return n; }
+    return null;
+  }
+  hover(e: ToolEvent) { const hd = this.handleAt(e); this.cursor = hd ? CURSORS[hd] : this.boardAt(e.x, e.y) ? 'default' : 'crosshair'; }
+  down(e: ToolEvent) {
+    const hd = this.handleAt(e);
+    if (hd && this.sel) { this.drag = { h: hd, start: { x: e.x, y: e.y }, orig: { ...this.sel.artboard! } }; return; }
+    const b = this.boardAt(e.x, e.y);
+    if (b) { this.sel = b; const first = b.children[b.children.length - 1]; app.doc!.setActive(first ?? b); app.viewport.requestRender(); return; }
+    this.drag = { h: 'new', start: { x: e.x, y: e.y }, orig: { x: Math.round(e.x), y: Math.round(e.y), w: 0, h: 0 } };
+  }
+  private preview: Rect | null = null;
+  move(e: ToolEvent) {
+    const g = this.drag; if (!g) return;
+    const dx = Math.round(e.x - g.start.x), dy = Math.round(e.y - g.start.y);
+    let { x, y, w, h: hh } = g.orig;
+    if (g.h === 'new') { w = dx; hh = dy; }
+    else {
+      if (g.h.includes('w')) { x += dx; w -= dx; } if (g.h.includes('e')) w += dx;
+      if (g.h.includes('n')) { y += dy; hh -= dy; } if (g.h.includes('s')) hh += dy;
+    }
+    if (w < 0) { x += w; w = -w; } if (hh < 0) { y += hh; hh = -hh; }
+    const r = { x, y, w: Math.max(1, w), h: Math.max(1, hh) };
+    if (g.h === 'new') this.preview = r; else if (this.sel) { Object.assign(this.sel.artboard!, r); app.doc!.invalidate(); }
+    app.viewport.requestRender();
+  }
+  up() {
+    const g = this.drag, d = app.doc; this.drag = null; if (!g || !d) return;
+    if (g.h !== 'new') {
+      const a = this.sel!.artboard!;
+      if (a.x < 0 || a.y < 0) { const ox = Math.max(0, -a.x), oy = Math.max(0, -a.y); a.x += ox; a.y += oy; a.w -= ox; a.h -= oy; }
+      if (a.x + a.w > d.width || a.y + a.h > d.height) d.resizeCanvas(Math.max(d.width, a.x + a.w), Math.max(d.height, a.y + a.h), 0, 0);
+      d.invalidate(); d.commit('Tamaño de la mesa de trabajo'); return;
+    }
+    let r = this.preview; this.preview = null;
+    const sz = app.opt<string>('size', this.id);
+    if (sz && sz !== 'free') { const [W, H] = sz.split('x').map(Number); r = { x: g.orig.x, y: g.orig.y, w: W, h: H }; }
+    if (!r || r.w < 4 || r.h < 4) { app.viewport.requestRender(); return; }
+    if (this.boards().some(b => { const a = b.artboard!; return r!.x < a.x + a.w && r!.x + r!.w > a.x && r!.y < a.y + a.h && r!.y + r!.h > a.y; })) { app.toast('Se solapa con otra mesa de trabajo', 'warn'); app.viewport.requestRender(); return; }
+    import('../ui/ops').then(o => { const bg = app.opt<string>('bg', this.id); const nb = o.newArtboardAt(r!, bg || null); if (nb) this.sel = nb; app.viewport.requestRender(); });
+  }
+  cancel() { this.drag = null; this.preview = null; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    ctx.save();
+    if (this.preview) { const r = this.preview, a = vp.toScreen(r.x, r.y), b = vp.toScreen(r.x + r.w, r.y + r.h); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1.5; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y); ctx.setLineDash([]); ctx.fillStyle = '#ddd'; ctx.font = '11px system-ui'; ctx.fillText(`${r.w} × ${r.h}`, a.x + 4, a.y - 6); }
+    if (this.sel && this.sel.artboard && this.boards().includes(this.sel)) {
+      const r = this.sel.artboard, a = vp.toScreen(r.x, r.y), b = vp.toScreen(r.x + r.w, r.y + r.h);
+      ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 2; ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+      for (const [, x, y] of handlePoints(r)) { const s = vp.toScreen(x, y); ctx.fillStyle = '#fff'; ctx.fillRect(s.x - 4, s.y - 4, 8, 8); ctx.strokeStyle = '#3d8bfd'; ctx.lineWidth = 1; ctx.strokeRect(s.x - 4, s.y - 4, 8, 8); }
+      ctx.fillStyle = '#3d8bfd'; ctx.font = '11px system-ui'; ctx.fillText(`${r.w} × ${r.h} px`, a.x, b.y + 15);
+    }
     ctx.restore();
   }
 }

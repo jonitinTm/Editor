@@ -9,8 +9,8 @@ import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
-  ['move'], ['marqueeRect', 'marqueeEllipse', 'marqueeRow', 'marqueeCol'], ['lasso', 'polyLasso', 'magLasso'], ['objectSel', 'quickSel', 'wand'], ['crop', 'perspCrop', 'slice'], ['frame'], ['eyedropper', 'colorSampler', 'ruler', 'count'],
-  ['spotHeal', 'remove', 'heal', 'patch', 'contentMove', 'redEye'], ['clone', 'patternStamp'], ['historyBrush'], ['brush', 'pencil', 'colorReplace', 'mixer'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text', 'typeMask'], ['pen', 'freePen', 'curvPen', 'addAnchor', 'delAnchor', 'convertPoint'], ['pathSelect', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
+  ['move', 'artboardTool'], ['marqueeRect', 'marqueeEllipse', 'marqueeRow', 'marqueeCol'], ['lasso', 'polyLasso', 'magLasso'], ['objectSel', 'quickSel', 'wand'], ['crop', 'perspCrop', 'slice'], ['frame'], ['eyedropper', 'colorSampler', 'ruler', 'note', 'count'],
+  ['spotHeal', 'remove', 'heal', 'patch', 'contentMove', 'redEye'], ['clone', 'patternStamp'], ['historyBrush', 'artHistory'], ['brush', 'pencil', 'colorReplace', 'mixer'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text', 'textV', 'typeMaskV', 'typeMask'], ['pen', 'freePen', 'curvPen', 'addAnchor', 'delAnchor', 'convertPoint'], ['pathSelect', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
 ];
 
 export function buildToolbar(parent: HTMLElement) {
