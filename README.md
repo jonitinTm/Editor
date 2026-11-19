@@ -351,6 +351,11 @@ Ya disponible:
   o «Coincidencia de proximidad» (el método anterior). **Selección rápida** con *Mejora automática* (bordes más limpios).
 - **Forma › Operación**: con una forma seleccionada, la nueva puede ir en capa nueva o combinarse con ella (unir, restar,
   intersecar o excluir); el resultado es una sola forma vectorial y se deshace en un paso.
+- **17 filtros nuevos**: *Artístico* (Acuarela, Grano de película, Resplandor de neón, Bordes posterizados), *Bosquejar*
+  (Boceto a lápiz, Tiza y carboncillo, Pluma de tinta, Sello), *Estilizar* (Bordes resplandecientes, Extrusión),
+  *Textura* (Cuarteado, Texturizador —lienzo, arpillera, ladrillo, arenisca—, Vidriera), *Pixelizar › Grabado*,
+  *Desenfocar › Desenfoque inteligente*, *Distorsionar › Cizalla* y *Ruido › Destramar*. Todos con vista previa, como
+  capa de ajuste/filtro inteligente y deshacer.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
