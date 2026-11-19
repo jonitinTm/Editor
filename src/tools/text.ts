@@ -10,7 +10,7 @@ import { TextLayer, walkLayers } from '../core/layers';
 export const FONTS = ['Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Segoe UI', 'Georgia', 'Times New Roman', 'Garamond', 'Courier New', 'Consolas', 'Impact', 'Comic Sans MS', 'serif', 'sans-serif', 'monospace', 'cursive'];
 
 export class TextTool implements Tool {
-  id = 'text'; name = 'Texto'; icon = icon('text'); key = 'T'; cursor = 'text';
+  id = 'text'; name = 'Texto'; icon = icon('text'); key = 'T'; group = 'text'; cursor = 'text';
   options = [
     { key: 'font', type: 'font', default: 'Arial' },
     { key: 'size', label: 'Tamaño', type: 'range', min: 4, max: 800, default: 48, unit: 'px' },
@@ -104,7 +104,7 @@ export class TextTool implements Tool {
     app.touchDoc();
   }
 
-  private textLayerAt(x: number, y: number): TextLayer | null {
+  protected textLayerAt(x: number, y: number): TextLayer | null {
     const all = [...walkLayers(app.doc!.root)].filter(l => l instanceof TextLayer && l.isVisibleInTree()) as TextLayer[];
     for (let i = all.length - 1; i >= 0; i--) {
       const b = all[i].bounds();
@@ -214,8 +214,10 @@ export class TextTool implements Tool {
       return;
     }
     l.name = text.split('\n')[0].slice(0, 30);
-    doc.commit(ed.isNew ? 'Texto' : 'Editar texto');
+    this.finished(l, ed.isNew);
   }
+  /** Al terminar de escribir (la máscara de texto lo cambia para convertirlo en selección). */
+  protected finished(_l: TextLayer, isNew: boolean) { app.doc!.commit(isNew ? 'Texto' : 'Editar texto'); }
 
   deactivate() { this.commit(); }
   cancel() { this.commit(); }
@@ -232,5 +234,27 @@ export class TextTool implements Tool {
     const p = vp.toScreen(b.x, b.y);
     ctx.strokeStyle = 'rgba(80,160,255,.9)'; ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
     ctx.strokeRect(p.x - 3, p.y - 3, b.w * vp.zoom + 6, b.h * vp.zoom + 6);
+  }
+}
+
+/** Máscara de texto: escribe como con la herramienta Texto y, al terminar, las letras se convierten en una selección. */
+export class TypeMaskTool extends TextTool {
+  id = 'typeMask'; name = 'Máscara de texto horizontal'; icon = icon('typeMask');
+  constructor() { super(); this.options = [{ key: 'maskMode', type: 'selmode', default: 'new' }, ...this.options.filter((o: any) => o.key !== 'underline')]; }
+  protected textLayerAt() { return null; }
+  protected finished(l: TextLayer) {
+    const doc = app.doc!, mask = document.createElement('canvas'); mask.width = doc.width; mask.height = doc.height;
+    mask.getContext('2d')!.drawImage(l.canvas, 0, 0);
+    l.parent?.remove(l); doc.setActive(doc.allLayers().pop() ?? null);
+    const mode = app.opt<string>('maskMode', this.id) || 'new';
+    if (mode === 'new' || !doc.selection.mask) doc.selection.setMask(mask);
+    else {
+      const out = document.createElement('canvas'); out.width = doc.width; out.height = doc.height; const x = out.getContext('2d')!;
+      x.drawImage(doc.selection.mask, 0, 0);
+      x.globalCompositeOperation = mode === 'add' ? 'source-over' : mode === 'subtract' ? 'destination-out' : 'destination-in';
+      x.drawImage(mask, 0, 0); x.globalCompositeOperation = 'source-over';
+      doc.selection.setMask(out);
+    }
+    doc.invalidate(); doc.commit('Máscara de texto');
   }
 }

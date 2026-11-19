@@ -231,3 +231,52 @@ export function drawSamplers(ctx: CanvasRenderingContext2D, vp: Viewport) {
 }
 
 (app as any).drawSamplers = drawSamplers;
+
+/** Recuento: cada clic pone un número sobre la imagen (para contar objetos). Alt+clic quita el más cercano. */
+export class CountTool implements Tool {
+  id = 'count'; name = 'Recuento'; icon = icon('count'); key = 'I'; group = 'eyedropper'; cursor = 'crosshair';
+  options = [
+    { key: 'color', label: 'Color', type: 'color', default: '#ff2d55' },
+    { key: 'size', label: 'Tamaño', type: 'range', min: 6, max: 80, default: 14, unit: 'px' },
+  ] as any[];
+  private info: HTMLElement | null = null;
+  private list(): { x: number; y: number }[] { const d = app.doc as any; if (!d.counts) d.counts = []; return d.counts; }
+  private upd() { if (this.info) this.info.textContent = `Total: ${app.doc ? this.list().length : 0}`; app.viewport.requestRender(); }
+  extraOptions(bar: HTMLElement) {
+    this.info = h('b', { class: 'opt' }, '');
+    bar.append(this.info,
+      h('span', { class: 'hint' }, 'Clic: contar · Alt+clic: quitar'),
+      h('button', { class: 'btn', onclick: () => { if (app.doc) { (app.doc as any).counts = []; this.upd(); } } }, 'Borrar'),
+      h('button', { class: 'btn', title: 'Dibuja los números en una capa nueva para que se vean al exportar', onclick: () => this.bake() }, 'Pasar a capa'));
+    this.upd();
+  }
+  activate() { this.upd(); }
+  docChanged() { this.upd(); }
+  down(e: ToolEvent) {
+    const L = this.list();
+    if (e.alt) {
+      let k = -1, best = 1e9; L.forEach((p, i) => { const d = Math.hypot(p.x - e.x, p.y - e.y); if (d < best) { best = d; k = i; } });
+      if (k >= 0 && best * app.viewport.zoom < 30) L.splice(k, 1);
+    } else L.push({ x: Math.round(e.x), y: Math.round(e.y) });
+    this.upd();
+  }
+  private paint(ctx: CanvasRenderingContext2D, pts: { x: number; y: number }[], scale: number) {
+    const col = app.opt<string>('color', this.id) || '#ff2d55', sz = (app.opt<number>('size', this.id) || 14) * scale;
+    ctx.save(); ctx.font = `bold ${sz}px system-ui, sans-serif`; ctx.textBaseline = 'middle';
+    pts.forEach((p, i) => {
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, sz * 0.22), 0, 7); ctx.fill();
+      ctx.lineWidth = Math.max(2, sz / 5); ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.strokeText(String(i + 1), p.x + sz * 0.35, p.y - sz * 0.45);
+      ctx.fillText(String(i + 1), p.x + sz * 0.35, p.y - sz * 0.45);
+    });
+    ctx.restore();
+  }
+  private bake() {
+    const d = app.doc, L = d ? this.list() : []; if (!d || !L.length) { app.toast('No hay nada contado', 'warn'); return; }
+    const t = d.newRasterLayer('Recuento') as any;
+    this.paint(ctx2d(t.canvas), L, 1); t.touch(); d.invalidate(); d.commit('Recuento a capa'); (d as any).counts = []; this.upd();
+  }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (!app.doc) return;
+    this.paint(ctx, this.list().map(p => vp.toScreen(p.x, p.y)), vp.zoom);
+  }
+}

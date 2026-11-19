@@ -59,7 +59,10 @@ class SelectionMover {
 abstract class DragSelectTool implements Tool {
   abstract id: string; abstract name: string; abstract icon: string;
   key = 'M'; group = 'marquee'; cursor = 'crosshair';
-  options = [MODE_OPT, FEATHER_OPT] as any[];
+  options = [MODE_OPT, FEATHER_OPT,
+    { key: 'style', label: 'Estilo', type: 'select', default: 'normal', choices: [{ value: 'normal', label: 'Normal' }, { value: 'ratio', label: 'Proporción fija' }, { value: 'size', label: 'Tamaño fijo' }] },
+    { key: 'fw', label: 'An.', type: 'number', min: 1, max: 30000, default: 1, title: 'Anchura (proporción o píxeles)' },
+    { key: 'fh', label: 'Al.', type: 'number', min: 1, max: 30000, default: 1, title: 'Altura (proporción o píxeles)' }] as any[];
   protected a: { x: number; y: number } | null = null;
   protected b: { x: number; y: number } | null = null;
   protected mode: SelMode = 'new';
@@ -84,7 +87,10 @@ abstract class DragSelectTool implements Tool {
   protected rect() {
     const a = this.a!, b = this.b!;
     let w = b.x - a.x, h = b.y - a.y;
-    if (this.square && this.mode === 'new') { const s = Math.max(Math.abs(w), Math.abs(h)); w = Math.sign(w || 1) * s; h = Math.sign(h || 1) * s; }
+    const st = app.opt<string>('style', this.id), fw = Math.max(1, app.opt<number>('fw', this.id) || 1), fh = Math.max(1, app.opt<number>('fh', this.id) || 1);
+    if (st === 'size') { w = fw * (w < 0 ? -1 : 1); h = fh * (h < 0 ? -1 : 1); }
+    else if (st === 'ratio') { const s = Math.max(Math.abs(w) / fw, Math.abs(h) / fh); w = Math.sign(w || 1) * Math.round(s * fw); h = Math.sign(h || 1) * Math.round(s * fh); }
+    else if (this.square && this.mode === 'new') { const s = Math.max(Math.abs(w), Math.abs(h)); w = Math.sign(w || 1) * s; h = Math.sign(h || 1) * s; }
     let x = a.x, y = a.y;
     if (this.fromCenter && this.mode === 'new') { x = a.x - w; y = a.y - h; w *= 2; h *= 2; }
     if (w < 0) { x += w; w = -w; } if (h < 0) { y += h; h = -h; }
@@ -131,6 +137,25 @@ export class EllipseSelectTool extends DragSelectTool {
   protected apply(r: any) { app.doc!.selection.ellipse(r, this.mode); }
   protected shape(p: Path2D, r: any) { p.ellipse(r.x + r.w / 2, r.y + r.h / 2, r.w / 2, r.h / 2, 0, 0, Math.PI * 2); }
 }
+
+/** Marco de fila única / columna única: un clic selecciona una línea de 1 píxel de alto (o ancho) en toda la imagen. */
+abstract class SingleLineSelectTool implements Tool {
+  abstract id: string; abstract name: string; abstract icon: string; protected abstract vertical: boolean;
+  key = 'M'; group = 'marquee'; cursor = 'crosshair';
+  options = [MODE_OPT] as any[];
+  private p: { x: number; y: number } | null = null;
+  private r(p: { x: number; y: number }) { const d = app.doc!; return this.vertical ? { x: Math.floor(p.x), y: 0, w: 1, h: d.height } : { x: 0, y: Math.floor(p.y), w: d.width, h: 1 }; }
+  down(e: ToolEvent) { this.p = { x: e.x, y: e.y }; app.viewport.requestRender(); }
+  move(e: ToolEvent) { if (this.p) { this.p = { x: e.x, y: e.y }; app.viewport.requestRender(); } }
+  up(e: ToolEvent) {
+    if (!this.p) return; this.p = null; const d = app.doc!;
+    d.selection.rect(this.r({ x: e.x, y: e.y }), selMode(this.id, e)); d.commit(this.name);
+  }
+  cancel() { this.p = null; }
+  drawOverlay(_ctx: CanvasRenderingContext2D, vp: Viewport) { if (!this.p) return; const r = this.r(this.p), path = new Path2D(); path.rect(r.x, r.y, r.w, r.h); vp.drawAnts(path); }
+}
+export class SingleRowSelectTool extends SingleLineSelectTool { id = 'marqueeRow'; name = 'Marco de fila única'; icon = icon('marqueeRow'); protected vertical = false; }
+export class SingleColSelectTool extends SingleLineSelectTool { id = 'marqueeCol'; name = 'Marco de columna única'; icon = icon('marqueeCol'); protected vertical = true; }
 
 export class LassoTool implements Tool {
   id = 'lasso'; name = 'Lazo'; icon = icon('lasso'); key = 'L'; group = 'lasso'; cursor = 'crosshair';

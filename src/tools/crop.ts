@@ -22,8 +22,17 @@ const CURSORS: Record<string, string> = { nw: 'nwse-resize', se: 'nwse-resize', 
 
 export class CropTool implements Tool {
   id = 'crop'; name = 'Recortar'; icon = icon('crop'); key = 'C'; group = 'crop'; cursor = 'crosshair';
-  options = [{ key: 'fill', label: 'Rellenar según contenido', type: 'checkbox', default: false }] as any[];
+  options = [
+    { key: 'ratio', label: 'Proporción', type: 'select', default: 'free', choices: [['free', 'Libre'], ['orig', 'Original'], ['1:1', '1:1 (cuadrado)'], ['4:3', '4:3'], ['3:2', '3:2'], ['16:9', '16:9'], ['5:4', '5:4'], ['3:4', '3:4'], ['2:3', '2:3'], ['9:16', '9:16'], ['4:5', '4:5 (Instagram)']].map(([value, label]) => ({ value, label })) },
+    { key: 'guide', label: 'Guía', type: 'select', default: 'thirds', choices: [['thirds', 'Regla de tercios'], ['grid', 'Cuadrícula'], ['golden', 'Proporción áurea'], ['diag', 'Diagonal'], ['triangle', 'Triángulo'], ['none', 'Ninguna']].map(([value, label]) => ({ value, label })) },
+    { key: 'fill', label: 'Rellenar según contenido', type: 'checkbox', default: false }] as any[];
   rect: Rect | null = null;
+  /** Proporción anchura/altura elegida, o 0 si es libre. */
+  private ratio(): number {
+    const v = app.opt<string>('ratio', this.id), d = app.doc;
+    if (v === 'orig') return d ? d.width / d.height : 0;
+    const m = /^(\d+):(\d+)$/.exec(v || ''); return m ? +m[1] / +m[2] : 0;
+  }
   private drag: { h: Handle; start: { x: number; y: number }; orig: Rect } | null = null;
 
   activate() { this.reset(); }
@@ -70,6 +79,19 @@ export class CropTool implements Tool {
       if (hnd.includes('n')) { y += dy; hh -= dy; }
       if (hnd.includes('s')) hh += dy;
     }
+    const R = this.ratio();
+    if (R && hnd !== 'move') {
+      if (hnd === 'n' || hnd === 's') { const nw = Math.abs(hh) * R; x += (w - nw) / 2; w = nw; }
+      else if (hnd === 'e' || hnd === 'w') { const nh = Math.abs(w) / R; y += (hh - nh) / 2; hh = nh; }
+      else {
+        // esquina o marco nuevo: se ajusta la altura a la anchura (o al revés, lo que sea mayor) desde la esquina fija
+        const aw = Math.abs(w), ah = Math.abs(hh), s = Math.max(aw, ah * R), nw = s, nh = s / R;
+        const sw = Math.sign(w || 1), sh = Math.sign(hh || 1);
+        if (hnd === 'new') { w = sw * nw; hh = sh * nh; }
+        else { if (hnd.includes('w')) x += w - nw; if (hnd.includes('n')) y += hh - nh; w = nw; hh = nh; }
+      }
+      x = Math.round(x); y = Math.round(y); w = Math.round(w); hh = Math.round(hh);
+    }
     if (w < 0) { x += w; w = -w; } if (hh < 0) { y += hh; hh = -hh; }
     this.rect = { x, y, w, h: hh };
   }
@@ -113,12 +135,17 @@ export class CropTool implements Tool {
     ctx.save();
     ctx.fillStyle = 'rgba(0,0,0,.55)';
     ctx.beginPath(); ctx.rect(0, 0, vp.width, vp.height); poly(); ctx.fill('evenodd');
-    ctx.strokeStyle = 'rgba(255,255,255,.35)'; ctx.lineWidth = 1; ctx.beginPath();
-    for (const k of [1 / 3, 2 / 3]) {
-      const t1 = vp.toScreen(r.x + r.w * k, r.y), t2 = vp.toScreen(r.x + r.w * k, r.y + r.h), l1 = vp.toScreen(r.x, r.y + r.h * k), l2 = vp.toScreen(r.x + r.w, r.y + r.h * k);
-      ctx.moveTo(t1.x, t1.y); ctx.lineTo(t2.x, t2.y); ctx.moveTo(l1.x, l1.y); ctx.lineTo(l2.x, l2.y);
-    }
-    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1; ctx.beginPath();
+    const L = (x1: number, y1: number, x2: number, y2: number) => { const p1 = vp.toScreen(r.x + r.w * x1, r.y + r.h * y1), p2 = vp.toScreen(r.x + r.w * x2, r.y + r.h * y2); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); };
+    const g = app.opt<string>('guide', this.id) || 'thirds';
+    const lines = (ks: number[]) => ks.forEach(k => { L(k, 0, k, 1); L(0, k, 1, k); });
+    if (g === 'thirds') lines([1 / 3, 2 / 3]);
+    else if (g === 'grid') lines([1, 2, 3, 4, 5, 6, 7].map(i => i / 8));
+    else if (g === 'golden') lines([0.382, 0.618]);
+    else if (g === 'diag') { L(0, 0, 1, 1); L(1, 0, 0, 1); }
+    else if (g === 'triangle') { L(0, 0, 1, 1); const D = r.w * r.w + r.h * r.h || 1, a = r.w * r.w / D, b = r.h * r.h / D; L(1, 0, a, a); L(0, 1, b, b); }
+    // dos tonos para que se vean sobre fondos claros y oscuros
+    ctx.stroke(); ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(0,0,0,.45)'; ctx.stroke(); ctx.setLineDash([]);
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.beginPath(); poly(); ctx.stroke();
     for (const [, x, y] of handlePoints(r)) {
       const s = vp.toScreen(x, y);

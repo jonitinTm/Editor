@@ -23,22 +23,23 @@ import { readPsd, writePsd } from './io/psd';
 (app as any).debug = { readPsd, writePsd, ops }; // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
-import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool } from './tools/select';
+import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool, SingleRowSelectTool, SingleColSelectTool } from './tools/select';
 import { retouchTools } from './tools/retouch';
 import { QuickSelectTool, ObjectSelectTool } from './tools/quicksel';
 import { CropTool, PerspectiveCropTool, SliceTool } from './tools/crop';
 import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool, PatternStampTool, MixerBrushTool, RemoveTool } from './tools/brush';
 import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool, RotateViewTool } from './tools/misc';
-import { TextTool } from './tools/text';
+import { TextTool, TypeMaskTool } from './tools/text';
 import { ShapeTool, FrameTool } from './tools/shape';
 import { TransformTool } from './tools/transform';
 import { PenTool, NodeTool, FreeformPenTool } from './tools/pen';
+import { AddAnchorTool, DeleteAnchorTool, ConvertPointTool, PathSelectTool, CurvaturePenTool } from './tools/pathtools';
 import { MagneticLassoTool } from './tools/maglasso';
 import { HistoryBrushTool } from './tools/brush';
 import { PuppetTool } from './tools/puppet';
 import { PatchTool, ContentMoveTool } from './tools/patch';
 import { buildCharacterPanel, buildParagraphPanel } from './ui/textpanels';
-import { ColorSamplerTool } from './tools/extra';
+import { ColorSamplerTool, CountTool } from './tools/extra';
 import { ColorReplaceTool, MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool } from './tools/extra';
 import { buildBrushesPanel } from './ui/brushes';
 import { TextLayer } from './core/layers';
@@ -54,7 +55,7 @@ app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
 // Las herramientas añadidas después van al final: la tecla de cada grupo sigue eligiendo la de siempre
-for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool, MixerBrushTool, FrameTool, RemoveTool, ObjectSelectTool]) app.registerTool(new T());
+for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool, MixerBrushTool, FrameTool, RemoveTool, ObjectSelectTool, CurvaturePenTool, AddAnchorTool, DeleteAnchorTool, ConvertPointTool, PathSelectTool, SingleRowSelectTool, SingleColSelectTool, TypeMaskTool, CountTool]) app.registerTool(new T());
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;

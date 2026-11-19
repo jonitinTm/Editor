@@ -305,6 +305,18 @@ Ya disponible:
   azules, magentas, luces, medios tonos y sombras, con tolerancia e «Invertir».
 - **Curvas: ajustar haciendo clic en la imagen**: con Curvas abierto, haz clic en un tono de la foto y arrastra hacia
   arriba para aclararlo o hacia abajo para oscurecerlo; se añade el punto justo en ese tono.
+- **Más herramientas de trazados** (grupo de la Pluma, `P`): *Pluma de curvatura* (cada clic añade un punto y la curva
+  pasa suave por todos; doble clic = esquina), *Añadir punto de ancla* (clic en el trazado, sin cambiar su forma),
+  *Eliminar punto de ancla* y *Convertir punto* (clic = esquina, arrastrar = curva). *Selección de trazado* (`A`) mueve un
+  trazado entero; Alt+arrastrar lo duplica y Supr lo borra.
+- **Marcos de fila única y columna única** (con el Marco, `M`): seleccionan una línea de 1 píxel de toda la imagen.
+  El Marco rectangular y el elíptico tienen *Estilo*: normal, proporción fija o tamaño fijo.
+- **Recortar con proporción y guías**: proporciones 1:1, 4:3, 3:2, 16:9, 4:5, original…; guías de tercios, cuadrícula,
+  proporción áurea, diagonal o triángulo.
+- **Máscara de texto** (con el Texto, `T`): escribes y, al terminar (Ctrl+Intro o Esc), las letras se convierten en una
+  selección (nueva, añadir, restar o intersecar).
+- **Recuento** (con el cuentagotas, `I`): cada clic pone un número para contar objetos; Alt+clic quita; «Pasar a capa»
+  los dibuja en una capa para exportarlos.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
