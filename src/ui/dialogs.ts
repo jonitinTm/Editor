@@ -1230,3 +1230,35 @@ export function duplicateToDialog() {
   showDialog({ title: 'Duplicar capa en…', okLabel: 'Duplicar', body: [row('Capa', h('b', {}, d.active.name)), row('Destino', sel)],
     onOk: () => ops.duplicateLayerTo(sel.value === 'new' ? 'new' : app.docs[+sel.value]) });
 }
+
+// ---- Galería de filtros ------------------------------------------------------------------------
+/** Miniaturas de la imagen con cada filtro artístico: clic para abrirlo con sus opciones. */
+export async function filterGalleryDialog() {
+  const d = app.doc; if (!d) return;
+  const { FILTERS } = await import('../filters/registry');
+  const groups = ['Artístico', 'Bosquejar', 'Textura', 'Estilizar'];
+  const list = FILTERS.filter(f => f.group === 'filtro' && f.inMenu !== false && groups.includes(f.submenu ?? ''));
+  // vista previa pequeña: el centro de la capa activa (o de la imagen combinada)
+  const src = d.activeRaster()?.canvas ?? d.getComposite(), side = 150;
+  const sc = Math.min(1, 320 / Math.max(src.width, src.height));
+  const base = makeCanvas(Math.max(1, Math.round(src.width * sc)), Math.max(1, Math.round(src.height * sc)));
+  ctx2d(base).drawImage(src, 0, 0, base.width, base.height);
+  const cw = Math.min(side, base.width), chh = Math.min(side, base.height), crop = makeCanvas(cw, chh);
+  ctx2d(crop).drawImage(base, -(base.width - cw) / 2, -(base.height - chh) / 2);
+  const grid = h('div', { class: 'fgal-grid' });
+  let dlg: { close(): void } | null = null;
+  for (const g of groups) {
+    const items = list.filter(f => f.submenu === g); if (!items.length) continue;
+    grid.append(h('div', { class: 'fgal-head' }, g));
+    const row2 = h('div', { class: 'fgal-row' });
+    for (const f of items) {
+      const c = makeCanvas(cw, chh), cell = h('button', { class: 'fgal-item', type: 'button', title: f.name.replace('…', '') }, c, h('span', {}, f.name.replace('…', '')));
+      cell.onclick = () => { dlg?.close(); filterDialog(f); };
+      row2.append(cell);
+      // se calcula poco a poco para que la ventana aparezca enseguida
+      setTimeout(() => { try { const img = ctx2d(crop).getImageData(0, 0, cw, chh); f.apply(img, defaultParams(f)); ctx2d(c).putImageData(img, 0, 0); } catch { /* filtro que no admite miniatura */ } }, 30);
+    }
+    grid.append(row2);
+  }
+  dlg = showDialog({ title: 'Galería de filtros', width: 720, okLabel: 'Cerrar', cancelLabel: null, body: [h('div', { class: 'hint' }, 'Haz clic en un efecto para ajustarlo y aplicarlo.'), grid] });
+}

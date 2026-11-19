@@ -543,3 +543,10 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .preset-fly .fly-head { padding: 6px 10px; font-size: 11px; opacity: .7; border-bottom: 1px solid rgba(255,255,255,.08); }
 .preset-fly .fly-item { position: relative; }
 .preset-fly .fly-action { border-top: 1px solid rgba(255,255,255,.08); opacity: .9; }
+
+.fgal-grid { max-height: 62vh; overflow: auto; }
+.fgal-head { font-size: 12px; opacity: .7; margin: 10px 0 4px; }
+.fgal-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.fgal-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; background: rgba(255,255,255,.04); border: 1px solid transparent; border-radius: 6px; color: inherit; cursor: pointer; font-size: 11px; width: 128px; }
+.fgal-item:hover { border-color: var(--accent, #3d8bfd); }
+.fgal-item canvas { width: 118px; height: 90px; object-fit: cover; border-radius: 4px; background: #222; }
