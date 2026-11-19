@@ -172,6 +172,8 @@ export class Viewport {
 
   setRulers(show: boolean) { app.showRulers = show; this.el.classList.toggle('no-rulers', !show); requestAnimationFrame(() => this.resize()); }
 
+  /** Rellenar pantalla: la imagen ocupa todo el área (puede quedar cortada por un lado). */
+  fill() { const d = this.doc; if (!d || this.width < 10) return; this.setZoom(Math.max(this.width / d.width, this.height / d.height), null, true); }
   fit(onlyShrink = false) {
     const d = this.doc; if (!d || this.width < 10) return;
     const m = 40;

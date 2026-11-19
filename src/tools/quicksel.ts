@@ -17,6 +17,7 @@ export class QuickSelectTool implements Tool {
     { key: 'size', label: 'Tamaño', type: 'range', min: 2, max: 500, default: 30, unit: 'px' },
     { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 5, max: 120, default: 32 },
     { key: 'all', label: 'Todas las capas', type: 'checkbox', default: true },
+    { key: 'enhance', label: 'Mejora automática', type: 'checkbox', default: false },
   ] as any[];
   private data: Uint8ClampedArray | null = null;
   private mark: Uint8Array | null = null;
@@ -106,6 +107,8 @@ export class QuickSelectTool implements Tool {
     if (!this.mark) return;
     clearTimeout(this.timer); this.timer = 0; this.dirty = true; this.apply();
     this.data = null; this.mark = null; this.maskCanvas = null; this.base = null;
+    // mejora automática: borde menos escalonado y más ajustado
+    if (app.opt('enhance', this.id) && app.doc!.selection.mask) app.doc!.selection.smooth(2);
     app.doc!.commit('Selección rápida');
   }
   cancel() { if (this.mark) { app.doc!.selection.setMask(this.base); this.data = null; this.mark = null; this.maskCanvas = null; } }

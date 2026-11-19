@@ -416,7 +416,8 @@ export class HealTool extends CloneTool {
 /** Pincel corrector puntual: pinta sobre la imperfección y se corrige sola, sin elegir origen. */
 export class SpotHealTool implements Tool {
   id = 'spotHeal'; name = 'Pincel corrector puntual'; icon = icon('spotHeal'); key = 'J'; group = 'heal'; cursor = 'none';
-  options = [{ ...SIZE, default: 30 }] as any[];
+  options = [{ ...SIZE, default: 30 },
+    { key: 'healType', label: 'Tipo', type: 'select', default: 'content', choices: [{ value: 'content', label: 'Según el contenido' }, { value: 'proximity', label: 'Coincidencia de proximidad' }] }] as any[];
   private hole: HTMLCanvasElement | null = null;
   private box: { x0: number; y0: number; x1: number; y1: number } | null = null;
   private last: { x: number; y: number } | null = null;
@@ -452,7 +453,16 @@ export class SpotHealTool implements Tool {
     if (box.w < 1 || box.h < 1) return;
     this.finishHole(t, hole, box);
   }
-  protected finishHole(t: PaintTarget, hole: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }) { healHole(t, hole, box, 'Pincel corrector puntual'); }
+  protected async finishHole(t: PaintTarget, hole: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }) {
+    if (app.opt('healType', this.id) !== 'content' || box.w * box.h > 1500 * 1500) { healHole(t, hole, box, 'Pincel corrector puntual'); return; }
+    // según el contenido: se rellena con textura parecida de alrededor y luego se funde el borde
+    const g = makeCanvas(hole.width, hole.height), gx = ctx2d(g); gx.drawImage(hole, 0, 0);
+    const id = gx.getImageData(box.x, box.y, box.w, box.h); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] > 10 ? 255 : 0; gx.putImageData(id, box.x, box.y);
+    const { inpaintCanvas } = await import('../ui/ops');
+    const out = await inpaintCanvas(t.canvas, g, { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 });
+    if (!out) { healHole(t, hole, box, 'Pincel corrector puntual'); return; }
+    const { setTargetCanvas } = await import('./paint'); setTargetCanvas(t, out); app.doc!.commit('Pincel corrector puntual');
+  }
   cancel() { this.t = null; this.hole = null; this.box = null; }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     if (this.hole) { const v = vp.doc!.view; ctx.save(); ctx.globalAlpha = 0.45; ctx.imageSmoothingEnabled = v.zoom < 1; vp.docTransform(ctx); ctx.drawImage(this.hole, 0, 0); ctx.restore(); }

@@ -24,15 +24,17 @@ export class ShapeTool implements Tool {
     { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
     { key: 'strokeColor', type: 'color', default: '#000000' },
     { key: 'strokeWidth', label: 'Grosor', type: 'range', min: 1, max: 200, default: 4, unit: 'px' },
+    { key: 'pathOp', label: 'Operación', type: 'select', default: 'new', choices: [{ value: 'new', label: 'Capa nueva' }, { value: 'unite', label: 'Combinar con la forma' }, { value: 'subtract', label: 'Restar de la forma' }, { value: 'intersect', label: 'Intersecar con la forma' }, { value: 'exclude', label: 'Excluir solapamiento' }] },
     { key: 'dash', label: 'Línea', type: 'select', default: 'solid', choices: [{ value: 'solid', label: 'Continua' }, { value: 'dash', label: 'Discontinua' }, { value: 'dot', label: 'Punteada' }, { value: 'dashdot', label: 'Raya y punto' }] },
     { key: 'radius', label: 'Radio', type: 'range', min: 0, max: 500, default: 20, unit: 'px' },
   ] as any[];
   private a: { x: number; y: number } | null = null;
   private layer: ShapeLayer | null = null;
+  private prev: any = null;
 
   down(e: ToolEvent) {
     const doc = app.doc!;
-    this.a = { x: e.x, y: e.y };
+    this.a = { x: e.x, y: e.y }; this.prev = doc.active;
     const opt = app.opt<string>('shape', this.id), custom = opt.startsWith('custom:') ? opt.slice(7) : undefined;
     const shape = (custom ? 'custom' : opt) as ShapeProps['shape'];
     this.layer = new ShapeLayer('Forma', doc.width, doc.height, {
@@ -66,9 +68,15 @@ export class ShapeTool implements Tool {
     if (!this.a || !this.layer) return;
     const doc = app.doc!;
     const tiny = Math.hypot(e.x - this.a.x, e.y - this.a.y) * app.viewport.zoom < 3;
+    const op = app.opt<string>('pathOp', this.id) || 'new', prev = this.prev, nl = this.layer;
+    const combinable = prev && prev !== nl && (prev instanceof ShapeLayer || (prev.kind === 'adjust' && prev.vmask)) && nl.props.shape !== 'line';
     if (tiny) { this.layer.parent?.remove(this.layer); doc.setActive(doc.allLayers().pop() ?? null); doc.invalidate(); }
-    else doc.commit('Forma');
-    this.a = null; this.layer = null;
+    else if (op !== 'new' && combinable) {
+      // se combina con la forma que estaba seleccionada: el resultado es una sola forma vectorial
+      doc.selectedIds = new Set([prev.id, nl.id]); doc.active = nl;
+      import('../ui/ops').then(o => o.combineShapes(op as any));
+    } else doc.commit('Forma');
+    this.a = null; this.layer = null; this.prev = null;
   }
   cancel() { if (this.layer) { this.layer.parent?.remove(this.layer); app.doc?.invalidate(); } this.a = null; this.layer = null; }
 }

@@ -343,6 +343,14 @@ Ya disponible:
 - **Pluma**: «Añadir/eliminar automáticamente» (clic en el trazado de la capa añade un punto; en un punto lo quita) y
   banda elástica opcional.
 - **Varita mágica**: muestra de un punto o media de 3×3, 5×5 u 11×11, y bordes suavizados.
+- **Sobreexponer y Subexponer** con *Rango* (sombras, medios tonos o iluminaciones) y *Proteger tonos* (cambia la luz sin
+  desteñir el color); **Esponja** con *Intensidad natural* (respeta lo ya saturado y la piel); **Dedo** con *Pintura con
+  los dedos* (empieza con el color frontal); **Enfocar** con *Proteger detalles* (sin halos ni ruido). Todas con *Dureza*.
+- **Mano y Zoom**: botones 100 %, 200 %, Ajustar a pantalla y Rellenar pantalla.
+- **Pincel corrector puntual** con *Tipo*: «Según el contenido» (rellena con textura parecida de alrededor, por defecto)
+  o «Coincidencia de proximidad» (el método anterior). **Selección rápida** con *Mejora automática* (bordes más limpios).
+- **Forma › Operación**: con una forma seleccionada, la nueva puede ir en capa nueva o combinarse con ella (unir, restar,
+  intersecar o excluir); el resultado es una sola forma vectorial y se deshace en un paso.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

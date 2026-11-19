@@ -270,7 +270,7 @@ export class WandTool implements Tool {
       for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
         const i = (y * W + xx) * 4; if (A[i + 3] >= 128) { O[i + 3] = 255; continue; }
         let n = 0; if (xx > 0 && A[i - 1] >= 128) n++; if (xx < W - 1 && A[i + 7] >= 128) n++; if (y > 0 && A[i - W * 4 + 3] >= 128) n++; if (y < H - 1 && A[i + W * 4 + 3] >= 128) n++;
-        O[i + 3] = n ? Math.min(160, 64 * n) : 0;
+        O[i + 3] = n >= 2 ? Math.min(170, 56 * n) : 0; // solo en los escalones (dos o más vecinos dentro), los bordes rectos quedan nítidos
       }
       x.putImageData(d, 0, 0); m = c;
     }

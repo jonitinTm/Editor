@@ -273,6 +273,8 @@ export class HandTool implements Tool {
     const b = (label: string, fn: () => void) => { const el = document.createElement('button'); el.className = 'btn'; el.textContent = label; el.onclick = fn; bar.append(el); };
     b('100 %', () => app.viewport.setZoom(1, null));
     b('Ajustar a pantalla', () => app.viewport.fit());
+    b('Rellenar pantalla', () => app.viewport.fill());
+    b('200 %', () => app.viewport.setZoom(2, null, true));
   }
 }
 
