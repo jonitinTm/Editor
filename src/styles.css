@@ -550,3 +550,8 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .fgal-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px; background: rgba(255,255,255,.04); border: 1px solid transparent; border-radius: 6px; color: inherit; cursor: pointer; font-size: 11px; width: 128px; }
 .fgal-item:hover { border-color: var(--accent, #3d8bfd); }
 .fgal-item canvas { width: 118px; height: 90px; object-fit: cover; border-radius: 4px; background: #222; }
+
+.var-top { display: flex; gap: 8px; justify-content: center; margin: 8px 0; flex-wrap: wrap; }
+.var-grid { display: grid; grid-template-columns: repeat(3, 128px); gap: 8px; justify-content: center; }
+.var-item canvas { object-fit: contain; }
+.var-center { pointer-events: none; outline: 2px solid var(--accent, #3d8bfd); }

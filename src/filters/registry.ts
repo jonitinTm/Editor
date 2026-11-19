@@ -355,6 +355,13 @@ export const FILTERS: FilterDef[] = [
     { key: 'shadow', label: 'Sombras', type: 'range', min: -100, max: 100, default: 0, section: 'Avanzado' },
     { key: 'highlight', label: 'Iluminaciones', type: 'range', min: -100, max: 100, default: 0 },
     { key: 'saturation', label: 'Saturación', type: 'range', min: -100, max: 100, default: 20 }], apply: (img, p) => MD.hdrToning(img, p) },
+  { id: 'variations', name: 'Variaciones…', group: 'ajuste', inMenu: false,
+    apply: (img, p) => {
+      // combinación de equilibrio de color por rango, saturación y brillo (lo que se va eligiendo en Variaciones)
+      FILTERS.find(f => f.id === 'colorbalance')!.apply(img, { ...p, preserve: true });
+      if (p.sat) FILTERS.find(f => f.id === 'huesat')!.apply(img, { hue: 0, sat: p.sat, light: 0, colorize: false });
+      if (p.light) FILTERS.find(f => f.id === 'brightness')!.apply(img, { brightness: p.light, contrast: 0 });
+    } },
 ];
 
 /** Los motivos se piden a quien los tenga (la página); en el hilo de fondo no existen. */

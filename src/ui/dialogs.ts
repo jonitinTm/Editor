@@ -1262,3 +1262,55 @@ export async function filterGalleryDialog() {
   }
   dlg = showDialog({ title: 'Galería de filtros', width: 720, okLabel: 'Cerrar', cancelLabel: null, body: [h('div', { class: 'hint' }, 'Haz clic en un efecto para ajustarlo y aplicarlo.'), grid] });
 }
+
+// ---- Variaciones ------------------------------------------------------------------------------
+/** Variaciones: miniaturas con «más rojo», «más azul», «más claro»… Cada clic acumula el cambio. */
+export async function variationsDialog() {
+  const d = app.doc; if (!d || !d.activeRaster()) { app.toast('Elige una capa de píxeles', 'warn'); return; }
+  const { FILTERS } = await import('../filters/registry');
+  const def = FILTERS.find(f => f.id === 'variations')!;
+  const src = d.activeRaster()!.canvas, sc = Math.min(1, 150 / Math.max(src.width, src.height));
+  const tw = Math.max(1, Math.round(src.width * sc)), th = Math.max(1, Math.round(src.height * sc));
+  const thumb = makeCanvas(tw, th); ctx2d(thumb).drawImage(src, 0, 0, tw, th);
+  const orig = ctx2d(thumb).getImageData(0, 0, tw, th);
+  const zero = () => ({ m0: 0, m1: 0, m2: 0, s0: 0, s1: 0, s2: 0, h0: 0, h1: 0, h2: 0, sat: 0, light: 0 });
+  let cur: any = zero();
+  const range = h('select', {}, h('option', { value: 'm' }, 'Medios tonos'), h('option', { value: 's' }, 'Sombras'), h('option', { value: 'h' }, 'Iluminaciones'), h('option', { value: 'sat' }, 'Saturación')) as HTMLSelectElement;
+  const amount = h('input', { type: 'range', min: '1', max: '7', value: '3' }) as HTMLInputElement;
+  const step = () => [6, 12, 20, 30, 42, 56, 75][+amount.value - 1];
+  const moves: [string, string, (p: any, k: number) => void][] = [
+    ['Más verde', '#3c3', (p, k) => { p[r() + '1'] += k; }], ['Más amarillo', '#cc3', (p, k) => { p[r() + '2'] -= k; }], ['Más cian', '#3cc', (p, k) => { p[r() + '0'] -= k; }],
+    ['Más rojo', '#e55', (p, k) => { p[r() + '0'] += k; }], ['Más azul', '#66f', (p, k) => { p[r() + '2'] += k; }], ['Más magenta', '#d5d', (p, k) => { p[r() + '1'] -= k; }],
+  ];
+  const r = () => range.value === 'sat' ? 'm' : range.value;
+  const render = (c: HTMLCanvasElement, p: any) => { const img = new ImageData(new Uint8ClampedArray(orig.data), tw, th); def.apply(img, p); ctx2d(c).putImageData(img, 0, 0); };
+  const cell = (label: string, p: () => any, onClick?: () => void, color?: string) => {
+    const c = makeCanvas(tw, th), b = h('button', { class: 'fgal-item var-item', type: 'button' }, c, h('span', { style: color ? { color } : {} }, label));
+    if (onClick) b.onclick = () => { onClick(); refresh(); };
+    cells.push(() => render(c, p()));
+    return b;
+  };
+  const cells: (() => void)[] = [];
+  const refresh = () => cells.forEach(f => f());
+  const variant = (fn: (p: any, k: number) => void) => () => { const p = JSON.parse(JSON.stringify(cur)); fn(p, step()); return p; };
+  const origCell = cell('Original', () => zero());
+  const curCell = cell('Elección actual', () => cur);
+  const ring = moves.map(([label, col, fn]) => cell(label, variant(fn), () => { const p = variant(fn)(); cur = p; }, col));
+  const lighter = cell('Más claro', variant((p, k) => { p.light += k * 1.5; }), () => { cur.light += step() * 1.5; });
+  const darker = cell('Más oscuro', variant((p, k) => { p.light -= k * 1.5; }), () => { cur.light -= step() * 1.5; });
+  const moreSat = cell('Más saturación', variant((p, k) => { p.sat += k; }), () => { cur.sat += step(); });
+  const lessSat = cell('Menos saturación', variant((p, k) => { p.sat -= k; }), () => { cur.sat -= step(); });
+  origCell.onclick = () => { cur = zero(); refresh(); };
+  range.onchange = refresh; amount.oninput = refresh;
+  const body = [
+    h('div', { class: 'form-row' }, h('span', { class: 'lbl' }, 'Ajustar'), range, h('span', { class: 'lbl' }, 'Fino'), amount, h('span', { class: 'lbl' }, 'Grueso')),
+    h('div', { class: 'var-top' }, origCell, curCell),
+    h('div', { class: 'var-grid' }, ring[0], ring[1], ring[2], ring[3], curCell.cloneNode(false) as HTMLElement, ring[4], h('div', {}), ring[5]),
+    h('div', { class: 'var-top' }, lighter, darker, moreSat, lessSat),
+    h('div', { class: 'hint' }, 'Cada clic suma el cambio a la «Elección actual». Clic en «Original» para empezar de nuevo.'),
+  ];
+  // en el centro de la rejilla va otra vez la elección actual
+  const center = body[2].children[4] as HTMLElement; const cc = makeCanvas(tw, th); center.className = 'fgal-item var-item var-center'; center.append(cc, h('span', {}, 'Actual')); cells.push(() => render(cc, cur));
+  refresh();
+  showDialog({ title: 'Variaciones', width: 640, body, okLabel: 'Aplicar', onOk: () => { if (JSON.stringify(cur) === JSON.stringify(zero())) return; ops.applyFilterDirect(def, cur); } });
+}

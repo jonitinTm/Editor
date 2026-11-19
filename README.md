@@ -361,6 +361,8 @@ Ya disponible:
 - **Ajustes nuevos**: *Duotono* (monotono, duotono o tritono con las tintas y el papel que elijas), *Mapa de bits* (solo
   blanco y negro: umbral, tramado de motivo, difusión o trama de semitonos) y *Tonos HDR* (realce local de detalle, con
   radio, intensidad, gamma, exposición, sombras, iluminaciones y saturación).
+- **Imagen › Ajustes › Variaciones…**: miniaturas con «más rojo», «más verde», «más azul», «más claro», «más
+  saturación»…, por sombras, medios tonos o iluminaciones y con paso fino o grueso; cada clic suma el cambio.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
