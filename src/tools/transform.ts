@@ -54,6 +54,9 @@ function prepare(): Session | null {
   if (!doc.active) { app.toast('No hay ninguna capa seleccionada', 'warn'); return null; }
   let chosen = selectedLayers();
   if (!chosen.includes(doc.active)) chosen = [doc.active];
+  // sin selección, las capas vinculadas se transforman juntas
+  const links = new Set(chosen.map(l => l.link).filter(v => v != null));
+  if (links.size && !doc.selection.active) chosen = [...new Set([...chosen, ...doc.allLayers().filter(l => l.link != null && links.has(l.link))])];
   if (chosen.some(l => l.posLocked())) { app.toast(chosen.some(l => l.isLocked()) ? 'La capa está bloqueada' : 'La posición de la capa está bloqueada', 'warn'); return null; }
   const layers = [...new Set(chosen.flatMap(l => l instanceof GroupLayer ? [...walkLayers(l)] : [l]))].filter(l => isRaster(l) && !l.isLocked());
   const sel = doc.selection.mask;
