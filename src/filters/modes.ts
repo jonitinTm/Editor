@@ -2,6 +2,7 @@
 // y Tonos HDR (realce local de detalle y contraste). Trabajan sobre ImageData, sin interfaz.
 
 import { gaussianBlur } from './blur';
+import { sample } from './advanced';
 
 const clamp = (v: number) => v < 0 ? 0 : v > 255 ? 255 : v;
 const hex = (s: string) => { const n = parseInt(String(s || '#000').slice(1), 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; };
@@ -75,5 +76,41 @@ export function hdrToning(img: ImageData, p: any) {
     const k = l > 0.002 ? nl / l : 1;
     const i4 = i * 4, r = d[i4] * k, g = d[i4 + 1] * k, bb = d[i4 + 2] * k, m = (r + g + bb) / 3;
     d[i4] = clamp(m + (r - m) * (1 + sat)); d[i4 + 1] = clamp(m + (g - m) * (1 + sat)); d[i4 + 2] = clamp(m + (bb - m) * (1 + sat));
+  }
+}
+
+/** Desenfoque de giro: gira los píxeles dentro de una elipse (como una rueda en movimiento). */
+export function spinBlur(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, src = new Uint8ClampedArray(d);
+  const cx = (p.x ?? 50) / 100 * w, cy = (p.y ?? 50) / 100 * h, R = (p.radius ?? 30) / 100 * Math.min(w, h), ang = (p.angle ?? 15) * Math.PI / 180, fe = (p.feather ?? 20) / 100;
+  const n = Math.max(3, Math.min(96, Math.ceil(ang * R / 1.5)));
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const dx = x - cx, dy = y - cy, r = Math.hypot(dx, dy) / R; if (r >= 1) continue;
+    const k = r < 1 - fe ? 1 : (1 - r) / Math.max(1e-6, fe), a0 = Math.atan2(dy, dx), rr = Math.hypot(dx, dy);
+    let sr = 0, sg = 0, sb = 0, sa = 0; const c = [0, 0, 0, 0];
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (i / (n - 1) - 0.5) * ang * k;
+      sample(src, w, h, cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, c); const al = c[3];
+      sr += c[0] * al; sg += c[1] * al; sb += c[2] * al; sa += al;
+    }
+    const i4 = (y * w + x) * 4; if (!sa) continue;
+    d[i4] = sr / sa; d[i4 + 1] = sg / sa; d[i4 + 2] = sb / sa; d[i4 + 3] = sa / n;
+  }
+}
+
+/** Desenfoque de campo: dos chinchetas con su cantidad de desenfoque; entre ellas el desenfoque varía suavemente. */
+export function fieldBlur(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img;
+  const pins = [[p.x1 ?? 50, p.y1 ?? 25, p.b1 ?? 0], [p.x2 ?? 50, p.y2 ?? 85, p.b2 ?? 20]].map(([x, y, b]) => ({ x: x / 100 * w, y: y / 100 * h, b }));
+  const levels = [0, 2, 5, 10, 20, 40, 80].filter(v => v <= Math.max(pins[0].b, pins[1].b) * 1.01 || v === 0);
+  const blurred = levels.map(r => { const c = new ImageData(new Uint8ClampedArray(d), w, h); if (r > 0) gaussianBlur(c, r); return c.data; });
+  const ax = pins[1].x - pins[0].x, ay = pins[1].y - pins[0].y, L2 = ax * ax + ay * ay || 1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const t = Math.max(0, Math.min(1, ((x - pins[0].x) * ax + (y - pins[0].y) * ay) / L2)), s = t * t * (3 - 2 * t);
+    const r = pins[0].b + (pins[1].b - pins[0].b) * s;
+    let k = 0; while (k < levels.length - 2 && levels[k + 1] < r) k++;
+    const lo = levels[k], hi = levels[Math.min(k + 1, levels.length - 1)], f = hi > lo ? Math.max(0, Math.min(1, (r - lo) / (hi - lo))) : 0, i = (y * w + x) * 4;
+    const A = blurred[k], B = blurred[Math.min(k + 1, levels.length - 1)];
+    for (let c = 0; c < 4; c++) d[i + c] = A[i + c] + (B[i + c] - A[i + c]) * f;
   }
 }

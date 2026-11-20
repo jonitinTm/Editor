@@ -555,3 +555,5 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .var-grid { display: grid; grid-template-columns: repeat(3, 128px); gap: 8px; justify-content: center; }
 .var-item canvas { object-fit: contain; }
 .var-center { pointer-events: none; outline: 2px solid var(--accent, #3d8bfd); }
+
+.code-box { width: 100%; min-height: 260px; font: 12px ui-monospace, monospace; background: var(--bg, #1e1f22); color: inherit; border: 1px solid var(--border, #3a3c42); border-radius: 4px; padding: 8px; box-sizing: border-box; }

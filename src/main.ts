@@ -1,4 +1,4 @@
-import { prefs, applyPrefs } from './ui/prefs';
+import { prefs, applyPrefs, fmtUnit } from './ui/prefs';
 applyPrefs();
 // Punto de entrada: monta la interfaz y conecta teclado, arrastrar y pegar.
 
@@ -165,10 +165,10 @@ function renderStatus() {
   zoomInput.addEventListener('change', () => { const z = parseFloat(zoomInput.value); if (z > 0) app.viewport.setZoom(z / 100, null); });
   status.innerHTML = '';
   status.append(zoomInput,
-    h('span', {}, `${d.width} × ${d.height} px`),
-    h('span', {}, m ? `X: ${Math.floor(m.x)}  Y: ${Math.floor(m.y)}` : ''),
+    h('span', {}, prefs.units === 'px' ? `${d.width} × ${d.height} px` : `${fmtUnit(d.width, d.ppi || 72, d.width)} × ${fmtUnit(d.height, d.ppi || 72, d.height)}`),
+    h('span', {}, m ? (prefs.units === 'px' ? `X: ${Math.floor(m.x)}  Y: ${Math.floor(m.y)}` : `X: ${fmtUnit(m.x, d.ppi || 72, d.width)}  Y: ${fmtUnit(m.y, d.ppi || 72, d.height)}`) : ''),
     h('span', { class: 'grow' }),
-    h('span', { class: 'hint' }, d.selection.bounds ? `Selección: ${d.selection.bounds.w} × ${d.selection.bounds.h}` : ''));
+    h('span', { class: 'hint' }, d.selection.bounds ? `Selección: ${prefs.units === 'px' ? `${d.selection.bounds.w} × ${d.selection.bounds.h}` : `${fmtUnit(d.selection.bounds.w, d.ppi || 72, d.width)} × ${fmtUnit(d.selection.bounds.h, d.ppi || 72, d.height)}`}` : ''));
 }
 app.on('view', () => { if (document.activeElement?.classList.contains('zoom-input')) return; renderStatus(); });
 app.on('doc', renderStatus); app.on('docs', renderStatus);

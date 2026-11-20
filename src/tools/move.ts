@@ -104,6 +104,9 @@ export class MoveTool implements Tool {
     if (!a) { app.toast('No hay ninguna capa seleccionada', 'warn'); return false; }
     let sel = selectedLayers();
     if (!sel.includes(a)) sel = [a];
+    // las capas vinculadas se mueven juntas
+    const links = new Set(sel.map(l => l.link).filter(v => v != null));
+    if (links.size) sel = [...new Set([...sel, ...doc.allLayers().filter(l => l.link != null && links.has(l.link))])];
     if (sel.some(l => l.posLocked())) { app.toast(sel.some(l => l.isLocked()) ? 'La capa está bloqueada' : 'La posición de la capa está bloqueada', 'warn'); return false; }
     this.offset = { x: 0, y: 0 };
     if (doc.selection.active && sel.length === 1 && !(a instanceof GroupLayer) && !doc.editMask) {

@@ -11,7 +11,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
   if (group === 'ajuste') return list.map(f => 'filter:' + f.id);
   const subs = new Map<string, Item[]>();
   for (const f of list) { if (!f.submenu) continue; const k = f.submenu; if (!subs.has(k)) subs.set(k, []); subs.get(k)!.push('filter:' + f.id); }
-  const order = ['Desenfocar', 'Distorsionar', 'Enfocar', 'Estilizar', 'Pixelizar', 'Ruido', 'Otro'];
+  const order = ['Artístico', 'Bosquejar', 'Desenfocar', 'Galería de desenfoque', 'Distorsionar', 'Enfocar', 'Estilizar', 'Interpretar', 'Pixelizar', 'Ruido', 'Textura', 'Otro'];
   return [...subs].sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0])).map(([label, items]) => ({ label, items }));
 };
 
@@ -26,10 +26,10 @@ const MENUS: { label: string; items: Item[] }[] = [
     'artboard',
     { label: 'Nueva capa de relleno', items: ['fill:solid', 'fill:gradient', 'fill:pattern'] },
     { label: 'Nueva capa de ajuste', items: FILTERS.filter(f => f.group === 'ajuste' && !f.noLayer).map(f => 'adjust:' + f.id) }, 'layerStyle', 'copyStyle', 'pasteStyle', 'rasterizeStyle', 'clearStyle', 'clip',
-    { label: 'Objeto inteligente', items: ['toSmart', 'smartCopy', 'editSmart', 'replaceSmart', 'exportSmart', 'rasterize'] }, { label: 'Texto', items: ['warpText', 'textOnPath', 'textVertical', '-', 'textToShape', 'textToPath'] }, '-', 'group', 'ungroup', '-',
+    { label: 'Objeto inteligente', items: ['toSmart', 'smartCopy', 'editSmart', 'replaceSmart', 'exportSmart', 'rasterize'] }, { label: 'Texto', items: ['warpText', 'textOnPath', 'textVertical', '-', 'textToShape', 'textToPath'] }, '-', 'group', 'ungroup', '-', 'linkLayers', 'selectLinked', '-', 'copyCSS', 'copySVG', '-',
     'removeBg', { label: 'Máscara de capa', items: ['maskReveal', 'maskHide', 'maskSel', '-', 'maskToggle', 'maskInvert', 'maskApply', 'maskDelete'] }, { label: 'Máscara vectorial', items: ['vmPath', '-', 'vmToggle', 'vmInvert', 'vmRaster', 'vmDelete'] },
     { label: 'Organizar', items: ['bringFront', 'bringForward', 'sendBackward', 'sendBack'] }, { label: 'Alinear', items: ['align:left', 'align:hcenter', 'align:right', '-', 'align:top', 'align:vcenter', 'align:bottom'] }, { label: 'Distribuir', items: ['dist:left', 'dist:hcenter', 'dist:right', '-', 'dist:top', 'dist:vcenter', 'dist:bottom', '-', 'dist:hspace', 'dist:vspace'] }, '-', 'rasterize', '-', 'mergeDown', 'mergeVisible', 'stamp', 'flatten', { label: 'Combinar formas', items: ['shape:unite', 'shape:subtract', 'shape:intersect', 'shape:exclude'] }, { label: 'Combinar en pila', items: ['stack:median', 'stack:mean', 'stack:max', 'stack:min', '-', 'stack:hdr'] }] },
-  { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'selToPath', 'selectSubject', 'selectSky', 'colorRange', { label: 'Luminosidad', items: ['lum:lights', 'lum:darks', 'lum:mids'] }, 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['border', 'smoothSel', 'expand', 'contract', 'feather'] }, 'growSel', 'similarSel', 'transformSel'] },
+  { label: 'Selección', items: ['selectAll', 'deselect', 'invertSel', '-', 'selFromLayer', 'pathToSel', 'selToPath', 'selectSubject', 'selectSky', 'focusArea', 'colorRange', { label: 'Luminosidad', items: ['lum:lights', 'lum:darks', 'lum:mids'] }, 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['border', 'smoothSel', 'expand', 'contract', 'feather'] }, 'growSel', 'similarSel', 'transformSel'] },
   { label: 'Filtro', items: ['lastFilter', '-', 'filterGallery', 'filter:develop', 'liquify', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'extras', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'guideLayout', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Carácter', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Párrafo', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },

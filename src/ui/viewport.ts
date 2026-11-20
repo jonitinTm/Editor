@@ -2,7 +2,7 @@
 // la selección ("hormigas en marcha") y lo que dibuje la herramienta activa.
 
 import { app } from './app';
-import { prefs } from './prefs';
+import { prefs, savePrefs, pxPerUnit, UNIT_NAMES } from './prefs';
 import type { ToolEvent } from '../tools/tool';
 import { h } from './dom';
 import { drawSnap } from '../tools/snap';
@@ -376,28 +376,31 @@ export class Viewport {
       ctx.fillStyle = cv('--panel', '#2b2d31'); ctx.fillRect(0, 0, horiz ? len : RULER, horiz ? RULER : len);
       ctx.fillStyle = cv('--border', '#3a3c42'); horiz ? ctx.fillRect(0, RULER - 1, len, 1) : ctx.fillRect(RULER - 1, 0, 1, len);
       if (!d || this.rot) continue;
-      const zoom = d.view.zoom, pan = horiz ? d.view.panX : d.view.panY;
-      const nice = [1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000];
+      const pan = horiz ? d.view.panX : d.view.panY;
+      // en otras unidades se trabaja en «unidades» y se pasa a píxeles con el factor
+      const ppu = pxPerUnit(prefs.units, d.ppi || 72, horiz ? d.width : d.height), zoom = d.view.zoom * ppu;
+      const nice = [0.01, 0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000, 10000].filter(s => prefs.units !== 'px' || s >= 1);
       const step = nice.find(s => s * zoom >= 60) ?? 10000;
-      const minor = step / (step % 5 === 0 ? 5 : step % 2 === 0 ? 2 : 1);
+      const mant = Math.round(step / Math.pow(10, Math.floor(Math.log10(step) + 1e-9)));
+      const minor = step / (mant === 5 || mant === 1 ? 5 : mant === 2 ? 2 : 5);
       ctx.strokeStyle = cv('--ruler-tick', '#80838a'); ctx.fillStyle = cv('--ruler-text', '#a9acb3'); ctx.font = '9px system-ui, sans-serif'; ctx.lineWidth = 1;
       ctx.beginPath();
       const start = Math.floor(-pan / zoom / minor) * minor, end = (len - pan) / zoom;
-      for (let v = start; v <= end; v += minor) {
+      for (let k = 0, v = start; v <= end; k++, v = start + k * minor) {
         const p = Math.round(pan + v * zoom) + .5;
-        const major = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+        const major = Math.abs(v / step - Math.round(v / step)) < 1e-4;
         const tl = major ? RULER : 5;
         if (horiz) { ctx.moveTo(p, RULER); ctx.lineTo(p, RULER - tl); }
         else { ctx.moveTo(RULER, p); ctx.lineTo(RULER - tl, p); }
         if (major) {
-          const label = String(Math.round(v));
+          const label = String(+v.toFixed(2)).replace('.', ',');
           if (horiz) ctx.fillText(label, p + 3, 9);
           else { ctx.save(); ctx.translate(9, p + 3); ctx.rotate(-Math.PI / 2); ctx.textAlign = 'right'; ctx.fillText(label, 0, 0); ctx.restore(); }
         }
       }
       ctx.stroke();
       if (this.mouse) {
-        const p = Math.round(pan + (horiz ? this.mouse.x : this.mouse.y) * zoom) + .5;
+        const p = Math.round(pan + (horiz ? this.mouse.x : this.mouse.y) * d.view.zoom) + .5;
         ctx.strokeStyle = '#4ea1ff'; ctx.beginPath();
         if (horiz) { ctx.moveTo(p, 0); ctx.lineTo(p, RULER); } else { ctx.moveTo(0, p); ctx.lineTo(RULER, p); }
         ctx.stroke();
@@ -568,7 +571,7 @@ export class Viewport {
 
     // Arrastrar desde las reglas crea guías.
     const rulerDrag = (axis: 'h' | 'v') => (e: PointerEvent) => {
-      if (!this.doc) return;
+      if (!this.doc || e.button !== 0) return;
       e.preventDefault();
       const move = (ev: PointerEvent) => {
         const r = cv.getBoundingClientRect();
@@ -582,6 +585,15 @@ export class Viewport {
       };
       window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
     };
+    // clic derecho en una regla: elegir unidades
+    for (const r of [this.rulerH, this.rulerV]) r.addEventListener('contextmenu', e => {
+      e.preventDefault();
+      document.querySelector('.units-menu')?.remove();
+      const m = h('div', { class: 'flyout units-menu', style: { left: e.clientX + 'px', top: e.clientY + 'px' } },
+        ...UNIT_NAMES.map(([u, n]) => h('div', { class: 'fly-item' + (prefs.units === u ? ' on' : ''), onclick: () => { prefs.units = u; savePrefs(); m.remove(); this.requestRender(); app.emit('view'); } }, (prefs.units === u ? '✓ ' : '\u2003 ') + n)));
+      document.body.append(m);
+      setTimeout(() => document.addEventListener('pointerdown', function close(ev) { if (!m.contains(ev.target as Node)) { m.remove(); document.removeEventListener('pointerdown', close); } }), 0);
+    });
     this.rulerH.addEventListener('pointerdown', rulerDrag('h'));
     this.rulerV.addEventListener('pointerdown', rulerDrag('v'));
 

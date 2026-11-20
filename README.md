@@ -363,6 +363,21 @@ Ya disponible:
   radio, intensidad, gamma, exposición, sombras, iluminaciones y saturación).
 - **Imagen › Ajustes › Variaciones…**: miniaturas con «más rojo», «más verde», «más azul», «más claro», «más
   saturación»…, por sombras, medios tonos o iluminaciones y con paso fino o grueso; cada clic suma el cambio.
+- **Unidades de las reglas**: clic derecho en una regla (o *Preferencias › Unidades*) para elegir píxeles, centímetros,
+  milímetros, pulgadas, puntos o porcentaje; la barra de estado muestra la posición y el tamaño en esa unidad (según la
+  resolución del documento).
+- **Vincular capas** (*Capa › Vincular / desvincular capas* o el botón de la cadena abajo en el panel Capas): las capas
+  vinculadas se mueven juntas aunque solo selecciones una. Clic en el icono de la cadena para seleccionarlas todas. Se
+  guarda en el proyecto.
+- **Capa › Copiar CSS / Copiar SVG**: copia al portapapeles el código de las capas seleccionadas para una web — formas y
+  textos con su posición, color, bordes, radio y sombras; en SVG las formas y los textos van como vectores y el resto
+  como imagen.
+- **Filtro › Galería de desenfoque**: *Desenfoque de campo* (dos chinchetas con distinto desenfoque y transición suave
+  entre ellas), *Desenfoque de giro* (efecto de rueda en movimiento), *Inclinación-desplazamiento* y *Desenfoque de iris*.
+- **Selección › Área de enfoque…**: selecciona lo que está nítido y deja fuera el fondo desenfocado (útil para recortar
+  a una persona en un retrato); con rango y suavizado del borde, y vista previa mientras ajustas.
+- **Dinámica del pincel**: *Variar tamaño*, *Variar ángulo* y *Variar opacidad* en cada pincelada, y modo *Aerógrafo*
+  (si mantienes pulsado sin moverte, la pintura se sigue acumulando).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

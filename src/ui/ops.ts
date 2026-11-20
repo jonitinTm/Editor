@@ -3,7 +3,7 @@
 
 import { app } from './app';
 import { EditorDocument, type LayerComp } from '../core/document';
-import { effectiveMask } from '../core/layers';
+import { effectiveMask, dashPattern } from '../core/layers';
 import { isCustomBlend, drawCustomBlend } from '../core/blend';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, SmartFilter, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
@@ -2098,4 +2098,140 @@ export async function combineShapes(mode: 'unite' | 'subtract' | 'intersect' | '
   for (const l of list) l.parent?.remove(l);
   d.setActive(f, false); d.selectedIds = new Set([f.id]); d.invalidate();
   d.commit({ unite: 'Unir formas', subtract: 'Restar formas', intersect: 'Intersecar formas', exclude: 'Excluir formas' }[mode]);
+}
+
+// ---- Vincular capas -----------------------------------------------------------------------------
+/** Vincula las capas seleccionadas (se moverán juntas) o, si ya lo están todas, las desvincula. */
+export function toggleLinkLayers() {
+  const d = doc(); if (!d) return;
+  const sel = selectedLayers();
+  const linked = sel.length > 0 && sel.every(l => l.link != null && l.link === sel[0].link);
+  if (linked) { for (const l of sel) l.link = null; d.commit('Desvincular capas'); app.toast('Capas desvinculadas'); return; }
+  if (sel.length < 2) { app.toast('Selecciona dos o más capas (Ctrl+clic en el panel Capas)', 'warn'); return; }
+  const id = Math.max(0, ...d.allLayers().map(l => l.link ?? 0)) + 1;
+  for (const l of sel) l.link = id;
+  d.commit('Vincular capas'); app.toast(`${sel.length} capas vinculadas`);
+}
+/** Selecciona todas las capas vinculadas con la activa. */
+export function selectLinkedLayers() {
+  const d = doc(); const a = d?.active; if (!d || !a || a.link == null) { app.toast('La capa no está vinculada', 'warn'); return; }
+  d.selectedIds = new Set(d.allLayers().filter(l => l.link === a.link).map(l => l.id)); d.changed();
+}
+
+// ---- Copiar CSS / SVG de las capas --------------------------------------------------------------
+const cssName = (s: string, i: number) => (s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'capa') + (i ? '-' + i : '');
+const rgba = (hex: string, a = 1) => { const n = parseInt(hex.slice(1), 16); return a >= 1 ? hex : `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${+a.toFixed(3)})`; };
+/** Texto al portapapeles; si el navegador no deja, se muestra para copiarlo a mano. */
+async function toClipboard(text: string, what: string) {
+  try { await navigator.clipboard.writeText(text); app.toast(`${what} copiado al portapapeles`); }
+  catch { const { showDialog } = await import('./dialog'); const { h } = await import('./dom'); const ta = h('textarea', { class: 'code-box', readonly: true }, text) as HTMLTextAreaElement; showDialog({ title: what, width: 560, body: [ta], okLabel: 'Cerrar', cancelLabel: null }); setTimeout(() => ta.select(), 50); }
+}
+/** CSS de las capas seleccionadas (formas y textos con su posición, color, borde, sombra…). */
+export function layerCSS(list: Layer[]): string {
+  const out: string[] = [];
+  list.forEach((l, i) => {
+    const r: string[] = [], b = layerBox(l);
+    if (b) r.push('position: absolute;', `left: ${b.x}px;`, `top: ${b.y}px;`, `width: ${b.w}px;`, `height: ${b.h}px;`);
+    if (l.opacity < 1) r.push(`opacity: ${+l.opacity.toFixed(2)};`);
+    if (l.blendMode !== 'source-over' && !String(l.blendMode).includes('-light') && !String(l.blendMode).includes('linear')) r.push(`mix-blend-mode: ${l.blendMode};`);
+    if (l instanceof ShapeLayer) {
+      const p = l.props;
+      if (p.fill) r.push(`background: ${p.fill};`);
+      if (p.shape === 'ellipse') r.push('border-radius: 50%;'); else if (p.shape === 'round') r.push(`border-radius: ${Math.round(p.radius)}px;`);
+      if (p.stroke) r.push(`border: ${Math.round(p.strokeWidth)}px ${p.dash === 'dash' ? 'dashed' : p.dash === 'dot' ? 'dotted' : 'solid'} ${p.stroke};`);
+      if (!['rect', 'round', 'ellipse'].includes(p.shape)) r.push('/* forma compleja: mejor como SVG (Copiar SVG) */');
+    } else if (l instanceof TextLayer) {
+      const p = l.props;
+      r.push(`font-family: ${JSON.stringify(p.font)}, sans-serif;`, `font-size: ${Math.round(p.size)}px;`, `color: ${p.color};`);
+      if (p.bold) r.push('font-weight: bold;'); if (p.italic) r.push('font-style: italic;');
+      if (p.tracking) r.push(`letter-spacing: ${+(p.tracking / 1000).toFixed(3)}em;`);
+      r.push(`line-height: ${+p.lineHeight.toFixed(2)};`);
+      if (p.align && p.align !== 'left') r.push(`text-align: ${p.align};`);
+      if (p.underline) r.push('text-decoration: underline;'); if (p.caps) r.push('text-transform: uppercase;');
+      if (p.vertical) r.push('writing-mode: vertical-rl;');
+    }
+    const st = l.styles;
+    const shadows: string[] = [];
+    if (st?.shadow?.enabled) { const s = st.shadow, a = (180 - s.angle) * Math.PI / 180; shadows.push(`${Math.round(Math.cos(a) * s.distance)}px ${Math.round(-Math.sin(a) * s.distance)}px ${Math.round(s.blur)}px ${rgba(s.color, s.opacity)}`); }
+    if (st?.glow?.enabled) shadows.push(`0 0 ${Math.round(st.glow.size)}px ${rgba(st.glow.color, st.glow.opacity)}`);
+    if (shadows.length) r.push(`${l instanceof TextLayer ? 'text-shadow' : 'box-shadow'}: ${shadows.join(', ')};`);
+    if (st?.stroke?.enabled && !(l instanceof TextLayer)) r.push(`outline: ${Math.round(st.stroke.size)}px solid ${st.stroke.color};`);
+    out.push(`/* ${l.name} */\n.${cssName(l.name, list.filter(x => x.name === l.name).indexOf(l))} {\n  ${r.join('\n  ')}\n}`);
+  });
+  return out.join('\n\n');
+}
+export async function copyLayerCSS() {
+  const sel = selectedLayers(); if (!sel.length) { app.toast('Selecciona una o varias capas', 'warn'); return; }
+  await toClipboard(layerCSS(sel), 'CSS');
+}
+const svgEsc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+function svgPath(subs: { closed: boolean; pts: import('../core/layers').PathPoint[] }[]) {
+  return subs.map(sp => { const P = sp.pts; if (!P.length) return ''; let d = `M${+P[0].x.toFixed(2)} ${+P[0].y.toFixed(2)}`; const n = P.length, seg = sp.closed ? n : n - 1; for (let i = 0; i < seg; i++) { const a = P[i], b = P[(i + 1) % n]; d += ` C${+a.ox.toFixed(2)} ${+a.oy.toFixed(2)} ${+b.ix.toFixed(2)} ${+b.iy.toFixed(2)} ${+b.x.toFixed(2)} ${+b.y.toFixed(2)}`; } return d + (sp.closed ? 'Z' : ''); }).join(' ');
+}
+/** SVG con las capas seleccionadas: formas y textos como vectores; el resto, como imagen. */
+export async function layerSVG(list: Layer[]): Promise<string> {
+  const d = doc()!, parts: string[] = [];
+  for (const l of list) {
+    if (!l.visible) continue;
+    const op = l.opacity < 1 ? ` opacity="${+l.opacity.toFixed(2)}"` : '';
+    if (l instanceof ShapeLayer) {
+      const p = l.props, fill = p.fill ?? 'none', stroke = p.stroke ? ` stroke="${p.stroke}" stroke-width="${+p.strokeWidth.toFixed(2)}"${p.dash && p.dash !== 'solid' ? ` stroke-dasharray="${dashPattern(p.dash, p.strokeWidth).map(v => +v.toFixed(2)).join(' ')}" stroke-linecap="round"` : ''}` : '';
+      const x = Math.min(p.x0, p.x1), y = Math.min(p.y0, p.y1), w = Math.abs(p.x1 - p.x0), hh = Math.abs(p.y1 - p.y0);
+      if (p.shape === 'rect' || p.shape === 'round') parts.push(`<rect x="${+x.toFixed(2)}" y="${+y.toFixed(2)}" width="${+w.toFixed(2)}" height="${+hh.toFixed(2)}"${p.shape === 'round' ? ` rx="${p.radius}"` : ''} fill="${fill}"${stroke}${op}/>`);
+      else if (p.shape === 'ellipse') parts.push(`<ellipse cx="${+(x + w / 2).toFixed(2)}" cy="${+(y + hh / 2).toFixed(2)}" rx="${+(w / 2).toFixed(2)}" ry="${+(hh / 2).toFixed(2)}" fill="${fill}"${stroke}${op}/>`);
+      else if (p.shape === 'line') parts.push(`<line x1="${p.x0}" y1="${p.y0}" x2="${p.x1}" y2="${p.y1}" stroke="${p.stroke ?? p.fill ?? '#000'}" stroke-width="${p.strokeWidth}" stroke-linecap="round"${op}/>`);
+      else if (p.shape === 'path' && p.path) parts.push(`<path d="${svgPath([p.path])}" fill="${p.path.closed ? fill : 'none'}"${stroke}${op}/>`);
+      else parts.push(`<path d="${svgPath(await layerOutlines(l))}" fill="${fill}" fill-rule="evenodd"${op}/>`);
+    } else if (l instanceof TextLayer && !l.props.onPath && !l.props.warp) {
+      const p = l.props, lines = (p.caps ? p.text.toUpperCase() : p.text).split('\n');
+      const anchor = p.align === 'center' ? 'middle' : p.align === 'right' ? 'end' : 'start';
+      const tx = p.boxWidth && p.align === 'center' ? p.x + p.boxWidth / 2 : p.boxWidth && p.align === 'right' ? p.x + p.boxWidth : p.x;
+      parts.push(`<text x="${+tx.toFixed(2)}" y="${+(p.y + p.size).toFixed(2)}" font-family="${svgEsc(p.font)}" font-size="${+p.size.toFixed(2)}"${p.bold ? ' font-weight="bold"' : ''}${p.italic ? ' font-style="italic"' : ''} fill="${p.color}" text-anchor="${anchor}"${p.tracking ? ` letter-spacing="${+(p.tracking / 1000 * p.size).toFixed(2)}"` : ''}${op}>${lines.map((t, i) => `<tspan x="${+tx.toFixed(2)}"${i ? ` dy="${+(p.size * p.lineHeight).toFixed(2)}"` : ''}>${svgEsc(t) || ' '}</tspan>`).join('')}</text>`);
+    } else if (isRaster(l)) {
+      const b = layerBox(l); if (!b) continue;
+      const c = makeCanvas(b.w, b.h); ctx2d(c).drawImage((l as RasterLayer).canvas, -b.x, -b.y);
+      parts.push(`<image x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" href="${c.toDataURL('image/png')}"${op}/>`);
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${d.width}" height="${d.height}" viewBox="0 0 ${d.width} ${d.height}">\n  ${parts.join('\n  ')}\n</svg>`;
+}
+export async function copyLayerSVG() {
+  const sel = selectedLayers(); if (!sel.length) { app.toast('Selecciona una o varias capas', 'warn'); return; }
+  const order = doc()!.allLayers();
+  await toClipboard(await layerSVG([...sel].sort((a, b) => order.indexOf(a) - order.indexOf(b))), 'SVG');
+}
+
+// ---- Selección › Foco -------------------------------------------------------------------------
+/** Mapa de nitidez (0..1) de la imagen: alto donde hay detalle enfocado. */
+export function focusMap(src: ImageData, smooth: number): Float32Array {
+  const { width: w, height: h, data: d } = src, L = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) L[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+  // energía del laplaciano: lo enfocado tiene cambios bruscos entre píxeles vecinos
+  const E = new ImageData(w, h);
+  for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+    const i = y * w + x, lap = Math.abs(4 * L[i] - L[i - 1] - L[i + 1] - L[i - w] - L[i + w]);
+    const v = Math.min(255, lap * 3); E.data[i * 4] = E.data[i * 4 + 1] = E.data[i * 4 + 2] = v; E.data[i * 4 + 3] = 255;
+  }
+  const c = makeCanvas(w, h), x = ctx2d(c); x.putImageData(E, 0, 0);
+  const b = makeCanvas(w, h), bx = ctx2d(b); bx.filter = `blur(${Math.max(1, smooth)}px)`; bx.drawImage(c, 0, 0); bx.filter = 'none';
+  const B = bx.getImageData(0, 0, w, h).data, out = new Float32Array(w * h);
+  let mx = 1e-6; for (let i = 0; i < w * h; i++) mx = Math.max(mx, B[i * 4]);
+  for (let i = 0; i < w * h; i++) out[i] = B[i * 4] / mx;
+  return out;
+}
+/** Selecciona las zonas enfocadas. `level` 0..100: cuanto más alto, más zonas cuentan como enfocadas. */
+export function selectFocusArea(level: number, softness: number, map?: Float32Array, commit = true) {
+  const d = doc(); if (!d) return null;
+  const smooth = Math.max(4, Math.round(Math.min(d.width, d.height) / 40));
+  const M = map ?? focusMap(ctx2d(d.getComposite()).getImageData(0, 0, d.width, d.height), smooth);
+  const thr = 0.6 * Math.pow(1 - level / 100, 1.6) + 0.01, soft = 0.02 + softness / 100 * 0.25;
+  const m = makeCanvas(d.width, d.height), x = ctx2d(m), img = x.createImageData(d.width, d.height), o = img.data;
+  for (let i = 0; i < M.length; i++) { const t = Math.max(0, Math.min(1, (M[i] - thr) / soft + 0.5)); o[i * 4] = o[i * 4 + 1] = o[i * 4 + 2] = 255; o[i * 4 + 3] = t * 255; }
+  x.putImageData(img, 0, 0);
+  // se cierran los huecos pequeños dentro del objeto enfocado
+  const c2 = makeCanvas(d.width, d.height), x2 = ctx2d(c2); x2.filter = `blur(${smooth}px)`; x2.drawImage(m, 0, 0); x2.filter = 'none';
+  const q = x2.getImageData(0, 0, d.width, d.height); for (let i = 3; i < q.data.length; i += 4) q.data[i] = Math.max(0, Math.min(255, (q.data[i] - 110) * 2.2)); x2.putImageData(q, 0, 0);
+  d.selection.setMask(c2);
+  if (commit) d.commit('Foco');
+  return M;
 }

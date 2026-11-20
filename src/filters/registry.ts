@@ -246,12 +246,12 @@ export const FILTERS: FilterDef[] = [
     apply: (img, p) => M.replaceColor(img, p) },
   { id: 'equalize', name: 'Ecualizar', group: 'ajuste', noLayer: true, apply: img => M.equalize(img) },
   { id: 'surfaceblur', name: 'Desenfoque de superficie…', group: 'filtro', submenu: 'Desenfocar', params: [{ key: 'radius', label: 'Radio', type: 'range', min: 1, max: 40, default: 5, unit: 'px' }, { key: 'threshold', label: 'Umbral', type: 'range', min: 2, max: 255, default: 15 }], apply: (img, p) => M.surfaceBlur(img, p.radius, p.threshold) },
-  { id: 'tiltshift', name: 'Inclinación-desplazamiento…', group: 'filtro', submenu: 'Desenfocar',
+  { id: 'tiltshift', name: 'Inclinación-desplazamiento…', group: 'filtro', submenu: 'Galería de desenfoque',
     params: [{ key: 'blur', label: 'Desenfoque', type: 'range', min: 1, max: 100, default: 15, unit: 'px' }, { key: 'center', label: 'Posición', type: 'range', min: 0, max: 100, default: 55, unit: '%' },
       { key: 'focus', label: 'Zona nítida', type: 'range', min: 0, max: 100, default: 20, unit: '%' }, { key: 'transition', label: 'Transición', type: 'range', min: 1, max: 100, default: 25, unit: '%' },
       { key: 'angle', label: 'Ángulo', type: 'range', min: -90, max: 90, default: 0, unit: '°' }, { key: 'saturation', label: 'Saturación extra', type: 'range', min: 0, max: 100, default: 0, unit: '%' }],
     apply: (img, p) => M.tiltShift(img, p) },
-  { id: 'irisblur', name: 'Desenfoque de iris…', group: 'filtro', submenu: 'Desenfocar',
+  { id: 'irisblur', name: 'Desenfoque de iris…', group: 'filtro', submenu: 'Galería de desenfoque',
     params: [{ key: 'blur', label: 'Desenfoque', type: 'range', min: 1, max: 100, default: 20, unit: 'px' }, { key: 'x', label: 'Centro horizontal', type: 'range', min: 0, max: 100, default: 50, unit: '%' }, { key: 'y', label: 'Centro vertical', type: 'range', min: 0, max: 100, default: 50, unit: '%' },
       { key: 'size', label: 'Tamaño de la elipse', type: 'range', min: 5, max: 100, default: 35, unit: '%' }, { key: 'ratio', label: 'Alargamiento', type: 'range', min: 0.3, max: 3, step: 0.05, default: 1 }, { key: 'angle', label: 'Ángulo', type: 'range', min: -90, max: 90, default: 0, unit: '°' },
       { key: 'focus', label: 'Zona totalmente nítida', type: 'range', min: 0, max: 95, default: 55, unit: '%' }, { key: 'lights', label: 'Brillo de las luces (bokeh)', type: 'range', min: 0, max: 100, default: 0, unit: '%' }],
@@ -362,6 +362,13 @@ export const FILTERS: FilterDef[] = [
       if (p.sat) FILTERS.find(f => f.id === 'huesat')!.apply(img, { hue: 0, sat: p.sat, light: 0, colorize: false });
       if (p.light) FILTERS.find(f => f.id === 'brightness')!.apply(img, { brightness: p.light, contrast: 0 });
     } },
+  { id: 'spinblur', name: 'Desenfoque de giro…', group: 'filtro', submenu: 'Galería de desenfoque', params: [
+    { key: 'x', label: 'Centro X', type: 'range', min: 0, max: 100, default: 50, unit: '%' }, { key: 'y', label: 'Centro Y', type: 'range', min: 0, max: 100, default: 50, unit: '%' },
+    { key: 'radius', label: 'Radio', type: 'range', min: 2, max: 100, default: 30, unit: '%' }, { key: 'angle', label: 'Ángulo de desenfoque', type: 'range', min: 1, max: 360, default: 15, unit: '°' },
+    { key: 'feather', label: 'Transición del borde', type: 'range', min: 0, max: 100, default: 20, unit: '%' }], apply: (img, p) => MD.spinBlur(img, p) },
+  { id: 'fieldblur', name: 'Desenfoque de campo…', group: 'filtro', submenu: 'Galería de desenfoque', params: [
+    { key: 'x1', label: 'Chincheta 1: X', type: 'range', min: 0, max: 100, default: 50, unit: '%', section: 'Chincheta 1' }, { key: 'y1', label: 'Chincheta 1: Y', type: 'range', min: 0, max: 100, default: 25, unit: '%' }, { key: 'b1', label: 'Chincheta 1: desenfoque', type: 'range', min: 0, max: 80, default: 0, unit: 'px' },
+    { key: 'x2', label: 'Chincheta 2: X', type: 'range', min: 0, max: 100, default: 50, unit: '%', section: 'Chincheta 2' }, { key: 'y2', label: 'Chincheta 2: Y', type: 'range', min: 0, max: 100, default: 85, unit: '%' }, { key: 'b2', label: 'Chincheta 2: desenfoque', type: 'range', min: 0, max: 80, default: 20, unit: 'px' }], apply: (img, p) => MD.fieldBlur(img, p) },
 ];
 
 /** Los motivos se piden a quien los tenga (la página); en el hilo de fondo no existen. */

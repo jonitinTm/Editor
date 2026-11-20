@@ -197,6 +197,8 @@ export abstract class Layer {
   lockPixels = false;
   /** Relleno (0-1): opacidad del contenido sin afectar a la sombra, el contorno ni el resplandor exteriores. */
   fillOpacity = 1;
+  /** Capas vinculadas: las que comparten este número se mueven juntas. */
+  link: number | null = null;
   /** Etiqueta de color en el panel de capas (rojo, naranja, amarillo, verde, azul, violeta, gris). */
   label: string | null = null;
   /** Máscara de recorte: la capa solo se ve donde la capa de debajo tiene píxeles. */

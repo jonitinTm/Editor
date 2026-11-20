@@ -165,6 +165,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     setTimeout(() => document.addEventListener('pointerdown', function off(e) { if (!fly.contains(e.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', off); } }), 0);
   });
   const foot = h('div', { class: 'panel-foot' },
+    footBtn('link', 'Vincular / desvincular las capas seleccionadas', ops.toggleLinkLayers),
     h('button', { class: 'btn icon-btn fx-btn', title: 'Estilo de capa (sombra, trazo, resplandor)', onclick: layerStyleDialog }, 'fx'),
     adjBtn,
     footBtn('mask', 'Añadir máscara de capa', () => ops.addMask('reveal')),
@@ -228,6 +229,8 @@ export function buildLayersPanel(parent: HTMLElement) {
     const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockPos || l.lockPixels ? h('span', { class: 'llock', title: [l.lockPixels && 'Píxeles bloqueados', l.lockPos && 'Posición bloqueada'].filter(Boolean).join(' · '), html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
+    const linkEl = l.link != null ? h('span', { class: 'llock llink', title: 'Vinculada (se mueve con las otras capas vinculadas). Clic: seleccionarlas', html: icon('link') }) : null;
+    linkEl?.addEventListener('click', e => { e.stopPropagation(); d.setActive(l); ops.selectLinkedLayers(); });
     if (l.label) eye.style.background = LABEL_COLORS[l.label] ?? '';
     // miniatura de la máscara vectorial
     let vmEl: HTMLElement | null = null;
@@ -240,7 +243,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
       draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
-    }, eye, arrow, clipMark, thumbWrap, maskEl, vmEl, name, kindTag, fx, lock);
+    }, eye, arrow, clipMark, thumbWrap, maskEl, vmEl, name, kindTag, fx, linkEl, lock);
     el.addEventListener('click', e => {
       if (e.ctrlKey || e.metaKey) {
         if (d.selectedIds.has(l.id) && d.selectedIds.size > 1) d.selectedIds.delete(l.id); else d.selectedIds.add(l.id);

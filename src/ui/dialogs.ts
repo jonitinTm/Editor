@@ -17,7 +17,7 @@ import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import { allPatterns } from '../core/patterns';
 import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
-import { prefs, savePrefs } from './prefs';
+import { prefs, savePrefs, UNIT_NAMES } from './prefs';
 import { BEVEL_DEFAULT } from '../core/bevel';
 import { shiftRuns } from '../core/textruns';
 
@@ -268,15 +268,17 @@ export function prefsDialog() {
   const snapTol = numberSlider({ min: 1, max: 20, value: prefs.snapTolerance, unit: 'px', onInput: v => snapV = v });
   const auto = h('input', { type: 'checkbox', checked: prefs.autosave });
   const gsize = h('input', { type: 'number', class: 'num', min: 2, max: 2000, value: prefs.gridSize, style: 'width:80px' }) as HTMLInputElement;
+  const units = h('select', {}, ...UNIT_NAMES.map(([v, n]) => h('option', { value: v, selected: prefs.units === v }, n))) as HTMLSelectElement;
   const gcol = h('input', { type: 'color', class: 'color-input', value: prefs.gridColor }) as HTMLInputElement, gdcol = h('input', { type: 'color', class: 'color-input', value: prefs.guideColor }) as HTMLInputElement;
   showDialog({
     title: 'Preferencias', width: 420,
     body: [h('div', { class: 'dlg-section' }, 'Interfaz'), row('Tema', theme), row('Tamaño de la interfaz', scale),
       h('div', { class: 'dlg-section' }, 'Rendimiento'), row('Pasos de historial', hist.el),
+      h('div', { class: 'dlg-section' }, 'Unidades'), row('Reglas', units),
       h('div', { class: 'dlg-section' }, 'Guías, cuadrícula y ajuste'), row('Distancia de ajuste', snapTol.el), row('Cuadrícula cada', gsize, ' px'), row('Color de la cuadrícula', gcol), row('Color de las guías', gdcol),
       h('div', { class: 'dlg-section' }, 'Archivos'), row('', h('label', { class: 'check' }, auto, ' Guardar copia de recuperación cada 15 s'))],
     onOk: () => {
-      Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked, gridSize: Math.max(2, Math.round(+gsize.value) || 50), gridColor: gcol.value, guideColor: gdcol.value });
+      Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked, gridSize: Math.max(2, Math.round(+gsize.value) || 50), gridColor: gcol.value, guideColor: gdcol.value, units: units.value as any });
       savePrefs(); app.viewport.requestRender(); app.toast('Preferencias guardadas');
     },
     onCancel: () => { document.body.dataset.theme = before.theme; app.viewport.requestRender(); },
@@ -1313,4 +1315,21 @@ export async function variationsDialog() {
   const center = body[2].children[4] as HTMLElement; const cc = makeCanvas(tw, th); center.className = 'fgal-item var-item var-center'; center.append(cc, h('span', {}, 'Actual')); cells.push(() => render(cc, cur));
   refresh();
   showDialog({ title: 'Variaciones', width: 640, body, okLabel: 'Aplicar', onOk: () => { if (JSON.stringify(cur) === JSON.stringify(zero())) return; ops.applyFilterDirect(def, cur); } });
+}
+
+// ---- Selección › Foco -------------------------------------------------------------------------
+export function focusAreaDialog() {
+  const d = app.doc; if (!d) return;
+  const before = d.selection.mask ? cloneCanvas(d.selection.mask) : null;
+  let level = 50, soft = 30, map: Float32Array | null = null, t = 0;
+  const run = () => { clearTimeout(t); t = window.setTimeout(() => { map = ops.selectFocusArea(level, soft, map ?? undefined, false); }, 60); };
+  const lv = numberSlider({ min: 0, max: 100, value: level, unit: '%', onInput: v => { level = v; run(); } });
+  const sf = numberSlider({ min: 0, max: 100, value: soft, unit: '%', onInput: v => { soft = v; run(); } });
+  showDialog({
+    title: 'Área de enfoque', width: 400, side: true,
+    body: [row('Rango de enfoque', lv.el), row('Suavizar borde', sf.el), h('div', { class: 'hint' }, 'Selecciona lo que está nítido (por ejemplo, la persona) y deja fuera el fondo desenfocado. Sube el rango si falta parte del objeto.')],
+    onOk: () => { clearTimeout(t); map = ops.selectFocusArea(level, soft, map ?? undefined, true); },
+    onCancel: () => { clearTimeout(t); d.selection.setMask(before); d.invalidate(); },
+  });
+  run();
 }

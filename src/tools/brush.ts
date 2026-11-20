@@ -64,6 +64,10 @@ export function drawSymAxes(ctx: CanvasRenderingContext2D, vp: Viewport, mode: s
   }
   ctx.restore();
 }
+const SIZE_JIT = { key: 'sizeJitter', label: 'Variar tamaño', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const ANG_JIT = { key: 'angleJitter', label: 'Variar ángulo', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const OPAC_JIT = { key: 'opacityJitter', label: 'Variar opacidad', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const AIRBRUSH = { key: 'airbrush', label: 'Aerógrafo (acumula al quedarse quieto)', type: 'checkbox' as const, default: false };
 const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, min: 0, max: 500, default: 0, unit: '%' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
@@ -114,7 +118,7 @@ abstract class StrokeTool implements Tool {
     const hard = (app.opt<number>('hardness', this.id) ?? 100) / 100;
     const flow = (app.opt<number>('flow', this.id) ?? 100) / 100;
     const ctx = ctx2d(this.stroke!.buffer);
-    const round = (app.opt<number>('roundness', this.id) ?? 100) / 100, angle = app.opt<number>('angle', this.id) ?? 0, scatter = (app.opt<number>('scatter', this.id) ?? 0) / 100;
+    const round = (app.opt<number>('roundness', this.id) ?? 100) / 100, angle0 = app.opt<number>('angle', this.id) ?? 0, scatter = (app.opt<number>('scatter', this.id) ?? 0) / 100;
     const tipId = this.aliased ? '' : (app.opt<string>('tip', this.id) ?? ''), jitter = !!app.opt('tipJitter', this.id);
     // dinámica de color: cada pincelada con un color algo distinto
     const fj = (app.opt<number>('fgbgJitter', this.id) ?? 0) / 100, hj = (app.opt<number>('hueJitter', this.id) ?? 0) / 100, bj = (app.opt<number>('briJitter', this.id) ?? 0) / 100;
@@ -128,8 +132,11 @@ abstract class StrokeTool implements Tool {
       if (bj > 0) { const k = 1 + (Math.random() * 2 - 1) * bj * 0.6; r *= k; g *= k; b *= k; }
       return `rgb(${Math.max(0, Math.min(255, r)) | 0},${Math.max(0, Math.min(255, g)) | 0},${Math.max(0, Math.min(255, b)) | 0})`;
     };
+    const sj = (app.opt<number>('sizeJitter', this.id) ?? 0) / 100, aj = (app.opt<number>('angleJitter', this.id) ?? 0) / 100, oj = (app.opt<number>('opacityJitter', this.id) ?? 0) / 100;
     return (x, y, p) => {
-      const size = this.size(p);
+      // dinámica de forma: cada pincelada con tamaño, ángulo y opacidad algo distintos
+      const size = sj > 0 ? Math.max(1, this.size(p) * (1 - Math.random() * sj)) : this.size(p);
+      const angle = aj > 0 ? angle0 + (Math.random() * 2 - 1) * aj * 180 : angle0;
       // punta con imagen (si hay) o la redonda de siempre
       let tip = (tipId && sampledTip(tipId, size, dyn ? '#ffffff' : color, jitter ? Math.random() * 360 : angle, round)) || brushTip(size, hard, dyn ? '#ffffff' : color, this.aliased, round, angle);
       if (dyn) {
@@ -146,6 +153,7 @@ abstract class StrokeTool implements Tool {
         const overlap = Math.max(1, size / Math.max(0.5, this.spacing(p)));
         ctx.globalAlpha = flow * (1 - Math.pow(1 - Math.min(1, Math.max(0.02, p)), 1 / overlap));
       } else ctx.globalAlpha = flow;
+      if (oj > 0) ctx.globalAlpha *= 1 - Math.random() * oj;
       ctx.drawImage(tip, dx, dy);
       return { x: dx, y: dy, w: tip.width, h: tip.height };
     };
@@ -172,6 +180,11 @@ abstract class StrokeTool implements Tool {
       return r;
     };
     this.sm = { x: e.x, y: e.y, p: e.pressure };
+    if (app.opt('airbrush', this.id)) {
+      // aerógrafo: mientras se mantiene pulsado, sigue soltando pintura aunque no se mueva
+      clearInterval(this.airTimer);
+      this.airTimer = window.setInterval(() => { const s = this.stroke, f = this.dab, q = this.lastPoint ?? this.sm; if (!s || !f || !q) return; (s as any).addDirty(f(q.x, q.y, this.sm?.p ?? 1)); s.update(); }, 60);
+    }
     const sp = this.spacing(e.pressure);
     if (e.shift && this.lastPoint) {
       // Mayús + clic: línea recta desde el punto anterior
@@ -191,7 +204,9 @@ abstract class StrokeTool implements Tool {
     this.stroke.update();
     this.lastPoint = { x, y };
   }
+  private airTimer = 0;
   up(e?: ToolEvent) {
+    clearInterval(this.airTimer); this.airTimer = 0;
     if (this.picking) { this.picking = false; return; }
     if (!this.stroke) return;
     // Con suavizado, el trazo termina en el punto real donde se soltó
@@ -209,7 +224,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, SPACING, ANGLE, ROUND, SCATTER, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, AIRBRUSH, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
 }
