@@ -519,7 +519,16 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
   .optionsbar .opt-name { display: none; }
   .statusbar { font-size: 11px; }
   .modal { width: auto !important; min-width: min(94vw, 300px); max-width: 96vw; }
-  .modal-overlay.at-side { justify-content: center; padding-right: 0; }
+  .modal-overlay.at-side { justify-content: center; align-items: flex-end; padding: 0; }
+  /* en el móvil, las ventanas con vista previa ocupan la mitad de abajo: la imagen se sigue viendo arriba */
+  .modal-overlay.at-side .modal { max-height: 52vh; width: 100vw !important; max-width: 100vw; border-radius: 10px 10px 0 0; }
+  .modal-body .num-slider { min-width: 0; flex: 1; }
+  .modal-body .num-slider input[type=range] { width: auto; flex: 1; min-width: 60px; }
+  .modal-body .num-slider .num { width: 56px; flex-shrink: 0; }
+  .modal-body .form-row { min-width: 0; }
+  /* avisos arriba para no tapar los botones de las ventanas de abajo */
+  #toasts { bottom: auto; top: 76px; width: calc(100vw - 24px); }
+  .toast { max-width: 100%; }
   .menu-list { min-width: 250px; max-width: calc(100vw - 8px); }
   .menu-item { padding-top: 8px; padding-bottom: 8px; }
   .menu-item.has-sub:hover > .submenu { display: none; }

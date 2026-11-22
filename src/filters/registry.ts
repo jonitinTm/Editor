@@ -369,6 +369,10 @@ export const FILTERS: FilterDef[] = [
   { id: 'fieldblur', name: 'Desenfoque de campo…', group: 'filtro', submenu: 'Galería de desenfoque', params: [
     { key: 'x1', label: 'Chincheta 1: X', type: 'range', min: 0, max: 100, default: 50, unit: '%', section: 'Chincheta 1' }, { key: 'y1', label: 'Chincheta 1: Y', type: 'range', min: 0, max: 100, default: 25, unit: '%' }, { key: 'b1', label: 'Chincheta 1: desenfoque', type: 'range', min: 0, max: 80, default: 0, unit: 'px' },
     { key: 'x2', label: 'Chincheta 2: X', type: 'range', min: 0, max: 100, default: 50, unit: '%', section: 'Chincheta 2' }, { key: 'y2', label: 'Chincheta 2: Y', type: 'range', min: 0, max: 100, default: 85, unit: '%' }, { key: 'b2', label: 'Chincheta 2: desenfoque', type: 'range', min: 0, max: 80, default: 20, unit: 'px' }], apply: (img, p) => MD.fieldBlur(img, p) },
+  { id: 'impasto', name: 'Relieve de pintura (impasto)…', group: 'filtro', submenu: 'Artístico', params: [
+    { key: 'depth', label: 'Relieve', type: 'range', min: 0, max: 100, default: 50, unit: '%' }, { key: 'size', label: 'Tamaño de pincelada', type: 'range', min: 1, max: 30, default: 6, unit: 'px' },
+    { key: 'strokes', label: 'Dirección de las pinceladas', type: 'range', min: -90, max: 90, default: 30, unit: '°' }, { key: 'light', label: 'Dirección de la luz', type: 'range', min: -180, max: 180, default: 135, unit: '°' },
+    { key: 'gloss', label: 'Brillo (barniz)', type: 'range', min: 0, max: 100, default: 30, unit: '%' }], apply: (img, p) => R.impasto(img, p) },
 ];
 
 /** Los motivos se piden a quien los tenga (la página); en el hilo de fondo no existen. */

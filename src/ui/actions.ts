@@ -7,6 +7,7 @@ import * as ops from './ops';
 import * as dlg from './dialogs';
 import * as cmpv from './compare';
 import * as uniq from './unique';
+import * as s3d from './shadow3d';
 
 import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
@@ -231,6 +232,8 @@ export const ACTIONS: Action[] = [
   ...cmpv.SIM_NAMES.map(([s, n]) => ({ id: 'sim:' + s, label: n, enabled: hasDoc, checked: () => cmpv.getSim() === s, run: () => cmpv.setSim(s) })),
   { id: 'contrast', label: 'Comprobar contraste de textos…', enabled: hasDoc, run: uniq.contrastDialog },
   { id: 'autoStraighten', label: 'Enderezar automáticamente', enabled: hasDoc, run: uniq.autoStraighten },
+  { id: 'castShadow', label: 'Sombra proyectada…', enabled: hasLayer, run: s3d.castShadowDialog },
+  { id: 'extrude3d', label: 'Extrusión 3D…', enabled: hasLayer, run: s3d.extrudeDialog },
   { id: 'social', label: 'Exportar para redes sociales…', enabled: hasDoc, run: uniq.socialDialog },
   { id: 'timelapse', label: 'Timelapse de la edición…', enabled: () => (app.doc?.history.index ?? 0) > 0, run: uniq.timelapseDialog },
   { id: 'palette', label: 'Paleta de la imagen…', enabled: hasDoc, run: uniq.paletteDialog },

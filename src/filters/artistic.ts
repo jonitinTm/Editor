@@ -281,3 +281,29 @@ export function extrude(img: ImageData, p: any) {
     }
   }
 }
+
+// ---- Relieve de pintura (impasto) ----------------------------------------------------------------
+/** Da a una pintura plana el relieve de la pintura gruesa: pinceladas con volumen iluminadas desde un lado. */
+export function impasto(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, depth = (p.depth ?? 50) / 100 * 6, size = Math.max(1, p.size ?? 6), ang = (p.light ?? 135) * Math.PI / 180;
+  const strokeAng = (p.strokes ?? 30) * Math.PI / 180, gloss = (p.gloss ?? 30) / 100;
+  // altura: la luminosidad suavizada (las zonas claras «abultan») más la textura de las pinceladas
+  const L = blurArr(lum(img), w, h, size * 0.35);
+  const N = valueNoise(w, h, Math.max(1.5, size * 0.6), 17);
+  // ruido estirado en la dirección de las pinceladas
+  const ca = Math.cos(strokeAng), sa = Math.sin(strokeAng), len = Math.max(2, Math.round(size * 1.6)), S = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let s = 0, k = 0;
+    for (let t = -len; t <= len; t += 2) { const xx = Math.round(x + ca * t), yy = Math.round(y + sa * t); if (xx >= 0 && yy >= 0 && xx < w && yy < h) { s += N[yy * w + xx]; k++; } }
+    S[y * w + x] = k ? s / k : 0.5;
+  }
+  const Hm = new Float32Array(w * h); for (let i = 0; i < w * h; i++) Hm[i] = L[i] / 255 * 0.6 + S[i] * 0.9;
+  const lx = Math.cos(ang) * 0.7, ly = -Math.sin(ang) * 0.7, lz = 0.7, hx0 = lx, hy0 = ly, hz0 = lz + 1, hn = Math.hypot(hx0, hy0, hz0);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, xm = x > 0 ? i - 1 : i, xp = x < w - 1 ? i + 1 : i, ym = y > 0 ? i - w : i, yp = y < h - 1 ? i + w : i;
+    let nx = -(Hm[xp] - Hm[xm]) * depth, ny = -(Hm[yp] - Hm[ym]) * depth, nz = 1; const nn = Math.hypot(nx, ny, nz); nx /= nn; ny /= nn; nz /= nn;
+    const diff = Math.max(0, nx * lx + ny * ly + nz * lz), spec = Math.pow(Math.max(0, (nx * hx0 + ny * hy0 + nz * hz0) / hn), 30) * gloss * 255;
+    const k = 0.45 + diff * 0.75;
+    for (let c = 0; c < 3; c++) d[i * 4 + c] = clamp(d[i * 4 + c] * k + spec);
+  }
+}
