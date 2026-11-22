@@ -411,6 +411,18 @@ Ya disponible:
   *Capa › Combinar en pila › Fusión de enfoque* (varias fotos enfocadas en distintos puntos → una nítida en todas partes).
 - **En el móvil**, las ventanas con vista previa (sombra, 3D, desplazar…) ocupan la mitad de abajo para que la imagen se
   siga viendo, y los avisos salen arriba.
+- **Fácil para cualquiera**:
+  - **Buscador «¿Qué quieres hacer?»** (botón de la lupa arriba a la derecha o `Ctrl+F`): escribe con tus palabras
+    («quitar fondo», «girar», «más brillo», «blanco y negro»…) y aparece la función, con dónde está en los menús.
+  - **Tareas rápidas** (botón de la varita): botones grandes para lo más habitual — abrir una foto, mejorarla en un
+    clic, quitar el fondo, borrar algo, recortar, para redes, añadir texto, desenfocar el fondo (efecto retrato), blanco y
+    negro, enderezar, cambiar el cielo, efectos artísticos, cambiar el tamaño y guardar.
+  - Cada herramienta explica para qué sirve (al pasar el ratón o en la lista que sale al mantenerla pulsada).
+  - **Guía de bienvenida** la primera vez que abres una imagen (y en *Ayuda › Ver la guía de bienvenida*).
+  - *Imagen › Mejorar la foto* y *Desenfocar el fondo* en un solo paso.
+- **Paneles en el móvil**: una fila de botones grandes arriba del cajón (Capas, Color, Propiedades, Historial,
+  Muestras, Pinceles…); el panel elegido ocupa todo el cajón. Se abre deslizando el dedo desde el borde derecho y se
+  cierra deslizándolo hacia la derecha o tocando fuera.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

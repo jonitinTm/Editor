@@ -20,6 +20,7 @@ import { keyString } from './ui/keys';
 import * as io from './io/files';
 import * as uniq from './ui/unique';
 import * as more from './ui/more';
+import * as easy from './ui/easy';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
@@ -69,7 +70,12 @@ buildMenuBar(header);
 // En el móvil los paneles van en un cajón que se abre con este botón
 const sideToggle = h('button', { class: 'side-toggle', title: 'Mostrar u ocultar los paneles (capas, color, propiedades…)', html: icon('newLayer') + '<span>Paneles</span>' });
 sideToggle.onclick = () => { document.body.classList.toggle('show-side'); };
-header.append(sideToggle);
+// botones fáciles: tareas rápidas y buscador (siempre a mano, también en el móvil)
+const quickBtn = h('button', { class: 'top-btn top-quick', type: 'button', title: 'Tareas rápidas: mejorar foto, quitar fondo, recortar para redes…', html: icon('magic') + '<span>Tareas</span>' });
+quickBtn.onclick = () => easy.quickTasks();
+const searchBtn = h('button', { class: 'top-btn top-search', type: 'button', title: '¿Qué quieres hacer? Busca cualquier función (Ctrl+F)', html: icon('search') + '<span>Buscar</span>' });
+searchBtn.onclick = () => easy.openSearch();
+header.append(h('div', { class: 'top-right' }, quickBtn, searchBtn, sideToggle));
 // fondo oscuro detrás del cajón: tocarlo lo cierra
 const sideBackdrop = h('div', { class: 'side-backdrop' });
 sideBackdrop.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); document.body.classList.remove('show-side'); });
@@ -107,12 +113,44 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
     b.onclick = () => { pages.forEach((p, j) => p.classList.toggle('on', j === i)); [...head.children].forEach((c, j) => c.classList.toggle('on', j === i)); };
     head.append(b);
   });
+  (group as any).select = (i: number) => (head.children[i] as HTMLElement)?.click();
   parent.append(group);
   return group;
 }
 tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel], ['Estilos', buildStylesPanel]]);
 tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel], ['Carácter', buildCharacterPanel], ['Párrafo', buildParagraphPanel]]);
 tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Trazados', buildPathsPanel], ['Composiciones', buildCompsPanel], ['Acciones', buildActionsPanel]]);
+
+// ---- Paneles en el móvil: una fila de botones grandes arriba del cajón y un solo panel a pantalla completa ----
+{
+  const ENTRIES: [string, string, number, string][] = [
+    ['Capas', 'layers', 0, 'layers'], ['Color', 'color', 0, 'colorPanel'], ['Propiedades', 'props', 0, 'props'], ['Historial', 'props', 1, 'history'],
+    ['Muestras', 'color', 1, 'swatches'], ['Pinceles', 'color', 2, 'brush'], ['Estilos', 'color', 3, 'fx'], ['Carácter', 'props', 5, 'text'], ['Párrafo', 'props', 6, 'text'],
+    ['Canales', 'layers', 1, 'channels'], ['Trazados', 'layers', 2, 'pen'], ['Navegador', 'props', 2, 'zoom'], ['Histograma', 'props', 3, 'histogram'], ['Info', 'props', 4, 'info'],
+    ['Composiciones', 'layers', 3, 'comps'], ['Acciones', 'layers', 4, 'actions'],
+  ];
+  const nav = h('div', { class: 'side-nav', role: 'tablist', 'aria-label': 'Paneles' });
+  const show = (k: number) => {
+    const [, g, i] = ENTRIES[k];
+    side.querySelectorAll<HTMLElement>('.tab-group').forEach(el => el.classList.toggle('m-on', el.dataset.group === g));
+    (side.querySelector(`.tab-group[data-group="${g}"]`) as any)?.select(i);
+    nav.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', j === k));
+    try { localStorage.setItem('editor.mobilePanel', String(k)); } catch { /* */ }
+  };
+  ENTRIES.forEach(([label, , , ic], k) => { const b = h('button', { class: 'side-nav-btn', type: 'button', role: 'tab', html: (icon(ic) || '') + `<span>${label}</span>` }); b.onclick = () => show(k); nav.append(b); });
+  side.prepend(nav);
+  let first = 0; try { first = Math.max(0, Math.min(ENTRIES.length - 1, +(localStorage.getItem('editor.mobilePanel') ?? 0))); } catch { /* */ }
+  show(first);
+  // en el ordenador, todos los grupos se ven a la vez (la selección del móvil no afecta)
+  // deslizar el dedo desde el borde derecho abre el cajón; hacia la derecha lo cierra
+  let sx = -1, sy = 0;
+  document.addEventListener('touchstart', e => { const t = e.touches[0]; if (window.innerWidth > 700 || !t) return; const open = document.body.classList.contains('show-side'); sx = (!open && t.clientX > window.innerWidth - 24) || (open && side.contains(e.target as Node)) ? t.clientX : -1; sy = t.clientY; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    const t = e.changedTouches[0]; if (sx < 0 || !t) return; const dx = t.clientX - sx, dy = Math.abs(t.clientY - sy); sx = -1;
+    if (dy > 60) return;
+    if (dx < -50) document.body.classList.add('show-side'); else if (dx > 70 && !(document.activeElement instanceof HTMLInputElement)) document.body.classList.remove('show-side');
+  }, { passive: true });
+}
 root.append(h('div', { id: 'toasts' }));
 
 // Separador ajustable entre paneles
@@ -152,6 +190,8 @@ function renderTabs() {
   if (app.doc && !app.doc.viewInitialized) requestAnimationFrame(() => app.viewport.resize());
 }
 app.on('docs', renderTabs);
+// guía de primera visita, al abrir la primera imagen (no en navegadores automatizados de pruebas)
+app.on('docs', () => { if (app.doc && !(navigator as any).webdriver) easy.maybeTour(); });
 app.on('doc', () => {
   // El indicador de "sin guardar" de la pestaña
   const t = tabs.querySelector('.tab.active span');
@@ -201,7 +241,7 @@ function buildWelcome() {
       h('div', { class: 'welcome-logo', html: icon('logo') }),
       h('h1', {}, 'Editor'),
       h('p', {}, 'Editor de imágenes por capas. Todo se procesa en tu equipo: tus imágenes no salen de él.'),
-      h('div', { class: 'welcome-actions' }, openBtn, newBtn),
+      h('div', { class: 'welcome-actions' }, openBtn, newBtn, h('button', { class: 'btn big', type: 'button', onclick: () => easy.quickTasks(), html: icon('magic') + ' ¿Qué quieres hacer?' })),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,
       recentBox,
       h('div', { class: 'drop-hint' }, 'También puedes arrastrar aquí imágenes (PNG, JPG, WebP, GIF, TIFF…), PSD, RAW o proyectos .edp, o pegar con Ctrl+V.'),
@@ -225,6 +265,7 @@ window.addEventListener('keyup', e => {
 
 window.addEventListener('keydown', e => {
   if (dialogOpen()) return;
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && !isTyping()) { e.preventDefault(); easy.openSearch(); return; }
   if (e.key === 'Alt') e.preventDefault(); // evita que el navegador active su menú
   const typing = isTyping();
   const ks = keyString(e);

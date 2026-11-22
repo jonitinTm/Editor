@@ -1,5 +1,6 @@
 // Barra de herramientas vertical (izquierda) y colores.
 
+import { TOOL_DESC } from './tooldesc';
 import { app } from './app';
 import { h } from './dom';
 import { icon } from './icons';
@@ -32,7 +33,7 @@ export function buildToolbar(parent: HTMLElement) {
       closeFly();
       const r = el.getBoundingClientRect();
       flyout = h('div', { class: 'flyout', style: { left: r.right + 4 + 'px', top: r.top + 'px' } },
-        ...ids.map(id => { const t = app.tools.get(id)!; return h('div', { class: 'fly-item', onclick: () => { app.setTool(id); closeFly(); } }, h('span', { html: t.icon }), h('span', {}, t.name), h('kbd', {}, t.key ?? '')); }));
+        ...ids.map(id => { const t = app.tools.get(id)!; return h('div', { class: 'fly-item', title: TOOL_DESC[id] ?? '', onclick: () => { app.setTool(id); closeFly(); } }, h('span', { html: t.icon }), h('span', { class: 'fly-name' }, t.name, TOOL_DESC[id] ? h('small', { class: 'fly-desc' }, TOOL_DESC[id]) : null), h('kbd', {}, t.key ?? '')); }));
       document.body.append(flyout);
     };
     el.addEventListener('click', () => app.setTool(toolOf(ids).id));
@@ -69,7 +70,8 @@ export function buildToolbar(parent: HTMLElement) {
     for (const b of buttons) {
       const t: Tool = toolOf(b.ids);
       b.el.innerHTML = t.icon;
-      b.el.title = `${t.name}${t.key ? ` (${t.key})` : ''}${b.ids.length > 1 ? ' — clic derecho para más' : ''}`;
+      b.el.title = `${t.name}${t.key ? ` (${t.key})` : ''}${TOOL_DESC[t.id] ? '\n' + TOOL_DESC[t.id] : ''}${b.ids.length > 1 ? '\nMantén pulsado o clic derecho para ver más' : ''}`;
+      b.el.setAttribute('aria-label', t.name);
       b.el.classList.toggle('active', b.ids.includes(app.tool?.id));
     }
     fgSw.style.background = app.fg; bgSw.style.background = app.bg;

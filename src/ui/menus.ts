@@ -19,7 +19,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Archivo', items: ['new', 'open', 'openLayers', 'recent', 'place', '-', 'save', 'saveAs', 'export', 'exportLayers', 'exportSlices', 'social', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'print', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fade', '-', 'fill', 'contentFill', '-', 'caScale', 'puppet', 'autoAlign', 'stroke', '-', 'findReplace', 'skyReplace', '-', 'defineBrush', 'definePattern', 'importPresets', '-', 'freeTransform',
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'prefs'] },
-  { label: 'Imagen', items: [{ label: 'Ajustes', items: [...filterItems('ajuste'), '-', 'variations'] }, '-', 'dupDoc', '-', 'palette', 'applyImage', 'freqSep', '-', 'imageSize', 'canvasSize',
+  { label: 'Imagen', items: ['autoEnhance', 'blurBg', '-', { label: 'Ajustes', items: [...filterItems('ajuste'), '-', 'variations'] }, '-', 'dupDoc', '-', 'palette', 'applyImage', 'freqSep', '-', 'imageSize', 'canvasSize',
     { label: 'Modo', items: ['modeRgb', 'modeGray', '-', 'filter:indexed'] },
     { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', 'imgRotArb', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll', 'autoStraighten', 'fitImage'] },
   { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'dupLayerTo', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
@@ -33,7 +33,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Filtro', items: ['lastFilter', '-', 'filterGallery', 'filter:develop', 'liquify', 'displace', '-', ...filterItems('filtro')] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'proof', 'gamut', 'pixelGrid', '-', 'compare', 'comparePrev', { label: 'Simular visión', items: ['sim:none', '-', 'sim:protan', 'sim:deutan', 'sim:tritan', 'sim:achroma'] }, 'contrast', '-', 'extras', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'guideLayout', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Carácter', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Párrafo', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },
-  { label: 'Ayuda', items: ['guide', 'shortcuts', '-', 'about'] },
+  { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'guide', 'shortcuts', '-', 'about'] },
 ];
 
 window.addEventListener('editor-keys', () => {
@@ -125,4 +125,12 @@ export function buildMenuBar(parent: HTMLElement) {
   document.addEventListener('pointerdown', e => { if (openMenu && !bar.contains(e.target as Node)) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && openMenu) close(); });
   parent.append(bar);
+}
+
+/** Ruta de menú de cada acción («Imagen › Ajustes › Curvas»), para el buscador. */
+export function menuPaths(): Map<string, string> {
+  const out = new Map<string, string>();
+  const walk = (items: Item[], path: string) => { for (const it of items) { if (it === '-') continue; if (typeof it === 'object') walk(it.items, path + ' › ' + it.label); else if (!out.has(it)) out.set(it, path); } };
+  for (const m of MENUS) walk(m.items, m.label);
+  return out;
 }
