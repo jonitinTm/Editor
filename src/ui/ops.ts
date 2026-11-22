@@ -1769,7 +1769,7 @@ export async function exportSlices(type: 'image/png' | 'image/jpeg' | 'image/web
 }
 
 /** Contornos (en coordenadas del documento) de lo opaco de una capa, calculados a 3× para más precisión. */
-async function layerOutlines(l: Layer): Promise<{ closed: boolean; pts: import('../core/layers').PathPoint[] }[]> {
+export async function layerOutlines(l: Layer): Promise<{ closed: boolean; pts: import('../core/layers').PathPoint[] }[]> {
   const d = doc()!, S = 3, src = (l as RasterLayer).canvas;
   const big = makeCanvas(d.width * S, d.height * S), bx = ctx2d(big);
   bx.imageSmoothingEnabled = true; bx.imageSmoothingQuality = 'high'; bx.drawImage(src, 0, 0, big.width, big.height);

@@ -423,6 +423,17 @@ Ya disponible:
 - **Paneles en el móvil**: una fila de botones grandes arriba del cajón (Capas, Color, Propiedades, Historial,
   Muestras, Pinceles…); el panel elegido ocupa todo el cajón. Se abre deslizando el dedo desde el borde derecho y se
   cierra deslizándolo hacia la derecha o tocando fuera.
+- **Más de los editores profesionales**:
+  - *Archivo › Información de archivo…* (`Alt+Mayús+Ctrl+I`): datos de la cámara de las fotos JPEG (modelo, objetivo,
+    exposición, diafragma, ISO, fecha, ubicación GPS con enlace al mapa) y título, autor, copyright, palabras clave y
+    descripción (se guardan en el proyecto; al exportar no se añaden datos de cámara ni de ubicación).
+  - *Archivo › Exportación rápida como PNG*.
+  - *Edición › Definir forma personalizada…*: una forma, texto, trazado o dibujo pasa a la lista de la herramienta Forma.
+  - *Capa › Texto › Glifos*: símbolos y caracteres especiales (letras con tilde, monedas, flechas, matemáticas,
+    emojis…) que se escriben donde está el cursor.
+  - *Filtro › Interpretar › Árbol*, *Llama* y *Marco de imagen* (madera, dorado, negro, blanco, paspartú, Polaroid,
+    antiguo); *Filtro › Enfocar › Reducción de movimiento* (fotos movidas); *Filtro › Vídeo › Desentrelazar*.
+  - Pincel con *Bordes húmedos* (efecto acuarela) y *Ruido* (textura granulada).
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

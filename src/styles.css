@@ -660,3 +660,8 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .tour-bubble { position: fixed; z-index: 462; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 12px 14px; box-shadow: 0 12px 40px rgba(0,0,0,.6); }
 .tour-bubble p { margin: 6px 0 10px; line-height: 1.45; font-size: 13px; }
 .tour-btns { display: flex; gap: 8px; justify-content: flex-end; }
+
+.exif-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 13px; }
+.glyph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; }
+.glyph { height: 38px; font-size: 20px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 6px; cursor: pointer; }
+.glyph:hover { border-color: var(--accent); }

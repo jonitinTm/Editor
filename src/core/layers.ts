@@ -515,6 +515,8 @@ export interface ShapeProps {
   shape: 'rect' | 'round' | 'ellipse' | 'line' | 'path' | 'polygon' | 'star' | 'arrow' | 'heart' | 'custom';
   /** Forma personalizada (biblioteca de formas). */
   custom?: string;
+  /** Su trazado SVG (por si se abre en un navegador que no tiene esa forma). */
+  customD?: string;
   /** Lados del polígono o puntas de la estrella. */
   sides?: number;
   /** Estrella: radio interior respecto al exterior (0-1). */
@@ -592,7 +594,7 @@ export class ShapeLayer extends RasterLayer {
     }
     else if (p.shape === 'custom') {
       // la forma de la biblioteca se estira a la caja (como en Photoshop)
-      const base = customShapePath(p.custom ?? ''), path = new Path2D();
+      const base = customShapePath(p.custom ?? '', p.customD), path = new Path2D();
       if (base && w > 0 && h > 0) path.addPath(base, new DOMMatrix([w / 100, 0, 0, h / 100, x, y]));
       if (p.fill) { ctx.fillStyle = p.fill; ctx.fill(path, 'evenodd'); }
       if (p.stroke) { ctx.strokeStyle = p.stroke; ctx.lineWidth = p.strokeWidth; ctx.setLineDash(dashPattern(p.dash, p.strokeWidth)); if (p.dash === 'dot' || p.dash === 'dashdot') ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke(path); }

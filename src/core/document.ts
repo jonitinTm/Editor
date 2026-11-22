@@ -40,6 +40,8 @@ export class EditorDocument {
   slices: { x: number; y: number; w: number; h: number; name: string }[] = [];
   /** Resolución para imprimir (píxeles por pulgada). */
   ppi = 72;
+  /** Información del archivo: datos de la cámara (solo lectura) y título, autor, copyright… (editables). */
+  meta: { exif?: Record<string, string>; title?: string; author?: string; copyright?: string; description?: string; keywords?: string } = {};
   /** Modo de color: en «gris» se trabaja en escala de grises. */
   mode: 'rgb' | 'gray' = 'rgb';
   /** Trazado activo en el panel (-1 = ninguno). */

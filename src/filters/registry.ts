@@ -10,6 +10,7 @@ import * as L from './lut';
 import * as N from './more2';
 import * as R from './artistic';
 import * as MD from './modes';
+import * as R2 from './render2';
 import { indexColors } from './indexed';
 import { matchColor } from './matchcolor';
 
@@ -375,6 +376,24 @@ export const FILTERS: FilterDef[] = [
     { key: 'gloss', label: 'Brillo (barniz)', type: 'range', min: 0, max: 100, default: 30, unit: '%' }], apply: (img, p) => R.impasto(img, p) },
   { id: 'bumpmap', name: 'Generar mapa de relieve…', group: 'filtro', submenu: '3D', params: [{ key: 'blur', label: 'Suavizar', type: 'range', min: 0, max: 20, default: 2, unit: 'px' }, { key: 'contrast', label: 'Contraste', type: 'range', min: 10, max: 200, default: 50 }, { key: 'invert', label: 'Invertir altura', type: 'checkbox', default: false }], apply: (img, p) => R.bumpMap(img, p) },
   { id: 'normalmap', name: 'Generar mapa de normales…', group: 'filtro', submenu: '3D', params: [{ key: 'strength', label: 'Intensidad', type: 'range', min: 1, max: 200, default: 50 }, { key: 'blur', label: 'Suavizar', type: 'range', min: 0, max: 20, default: 1, unit: 'px' }, { key: 'invert', label: 'Invertir altura', type: 'checkbox', default: false }], apply: (img, p) => R.normalMap(img, p) },
+  { id: 'tree', name: 'Árbol…', group: 'filtro', submenu: 'Interpretar', params: [
+    { key: 'x', label: 'Posición horizontal', type: 'range', min: 0, max: 100, default: 50, unit: '%' }, { key: 'y', label: 'Base (altura)', type: 'range', min: 10, max: 100, default: 98, unit: '%' },
+    { key: 'size', label: 'Tamaño', type: 'range', min: 10, max: 100, default: 60, unit: '%' }, { key: 'depth', label: 'Ramificación', type: 'range', min: 3, max: 11, default: 8 },
+    { key: 'spread', label: 'Apertura de ramas', type: 'range', min: 5, max: 60, default: 28, unit: '°' }, { key: 'density', label: 'Hojas', type: 'range', min: 0, max: 100, default: 60, unit: '%' },
+    { key: 'bark', label: 'Tronco', type: 'color', default: '#4a3020' }, { key: 'leaves', label: 'Hojas', type: 'color', default: '#3f8f3a' }, { key: 'seed', label: 'Variación', type: 'range', min: 1, max: 100, default: 3 }], apply: (img, p) => R2.tree(img, p) },
+  { id: 'flame', name: 'Llama…', group: 'filtro', submenu: 'Interpretar', params: [
+    { key: 'x', label: 'Posición horizontal', type: 'range', min: 0, max: 100, default: 50, unit: '%' }, { key: 'y', label: 'Base (altura)', type: 'range', min: 5, max: 100, default: 90, unit: '%' },
+    { key: 'height', label: 'Altura de la llama', type: 'range', min: 5, max: 100, default: 45, unit: '%' }, { key: 'width', label: 'Anchura', type: 'range', min: 2, max: 60, default: 18, unit: '%' },
+    { key: 'turbulence', label: 'Turbulencia', type: 'range', min: 0, max: 100, default: 50, unit: '%' }, { key: 'color', label: 'Color', type: 'select', default: 'natural', choices: [['natural', 'Natural'], ['blue', 'Azul (gas)']] },
+    { key: 'seed', label: 'Variación', type: 'range', min: 1, max: 100, default: 5 }], apply: (img, p) => R2.flame(img, p) },
+  { id: 'pictureframe', name: 'Marco de imagen…', group: 'filtro', submenu: 'Interpretar', params: [
+    { key: 'style', label: 'Estilo', type: 'select', default: 'wood', choices: [['wood', 'Madera'], ['gold', 'Dorado'], ['black', 'Negro'], ['white', 'Blanco'], ['mat', 'Con paspartú'], ['polaroid', 'Polaroid'], ['vintage', 'Antiguo (viñeta)']] },
+    { key: 'width', label: 'Grosor', type: 'range', min: 1, max: 20, default: 6, unit: '%' }], apply: (img, p) => R2.pictureFrame(img, p) },
+  { id: 'shake', name: 'Reducción de movimiento…', group: 'filtro', submenu: 'Enfocar', params: [
+    { key: 'angle', label: 'Dirección del movimiento', type: 'range', min: -90, max: 90, default: 0, unit: '°' }, { key: 'length', label: 'Longitud del movimiento', type: 'range', min: 2, max: 40, default: 8, unit: 'px' },
+    { key: 'iterations', label: 'Intensidad', type: 'range', min: 1, max: 30, default: 10 }, { key: 'noise', label: 'Contener el ruido', type: 'range', min: 0, max: 100, default: 20, unit: '%' }], apply: (img, p) => R2.shakeReduction(img, p) },
+  { id: 'deinterlace', name: 'Desentrelazar…', group: 'filtro', submenu: 'Vídeo', params: [
+    { key: 'lines', label: 'Quitar líneas', type: 'select', default: 'odd', choices: [['odd', 'Impares'], ['even', 'Pares']] }, { key: 'mode', label: 'Rellenar con', type: 'select', default: 'interp', choices: [['interp', 'Interpolación'], ['dup', 'Duplicación']] }], apply: (img, p) => R2.deinterlace(img, p) },
 ];
 
 /** Los motivos se piden a quien los tenga (la página); en el hilo de fondo no existen. */

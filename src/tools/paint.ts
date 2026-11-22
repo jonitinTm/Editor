@@ -149,6 +149,8 @@ export class Stroke {
   private fast: boolean;
   dirty: Rect | null = null;
   bounds: Rect | null = null;
+  /** Retoque del trazo entero al terminar (p. ej. bordes húmedos). */
+  post?: (buffer: HTMLCanvasElement, bounds: Rect) => void;
   private last: { x: number; y: number; p: number } | null = null;
   private residue = 0;
   private sel: HTMLCanvasElement | null;
@@ -272,7 +274,13 @@ export class Stroke {
   /** Termina el trazo y devuelve true si cambió algo. */
   finish(): boolean {
     this.update();
-    if (this.fast) {
+    if (this.post && this.bounds) {
+      this.post(this.buffer, this.bounds);
+      if (this.sel) { const t = this.tmp ?? (this.tmp = makeCanvas(this.buffer.width, this.buffer.height)), x = ctx2d(t); x.clearRect(0, 0, t.width, t.height); x.drawImage(this.buffer, 0, 0); x.globalCompositeOperation = 'destination-in'; x.drawImage(this.sel, 0, 0); x.globalCompositeOperation = 'source-over'; }
+      if (this.fast) { this.clearExtra(); this.fast = false; }
+      this.preview = cloneCanvas(this.original);
+      this.composeInto(this.preview, this.bounds);
+    } else if (this.fast) {
       this.clearExtra(); this.fast = false;
       if (!this.bounds) { app.doc!.invalidate(); return false; }
       this.preview = cloneCanvas(this.original);

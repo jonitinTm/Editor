@@ -22,9 +22,20 @@ export const CUSTOM_SHAPES: [string, string, string][] = [
   ['doublearrow', 'Flecha doble', 'M2 50L26 26V40H74V26L98 50L74 74V60H26V74z'],
   ['chevron', 'Galón', 'M2 10H62L98 50L62 90H2L38 50z'],
 ];
+// las formas que define el usuario (Edición › Definir forma personalizada) se guardan en este navegador
+const USER_KEY = 'editor.userShapes';
+try { const u = JSON.parse(localStorage.getItem(USER_KEY) || '[]'); if (Array.isArray(u)) for (const s of u) if (Array.isArray(s) && s.length === 3) CUSTOM_SHAPES.push(s as [string, string, string]); } catch { /* sin almacenamiento */ }
+export function addUserShape(name: string, d: string): string {
+  const id = 'u' + Date.now().toString(36);
+  CUSTOM_SHAPES.push([id, name, d]);
+  try { const u = JSON.parse(localStorage.getItem(USER_KEY) || '[]'); u.push([id, name, d]); localStorage.setItem(USER_KEY, JSON.stringify(u)); } catch { /* sin almacenamiento */ }
+  return id;
+}
+export function shapeD(id: string) { return CUSTOM_SHAPES.find(s => s[0] === id)?.[2]; }
 const cache = new Map<string, Path2D>();
-export function customShapePath(id: string): Path2D | null {
+/** Trazado de una forma de la biblioteca; `d` sirve de respaldo si la forma no está en este navegador. */
+export function customShapePath(id: string, d?: string): Path2D | null {
   let p = cache.get(id);
-  if (!p) { const d = CUSTOM_SHAPES.find(s => s[0] === id)?.[2]; if (!d) return null; p = new Path2D(d); cache.set(id, p); }
+  if (!p) { const dd = CUSTOM_SHAPES.find(s => s[0] === id)?.[2] ?? d; if (!dd) return null; p = new Path2D(dd); cache.set(id, p); }
   return p;
 }

@@ -1,6 +1,7 @@
 // Herramienta Forma: rectángulo, rectángulo redondeado, elipse y línea.
 // Cada forma se crea en una capa vectorial nueva, editable desde Propiedades.
 
+import { shapeD } from '../core/customshapes';
 import { CUSTOM_SHAPES } from '../core/customshapes';
 import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
@@ -38,7 +39,7 @@ export class ShapeTool implements Tool {
     const opt = app.opt<string>('shape', this.id), custom = opt.startsWith('custom:') ? opt.slice(7) : undefined;
     const shape = (custom ? 'custom' : opt) as ShapeProps['shape'];
     this.layer = new ShapeLayer('Forma', doc.width, doc.height, {
-      shape, custom, x0: e.x, y0: e.y, x1: e.x, y1: e.y,
+      shape, custom, customD: custom?.startsWith('u') ? shapeD(custom) : undefined, x0: e.x, y0: e.y, x1: e.x, y1: e.y,
       fill: shape === 'line' ? null : app.opt('fill', this.id) ? app.fg : null,
       stroke: shape === 'line' ? app.fg : app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : null,
       strokeWidth: app.opt('strokeWidth', this.id), radius: app.opt('radius', this.id), dash: app.opt('dash', this.id) || 'solid',

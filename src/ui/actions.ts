@@ -9,6 +9,7 @@ import * as cmpv from './compare';
 import * as uniq from './unique';
 import * as s3d from './shadow3d';
 import * as more from './more';
+import * as more2 from './more2';
 
 import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
@@ -238,6 +239,10 @@ export const ACTIONS: Action[] = [
   { id: 'autoEnhance', label: 'Mejorar la foto (automático)', enabled: hasLayer, run: () => { import('./easy').then(m => m.autoEnhance()); } },
   { id: 'blurBg', label: 'Desenfocar el fondo (efecto retrato)', enabled: hasLayer, run: () => { import('./easy').then(m => m.blurBackground()); } },
   { id: 'tour', label: 'Ver la guía de bienvenida', run: () => { import('./easy').then(m => m.startTour()); } },
+  { id: 'fileInfo', label: 'Información de archivo…', keys: ['Alt+Shift+Ctrl+I'], enabled: hasDoc, run: more2.fileInfoDialog },
+  { id: 'quickPng', label: 'Exportación rápida como PNG', enabled: hasDoc, run: more2.quickExportPng },
+  { id: 'defineShape', label: 'Definir forma personalizada…', enabled: hasLayer, run: more2.defineCustomShape },
+  { id: 'glyphs', label: 'Glifos (símbolos)…', enabled: () => true, run: more2.glyphsDialog },
   { id: 'reselect', label: 'Volver a seleccionar', keys: ['Shift+Ctrl+D'], enabled: () => !!app.doc?.selection.last, run: more.reselect },
   { id: 'selAllLayers', label: 'Todas las capas', keys: ['Alt+Ctrl+A'], enabled: hasDoc, run: more.selectAllLayers },
   { id: 'defringe', label: 'Quitar halo…', enabled: hasLayer, run: more.defringeDialog },

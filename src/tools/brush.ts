@@ -67,6 +67,19 @@ export function drawSymAxes(ctx: CanvasRenderingContext2D, vp: Viewport, mode: s
 const SIZE_JIT = { key: 'sizeJitter', label: 'Variar tamaño', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
 const ANG_JIT = { key: 'angleJitter', label: 'Variar ángulo', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
 const OPAC_JIT = { key: 'opacityJitter', label: 'Variar opacidad', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const WET = { key: 'wetEdges', label: 'Bordes húmedos', type: 'checkbox' as const, default: false };
+const NOISE = { key: 'brushNoise', label: 'Ruido', type: 'checkbox' as const, default: false };
+/** Punta modificada: bordes húmedos (más pintura en el borde, como la acuarela) y/o ruido (textura granulada). */
+const modTips = new WeakMap<HTMLCanvasElement, Map<string, HTMLCanvasElement>>();
+function modTip(tip: HTMLCanvasElement, wet: boolean, noise: boolean): HTMLCanvasElement {
+  const key = `${wet}|${noise}`; let m = modTips.get(tip); if (!m) { m = new Map(); modTips.set(tip, m); }
+  let c = m.get(key); if (c) return c;
+  c = makeCanvas(tip.width, tip.height); const x = ctx2d(c); x.drawImage(tip, 0, 0);
+  const w = tip.width, hh = tip.height;
+  if (wet) { const g = x.createRadialGradient(w / 2, hh / 2, 0, w / 2, hh / 2, Math.min(w, hh) * 0.45); g.addColorStop(0, 'rgba(0,0,0,.6)'); g.addColorStop(0.7, 'rgba(0,0,0,.45)'); g.addColorStop(1, 'rgba(0,0,0,0)'); x.globalCompositeOperation = 'destination-out'; x.fillStyle = g; x.fillRect(0, 0, w, hh); }
+  if (noise) { const n = x.createImageData(w, hh); for (let i = 3; i < n.data.length; i += 4) n.data[i] = Math.random() < 0.5 ? 255 : 90 + Math.random() * 165; const t = makeCanvas(w, hh); ctx2d(t).putImageData(n, 0, 0); x.globalCompositeOperation = 'destination-in'; x.drawImage(t, 0, 0); }
+  x.globalCompositeOperation = 'source-over'; m.set(key, c); return c;
+}
 const AIRBRUSH = { key: 'airbrush', label: 'Aerógrafo (acumula al quedarse quieto)', type: 'checkbox' as const, default: false };
 const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, min: 0, max: 500, default: 0, unit: '%' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
@@ -132,6 +145,7 @@ abstract class StrokeTool implements Tool {
       if (bj > 0) { const k = 1 + (Math.random() * 2 - 1) * bj * 0.6; r *= k; g *= k; b *= k; }
       return `rgb(${Math.max(0, Math.min(255, r)) | 0},${Math.max(0, Math.min(255, g)) | 0},${Math.max(0, Math.min(255, b)) | 0})`;
     };
+    const wetE = !!app.opt('wetEdges', this.id) && !this.aliased, noiseE = !!app.opt('brushNoise', this.id);
     const sj = (app.opt<number>('sizeJitter', this.id) ?? 0) / 100, aj = (app.opt<number>('angleJitter', this.id) ?? 0) / 100, oj = (app.opt<number>('opacityJitter', this.id) ?? 0) / 100;
     return (x, y, p) => {
       // dinámica de forma: cada pincelada con tamaño, ángulo y opacidad algo distintos
@@ -139,6 +153,7 @@ abstract class StrokeTool implements Tool {
       const angle = aj > 0 ? angle0 + (Math.random() * 2 - 1) * aj * 180 : angle0;
       // punta con imagen (si hay) o la redonda de siempre
       let tip = (tipId && sampledTip(tipId, size, dyn ? '#ffffff' : color, jitter ? Math.random() * 360 : angle, round)) || brushTip(size, hard, dyn ? '#ffffff' : color, this.aliased, round, angle);
+      if (wetE || noiseE) tip = modTip(tip, wetE, noiseE);
       if (dyn) {
         if (tintC.width !== tip.width || tintC.height !== tip.height) { tintC.width = tip.width; tintC.height = tip.height; }
         const tc = ctx2d(tintC); tc.globalCompositeOperation = 'copy'; tc.drawImage(tip, 0, 0); tc.globalCompositeOperation = 'source-in'; tc.fillStyle = dynColor(); tc.fillRect(0, 0, tip.width, tip.height); tc.globalCompositeOperation = 'source-over';
@@ -173,6 +188,19 @@ abstract class StrokeTool implements Tool {
     const s = strokeSetup(t, this.erase);
     this.stroke = new Stroke(t, s.mode, app.opt<number>('opacity', this.id) / 100, s.maskValue, (s.mode === 'paint' ? app.opt<string>('blendMode', this.id) : undefined) as GlobalCompositeOperation || 'source-over');
     const dab0 = this.makeDab(s.color), sym = app.opt<string>('symmetry', this.id) || 'none';
+    // bordes húmedos: al terminar, el centro del trazo se aclara y el borde se queda con más pintura
+    if (app.opt('wetEdges', this.id) && !this.aliased) {
+      const r = Math.max(1.5, (app.opt<number>('size', this.id) ?? 20) * 0.22);
+      this.stroke.post = (buf, b) => {
+        const pad = Math.ceil(r * 3), x0 = Math.max(0, Math.floor(b.x) - pad), y0 = Math.max(0, Math.floor(b.y) - pad), x1 = Math.min(buf.width, Math.ceil(b.x + b.w) + pad), y1 = Math.min(buf.height, Math.ceil(b.y + b.h) + pad), w = x1 - x0, hh = y1 - y0;
+        if (w < 1 || hh < 1) return;
+        const bc = ctx2d(buf), img = bc.getImageData(x0, y0, w, hh), bl = makeCanvas(w, hh), bx = ctx2d(bl);
+        bx.filter = `blur(${r}px)`; bx.drawImage(buf, x0, y0, w, hh, 0, 0, w, hh); bx.filter = 'none';
+        const B2 = bx.getImageData(0, 0, w, hh).data, D = img.data;
+        for (let i = 3; i < D.length; i += 4) { const interior = Math.min(1, B2[i] / 255 / Math.max(0.01, D[i] / 255)); D[i] = D[i] * (1 - 0.6 * Math.pow(interior, 3)); }
+        bc.putImageData(img, x0, y0);
+      };
+    }
     // con simetría, cada pincelada se repite en los puntos reflejados o girados
     this.dab = sym === 'none' ? dab0 : (x: number, y: number, p: number) => {
       let r: any = null;
@@ -224,7 +252,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, AIRBRUSH, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
 }
