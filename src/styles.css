@@ -577,3 +577,9 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .pal-sw { border: 0; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; min-width: 40px; }
 .pal-sw span { font: 11px ui-monospace, monospace; background: rgba(0,0,0,.55); color: #fff; padding: 1px 4px; border-radius: 3px; }
 .pal-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+
+.soc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 12px; margin-bottom: 8px; }
+.soc-item { font-size: 13px; }
+.soc-prev { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin: 8px 0; min-height: 60px; }
+.soc-thumb { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; opacity: .9; }
+.soc-thumb canvas { max-height: 120px; max-width: 150px; border-radius: 3px; box-shadow: 0 1px 4px rgba(0,0,0,.5); }

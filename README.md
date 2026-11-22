@@ -384,6 +384,20 @@ Ya disponible:
   los botones son más grandes. En Safari (iPhone, iPad y Mac), si el navegador no sabe desenfocar al dibujar, Editor lo
   hace por su cuenta; las fotos más grandes de lo que admite un iPhone/iPad (unos 16,7 megapíxeles) se abren reducidas
   con un aviso en vez de fallar, y el vídeo se graba en MP4 si el navegador no admite WebM.
+- **Funciones propias de Editor** (no las traen los editores habituales):
+  - *Vista › Comparar antes / después* (`Mayús+Ctrl+Y`): una línea que arrastras separa el estado inicial (o el paso
+    anterior) del actual, sobre la misma imagen.
+  - *Vista › Simular visión*: ver el diseño como una persona con protanopía, deuteranopía, tritanopía o sin color.
+  - *Vista › Comprobar contraste de textos…*: dice si cada texto se lee bien sobre su fondo (pautas WCAG AA/AAA) y lo
+    arregla con un clic cambiando lo mínimo su color.
+  - *Imagen › Paleta de la imagen…*: los colores principales de la foto, para pintar con ellos, añadirlos a Muestras,
+    copiarlos como CSS o crear una capa con la paleta.
+  - *Archivo › Exportar para redes sociales…*: de una imagen, todos los tamaños a la vez (Instagram, historias, TikTok,
+    Facebook, YouTube, X, LinkedIn, Pinterest, WhatsApp) en un ZIP, con **recorte inteligente** que busca el sujeto
+    principal y no lo corta, o la imagen entera con fondo desenfocado o de color.
+  - *Archivo › Timelapse de la edición…*: GIF o vídeo con todos los pasos del historial, para enseñar cómo se hizo.
+  - *Imagen › Enderezar automáticamente*: detecta lo torcida que está la foto (horizonte, edificios) y la endereza y
+    recorta en un paso.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
