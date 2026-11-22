@@ -8,6 +8,7 @@ import * as dlg from './dialogs';
 import * as cmpv from './compare';
 import * as uniq from './unique';
 import * as s3d from './shadow3d';
+import * as more from './more';
 
 import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
@@ -232,6 +233,19 @@ export const ACTIONS: Action[] = [
   ...cmpv.SIM_NAMES.map(([s, n]) => ({ id: 'sim:' + s, label: n, enabled: hasDoc, checked: () => cmpv.getSim() === s, run: () => cmpv.setSim(s) })),
   { id: 'contrast', label: 'Comprobar contraste de textos…', enabled: hasDoc, run: uniq.contrastDialog },
   { id: 'autoStraighten', label: 'Enderezar automáticamente', enabled: hasDoc, run: uniq.autoStraighten },
+  { id: 'reselect', label: 'Volver a seleccionar', keys: ['Shift+Ctrl+D'], enabled: () => !!app.doc?.selection.last, run: more.reselect },
+  { id: 'selAllLayers', label: 'Todas las capas', keys: ['Alt+Ctrl+A'], enabled: hasDoc, run: more.selectAllLayers },
+  { id: 'defringe', label: 'Quitar halo…', enabled: hasLayer, run: more.defringeDialog },
+  { id: 'matteBlack', label: 'Quitar mate negro', enabled: hasLayer, run: () => more.removeMatte(false) },
+  { id: 'matteWhite', label: 'Quitar mate blanco', enabled: hasLayer, run: () => more.removeMatte(true) },
+  { id: 'pixelGrid', label: 'Cuadrícula de píxeles', enabled: hasDoc, checked: () => more.viewOpts.pixelGrid, run: more.togglePixelGrid },
+  { id: 'proof', label: 'Prueba de impresión (CMYK)', keys: ['Alt+Ctrl+Y'], enabled: hasDoc, checked: () => more.viewOpts.proof, run: more.toggleProof },
+  { id: 'gamut', label: 'Avisar de colores no imprimibles', enabled: hasDoc, checked: () => more.viewOpts.gamut, run: more.toggleGamut },
+  { id: 'videoFrames', label: 'Fotogramas de vídeo a capas…', enabled: () => true, run: more.videoFramesDialog },
+  { id: 'contactSheet', label: 'Hoja de contactos…', enabled: () => true, run: more.contactSheetDialog },
+  { id: 'fitImage', label: 'Encajar imagen…', enabled: hasDoc, run: more.fitImageDialog },
+  { id: 'displace', label: 'Desplazar (con otra capa)…', enabled: hasLayer, run: more.displaceDialog },
+  { id: 'focusStack', label: 'Fusión de enfoque (apilar)', enabled: hasDoc, run: more.focusStack },
   { id: 'castShadow', label: 'Sombra proyectada…', enabled: hasLayer, run: s3d.castShadowDialog },
   { id: 'extrude3d', label: 'Extrusión 3D…', enabled: hasLayer, run: s3d.extrudeDialog },
   { id: 'social', label: 'Exportar para redes sociales…', enabled: hasDoc, run: uniq.socialDialog },

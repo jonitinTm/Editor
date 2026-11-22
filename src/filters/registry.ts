@@ -373,6 +373,8 @@ export const FILTERS: FilterDef[] = [
     { key: 'depth', label: 'Relieve', type: 'range', min: 0, max: 100, default: 50, unit: '%' }, { key: 'size', label: 'Tamaño de pincelada', type: 'range', min: 1, max: 30, default: 6, unit: 'px' },
     { key: 'strokes', label: 'Dirección de las pinceladas', type: 'range', min: -90, max: 90, default: 30, unit: '°' }, { key: 'light', label: 'Dirección de la luz', type: 'range', min: -180, max: 180, default: 135, unit: '°' },
     { key: 'gloss', label: 'Brillo (barniz)', type: 'range', min: 0, max: 100, default: 30, unit: '%' }], apply: (img, p) => R.impasto(img, p) },
+  { id: 'bumpmap', name: 'Generar mapa de relieve…', group: 'filtro', submenu: '3D', params: [{ key: 'blur', label: 'Suavizar', type: 'range', min: 0, max: 20, default: 2, unit: 'px' }, { key: 'contrast', label: 'Contraste', type: 'range', min: 10, max: 200, default: 50 }, { key: 'invert', label: 'Invertir altura', type: 'checkbox', default: false }], apply: (img, p) => R.bumpMap(img, p) },
+  { id: 'normalmap', name: 'Generar mapa de normales…', group: 'filtro', submenu: '3D', params: [{ key: 'strength', label: 'Intensidad', type: 'range', min: 1, max: 200, default: 50 }, { key: 'blur', label: 'Suavizar', type: 'range', min: 0, max: 20, default: 1, unit: 'px' }, { key: 'invert', label: 'Invertir altura', type: 'checkbox', default: false }], apply: (img, p) => R.normalMap(img, p) },
 ];
 
 /** Los motivos se piden a quien los tenga (la página); en el hilo de fondo no existen. */

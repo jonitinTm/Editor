@@ -72,7 +72,9 @@ export class Selection {
     const ctx = ctx2d(this.mask); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.width, this.height);
   }
   selectAll() { this.selectAllInternal(); this.changed(); }
-  clear() { this.mask = null; this.changed(); }
+  /** La última selección que se quitó (para «Volver a seleccionar»). */
+  last: HTMLCanvasElement | null = null;
+  clear() { if (this.mask) this.last = this.mask; this.mask = null; this.changed(); }
   invert() {
     if (!this.mask) { this.selectAll(); return; }
     const inv = makeCanvas(this.width, this.height);

@@ -307,3 +307,23 @@ export function impasto(img: ImageData, p: any) {
     for (let c = 0; c < 3; c++) d[i * 4 + c] = clamp(d[i * 4 + c] * k + spec);
   }
 }
+
+// ---- 3D: mapas de relieve y de normales --------------------------------------------------------------
+/** Mapa de relieve (alturas en gris) a partir de la luminosidad, para usar en programas 3D o en Efectos de iluminación. */
+export function bumpMap(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, blur = p.blur ?? 2, contrast = (p.contrast ?? 50) / 50, inv = !!p.invert;
+  const L = blurArr(lum(img), w, h, blur);
+  let mn = 255, mx = 0; for (const v of L) { if (v < mn) mn = v; if (v > mx) mx = v; }
+  for (let i = 0; i < w * h; i++) { let v = (L[i] - mn) / Math.max(1, mx - mn); v = 0.5 + (v - 0.5) * contrast; if (inv) v = 1 - v; d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = clamp(v * 255); d[i * 4 + 3] = 255; }
+}
+/** Mapa de normales (azul violáceo) a partir de la luminosidad: da relieve a texturas en juegos y programas 3D. */
+export function normalMap(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, strength = (p.strength ?? 50) / 10, blur = p.blur ?? 1, inv = !!p.invert;
+  const L = blurArr(lum(img), w, h, blur);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x, xm = x > 0 ? i - 1 : i, xp = x < w - 1 ? i + 1 : i, ym = y > 0 ? i - w : i, yp = y < h - 1 ? i + w : i;
+    let nx = (L[xm] - L[xp]) / 255 * strength, ny = (L[ym] - L[yp]) / 255 * strength; if (inv) { nx = -nx; ny = -ny; }
+    const nz = 1, n = Math.hypot(nx, ny, nz);
+    d[i * 4] = clamp((nx / n * 0.5 + 0.5) * 255); d[i * 4 + 1] = clamp((-ny / n * 0.5 + 0.5) * 255); d[i * 4 + 2] = clamp((nz / n * 0.5 + 0.5) * 255); d[i * 4 + 3] = 255;
+  }
+}

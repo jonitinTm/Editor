@@ -261,6 +261,7 @@ export class Viewport {
     // vistas especiales: antes/después y simulación de daltonismo
     (app as any).drawCompare?.(ctx, this);
     (app as any).applyViewSim?.(ctx, this);
+    (app as any).drawViewExtras?.(ctx, this);
 
     // Zona visible en coordenadas del documento
     const corners = [this.toDoc(0, 0), this.toDoc(this.width, 0), this.toDoc(this.width, this.height), this.toDoc(0, this.height)];

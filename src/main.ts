@@ -19,10 +19,11 @@ import { newDocumentDialog, quickGuideDialog, recentGrid } from './ui/dialogs';
 import { keyString } from './ui/keys';
 import * as io from './io/files';
 import * as uniq from './ui/unique';
+import * as more from './ui/more';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
-(app as any).debug = { readPsd, writePsd, ops, io, uniq };
+(app as any).debug = { readPsd, writePsd, ops, io, uniq, more };
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';

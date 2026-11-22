@@ -398,6 +398,19 @@ Ya disponible:
   - *Archivo › Timelapse de la edición…*: GIF o vídeo con todos los pasos del historial, para enseñar cómo se hizo.
   - *Imagen › Enderezar automáticamente*: detecta lo torcida que está la foto (horizonte, edificios) y la endereza y
     recorta en un paso.
+- **Sombras y 3D** (*Capa › 3D y sombras*):
+  - *Sombra proyectada…*: el objeto recortado proyecta su sombra en el suelo (en perspectiva) o en la pared; nítida y
+    oscura junto al objeto, más difusa y clara al alejarse, con sombra de contacto en la base. Va en su propia capa.
+  - *Extrusión 3D…*: da volumen a textos, logotipos y formas, con profundidad, dirección, perspectiva y sombreado.
+  - *Filtro › Artístico › Relieve de pintura (impasto)*: una pintura plana pasa a tener pinceladas con relieve y brillo.
+  - *Filtro › 3D*: generar mapa de relieve y mapa de normales (para juegos y programas 3D).
+- **Más funciones de los editores profesionales**: *Selección › Volver a seleccionar* (`Mayús+Ctrl+D`) y *Todas las
+  capas* (`Alt+Ctrl+A`); *Capa › Halos* (quitar halo, quitar mate negro o blanco); *Vista › Prueba de impresión (CMYK)*
+  (`Alt+Ctrl+Y`), *Avisar de colores no imprimibles* y *Cuadrícula de píxeles* (al acercar mucho); *Archivo ›
+  Fotogramas de vídeo a capas* y *Hoja de contactos*; *Imagen › Encajar imagen*; *Filtro › Desplazar (con otra capa)*;
+  *Capa › Combinar en pila › Fusión de enfoque* (varias fotos enfocadas en distintos puntos → una nítida en todas partes).
+- **En el móvil**, las ventanas con vista previa (sombra, 3D, desplazar…) ocupan la mitad de abajo para que la imagen se
+  siga viendo, y los avisos salen arriba.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».
