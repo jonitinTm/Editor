@@ -258,6 +258,9 @@ export class Viewport {
     const onion = (app as any).onionCanvas?.(d) as HTMLCanvasElement | null;
     if (onion) { ctx.save(); ctx.globalAlpha = 0.3; this.docTransform(ctx); ctx.drawImage(onion, 0, 0); ctx.restore(); }
     ctx.restore();
+    // vistas especiales: antes/después y simulación de daltonismo
+    (app as any).drawCompare?.(ctx, this);
+    (app as any).applyViewSim?.(ctx, this);
 
     // Zona visible en coordenadas del documento
     const corners = [this.toDoc(0, 0), this.toDoc(this.width, 0), this.toDoc(this.width, this.height), this.toDoc(0, this.height)];

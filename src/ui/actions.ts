@@ -5,6 +5,9 @@ import '../filters/matchsrc';
 import { app } from './app';
 import * as ops from './ops';
 import * as dlg from './dialogs';
+import * as cmpv from './compare';
+import * as uniq from './unique';
+
 import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
 import * as io from '../io/files';
@@ -223,6 +226,11 @@ export const ACTIONS: Action[] = [
   // Filtro
   { id: 'liquify', label: 'Licuar…', keys: ['Shift+Ctrl+X'], enabled: hasLayer, run: liquifyDialog },
   { id: 'variations', label: 'Variaciones…', enabled: hasLayer, run: () => dlg.variationsDialog() },
+  { id: 'compare', label: 'Comparar antes / después', keys: ['Shift+Ctrl+Y'], enabled: hasDoc, checked: () => cmpv.compareActive(), run: cmpv.toggleCompare },
+  { id: 'comparePrev', label: 'Comparar con el paso anterior', enabled: hasDoc, run: () => cmpv.startCompare('prev') },
+  ...cmpv.SIM_NAMES.map(([s, n]) => ({ id: 'sim:' + s, label: n, enabled: hasDoc, checked: () => cmpv.getSim() === s, run: () => cmpv.setSim(s) })),
+  { id: 'contrast', label: 'Comprobar contraste de textos…', enabled: hasDoc, run: uniq.contrastDialog },
+  { id: 'palette', label: 'Paleta de la imagen…', enabled: hasDoc, run: uniq.paletteDialog },
   { id: 'filterGallery', label: 'Galería de filtros…', enabled: hasLayer, run: () => dlg.filterGalleryDialog() },
   { id: 'lastFilter', label: 'Repetir último filtro', keys: ['Alt+Ctrl+F'], enabled: () => !!ops.lastFilter && hasLayer(), run: ops.repeatLastFilter },
 

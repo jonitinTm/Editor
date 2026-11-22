@@ -565,3 +565,15 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
   .menu { padding: 0 12px; }
   .layer-row { min-height: 40px; }
 }
+
+.cmp-handle { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; background: #fff; color: #222; box-shadow: 0 2px 8px rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; cursor: ew-resize; z-index: 15; touch-action: none; font-size: 10px; letter-spacing: -2px; user-select: none; }
+.ct-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 50vh; overflow: auto; }
+.ct-row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 6px; background: rgba(255,255,255,.04); }
+.ct-sample { width: 44px; height: 32px; display: flex; align-items: center; justify-content: center; font: bold 18px system-ui, sans-serif; border-radius: 4px; flex-shrink: 0; border: 1px solid rgba(255,255,255,.1); }
+.ct-info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.ct-verdict { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ct-verdict.ok { color: #3ecf6e; } .ct-verdict.mid { color: #e6b422; } .ct-verdict.bad { color: #ff5a5a; }
+.pal-strip { display: flex; height: 90px; border-radius: 6px; overflow: hidden; margin: 10px 0 6px; }
+.pal-sw { border: 0; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 6px; min-width: 40px; }
+.pal-sw span { font: 11px ui-monospace, monospace; background: rgba(0,0,0,.55); color: #fff; padding: 1px 4px; border-radius: 3px; }
+.pal-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
