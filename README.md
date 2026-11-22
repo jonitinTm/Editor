@@ -378,6 +378,12 @@ Ya disponible:
   a una persona en un retrato); con rango y suavizado del borde, y vista previa mientras ajustas.
 - **Dinámica del pincel**: *Variar tamaño*, *Variar ángulo* y *Variar opacidad* en cada pincelada, y modo *Aerógrafo*
   (si mantienes pulsado sin moverte, la pintura se sigue acumulando).
+- **Funciona en móvil, tableta y ordenador**: revisado en 11 pantallas (iPhone SE y 14 Pro Max, Pixel 7, Galaxy en
+  horizontal, iPad Mini vertical y horizontal, iPad Pro, portátiles de 1280 y 1366 px, 1920×1080 y 2560×1440): nada se
+  sale de la pantalla, los menús largos se desplazan, los diálogos siempre muestran sus botones y en pantallas táctiles
+  los botones son más grandes. En Safari (iPhone, iPad y Mac), si el navegador no sabe desenfocar al dibujar, Editor lo
+  hace por su cuenta; las fotos más grandes de lo que admite un iPhone/iPad (unos 16,7 megapíxeles) se abren reducidas
+  con un aviso en vez de fallar, y el vídeo se graba en MP4 si el navegador no admite WebM.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

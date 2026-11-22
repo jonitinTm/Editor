@@ -18,6 +18,7 @@ import { allPatterns } from '../core/patterns';
 import { record, macros, play } from './macros';
 import { colorDialog } from './colorpicker';
 import { prefs, savePrefs, UNIT_NAMES } from './prefs';
+import { maxCanvasPixels } from '../core/polyfills';
 import { BEVEL_DEFAULT } from '../core/bevel';
 import { shiftRuns } from '../core/textruns';
 
@@ -57,7 +58,7 @@ export function newDocumentDialog() {
     onOk: () => {
       const W = Math.round(+w.value), H = Math.round(+hh.value);
       if (!(W >= 1 && H >= 1 && W <= 30000 && H <= 30000)) { app.toast('Tamaño no válido (1 – 30000 px)', 'warn'); return false; }
-      if (W * H > 268e6) { app.toast('La imagen es demasiado grande para el navegador', 'warn'); return false; }
+      if (W * H > maxCanvasPixels()) { app.toast(`Demasiado grande para este dispositivo (máximo ${Math.round(maxCanvasPixels() / 1e6)} megapíxeles)`, 'warn'); return false; }
       const b = bg.value === 'fg' ? app.fg : bg.value === 'bgc' ? app.bg : bg.value || null;
       ops.newDocument(name.value.trim() || 'Sin título', W, H, b);
       if (app.doc && +res.value > 0) app.doc.ppi = +res.value;

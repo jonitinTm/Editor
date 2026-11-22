@@ -1,3 +1,4 @@
+import './core/polyfills';
 import { prefs, applyPrefs, fmtUnit } from './ui/prefs';
 applyPrefs();
 // Punto de entrada: monta la interfaz y conecta teclado, arrastrar y pegar.
@@ -20,7 +21,8 @@ import * as io from './io/files';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
-(app as any).debug = { readPsd, writePsd, ops, io }; // para pruebas automáticas
+(app as any).debug = { readPsd, writePsd, ops, io };
+io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
 import { RectSelectTool, EllipseSelectTool, LassoTool, PolyLassoTool, WandTool, SingleRowSelectTool, SingleColSelectTool } from './tools/select';

@@ -4,6 +4,7 @@
 import { app } from './app';
 import { EditorDocument, type LayerComp } from '../core/document';
 import { effectiveMask, dashPattern } from '../core/layers';
+import { maxCanvasPixels } from '../core/polyfills';
 import { isCustomBlend, drawCustomBlend } from '../core/blend';
 import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer, SmartFilter, Matrix, RasterLayer, TextLayer, ShapeLayer, isRaster, isParametric, walkLayers } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
@@ -1338,7 +1339,7 @@ export function rotateImageArbitrary(deg: number, fill: boolean | 'content') {
   const d = doc(); if (!d || !deg) return;
   const W = d.width, H = d.height, a = deg * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
   const nw = Math.max(1, Math.ceil(Math.abs(W * c) + Math.abs(H * s) - 1e-6)), nh = Math.max(1, Math.ceil(Math.abs(W * s) + Math.abs(H * c) - 1e-6));
-  if (nw * nh > 268e6) { app.toast('El resultado sería demasiado grande', 'warn'); return; }
+  if (nw * nh > maxCanvasPixels()) { app.toast('El resultado sería demasiado grande', 'warn'); return; }
   const tf = (src: HTMLCanvasElement) => {
     const out = makeCanvas(nw, nh), x = ctx2d(out);
     x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
@@ -1683,7 +1684,7 @@ export function deleteLayerComp(i: number) { const d = doc(); if (!d) return; d.
 export async function perspectiveCrop(quad: { x: number; y: number }[], ow: number, oh: number) {
   const d = doc(); if (!d || quad.length !== 4) return;
   ow = Math.max(1, Math.round(ow)); oh = Math.max(1, Math.round(oh));
-  if (ow * oh > 268e6) { app.toast('El resultado sería demasiado grande', 'warn'); return; }
+  if (ow * oh > maxCanvasPixels()) { app.toast('El resultado sería demasiado grande', 'warn'); return; }
   const { warpQuadToRect } = await import('../tools/transform');
   for (const l of d.allLayers()) if (isParametric(l)) rasterizeLayer(l);
   const tf = (c: HTMLCanvasElement) => warpQuadToRect(c, quad, ow, oh);
@@ -2023,7 +2024,11 @@ export async function saveVideo(name: string, loops = 1) {
   // tamaño par (lo piden los códecs) y como mucho 1920 px
   const k = Math.min(1, 1920 / Math.max(d.width, d.height)), W = Math.max(2, Math.round(d.width * k / 2) * 2), H = Math.max(2, Math.round(d.height * k / 2) * 2);
   const c = makeCanvas(W, H), x = ctx2d(c);
-  const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find(m => MediaRecorder.isTypeSupported(m)) ?? 'video/webm';
+  // Safari solo graba MP4; el resto, WebM
+  const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4;codecs=avc1', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m));
+  if (!mime) { app.toast('Este navegador no puede grabar vídeo; usa GIF', 'warn'); return; }
+  const isMp4 = mime.startsWith('video/mp4');
+  if (typeof (c as any).captureStream !== 'function') { app.toast('Este navegador no puede grabar vídeo; usa GIF', 'warn'); return; }
   const stream = (c as any).captureStream(0) as MediaStream, track = stream.getVideoTracks()[0] as any;
   const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
   const chunks: Blob[] = []; rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
@@ -2034,8 +2039,8 @@ export async function saveVideo(name: string, loops = 1) {
   for (let l = 0; l < Math.max(1, loops); l++) for (const f of frames) { draw(f.canvas); await new Promise(r => setTimeout(r, Math.max(20, f.delay))); }
   draw(frames[frames.length - 1].canvas); await new Promise(r => setTimeout(r, 60));
   rec.stop(); await done;
-  const blob = new Blob(chunks, { type: 'video/webm' });
-  try { await io.saveBlob(blob, name + '.webm'); app.toast(`Vídeo guardado (${frames.length} cuadros, ${(blob.size / 1024).toFixed(0)} KB)`); }
+  const blob = new Blob(chunks, { type: isMp4 ? 'video/mp4' : 'video/webm' });
+  try { await io.saveBlob(blob, name + (isMp4 ? '.mp4' : '.webm')); app.toast(`Vídeo guardado (${frames.length} cuadros, ${(blob.size / 1024).toFixed(0)} KB)`); }
   catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
 }
 

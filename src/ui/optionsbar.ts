@@ -82,7 +82,7 @@ export function buildOptionsBar(parent: HTMLElement) {
     const pop = h('div', { class: 'opt-more-pop' });
     more.append(btn, pop); bar.append(more);
     const items = [...bar.children].slice(3).filter(el => el !== more) as HTMLElement[];
-    while (bar.scrollWidth > bar.clientWidth + 1 && items.length > 1) pop.prepend(items.pop()!);
+    while (bar.scrollWidth > bar.clientWidth + 1 && items.length > 0) pop.prepend(items.pop()!);
     btn.onclick = e => {
       e.stopPropagation(); pop.classList.toggle('open');
       if (pop.classList.contains('open')) { const r = btn.getBoundingClientRect(); pop.style.top = r.bottom + 4 + 'px'; pop.style.right = Math.max(8, innerWidth - r.right) + 'px'; }

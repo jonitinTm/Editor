@@ -1,6 +1,7 @@
 // Abrir imágenes y proyectos, exportar y guardar. Todo ocurre en el
 // navegador: nada se envía a ningún servidor.
 
+import { maxCanvasPixels } from '../core/polyfills';
 import { EditorDocument } from '../core/document';
 import { RasterLayer, TextLayer, ShapeLayer, SmartLayer, AdjustmentLayer, GroupLayer, LayerMask, Layer, bumpLayerId, isRaster, isParametric } from '../core/layers';
 import { canvasToBlob, ctx2d, makeCanvas } from '../core/canvas';
@@ -23,10 +24,17 @@ export function loadImage(src: Blob | string): Promise<HTMLImageElement> {
 
 export async function imageToCanvas(file: Blob): Promise<HTMLCanvasElement> {
   const img = await loadImage(file);
-  const c = makeCanvas(img.naturalWidth || img.width, img.naturalHeight || img.height);
-  ctx2d(c).drawImage(img, 0, 0);
+  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  // en iPhone/iPad un lienzo no puede pasar de unos 16,7 megapíxeles: la foto se reduce para que se pueda editar
+  const max = maxCanvasPixels();
+  if (w * h > max) { const k = Math.sqrt(max / (w * h)) * 0.98; const ow = w, oh = h; w = Math.floor(w * k); h = Math.floor(h * k); deviceLimitNotice?.(ow, oh, w, h); }
+  const c = makeCanvas(w, h);
+  ctx2d(c).drawImage(img, 0, 0, w, h);
   return c;
 }
+/** Aviso cuando una imagen se reduce por el límite del dispositivo (lo pone la interfaz). */
+export let deviceLimitNotice: ((ow: number, oh: number, w: number, h: number) => void) | null = null;
+export function setDeviceLimitNotice(f: typeof deviceLimitNotice) { deviceLimitNotice = f; }
 
 export function baseName(name: string) { return name.replace(/\.[^.]+$/, ''); }
 
