@@ -10,6 +10,7 @@ import * as uniq from './unique';
 import * as s3d from './shadow3d';
 import * as more from './more';
 import * as more2 from './more2';
+import * as more3 from './more3';
 
 import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
@@ -239,6 +240,13 @@ export const ACTIONS: Action[] = [
   { id: 'autoEnhance', label: 'Mejorar la foto (automático)', enabled: hasLayer, run: () => { import('./easy').then(m => m.autoEnhance()); } },
   { id: 'blurBg', label: 'Desenfocar el fondo (efecto retrato)', enabled: hasLayer, run: () => { import('./easy').then(m => m.blurBackground()); } },
   { id: 'tour', label: 'Ver la guía de bienvenida', run: () => { import('./easy').then(m => m.startTour()); } },
+  { id: 'perspWarp', label: 'Deformación de perspectiva', enabled: hasLayer, run: () => app.setTool('perspWarp', true) },
+  { id: 'textInShape', label: 'Texto dentro de la forma', enabled: hasLayer, run: () => { more3.textInShape(); } },
+  { id: 'vanishing', label: 'Punto de fuga (pegar en perspectiva)…', enabled: hasLayer, run: more3.vanishingDialog },
+  { id: 'pathBlur', label: 'Desenfoque de trazado…', enabled: hasLayer, run: more3.pathBlurDialog },
+  { id: 'textStyles', label: 'Estilos de texto…', enabled: () => true, run: more3.textStylesDialog },
+  { id: 'compareDoc', label: 'Comparar con otro documento…', enabled: () => app.docs.length > 1, run: more3.compareWithDoc },
+  { id: 'calculations', label: 'Cálculos…', enabled: hasDoc, run: more3.calculationsDialog },
   { id: 'fileInfo', label: 'Información de archivo…', keys: ['Alt+Shift+Ctrl+I'], enabled: hasDoc, run: more2.fileInfoDialog },
   { id: 'quickPng', label: 'Exportación rápida como PNG', enabled: hasDoc, run: more2.quickExportPng },
   { id: 'defineShape', label: 'Definir forma personalizada…', enabled: hasLayer, run: more2.defineCustomShape },

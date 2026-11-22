@@ -81,7 +81,8 @@ export function buildOptionsBar(parent: HTMLElement) {
     const btn = h('button', { class: 'btn opt-more-btn', type: 'button', title: 'Más opciones' }, 'Más ▾');
     const pop = h('div', { class: 'opt-more-pop' });
     more.append(btn, pop); bar.append(more);
-    const items = [...bar.children].slice(3).filter(el => el !== more) as HTMLElement[];
+    // los botones de aplicar y cancelar (✓ ✕) se quedan siempre a la vista
+    const items = [...bar.children].slice(3).filter(el => el !== more && !(el as HTMLElement).matches('.icon-btn.ok') && !((el as HTMLElement).matches('.icon-btn') && (el.previousElementSibling as HTMLElement | null)?.matches('.icon-btn.ok'))) as HTMLElement[];
     while (bar.scrollWidth > bar.clientWidth + 1 && items.length > 0) pop.prepend(items.pop()!);
     btn.onclick = e => {
       e.stopPropagation(); pop.classList.toggle('open');

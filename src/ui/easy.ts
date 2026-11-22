@@ -41,7 +41,7 @@ function entries(): Entry[] {
     out.push({ id: a.id, label: a.label.replace(/…$/, ''), path, kind: 'action', hay: norm(`${a.label} ${path} ${SYN[a.id] ?? ''}`), run: a.run, enabled: () => (a.enabled ? a.enabled() : true), keys: a.keys?.[0] });
   }
   for (const t of app.tools.values()) {
-    if (['transform', 'puppet', 'warp'].includes(t.id)) continue;
+    if (['transform', 'puppet', 'warp', 'perspWarp', 'vanish'].includes(t.id)) continue;
     out.push({ id: 'tool:' + t.id, label: t.name, path: 'Herramienta' + (TOOL_DESC[t.id] ? ' · ' + TOOL_DESC[t.id] : ''), kind: 'tool', hay: norm(`${t.name} herramienta ${TOOL_DESC[t.id] ?? ''}`), run: () => app.setTool(t.id), enabled: () => !!app.doc, keys: t.key });
   }
   return out;

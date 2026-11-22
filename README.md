@@ -434,6 +434,22 @@ Ya disponible:
   - *Filtro › Interpretar › Árbol*, *Llama* y *Marco de imagen* (madera, dorado, negro, blanco, paspartú, Polaroid,
     antiguo); *Filtro › Enfocar › Reducción de movimiento* (fotos movidas); *Filtro › Vídeo › Desentrelazar*.
   - Pincel con *Bordes húmedos* (efecto acuarela) y *Ruido* (textura granulada).
+- **Perspectiva, texto y más**:
+  - *Edición › Deformación de perspectiva*: 1) coloca 4 puntos sobre un plano de la foto (una fachada, el suelo…);
+    2) muévelos y toda la imagen sigue la nueva perspectiva. «Verticales rectas» corrige al momento los edificios que
+    «se caen» al fotografiarlos desde abajo; también «Horizontales rectas».
+  - *Filtro › Punto de fuga (pegar en perspectiva)*: coloca un plano sobre una pared, una pantalla o el suelo y la imagen
+    elegida se pega encima en perspectiva (llenando el plano o encajada sin deformar), en una capa nueva.
+  - *Filtro › Desenfoque de trazado*: desenfoca siguiendo la dirección de un trazado dibujado con la Pluma (movimiento
+    en curva).
+  - *Capa › Texto › Texto dentro de la forma*: el texto se escribe dentro de una forma (círculo, estrella, bocadillo…)
+    y cada línea se adapta a su contorno; sigue siendo texto editable.
+  - *Capa › Texto › Estilos de texto…*: estilos predefinidos (título, subtítulo, texto normal, pie de foto, cartel) y
+    los tuyos, para aplicar fuente, tamaño, color, interletraje… a varios textos de una vez.
+  - *Vista › Comparar con otro documento…*: dos imágenes abiertas, una a cada lado de una línea que se arrastra.
+  - *Imagen › Cálculos…*: mezcla dos canales (rojo, verde, azul, gris o transparencia de capas o canales) y crea un
+    canal, una selección o una capa (para máscaras precisas de pelo o cielos).
+- En el móvil, los botones ✓ (aplicar) y ✕ (cancelar) de recortar, transformar o deformar se quedan siempre a la vista.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

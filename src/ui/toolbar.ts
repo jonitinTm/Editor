@@ -26,7 +26,7 @@ export function buildToolbar(parent: HTMLElement) {
   const layout = LAYOUT.map(ids => ids.filter(id => app.tools.has(id))).filter(ids => ids.length);
   const placed = new Set(layout.flat());
   // (transformar y posición libre son modos temporales que se abren desde el menú Edición)
-  for (const t of app.tools.values()) if (!placed.has(t.id) && !['transform', 'puppet', 'warp'].includes(t.id)) { const g = layout.find(ids => app.tools.get(ids[0])!.group && app.tools.get(ids[0])!.group === t.group); if (g) g.push(t.id); else layout.push([t.id]); placed.add(t.id); }
+  for (const t of app.tools.values()) if (!placed.has(t.id) && !['transform', 'puppet', 'warp', 'perspWarp', 'vanish'].includes(t.id)) { const g = layout.find(ids => app.tools.get(ids[0])!.group && app.tools.get(ids[0])!.group === t.group); if (g) g.push(t.id); else layout.push([t.id]); placed.add(t.id); }
   for (const ids of layout) {
     const el = h('button', { class: 'tool-btn' + (ids.length > 1 ? ' grouped' : '') });
     const showFly = () => {

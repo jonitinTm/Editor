@@ -33,6 +33,15 @@ export function startCompare(what: 'first' | 'prev' = 'first') {
   cmp = { doc: d, before, split: cmp?.doc === d ? cmp.split : 0.5, label: what === 'first' ? 'Original' : 'Paso anterior' };
   ensureHandle(); app.viewport.requestRender(); app.emit('view');
 }
+/** Compara con otra imagen (otro documento abierto), encajada en el tamaño de este. */
+export function startCompareWith(img: HTMLCanvasElement, label: string) {
+  const d = app.doc; if (!d) return;
+  const c = document.createElement('canvas'); c.width = d.width; c.height = d.height; const x = c.getContext('2d')!;
+  const s = Math.min(d.width / img.width, d.height / img.height), w = img.width * s, hh = img.height * s;
+  x.imageSmoothingQuality = 'high'; x.drawImage(img, (d.width - w) / 2, (d.height - hh) / 2, w, hh);
+  cmp = { doc: d, before: c, split: 0.5, label };
+  ensureHandle(); app.viewport.requestRender(); app.emit('view');
+}
 export function stopCompare() { cmp = null; handle?.remove(); handle = null; app.viewport?.requestRender(); app.emit('view'); }
 export function toggleCompare() { compareActive() ? stopCompare() : startCompare('first'); }
 

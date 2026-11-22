@@ -102,6 +102,8 @@ export interface TextProps {
   caps?: boolean;
   /** Texto de párrafo: ancho de la caja (las líneas se ajustan solas). Sin valor = texto de punto. */
   boxWidth?: number;
+  /** Texto dentro de una forma: polígono (en coordenadas del documento) que limita cada línea. */
+  area?: { x: number; y: number }[];
   /** true = se muestran los píxeles originales (p. ej. de un PSD) hasta que se edite el texto. */
   keepPixels?: boolean;
   /** Datos originales del texto de Photoshop (base64), para devolverlos intactos al guardar en PSD. */
@@ -326,17 +328,39 @@ export class TextLayer extends RasterLayer {
     const txt = p.caps ? p.text.toUpperCase() : p.text, lines: { text: string; w: number; para: number; first: boolean; last: boolean }[] = [];
     const m = (t: string) => ctx.measureText(t).width;
     const hs = p.hScale ?? 1, il = p.indentLeft ?? 0, ir = p.indentRight ?? 0, ifl = p.indentFirst ?? 0;
+    // texto dentro de una forma: cada línea tiene el hueco que deja la forma a su altura
+    const lhA = p.size * p.lineHeight, area = p.area && p.area.length > 2 ? p.area : null;
+    const spanAt = (i: number): { x: number; w: number } => {
+      if (!area) return { x: p.x, w: p.boxWidth ?? 0 };
+      const ys = [p.y + i * lhA + lhA * 0.15, p.y + i * lhA + lhA * 0.5, p.y + i * lhA + lhA * 0.85];
+      let lo = -Infinity, hi = Infinity;
+      for (const y of ys) {
+        const xs: number[] = [];
+        for (let k = 0; k < area.length; k++) { const a = area[k], b = area[(k + 1) % area.length]; if ((a.y <= y && b.y > y) || (b.y <= y && a.y > y)) xs.push(a.x + (y - a.y) / (b.y - a.y) * (b.x - a.x)); }
+        xs.sort((u, v) => u - v);
+        // el tramo más ancho que hay dentro de la forma a esa altura
+        let bl = 0, br = -1; for (let k = 0; k + 1 < xs.length; k += 2) if (xs[k + 1] - xs[k] > br - bl) { bl = xs[k]; br = xs[k + 1]; }
+        if (br <= bl) return { x: 0, w: 0 };
+        lo = Math.max(lo, bl); hi = Math.min(hi, br);
+      }
+      const pad = p.size * 0.15; return hi - lo > pad * 2 ? { x: lo + pad, w: hi - lo - pad * 2 } : { x: 0, w: 0 };
+    };
+    const areaBottom = area ? Math.max(...area.map(q => q.y)) : Infinity;
     txt.split('\n').forEach((para, pi) => {
       const start = lines.length;
-      if (!p.boxWidth) { lines.push({ text: para, w: m(para), para: pi, first: true, last: true }); return; }
+      if (!p.boxWidth && !area) { lines.push({ text: para, w: m(para), para: pi, first: true, last: true }); return; }
+      // en una forma, se saltan las líneas donde aún no cabe nada (la parte de arriba de un círculo, por ejemplo)
+      if (area) while (spanAt(lines.length).w < p.size * 1.2 && p.y + lines.length * lhA < areaBottom) lines.push({ text: '', w: 0, para: pi, first: false, last: false, lx: 0, room: 0 } as any);
       // ancho útil (sin escalar) de cada línea: la caja menos las sangrías
-      const avail = (first: boolean) => Math.max(10, (p.boxWidth! - il - ir - (first ? ifl : 0)) / hs);
+      const avail = (first: boolean) => area ? Math.max(4, spanAt(lines.length).w / hs) : Math.max(10, (p.boxWidth! - il - ir - (first ? ifl : 0)) / hs);
       let cur = '';
-      const push = (t: string) => lines.push({ text: t, w: m(t), para: pi, first: lines.length === start, last: false });
+      const push = (t: string) => { const sp = spanAt(lines.length); lines.push({ text: t, w: m(t), para: pi, first: lines.length === start, last: false, ...(area ? { lx: sp.x, room: sp.w } : {}) } as any); };
       for (const word of para.split(/(\s+)/)) {
         const next = cur + word, bw = avail(lines.length === start);
         if (cur.trim() && m(next.trimEnd()) > bw) { push(cur.trimEnd()); cur = word.trimStart(); }
         else cur = next;
+        // en una forma, si la palabra no cabe en esta línea pero sí más abajo, se deja la línea vacía y se sigue
+        if (area && !cur.trim().includes(' ')) { let guard = 0; while (m(cur) > avail(false) && p.y + lines.length * lhA < areaBottom && guard++ < 200) { lines.push({ text: '', w: 0, para: pi, first: false, last: false, lx: 0, room: 0 } as any); } }
         // palabras más largas que la caja: se cortan por letras
         while (m(cur) > avail(lines.length === start) && cur.length > 1) { const b2 = avail(lines.length === start); let k = cur.length - 1; while (k > 1 && m(cur.slice(0, k)) > b2) k--; push(cur.slice(0, k)); cur = cur.slice(k); }
       }
@@ -344,6 +368,8 @@ export class TextLayer extends RasterLayer {
       lines[lines.length - 1].last = true;
     });
     ctx.restore();
+    // lo que no cabe en la forma no se dibuja
+    if (area) for (let i = lines.length - 1; i >= 0; i--) if (p.y + (i + 1) * lhA > areaBottom + lhA * 0.2) lines.splice(i, 1);
     const width = p.boxWidth ? p.boxWidth / hs : Math.max(1, ...lines.map(l => l.w));
     return { lines, lh: p.size * p.lineHeight, width };
   }
@@ -468,8 +494,9 @@ export class TextLayer extends RasterLayer {
     {
       const po = this.paraOffsets(L.lines), il = (p.indentLeft ?? 0) / hs, ir = (p.indentRight ?? 0) / hs, ifl = (p.indentFirst ?? 0) / hs;
       L.lines.forEach((line, i) => {
-        const ind = il + (line.first ? ifl : 0), room = L.width - (p.boxWidth ? ind + ir : 0);
-        const x0 = left + (p.boxWidth ? ind : 0);
+        const inArea = (line as any).room !== undefined;
+        const ind = il + (line.first ? ifl : 0), room = inArea ? (line as any).room / hs : L.width - (p.boxWidth ? ind + ir : 0);
+        const x0 = inArea ? p.x + ((line as any).lx - p.x) / hs : left + (p.boxWidth ? ind : 0);
         const lx = p.align === 'center' ? x0 + (room - line.w) / 2 : p.align === 'right' ? x0 + room - line.w : x0;
         const ty = p.y + i * lh + (lh - p.size) / 2 + po.off[i];
         ctx.textAlign = 'left';

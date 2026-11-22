@@ -665,3 +665,7 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .glyph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); gap: 4px; }
 .glyph { height: 38px; font-size: 20px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); border-radius: 6px; cursor: pointer; }
 .glyph:hover { border-color: var(--accent); }
+
+.ts-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow: auto; }
+.ts-row { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 6px; background: rgba(255,255,255,.04); }
+.ts-prev { flex: 1; font-size: 17px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

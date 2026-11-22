@@ -21,6 +21,8 @@ import * as io from './io/files';
 import * as uniq from './ui/unique';
 import * as more from './ui/more';
 import * as easy from './ui/easy';
+import { PerspectiveWarpTool } from './tools/perspwarp';
+import { VanishingTool } from './ui/more3';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
@@ -60,7 +62,8 @@ app.registerTool(new SpotHealTool());
 app.registerTool(new HealTool());
 for (const t of retouchTools()) app.registerTool(t);
 // Las herramientas añadidas después van al final: la tecla de cada grupo sigue eligiendo la de siempre
-for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool, MixerBrushTool, FrameTool, RemoveTool, ObjectSelectTool, CurvaturePenTool, AddAnchorTool, DeleteAnchorTool, ConvertPointTool, PathSelectTool, SingleRowSelectTool, SingleColSelectTool, TypeMaskTool, CountTool, VerticalTextTool, VerticalTypeMaskTool, NoteTool, ArtHistoryBrushTool, ArtboardTool]) app.registerTool(new T());
+for (const T of [MagicEraserTool, BackgroundEraserTool, RedEyeTool, RulerTool, HistoryBrushTool, ColorReplaceTool, PuppetTool, PatchTool, ContentMoveTool, PerspectiveCropTool, PatternStampTool, ColorSamplerTool, SliceTool, FreeformPenTool, MixerBrushTool, FrameTool, RemoveTool, ObjectSelectTool, CurvaturePenTool, AddAnchorTool, DeleteAnchorTool, ConvertPointTool, PathSelectTool, SingleRowSelectTool, SingleColSelectTool, TypeMaskTool, CountTool, VerticalTextTool, VerticalTypeMaskTool, NoteTool, ArtHistoryBrushTool, ArtboardTool, PerspectiveWarpTool]) app.registerTool(new T());
+app.registerTool(new VanishingTool() as any);
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;
