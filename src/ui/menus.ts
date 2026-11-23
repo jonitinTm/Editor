@@ -18,7 +18,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
 };
 
 const MENUS: { label: string; items: Item[] }[] = [
-  { label: 'Archivo', items: ['new', 'templates', 'collage', 'open', 'openLayers', 'recent', 'place', '-', 'save', 'saveAs', 'quickPng', 'export', 'exportLayers', 'exportSlices', 'social', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'fileInfo', 'print', 'revert', 'close'] },
+  { label: 'Archivo', items: ['new', 'templates', 'collage', 'open', 'openGallery', 'galleryLayer', 'openLayers', 'recent', 'place', '-', 'save', 'saveAs', 'quickPng', 'export', 'exportLayers', 'exportSlices', 'social', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'fileInfo', 'print', 'revert', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fade', '-', 'fill', 'contentFill', '-', 'caScale', 'puppet', 'perspWarp', 'autoAlign', 'stroke', '-', 'findReplace', 'skyReplace', '-', 'defineBrush', 'definePattern', 'defineShape', 'importPresets', '-', 'freeTransform',
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'penSettings', 'prefs'] },
   { label: 'Imagen', items: ['autoEnhance', 'blurBg', '-', { label: 'Ajustes', items: [...filterItems('ajuste'), '-', 'variations'] }, '-', 'dupDoc', '-', 'palette', 'applyImage', 'calculations', 'freqSep', '-', 'imageSize', 'canvasSize',
@@ -35,7 +35,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Filtro', items: ['lastFilter', '-', 'filterGallery', 'wideAngle', 'filter:develop', 'liquify', 'vanishing', 'pathBlur', 'displace', '-', ...filterItems('filtro')] },
   { label: 'IA', items: ['aiRemoveBg', 'aiSubject', 'aiSky', 'aiSelTool', '-', 'aiErase', 'aiFill', '-', 'aiDepthBlur', 'aiRelight', 'aiFog', 'aiPhoto3d', 'aiDepthLayer', '-', 'aiUpscale'] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'proof', 'gamut', 'pixelGrid', '-', 'compare', 'comparePrev', 'compareDoc', { label: 'Simular visión', items: ['sim:none', '-', 'sim:protan', 'sim:deutan', 'sim:tritan', 'sim:achroma'] }, 'contrast', '-', 'drawMode', '-', 'extras', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'guideLayout', 'clearGuides'] },
-  { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Carácter', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Párrafo', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },
+  { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', 'reference', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Carácter', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Párrafo', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },
   { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'guide', 'shortcuts', '-', 'privacy', 'about'] },
 ];
 

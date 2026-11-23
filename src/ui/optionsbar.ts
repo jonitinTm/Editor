@@ -107,9 +107,9 @@ const BUILTIN: Record<string, Preset[]> = {
     // pinceles de dibujo (pensados para lápiz: presión e inclinación)
     { name: 'Lápiz HB', opts: { size: 4, hardness: 50, opacity: 85, flow: 100, smoothing: 15, spacing: 10, pressure: true, pressureOpacity: true, tiltMode: 'shade', texture: 'base:Papel', texScale: 50, texDepth: 50 } },
     { name: 'Lápiz 2B (blando)', opts: { size: 7, hardness: 40, opacity: 95, flow: 100, smoothing: 10, spacing: 10, pressure: true, pressureOpacity: true, tiltMode: 'shade', texture: 'base:Papel', texScale: 70, texDepth: 60, blendMode: 'multiply' } },
-    { name: 'Entintado', opts: { size: 8, hardness: 100, opacity: 100, flow: 100, smoothing: 45, spacing: 5, pressure: true, tiltMode: 'none' } },
+    { name: 'Entintado', opts: { size: 8, hardness: 100, opacity: 100, flow: 100, smoothing: 45, spacing: 5, pressure: true, tiltMode: 'none', taper: 40 } },
     { name: 'Rotulador fino', opts: { size: 5, hardness: 95, opacity: 100, flow: 100, smoothing: 30, spacing: 5, pressure: false, tiltMode: 'none' } },
-    { name: 'Caligrafía', opts: { size: 18, hardness: 100, opacity: 100, flow: 100, smoothing: 30, spacing: 4, pressure: true, tiltMode: 'angle', angle: 45, roundness: 22 } },
+    { name: 'Caligrafía', opts: { taper: 25, size: 18, hardness: 100, opacity: 100, flow: 100, smoothing: 30, spacing: 4, pressure: true, tiltMode: 'angle', angle: 45, roundness: 22 } },
     { name: 'Carboncillo', opts: { size: 22, hardness: 40, opacity: 100, flow: 70, smoothing: 10, spacing: 12, pressure: true, pressureOpacity: true, tiltMode: 'shade', tip: 'base:Tiza', tipJitter: true, texture: 'base:Papel', texScale: 150, texDepth: 70, blendMode: 'multiply' } },
     { name: 'Pincel seco (óleo)', opts: { size: 40, hardness: 60, opacity: 100, flow: 80, smoothing: 20, spacing: 6, pressure: true, tiltMode: 'angle', tip: 'base:Pincel seco', texture: 'base:Lienzo', texScale: 100, texDepth: 25 } },
     { name: 'Pintura suave (gouache)', opts: { size: 40, hardness: 70, opacity: 100, flow: 60, smoothing: 15, spacing: 8, pressure: true, pressureOpacity: true, tiltMode: 'shade' } },

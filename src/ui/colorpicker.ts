@@ -4,14 +4,14 @@ import { h } from './dom';
 import { showDialog } from './dialog';
 import { hexToRgb, rgbToHex } from '../core/canvas';
 
-function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
+export function rgb2hsv(r: number, g: number, b: number): [number, number, number] {
   r /= 255; g /= 255; b /= 255;
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
   let hh = 0;
   if (d) hh = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
   return [hh * 60, mx ? d / mx : 0, mx];
 }
-function hsv2rgb(hh: number, s: number, v: number): [number, number, number] {
+export function hsv2rgb(hh: number, s: number, v: number): [number, number, number] {
   const f = (n: number) => { const k = (n + hh / 60) % 6; return (v - v * s * Math.max(0, Math.min(k, 4 - k, 1))) * 255; };
   return [f(5), f(3), f(1)];
 }

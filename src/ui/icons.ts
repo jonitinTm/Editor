@@ -114,6 +114,7 @@ export const ICONS: Record<string, string> = {
   selSub: S('<rect x="3" y="3" width="11" height="11" fill="currentColor" fill-opacity=".35"/><rect x="10" y="10" width="11" height="11" fill="var(--panel)"/>'),
   selInt: S('<rect x="3" y="3" width="11" height="11"/><rect x="10" y="10" width="11" height="11"/><rect x="10" y="10" width="4" height="4" fill="currentColor"/>'),
   open: S('<path d="M3 7.5A1.5 1.5 0 014.5 6H9l2 2h8.5A1.5 1.5 0 0121 9.5V11"/><path d="M3 7.5V18h15.5l3-7H6z"/>'),
+  image: S('<rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-5 4 4 2.500-2.500L20 18"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   logo: `<svg viewBox="0 0 32 32" width="22" height="22"><rect x="3" y="7" width="18" height="18" rx="3" fill="#3d8bfd"/><rect x="11" y="3" width="18" height="18" rx="3" fill="#f5a524" fill-opacity=".9"/><path d="M11 7h7a3 3 0 013 3v11h-7a3 3 0 01-3-3z" fill="#1d2a44" fill-opacity=".55"/></svg>`,
 };

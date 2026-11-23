@@ -44,6 +44,9 @@ export const ACTIONS: Action[] = [
   // Archivo
   { id: 'new', label: 'Nuevo…', keys: ['Alt+Ctrl+N', 'Ctrl+N'], run: dlg.newDocumentDialog },
   { id: 'open', label: 'Abrir…', keys: ['Ctrl+O'], run: async () => ops.openFiles(await io.pickFiles(io.OPEN_ACCEPT)) },
+  // en tablets y móviles, «image/*» a secas abre la galería de fotos (con extensiones abriría el gestor de archivos)
+  { id: 'openGallery', label: 'Abrir desde la galería…', run: async () => ops.openFiles(await io.pickFiles('image/*')) },
+  { id: 'galleryLayer', label: 'Añadir foto de la galería como capa…', enabled: hasDoc, run: async () => ops.openAsLayers(await io.pickFiles('image/*')) },
   { id: 'openLayers', label: 'Abrir como capas…', run: async () => ops.openAsLayers(await io.pickFiles('image/*,.tif,.tiff,.tga')) },
   { id: 'recent', label: 'Abrir reciente…', run: () => dlg.recentDialog() },
   { id: 'place', label: 'Colocar imagen como objeto inteligente…', keys: ['Shift+Ctrl+P'], enabled: hasDoc, run: async () => ops.openFiles(await io.pickFiles('image/*,.psd,.psb,.tif,.tiff,.tga'), true) },
@@ -338,6 +341,7 @@ export const ACTIONS: Action[] = [
   { id: 'win:tools', label: 'Herramientas', checked: () => !document.body.classList.contains('no-tools'), run: () => { document.body.classList.toggle('no-tools'); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:options', label: 'Opciones', checked: () => !document.body.classList.contains('no-options'), run: () => { document.body.classList.toggle('no-options'); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'drawMode', label: 'Modo dibujo (pantalla completa)', keys: ['F'], enabled: () => !!app.doc, run: () => import('./drawing').then(m => m.toggleDrawMode()) },
+  { id: 'reference', label: 'Imagen de referencia', run: () => import('./artist').then(m => m.toggleReference()) },
   { id: 'penSettings', label: 'Ajustes del lápiz…', run: () => import('./drawing').then(m => m.penSettingsDialog()) },
   { id: 'win:all', label: 'Ocultar / mostrar todos los paneles', keys: ['Tab'], run: () => { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); } },
 

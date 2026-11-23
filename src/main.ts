@@ -92,7 +92,21 @@ const redoBtn = h('button', { class: 'top-btn top-redo', type: 'button', title: 
 undoBtn.onclick = () => ops.undo(); redoBtn.onclick = () => ops.redo();
 const upUndo = () => { const hi = app.doc?.history; undoBtn.disabled = !hi?.canUndo(); redoBtn.disabled = !hi?.canRedo(); };
 app.on('doc', upUndo); app.on('docs', upUndo); upUndo();
-header.append(h('div', { class: 'top-right' }, undoBtn, redoBtn, quickBtn, searchBtn, sideToggle));
+// idioma siempre a mano: un globo con el código del idioma; al tocarlo, la lista con cada idioma en su propio idioma
+const langBtn = h('button', { class: 'top-btn top-lang no-i18n', type: 'button', title: 'Idioma / Language', 'aria-label': 'Idioma / Language', html: icon('globe') + `<span>${lang.toUpperCase()}</span>` });
+langBtn.onclick = e => {
+  e.stopPropagation();
+  document.querySelector('.lang-fly')?.remove();
+  const fly = h('div', { class: 'flyout lang-fly no-i18n' }, ...LANGS.map(([v, n]) => {
+    const it = h('div', { class: 'fly-item' + (v === lang ? ' on' : '') }, (v === lang ? '✓ ' : '\u2003 ') + n);
+    it.onclick = () => { fly.remove(); import('./ui/dialogs').then(m => m.changeLanguage(v)); };
+    return it;
+  }));
+  const r = langBtn.getBoundingClientRect(); document.body.append(fly);
+  fly.style.top = r.bottom + 4 + 'px'; fly.style.left = Math.max(8, Math.min(innerWidth - fly.offsetWidth - 8, r.right - fly.offsetWidth)) + 'px';
+  setTimeout(() => document.addEventListener('pointerdown', function close(ev) { if (!fly.contains(ev.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', close); } }), 0);
+};
+header.append(h('div', { class: 'top-right' }, langBtn, undoBtn, redoBtn, quickBtn, searchBtn, sideToggle));
 // fondo oscuro detrás del cajón: tocarlo lo cierra
 const sideBackdrop = h('div', { class: 'side-backdrop' });
 sideBackdrop.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); document.body.classList.remove('show-side'); });
@@ -269,6 +283,8 @@ function langPicker() {
 function buildWelcome() {
   const openBtn = h('button', { class: 'btn primary big', html: icon('open') + '<span>Abrir desde el equipo</span>' });
   openBtn.onclick = async () => ops.openFiles(await io.pickFiles(io.OPEN_ACCEPT));
+  const galBtn = h('button', { class: 'btn big welcome-gallery', html: icon('image') + '<span>Galería de fotos</span>' });
+  galBtn.onclick = async () => ops.openFiles(await io.pickFiles('image/*'));
   const newBtn = h('button', { class: 'btn big', html: icon('plus') + '<span>Nuevo documento</span>' });
   newBtn.onclick = newDocumentDialog;
   const presets = h('div', { class: 'welcome-presets' }, ...[[1920, 1080], [1080, 1080], [1280, 720], [800, 600]].map(([w, hh]) =>
@@ -288,7 +304,7 @@ function buildWelcome() {
       h('div', { class: 'welcome-logo', html: icon('logo') }),
       h('h1', {}, 'Editor'),
       h('p', {}, 'Editor de imágenes por capas. Todo se procesa en tu equipo: tus imágenes no salen de él.'),
-      h('div', { class: 'welcome-actions' }, openBtn, newBtn, h('button', { class: 'btn big', type: 'button', onclick: () => easy.quickTasks(), html: icon('magic') + ' ¿Qué quieres hacer?' })),
+      h('div', { class: 'welcome-actions' }, openBtn, galBtn, newBtn, h('button', { class: 'btn big', type: 'button', onclick: () => easy.quickTasks(), html: icon('magic') + ' ¿Qué quieres hacer?' })),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,
       recentBox,
       langPicker(),

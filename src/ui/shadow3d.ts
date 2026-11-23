@@ -1,4 +1,6 @@
 // Sombras y 3D a partir de una capa:
+import { isParametric } from '../core/layers';
+import { prefs } from './prefs';
 // · Sombra proyectada: la silueta del objeto se proyecta en el suelo (en perspectiva) o en la pared de detrás,
 //   y se difumina y aclara al alejarse del objeto, como una sombra real. Más una sombra de contacto en la base.
 // · Extrusión 3D: da volumen a textos, logotipos y formas (profundidad, dirección, perspectiva y sombreado).
@@ -143,8 +145,16 @@ export function extrudeDialog() {
   update();
   showDialog({ title: 'Extrusión 3D', width: 420, side: true, okLabel: 'Aplicar',
     body: [sl('depth', 'Profundidad', 1, 400, 'px'), sl('angle', 'Dirección', -180, 180, '°'), sl('persp', 'Perspectiva', 0, 100, '%'), sl('shade', 'Sombreado', 0, 100, '%'), sl('light', 'Brillo del borde', 0, 100, '%'), row('Laterales', side, col),
-      h('div', { class: 'hint' }, 'Crea una capa nueva con el volumen; la original queda oculta debajo por si quieres volver a ella.')],
-    onOk: () => { clearTimeout(t); update(); d.setActive(res); d.commit('Extrusión 3D'); },
+      h('div', { class: 'hint' }, prefs.autoLayers ? 'Crea una capa nueva con el volumen; la original queda oculta debajo por si quieres volver a ella.' : 'El volumen se aplica a la capa elegida (Ctrl+Z lo deshace).')],
+    onOk: async () => {
+      clearTimeout(t); update();
+      if (prefs.autoLayers) { d.setActive(res); d.commit('Extrusión 3D'); return; }
+      // sobre la misma capa (si es texto o forma, pasa a píxeles)
+      const { rasterizeLayer } = await import('../tools/paint');
+      res.parent?.remove(res); l.visible = wasVisible;
+      const target = isParametric(l) || l.kind === 'smart' ? rasterizeLayer(l as RasterLayer) : l as RasterLayer;
+      target.canvas = res.canvas; target.touch(); d.setActive(target); d.invalidate(); d.commit('Extrusión 3D');
+    },
     onCancel: () => { clearTimeout(t); res.parent?.remove(res); l.visible = wasVisible; d.invalidate(); },
   });
 }

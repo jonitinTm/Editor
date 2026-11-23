@@ -497,6 +497,8 @@ export class Viewport {
       if (e.pointerType === 'pen') { this.notePen(); this.penDown = true; }
       // rechazo de la palma: mientras el lápiz está apoyado, los toques no cuentan
       if (touch && this.penDown) return;
+      // un contacto muy grande es la palma o el canto de la mano, no un dedo
+      if (touch && (e.width > 48 || e.height > 48)) return;
       (document.activeElement as HTMLElement | null)?.blur?.();
       try { cv.setPointerCapture(e.pointerId); } catch { /* puntero sintético */ }
       const r = cv.getBoundingClientRect();

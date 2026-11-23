@@ -101,6 +101,7 @@ const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, 
 // Lápiz digital: la inclinación puede sombrear (como un lápiz de lado) o girar la punta (caligrafía). Estabilizador de cuerda.
 const TILT = { key: 'tiltMode', label: 'Inclinación del lápiz', type: 'select' as const, default: 'shade', choices: [
   { value: 'none', label: 'No hace nada' }, { value: 'shade', label: 'Sombrear (más ancho y suave)' }, { value: 'angle', label: 'Gira la punta (caligrafía)' }] };
+const TAPER = { key: 'taper', label: 'Afinar al empezar', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
 const ROPE = { key: 'rope', label: 'Estabilizador (cuerda)', type: 'range' as const, min: 0, max: 100, default: 0, unit: 'px' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
@@ -219,6 +220,19 @@ abstract class StrokeTool implements Tool {
   }
 
   private dab: ((x: number, y: number, p: number) => any) | null = null;
+  /** Distancia recorrida en el trazo (para afinar el comienzo) y última presión (para suavizar sus saltos). */
+  private travel = 0; private lastP = 1; private tapLast: { x: number; y: number } | null = null;
+  /** Presión ajustada: sin saltos bruscos (lápiz) y más fina al empezar si se pide. */
+  private shapeP(p: number, e: ToolEvent, x: number, y: number) {
+    if (e.pointerType === 'pen') { p = this.lastP + (p - this.lastP) * 0.55; this.lastP = p; }
+    const tp = this.options.some((o: any) => o.key === 'taper') ? (app.opt<number>('taper', this.id) ?? 0) : 0;
+    if (tp > 0 && this.tapLast) {
+      this.travel += Math.hypot(x - this.tapLast.x, y - this.tapLast.y); this.tapLast = { x, y };
+      const L = (app.opt<number>('size', this.id) ?? 10) * (1 + tp / 10);
+      p *= Math.min(1, 0.12 + 0.88 * Math.sqrt(this.travel / L));
+    }
+    return p;
+  }
   /** Inclinación y dirección del lápiz en el último punto. */
   protected tilt = 0; protected azi = 0;
   /** Estabilizador de cuerda: la punta solo avanza cuando el lápiz se aleja más que la cuerda. */
@@ -267,6 +281,7 @@ abstract class StrokeTool implements Tool {
       return r;
     };
     this.sm = { x: e.x, y: e.y, p: e.pressure };
+    this.travel = 0; this.lastP = e.pressure; this.tapLast = { x: e.x, y: e.y };
     if (app.opt('airbrush', this.id)) {
       // aerógrafo: mientras se mantiene pulsado, sigue soltando pintura aunque no se mueva
       clearInterval(this.airTimer);
@@ -277,7 +292,8 @@ abstract class StrokeTool implements Tool {
       // Mayús + clic: línea recta desde el punto anterior
       this.stroke.lineTo(this.lastPoint.x, this.lastPoint.y, e.pressure, sp, this.dab);
     }
-    this.stroke.lineTo(e.x, e.y, e.pressure, sp, this.dab);
+    const p0 = (app.opt<number>('taper', this.id) ?? 0) > 0 && this.options.some((o: any) => o.key === 'taper') ? e.pressure * 0.12 : e.pressure;
+    this.stroke.lineTo(e.x, e.y, p0, sp, this.dab);
     this.stroke.update();
     this.lastPoint = { x: e.x, y: e.y };
   }
@@ -294,6 +310,7 @@ abstract class StrokeTool implements Tool {
       this.ropePt.x += dx * (dist - R) / dist; this.ropePt.y += dy * (dist - R) / dist;
       x = this.ropePt.x; y = this.ropePt.y;
     }
+    p = this.shapeP(p, e, x, y);
     const k = Math.min(0.95, (app.opt<number>('smoothing', this.id) ?? 0) / 100 * 0.93);
     if (k > 0 && this.sm) { this.sm.x += (x - this.sm.x) * (1 - k); this.sm.y += (y - this.sm.y) * (1 - k); this.sm.p += (p - this.sm.p) * (1 - k); x = this.sm.x; y = this.sm.y; p = this.sm.p; }
     this.stroke.lineTo(x, y, p, this.spacing(p), this.dab);
@@ -311,7 +328,7 @@ abstract class StrokeTool implements Tool {
     this.sm = null;
     const changed = this.stroke.finish();
     this.stroke = null;
-    if (changed) app.doc!.commit(this.historyName);
+    if (changed) { app.doc!.commit(this.historyName); if (!this.erase) import('../ui/artist').then(m => m.addRecentColor(app.fg)); }
   }
   cancel() { this.stroke?.cancel(); this.stroke = null; }
   hover() { /* el cursor se dibuja en drawOverlay */ }
@@ -335,7 +352,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, ROPE, TILT, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP, { ...TEX }, TEX_SCALE, TEX_DEPTH, TEX_INV, DUAL, DUAL_SC] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, ROPE, TILT, TAPER, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP, { ...TEX }, TEX_SCALE, TEX_DEPTH, TEX_INV, DUAL, DUAL_SC] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) {
     // pinceles de dibujo listos para usar (lápiz, tinta, carboncillo…)

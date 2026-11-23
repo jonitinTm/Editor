@@ -8,6 +8,7 @@ import { FILTERS, FilterDef, defaultParams } from '../filters/registry';
 import { AdjustmentLayer, GroupLayer, LayerMask } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import * as ops from './ops';
+import { prefs, savePrefs } from './prefs';
 
 /** Valores para la miniatura: los de por defecto suelen no cambiar nada, así que se exagera el primer control. */
 function demoParams(f: FilterDef) {
@@ -49,8 +50,16 @@ async function saveLook(after: () => void) {
 }
 
 /** Crea un look: un grupo con sus capas de ajuste (se puede ocultar, bajar de opacidad o editar cada una). */
-function applyLook(look: Look) {
+async function applyLook(look: Look) {
   const d = app.doc; if (!d) return;
+  if (!prefs.autoLayers) {
+    // directamente sobre la capa elegida, en un solo paso del historial
+    if (!d.activeRaster()) { app.toast('Elige una capa de imagen', 'warn'); return; }
+    const n0 = d.history.index;
+    for (const [id, params] of look.layers) { const f = FILTERS.find(x => x.id === id); if (f) await ops.applyFilterDirect(f, { ...defaultParams(f), ...(params ?? {}) }); }
+    const hs = d.history; if (hs.index > n0 + 1) { const last = hs.steps[hs.index]; hs.steps.splice(n0 + 1, hs.index - n0); hs.steps.splice(n0 + 1, 0, { ...last, name: 'Look: ' + look.name }); hs.index = n0 + 1; } else if (hs.index === n0 + 1) hs.steps[hs.index].name = 'Look: ' + look.name;
+    app.emit('doc'); app.toast(`Look «${look.name}» aplicado`); return;
+  }
   const g = new GroupLayer('Look: ' + look.name);
   for (const [id, params] of look.layers) {
     const f = FILTERS.find(x => x.id === id); if (!f) continue;
@@ -69,7 +78,12 @@ export function buildAdjustmentsPanel(parent: HTMLElement) {
   for (const f of list) {
     const c = h('canvas', { width: 72, height: 48, class: 'adj-thumb' }) as HTMLCanvasElement;
     const b = h('button', { class: 'adj-item', type: 'button', title: f.name.replace('…', '') + ': se añade como capa de ajuste' }, c, h('span', {}, f.name.replace('…', '')));
-    b.onclick = () => { if (!app.doc) { app.toast('Abre primero una imagen', 'warn'); return; } ops.newAdjustmentLayer(f); app.toast('Capa de ajuste añadida: cámbiala en Propiedades'); };
+    b.onclick = async () => {
+      if (!app.doc) { app.toast('Abre primero una imagen', 'warn'); return; }
+      if (prefs.autoLayers) { ops.newAdjustmentLayer(f); app.toast('Capa de ajuste añadida: cámbiala en Propiedades'); return; }
+      if (!app.doc.activeRaster()) { app.toast('Elige una capa de imagen', 'warn'); return; }
+      const { filterDialog } = await import('./dialogs'); f.prepare?.(); filterDialog(f);
+    };
     grid.append(b);
     thumbs.push({ c, run: src => { const im = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height); try { f.apply(im, demoParams(f)); } catch { /* algún ajuste necesita más datos */ } ctx2d(c).putImageData(im, 0, 0); } });
   }
@@ -94,10 +108,15 @@ export function buildAdjustmentsPanel(parent: HTMLElement) {
     last = ''; refresh();
   };
   const mineHead = h('div', { class: 'adj-head' }, 'Mis looks');
+  const hint = h('div', { class: 'hint' });
+  const modeCb = h('input', { type: 'checkbox', checked: prefs.autoLayers }) as HTMLInputElement;
+  const setHint = () => { hint.textContent = prefs.autoLayers ? 'Toca un ajuste: se añade como capa encima (la foto no se estropea) y lo cambias en Propiedades.' : 'Toca un ajuste para aplicarlo a la capa elegida (Ctrl+Z lo deshace).'; };
+  modeCb.onchange = () => { prefs.autoLayers = modeCb.checked; savePrefs(); setHint(); };
+  setHint();
   const saveBtn = h('button', { class: 'btn adj-save', type: 'button', title: 'Guarda las capas de ajuste del grupo seleccionado para usarlas en otras fotos' }, '＋ Guardar como look');
   saveBtn.onclick = () => saveLook(fillMine);
   parent.append(h('div', { class: 'panel-body adj-panel' },
-    h('div', { class: 'hint' }, 'Toca un ajuste: se añade como capa encima (la foto no se estropea) y lo cambias en Propiedades.'),
+    hint, h('label', { class: 'check adj-mode' }, modeCb, ' Como capa de ajuste (se puede cambiar después)'),
     grid, h('div', { class: 'adj-head' }, 'Looks de un toque'), looks, mineHead, mine, saveBtn));
   // miniaturas con la imagen actual (solo cuando el panel se ve, y sin prisa)
   let t = 0, last = '';

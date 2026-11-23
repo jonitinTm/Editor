@@ -2,55 +2,60 @@
 // (y plantillas para los textos con partes variables: «Capa {0}», «{0} × {1} px»…). Lo que se ve en pantalla se traduce
 // solo: menús, botones, ventanas, avisos y descripciones, también lo que se crea después (se vigila el documento).
 
-// Los textos van como cadenas (no como objetos): solo se interpreta el idioma elegido, así arranca igual de rápido.
-import KEYS_RAW from './data/keys.json?raw';
-import en from './data/en.json?raw';
-import fr from './data/fr.json?raw';
-import pt from './data/pt.json?raw';
-import it from './data/it.json?raw';
-import de from './data/de.json?raw';
-import ru from './data/ru.json?raw';
-import zh from './data/zh.json?raw';
-import ja from './data/ja.json?raw';
+// Cada idioma va en su propio archivo (i18n/<idioma>.js) que solo se descarga si se elige: la app no crece con los idiomas.
+// La primera vez se guarda en este navegador, así las siguientes arranca ya traducida (y sin conexión).
 
 type Dict = { s: Record<string, string>; t: [string, string][] };
 /** Idiomas disponibles, cada uno con su nombre en su propio idioma. */
 export const LANGS: [string, string][] = [['es', 'Español'], ['en', 'English'], ['fr', 'Français'], ['pt', 'Português'], ['it', 'Italiano'], ['de', 'Deutsch'], ['ru', 'Русский'], ['zh', '中文（简体）'], ['ja', '日本語']];
-const RAW: Record<string, string> = { en, fr, pt, it, de, ru, zh, ja };
-function loadDict(l: string): Dict | null {
-  const raw = RAW[l]; if (!raw) return null;
-  const keys = JSON.parse(KEYS_RAW) as string[], vals = JSON.parse(raw) as (string | null)[], d: Dict = { s: {}, t: [] };
-  keys.forEach((k, i) => { const v = vals[i]; if (!v) return; if (k.startsWith('T:')) d.t.push([k.slice(2), v]); else d.s[k] = v; });
-  return d;
+const AVAILABLE = new Set(LANGS.map(l => l[0]));
+declare const __I18N_HASH__: string;
+const STORE = 'editor.i18n';
+/** Diccionario guardado de una visita anterior (si es de esta versión). */
+function cachedDict(l: string): Dict | null {
+  try { const v = JSON.parse(localStorage.getItem(STORE) || 'null'); return v && v.l === l && v.h === __I18N_HASH__ ? v.d : null; } catch { return null; }
+}
+/** Descarga el archivo del idioma (con una etiqueta <script>: funciona también abriendo el archivo HTML directamente). */
+export function fetchDict(l: string): Promise<Dict | null> {
+  return new Promise(res => {
+    const w = window as any; if (w.__editorI18n?.[l]) { res(w.__editorI18n[l]); return; }
+    const sc = document.createElement('script'); sc.src = `i18n/${l}.js?v=${__I18N_HASH__}`; sc.async = true;
+    sc.onload = () => { const d = w.__editorI18n?.[l] ?? null; if (d) try { localStorage.setItem(STORE, JSON.stringify({ l, h: __I18N_HASH__, d })); } catch { /* sin sitio */ } res(d); };
+    sc.onerror = () => res(null);
+    document.head.append(sc);
+  });
 }
 const KEY = 'editor.lang';
 
 function pick(): string {
-  try { const v = localStorage.getItem(KEY); if (v && (v === 'es' || RAW[v])) return v; } catch { /* sin almacenamiento */ }
+  try { const v = localStorage.getItem(KEY); if (v && AVAILABLE.has(v)) return v; } catch { /* sin almacenamiento */ }
   // primera vez: el idioma del navegador si lo tenemos; si no, inglés (el español solo si el navegador está en español)
-  for (const l of navigator.languages ?? [navigator.language]) { const c = (l || '').slice(0, 2).toLowerCase(); if (c === 'es' || RAW[c]) return c; }
+  for (const l of navigator.languages ?? [navigator.language]) { const c = (l || '').slice(0, 2).toLowerCase(); if (AVAILABLE.has(c)) return c; }
   return 'en';
 }
 export const lang = pick();
-const dict = lang === 'es' ? null : loadDict(lang);
+let dict: Dict | null = lang === 'es' ? null : cachedDict(lang);
 
 /** Cambia el idioma (se recarga la página para rehacer toda la interfaz). */
-export function setLang(l: string) {
+export async function setLang(l: string) {
   try { localStorage.setItem(KEY, l); } catch { /* */ }
+  if (l !== 'es') await Promise.race([fetchDict(l), new Promise(r => setTimeout(r, 4000))]); // así arranca ya traducida
   location.reload();
 }
 
 // plantillas: «Capa {0}» → /^Capa (.*?)$/ y la traducción con {0}, {1}… (pueden cambiar de orden o no usarse)
 const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const tmpls = (dict?.t ?? []).map(([es, tr]) => {
+let tmpls: { re: RegExp; tr: string; lit: number }[] = [];
+function buildTemplates() { tmpls = (dict?.t ?? []).map(([es, tr]) => {
   const lit = es.replace(/\{\}/g, '').trim().length;
   // con poco texto fijo («Capa {}», «Pincel {}»), lo variable tiene que ser un número: si no, atraparía «Pincel corrector»
   const any = lit >= 9 || /[«:]/.test(es);
   return { re: new RegExp('^' + es.split('{}').map(esc).join(any ? '([\\s\\S]*?)' : '(\\S{0,3}|[\\d\\s.,×x%°()+\\-]*?)') + '$'), tr, lit };
-}).sort((a, b) => b.lit - a.lit); // primero las más concretas
+}).sort((a, b) => b.lit - a.lit); } // primero las más concretas
+buildTemplates();
 const cache = new Map<string, string | null>();
 /** Los textos ya traducidos no se vuelven a traducir (evita cadenas «A → B → C» si una traducción coincide con otra palabra en español). */
-const outputs = new Set<string>(dict ? Object.values(dict.s) : []);
+let outputs = new Set<string>(dict ? Object.values(dict.s) : []);
 
 function lookup(s: string): string | null {
   const d = dict!.s;
@@ -174,7 +179,18 @@ function doTree(root: Node) {
 export function startI18n() {
   (window as any).__t = t;
   document.documentElement.lang = lang;
+  if (!dict && lang !== 'es') {
+    // primera vez en este idioma: se oculta la interfaz un momento mientras llega el diccionario (sin ver el español)
+    document.documentElement.classList.add('i18n-wait');
+    const show = () => document.documentElement.classList.remove('i18n-wait');
+    const fail = setTimeout(show, 4000);
+    fetchDict(lang).then(d => { clearTimeout(fail); if (d) { dict = d; buildTemplates(); outputs = new Set(Object.values(d.s)); cache.clear(); observe(); } show(); });
+    return;
+  }
   if (!dict) return;
+  observe();
+}
+function observe() {
   doTree(document.body);
   document.title = t(document.title);
   new MutationObserver(list => {

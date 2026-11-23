@@ -11,14 +11,14 @@ import * as ops from './ops';
 const PAINT = (id?: string) => !!id && typeof app.opt('size', id) === 'number';
 
 /** Barra vertical que se arrastra con el dedo o el lápiz (valor de 0 a 1). */
-function vslider(cls: string, title: string, get: () => number, set: (v: number) => void, label: () => string) {
+function vslider(cls: string, title: string, get: () => number, set: (v: number) => void, label: () => string, onDrag?: (on: boolean) => void) {
   const fill = h('div', { class: 'ss-fill' }), knob = h('div', { class: 'ss-knob' }), tip = h('div', { class: 'ss-tip' });
   const el = h('div', { class: 'ss-bar ' + cls, title, role: 'slider', 'aria-label': title }, fill, knob, tip);
   const paint = () => { const v = Math.max(0, Math.min(1, get())); fill.style.height = v * 100 + '%'; knob.style.bottom = `calc(${v * 100}% - 9px)`; tip.textContent = label(); el.setAttribute('aria-valuenow', label()); };
   const at = (e: PointerEvent) => { const r = el.getBoundingClientRect(); set(Math.max(0, Math.min(1, 1 - (e.clientY - r.top) / r.height))); paint(); };
   el.addEventListener('pointerdown', e => {
-    e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId); el.classList.add('drag'); at(e);
-    const mv = (ev: PointerEvent) => at(ev), up = () => { el.classList.remove('drag'); el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); app.saveOpts(); };
+    e.preventDefault(); e.stopPropagation(); el.setPointerCapture(e.pointerId); el.classList.add('drag'); onDrag?.(true); at(e);
+    const mv = (ev: PointerEvent) => at(ev), up = () => { el.classList.remove('drag'); onDrag?.(false); el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up); app.saveOpts(); };
     el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   });
   return { el, paint };
@@ -26,14 +26,22 @@ function vslider(cls: string, title: string, get: () => number, set: (v: number)
 
 /** Tamaño (escala logarítmica, 1–500 px) y opacidad a un lado del lienzo. */
 export function buildSideSliders(host: HTMLElement) {
+  const preview = h('div', { class: 'size-preview' });
   const id = () => app.tool?.id;
   const size = vslider('ss-size', 'Tamaño del pincel', () => Math.log(Math.max(1, app.opt<number>('size', id()) ?? 1)) / Math.log(500),
-    v => app.setOpt(id()!, 'size', Math.max(1, Math.round(Math.exp(v * Math.log(500))))), () => (app.opt<number>('size', id()) ?? 0) + ' px');
+    v => { app.setOpt(id()!, 'size', Math.max(1, Math.round(Math.exp(v * Math.log(500))))); showPreview(); }, () => (app.opt<number>('size', id()) ?? 0) + ' px',
+    on => { preview.classList.toggle('on', on); if (on) showPreview(); });
+  // al mover la barra de tamaño, un círculo en el centro enseña lo grande que pintará (con el zoom actual)
+  function showPreview() {
+    const d = Math.min(Math.max(host.clientWidth, host.clientHeight), (app.opt<number>('size', id()) ?? 1) * (app.viewport?.zoom ?? 1));
+    preview.style.width = preview.style.height = Math.max(2, d) + 'px';
+  }
   const op = vslider('ss-op', 'Opacidad', () => ((app.opt<number>('opacity', id()) ?? 100) - 1) / 99,
     v => app.setOpt(id()!, 'opacity', Math.round(1 + v * 99)), () => (app.opt<number>('opacity', id()) ?? 100) + ' %');
   const undo = h('button', { class: 'ss-btn', type: 'button', title: 'Deshacer', 'aria-label': 'Deshacer', html: icon('undo') });
   const redo = h('button', { class: 'ss-btn', type: 'button', title: 'Rehacer', 'aria-label': 'Rehacer', html: icon('redo') });
   undo.onclick = () => ops.undo(); redo.onclick = () => ops.redo();
+  host.append(preview);
   const wrap = h('div', { class: 'side-sliders' }, size.el, h('div', { class: 'ss-gap' }), op.el, undo, redo);
   host.append(wrap);
   const update = () => {
@@ -60,14 +68,18 @@ export function toggleDrawMode(force?: boolean) {
     if (!miniBar) {
       const tool = (tid: string, ic: string, title: string) => { const b = h('button', { class: 'dm-btn', type: 'button', title, 'aria-label': title, 'data-tool': tid, html: icon(ic) }); b.onclick = () => app.setTool(tid); return b; };
       const sw = h('button', { class: 'dm-btn dm-color', type: 'button', title: 'Color', 'aria-label': 'Color' });
-      sw.onclick = () => (document.querySelector('.toolbar .swatch.fg') as HTMLElement | null)?.click();
+      sw.onclick = () => import('./artist').then(m => m.colorPopover(sw));
+      const ref = h('button', { class: 'dm-btn', type: 'button', title: 'Imagen de referencia', 'aria-label': 'Imagen de referencia', html: icon('image') || '🖼' });
+      ref.onclick = () => import('./artist').then(m => m.toggleReference());
+      const gal = h('button', { class: 'dm-btn', type: 'button', title: 'Añadir foto de la galería como capa', 'aria-label': 'Añadir foto de la galería como capa', html: icon('plus') });
+      gal.onclick = async () => { const io = await import('../io/files'); ops.openAsLayers(await io.pickFiles('image/*')); };
       const u = h('button', { class: 'dm-btn', type: 'button', title: 'Deshacer', html: icon('undo') }), r = h('button', { class: 'dm-btn', type: 'button', title: 'Rehacer', html: icon('redo') });
       u.onclick = () => ops.undo(); r.onclick = () => ops.redo();
       const br = h('button', { class: 'dm-btn dm-presets', type: 'button', title: 'Pinceles' }, 'Pinceles');
       br.onclick = ev => { ev.stopPropagation(); if (app.tool?.id !== 'brush') app.setTool('brush'); import('./optionsbar').then(m => m.presetMenu(br, app.tool)); };
       const x = h('button', { class: 'dm-btn dm-exit', type: 'button', title: 'Salir del modo dibujo', 'aria-label': 'Salir del modo dibujo' }, '✕');
       x.onclick = () => toggleDrawMode(false);
-      miniBar = h('div', { class: 'draw-bar' }, tool('brush', 'brush', 'Pincel'), tool('eraser', 'eraser', 'Borrador'), tool('smudge', 'finger', 'Dedo'), tool('eyedropper', 'eyedropper', 'Cuentagotas'), br, sw, u, r, x);
+      miniBar = h('div', { class: 'draw-bar' }, tool('brush', 'brush', 'Pincel'), tool('eraser', 'eraser', 'Borrador'), tool('smudge', 'finger', 'Dedo'), tool('eyedropper', 'eyedropper', 'Cuentagotas'), br, sw, ref, gal, u, r, x);
       document.body.append(miniBar);
       const sync = () => {
         miniBar!.querySelectorAll<HTMLElement>('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === app.tool?.id));

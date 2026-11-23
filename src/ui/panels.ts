@@ -69,7 +69,20 @@ export function buildColorPanel(parent: HTMLElement) {
   const fg = h('button', { class: 'cp-target on', title: 'Color frontal' }), bg = h('button', { class: 'cp-target', title: 'Color de fondo' });
   const choose = (t: 'fg' | 'bg') => { target = t; fg.classList.toggle('on', t === 'fg'); bg.classList.toggle('on', t === 'bg'); picker.set(t === 'fg' ? app.fg : app.bg); };
   fg.onclick = () => choose('fg'); bg.onclick = () => choose('bg');
-  const body = h('div', { class: 'panel-body color-panel' }, h('div', { class: 'cp-targets' }, fg, bg), picker.el);
+  // cuadro clásico o rueda (como en las apps de dibujo); se recuerda la elección
+  const VKEY = 'editor.colorView'; let view = 'square'; try { view = localStorage.getItem(VKEY) || 'square'; } catch { /* */ }
+  const wheelBox = h('div', { class: 'cp-wheel-box' });
+  const toggle = h('button', { class: 'btn cp-view', type: 'button', title: 'Cambiar entre cuadro y rueda de color' });
+  const showView = () => {
+    const wheel = view === 'wheel'; picker.el.style.display = wheel ? 'none' : ''; wheelBox.style.display = wheel ? '' : 'none';
+    if (wheel && !wheelBox.firstChild) import('./artist').then(m => wheelBox.append(m.colorWheel(176)));
+    toggle.textContent = wheel ? '▦ Cuadrado' : '◎ Rueda';
+  };
+  toggle.onclick = () => { view = view === 'wheel' ? 'square' : 'wheel'; try { localStorage.setItem(VKEY, view); } catch { /* */ } showView(); };
+  const recentBox = h('div', { class: 'cp-recent' });
+  import('./artist').then(m => recentBox.append(m.recentRow()));
+  const body = h('div', { class: 'panel-body color-panel' }, h('div', { class: 'cp-side' }, h('div', { class: 'cp-targets' }, fg, bg), toggle), picker.el, wheelBox, recentBox);
+  showView();
   parent.append(panel('Color', body));
   const upd = () => { fg.style.background = app.fg; bg.style.background = app.bg; if (!body.contains(document.activeElement) || document.activeElement === document.body) picker.set(target === 'fg' ? app.fg : app.bg); };
   app.on('colors', upd); upd();

@@ -292,19 +292,20 @@ export function prefsDialog() {
   const hist = numberSlider({ min: 10, max: 300, value: prefs.historySteps, onInput: v => histV = v });
   const snapTol = numberSlider({ min: 1, max: 20, value: prefs.snapTolerance, unit: 'px', onInput: v => snapV = v });
   const auto = h('input', { type: 'checkbox', checked: prefs.autosave });
+  const autoL = h('input', { type: 'checkbox', checked: prefs.autoLayers }) as HTMLInputElement;
   const gsize = h('input', { type: 'number', class: 'num', min: 2, max: 2000, value: prefs.gridSize, style: 'width:80px' }) as HTMLInputElement;
   const units = h('select', {}, ...UNIT_NAMES.map(([v, n]) => h('option', { value: v, selected: prefs.units === v }, n))) as HTMLSelectElement;
   const langSel = h('select', { class: 'no-i18n' }, ...LANGS.map(([v, n]) => h('option', { value: v, selected: lang === v }, n))) as HTMLSelectElement;
   const gcol = h('input', { type: 'color', class: 'color-input', value: prefs.gridColor }) as HTMLInputElement, gdcol = h('input', { type: 'color', class: 'color-input', value: prefs.guideColor }) as HTMLInputElement;
   showDialog({
     title: 'Preferencias', width: 420,
-    body: [h('div', { class: 'dlg-section' }, 'Interfaz'), row('Idioma / Language', langSel), row('Tema', theme), row('Tamaño de la interfaz', scale),
+    body: [h('div', { class: 'dlg-section' }, 'Interfaz'), row('Idioma / Language', langSel), row('Tema', theme), row('Tamaño de la interfaz', scale), row('', h('label', { class: 'check' }, autoL, ' Ajustes y efectos en capas nuevas (si no, sobre la capa elegida)')),
       h('div', { class: 'dlg-section' }, 'Rendimiento'), row('Pasos de historial', hist.el),
       h('div', { class: 'dlg-section' }, 'Unidades'), row('Reglas', units),
       h('div', { class: 'dlg-section' }, 'Guías, cuadrícula y ajuste'), row('Distancia de ajuste', snapTol.el), row('Cuadrícula cada', gsize, ' px'), row('Color de la cuadrícula', gcol), row('Color de las guías', gdcol),
       h('div', { class: 'dlg-section' }, 'Archivos'), row('', h('label', { class: 'check' }, auto, ' Guardar copia de recuperación cada 15 s'))],
     onOk: () => {
-      Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked, gridSize: Math.max(2, Math.round(+gsize.value) || 50), gridColor: gcol.value, guideColor: gdcol.value, units: units.value as any });
+      Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked, autoLayers: autoL.checked, gridSize: Math.max(2, Math.round(+gsize.value) || 50), gridColor: gcol.value, guideColor: gdcol.value, units: units.value as any });
       savePrefs(); app.viewport.requestRender(); app.toast('Preferencias guardadas');
       if (langSel.value !== lang) changeLanguage(langSel.value);
     },
