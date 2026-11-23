@@ -122,13 +122,16 @@ const boundsCache = new WeakMap<HTMLCanvasElement, { key: number; rect: Rect | n
 export function contentBoundsQuick(c: HTMLCanvasElement, key = 0): Rect | null {
   const cached = boundsCache.get(c);
   if (cached && cached.key === key) return cached.rect;
-  const W = c.width, H = c.height, k = Math.max(1, Math.ceil(Math.max(W, H) / 512));
+  const W = c.width, H = c.height; let k = Math.max(1, Math.ceil(Math.max(W, H) / 512));
   let rect: Rect | null;
   if (k === 1) rect = contentBounds(c);
   else {
-    const sw = Math.ceil(W / k), sh = Math.ceil(H / k), s = makeCanvas(sw, sh), sc = ctx2d(s);
-    sc.imageSmoothingEnabled = true; sc.drawImage(c, 0, 0, sw * k, sh * k, 0, 0, sw, sh);
-    const coarse = contentBounds(s);
+    // reducción a mitades exactas (cada paso promedia 2×2 píxeles): reducir de golpe solo muestrea algunos píxeles
+    // y se perdían los bordes finos (las puntas de un círculo, por ejemplo)
+    let cur: HTMLCanvasElement = c, f = 1;
+    while (f < k) { const nw = Math.ceil(cur.width / 2), nh = Math.ceil(cur.height / 2), n = makeCanvas(nw, nh), nc = ctx2d(n); nc.imageSmoothingEnabled = true; nc.imageSmoothingQuality = 'low'; nc.drawImage(cur, 0, 0, nw * 2, nh * 2, 0, 0, nw, nh); cur = n; f *= 2; }
+    k = f;
+    const coarse = contentBounds(cur);
     if (!coarse) rect = null;
     else {
       // zona aproximada, ampliada un bloque por cada lado, y búsqueda exacta en las franjas de los bordes

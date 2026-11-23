@@ -1,6 +1,7 @@
 // Visor: muestra el documento con zoom y desplazamiento, reglas, guías,
 // la selección ("hormigas en marcha") y lo que dibuje la herramienta activa.
 
+import { setOnOutlineStale } from '../core/selection';
 import { app } from './app';
 import { prefs, savePrefs, pxPerUnit, UNIT_NAMES } from './prefs';
 import type { ToolEvent } from '../tools/tool';
@@ -15,6 +16,8 @@ export class Viewport {
   canvas: HTMLCanvasElement;
   rulerH: HTMLCanvasElement;
   rulerV: HTMLCanvasElement;
+  private markH: HTMLElement; private markV: HTMLElement;
+  private rulerKey = '';
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
   width = 0; height = 0;
@@ -40,11 +43,14 @@ export class Viewport {
     this.canvas = h('canvas', { class: 'view-canvas' });
     this.rulerH = h('canvas', { class: 'ruler ruler-h' });
     this.rulerV = h('canvas', { class: 'ruler ruler-v' });
+    // marcas de la posición del ratón en las reglas: elementos aparte que solo se mueven (no hay que redibujar las reglas)
+    this.markH = h('div', { class: 'ruler-mark ruler-mark-h' }); this.markV = h('div', { class: 'ruler-mark ruler-mark-v' });
     this.el = h('div', { class: 'viewport' },
       h('div', { class: 'ruler-corner' }), this.rulerH, this.rulerV,
-      h('div', { class: 'view-wrap' }, this.canvas));
+      h('div', { class: 'view-wrap' }, this.canvas), this.markH, this.markV);
     parent.append(this.el);
     this.ctx = this.canvas.getContext('2d')!;
+    setOnOutlineStale(() => this.requestRender());
     new ResizeObserver(() => this.resize()).observe(this.el.querySelector('.view-wrap')!);
     this.bindEvents();
     setInterval(() => {
@@ -167,12 +173,14 @@ export class Viewport {
 
   resize() {
     const wrap = this.canvas.parentElement!;
-    this.dpr = window.devicePixelRatio || 1;
+    // en pantallas muy densas (3×) se dibuja a 2×: se ve igual de nítido y es mucho más ligero
+    this.dpr = Math.min(2, window.devicePixelRatio || 1);
     this.width = wrap.clientWidth; this.height = wrap.clientHeight;
     for (const [c, w, hh] of [[this.canvas, this.width, this.height], [this.rulerH, this.width, RULER], [this.rulerV, RULER, this.height]] as const) {
       c.width = Math.max(1, Math.round(w * this.dpr)); c.height = Math.max(1, Math.round(hh * this.dpr));
       c.style.width = w + 'px'; c.style.height = hh + 'px';
     }
+    this.rulerKey = '';
     this.el.classList.toggle('no-rulers', !app.showRulers);
     if (this.doc && !this.doc.viewInitialized && this.width > 10) this.fit(true);
     this.render();
@@ -379,12 +387,19 @@ export class Viewport {
   private renderRulers() {
     if (!app.showRulers) return;
     const d = this.doc;
+    // marca del ratón: solo se mueve (barato); las reglas se redibujan solo si cambia el zum, el desplazamiento o el tamaño
+    const m = d && this.mouse && !this.rot ? { x: d.view.panX + this.mouse.x * d.view.zoom, y: d.view.panY + this.mouse.y * d.view.zoom } : null;
+    this.markH.style.display = this.markV.style.display = m ? '' : 'none';
+    if (m) { this.markH.style.transform = `translateX(${Math.round(m.x)}px)`; this.markV.style.transform = `translateY(${Math.round(m.y)}px)`; }
+    const key = d ? [this.width, this.height, this.dpr, d.view.zoom, d.view.panX, d.view.panY, this.rot, prefs.units, d.ppi, d.width, d.height, document.documentElement.dataset.theme ?? ''].join('|') : 'x' + this.width + 'x' + this.height;
+    if (key === this.rulerKey) return;
+    this.rulerKey = key;
+    const css = getComputedStyle(document.body), cv = (n: string, f: string) => css.getPropertyValue(n).trim() || f;
     for (const horiz of [true, false]) {
       const c = horiz ? this.rulerH : this.rulerV;
       const ctx = c.getContext('2d')!;
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
       const len = horiz ? this.width : this.height;
-      const css = getComputedStyle(document.body), cv = (n: string, f: string) => css.getPropertyValue(n).trim() || f;
       ctx.fillStyle = cv('--panel', '#2b2d31'); ctx.fillRect(0, 0, horiz ? len : RULER, horiz ? RULER : len);
       ctx.fillStyle = cv('--border', '#3a3c42'); horiz ? ctx.fillRect(0, RULER - 1, len, 1) : ctx.fillRect(RULER - 1, 0, 1, len);
       if (!d || this.rot) continue;
@@ -411,12 +426,6 @@ export class Viewport {
         }
       }
       ctx.stroke();
-      if (this.mouse) {
-        const p = Math.round(pan + (horiz ? this.mouse.x : this.mouse.y) * d.view.zoom) + .5;
-        ctx.strokeStyle = '#4ea1ff'; ctx.beginPath();
-        if (horiz) { ctx.moveTo(p, 0); ctx.lineTo(p, RULER); } else { ctx.moveTo(0, p); ctx.lineTo(RULER, p); }
-        ctx.stroke();
-      }
     }
   }
 

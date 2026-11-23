@@ -169,10 +169,11 @@ export class Stroke {
     // El lienzo de la capa no se modifica durante el trazo (se pinta sobre la vista previa), así que no hace falta copiarlo
     this.original = target.canvas;
     this.sel = clipMask(target);
-    this.fast = mode === 'paint' && !target.lockAlpha && !target.quick && !target.isMask && blend === 'source-over';
+    // modo rápido (pintar normal y borrar): el búfer se aplica al vuelo al componer, sin copiar la capa en cada fotograma
+    this.fast = (mode === 'paint' || mode === 'erase') && !target.lockAlpha && !target.quick && !target.isMask && blend === 'source-over';
     if (this.fast) {
-      const doc = app.doc!, ov = doc.overrides.get(target.layer) ?? {};
-      ov.extra = ctx => { ctx.save(); ctx.globalAlpha = this.opacity; ctx.drawImage(this.sel ? this.tmp! : this.buffer, 0, 0); ctx.restore(); };
+      const doc = app.doc!, ov = doc.overrides.get(target.layer) ?? {}, erase = mode === 'erase';
+      ov.extra = ctx => { ctx.save(); ctx.globalAlpha = this.opacity; if (erase) ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(this.sel ? this.tmp! : this.buffer, 0, 0); ctx.restore(); };
       doc.overrides.set(target.layer, ov);
     } else {
       this.preview = cloneCanvas(target.canvas);

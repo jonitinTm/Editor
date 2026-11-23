@@ -5,7 +5,7 @@ import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
-import { makeCanvas, ctx2d, getPixels } from '../core/canvas';
+import { makeCanvas, ctx2d, getPixels, cloneCanvas } from '../core/canvas';
 import { SelMode } from '../core/selection';
 import { isRaster } from '../core/layers';
 import { drawBrushCursor } from './brush';
@@ -27,25 +27,32 @@ export class QuickSelectTool implements Tool {
   private last: { x: number; y: number } | null = null;
   private timer = 0;
   private dirty = false;
+  /** Selección resultante, que se va construyendo por trozos mientras se arrastra (sin rehacer la imagen entera). */
+  private result: HTMLCanvasElement | null = null;
+  private pending: { x0: number; y0: number; x1: number; y1: number } | null = null;
+  private bounds: { x: number; y: number; w: number; h: number } | null = null;
 
   down(e: ToolEvent) {
     const d = app.doc!;
     const src = app.opt('all', this.id) || !d.activeRaster() ? d.flatten() : d.activeRaster()!.canvas;
     this.data = getPixels(src).data;
     this.mark = new Uint8Array(d.width * d.height);
-    this.maskCanvas = makeCanvas(d.width, d.height);
+    this.maskCanvas = makeCanvas(1, 1); // solo indica que hay un trazo en curso (las marcas están en this.mark)
     this.mode = e.alt ? 'subtract' : (e.shift || d.selection.active) ? 'add' : 'new';
     this.base = d.selection.mask;
+    this.result = this.mode !== 'new' && this.base ? cloneCanvas(this.base) : makeCanvas(d.width, d.height);
+    this.bounds = this.mode !== 'new' && this.base ? d.selection.bounds : null;
     this.last = null;
     this.dab(e.x, e.y);
     this.apply();
   }
   move(e: ToolEvent) {
     if (!this.mark || !this.last) return;
-    const r = app.opt<number>('size', this.id) / 2, dist = Math.hypot(e.x - this.last.x, e.y - this.last.y), step = Math.max(2, r * 0.6);
+    const r = app.opt<number>('size', this.id) / 2, dist = Math.hypot(e.x - this.last.x, e.y - this.last.y), step = Math.max(2, r * 1.0);
     for (let t = step; t <= dist; t += step) this.dab(this.last.x + (e.x - this.last.x) * t / dist, this.last.y + (e.y - this.last.y) * t / dist);
     if (dist >= step) this.dab(e.x, e.y);
-    if (!this.timer) this.timer = window.setTimeout(() => { this.timer = 0; this.apply(); }, 60);
+    // la selección en pantalla se pone al día una vez por fotograma como mucho
+    if (!this.timer) this.timer = requestAnimationFrame(() => { this.timer = 0; this.apply(); });
   }
   /** Un toque: crecimiento por color desde los píxeles bajo el pincel. */
   private dab(cx: number, cy: number) {
@@ -74,44 +81,54 @@ export class QuickSelectTool implements Tool {
     const seen = new Uint8Array((x1 - x0 + 1) * (y1 - y0 + 1)), stack: number[] = [];
     const local = (p: number) => ((p / W | 0) - y0) * (x1 - x0 + 1) + (p % W) - x0;
     for (const s of seeds) { seen[local(s)] = 1; stack.push(s); }
+    const LW = x1 - x0 + 1;
+    // vecino (qx, qy) del píxel p: se añade si se parece al color del pincel y no hay un borde entre los dos
+    const visit = (i: number, qx: number, qy: number) => {
+      const l = (qy - y0) * LW + qx - x0; if (seen[l]) return; seen[l] = 1;
+      const q = qy * W + qx, j = q * 4;
+      const a = px[j] - mr, b = px[j + 1] - mg, c = px[j + 2] - mb, e = px[j] - px[i], f = px[j + 1] - px[i + 1], g = px[j + 2] - px[i + 2];
+      if (a * a + b * b + c * c <= tol2 && e * e + f * f + g * g <= edge2) stack.push(q);
+    };
     while (stack.length) {
-      const p = stack.pop()!, x = p % W, y = p / W | 0, i = p * 4;
+      const p = stack.pop()!, x = p % W, y = (p - x) / W, i = p * 4;
       mark[p] = 1;
-      for (const q of [p - 1, p + 1, p - W, p + W]) {
-        const qx = q % W, qy = q / W | 0;
-        if (q < 0 || qy < y0 || qy > y1 || qx < x0 || qx > x1 || Math.abs(qx - x) > 1) continue;
-        const l = local(q); if (seen[l]) continue; seen[l] = 1;
-        const j = q * 4;
-        const dm = (px[j] - mr) ** 2 + (px[j + 1] - mg) ** 2 + (px[j + 2] - mb) ** 2;
-        const de = (px[j] - px[i]) ** 2 + (px[j + 1] - px[i + 1]) ** 2 + (px[j + 2] - px[i + 2]) ** 2;
-        if (dm <= tol2 && de <= edge2) stack.push(q);
-      }
+      if (x > x0) visit(i, x - 1, y); if (x < x1) visit(i, x + 1, y);
+      if (y > y0) visit(i, x, y - 1); if (y < y1) visit(i, x, y + 1);
     }
-    // pasa la zona marcada al lienzo de la máscara
-    const w = x1 - x0 + 1, h = y1 - y0 + 1, img = ctx2d(this.maskCanvas!).getImageData(x0, y0, w, h), o = img.data;
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (mark[(y0 + y) * W + x0 + x]) { const k = (y * w + x) * 4; o[k] = o[k + 1] = o[k + 2] = o[k + 3] = 255; }
-    ctx2d(this.maskCanvas!).putImageData(img, x0, y0);
+    // la zona marcada se pasa al lienzo una vez por fotograma (en apply), no en cada toque
+    const pd = this.pending; this.pending = pd ? { x0: Math.min(pd.x0, x0), y0: Math.min(pd.y0, y0), x1: Math.max(pd.x1, x1), y1: Math.max(pd.y1, y1) } : { x0, y0, x1, y1 };
     this.dirty = true;
   }
   private apply() {
-    if (!this.dirty || !this.maskCanvas) return;
+    if (!this.dirty || !this.maskCanvas || !this.result) return;
     this.dirty = false;
-    const d = app.doc!, sel = d.selection;
-    sel.setMask(this.base);
-    const m = makeCanvas(d.width, d.height), c = ctx2d(m);
-    c.filter = 'blur(0.6px)'; c.drawImage(this.maskCanvas, 0, 0); c.filter = 'none';
-    sel.combineCanvas(this.mode, m);
+    const d = app.doc!, sel = d.selection, pd = this.pending; this.pending = null;
+    if (pd) {
+      // solo la zona que cambió: las marcas pasan a imagen y (con el borde suavizado) a la selección resultante
+      const m = 2, x = Math.max(0, pd.x0 - m), y = Math.max(0, pd.y0 - m), w = Math.min(d.width, pd.x1 + m + 1) - x, h = Math.min(d.height, pd.y1 + m + 1) - y;
+      const mark = this.mark!, W = d.width, src = makeCanvas(w, h), sc = ctx2d(src), img = sc.createImageData(w, h), o = img.data;
+      for (let yy = 0; yy < h; yy++) for (let xx = 0, k = (y + yy) * W + x, q = yy * w * 4 + 3; xx < w; xx++, k++, q += 4) if (mark[k]) { o[q - 3] = o[q - 2] = o[q - 1] = o[q] = 255; }
+      sc.putImageData(img, 0, 0);
+      const tmp = makeCanvas(w, h), t = ctx2d(tmp); t.filter = 'blur(0.6px)'; t.drawImage(src, 0, 0); t.filter = 'none';
+      const r = ctx2d(this.result); r.save(); r.globalCompositeOperation = this.mode === 'subtract' ? 'destination-out' : 'lighten'; r.drawImage(tmp, x, y); r.restore();
+    }
+    // zona de la selección: la anterior más lo pintado (al restar, la anterior basta como margen)
+    const b0 = this.bounds, add = pd && this.mode !== 'subtract' ? { x: Math.max(0, pd.x0 - 2), y: Math.max(0, pd.y0 - 2), w: Math.min(d.width, pd.x1 + 3) - Math.max(0, pd.x0 - 2), h: Math.min(d.height, pd.y1 + 3) - Math.max(0, pd.y0 - 2) } : null;
+    this.bounds = !b0 ? add : !add ? b0 : { x: Math.min(b0.x, add.x), y: Math.min(b0.y, add.y), w: Math.max(b0.x + b0.w, add.x + add.w) - Math.min(b0.x, add.x), h: Math.max(b0.y + b0.h, add.y + add.h) - Math.min(b0.y, add.y) };
+    if (this.bounds) sel.setMaskShared(this.result, this.bounds); else sel.setMaskShared(this.result);
     d.changed();
   }
   up() {
     if (!this.mark) return;
-    clearTimeout(this.timer); this.timer = 0; this.dirty = true; this.apply();
-    this.data = null; this.mark = null; this.maskCanvas = null; this.base = null;
+    cancelAnimationFrame(this.timer); this.timer = 0; this.dirty = true; this.apply();
+    // la selección se queda con su propia copia
+    if (this.result) app.doc!.selection.setMask(this.result);
+    this.data = null; this.mark = null; this.maskCanvas = null; this.base = null; this.result = null;
     // mejora automática: borde menos escalonado y más ajustado
     if (app.opt('enhance', this.id) && app.doc!.selection.mask) app.doc!.selection.smooth(2);
     app.doc!.commit('Selección rápida');
   }
-  cancel() { if (this.mark) { app.doc!.selection.setMask(this.base); this.data = null; this.mark = null; this.maskCanvas = null; } }
+  cancel() { cancelAnimationFrame(this.timer); this.timer = 0; if (this.mark) { app.doc!.selection.setMask(this.base); this.data = null; this.mark = null; this.maskCanvas = null; this.result = null; } }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     drawBrushCursor(ctx, vp, app.opt<number>('size', this.id));
     if (vp.mouseScreen) { const { x, y } = vp.mouseScreen; ctx.fillStyle = '#fff'; ctx.font = 'bold 12px system-ui'; ctx.fillText(app.viewport.isSpaceDown() ? '' : '+', x + 6, y - 6); }

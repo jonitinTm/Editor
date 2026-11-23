@@ -1,7 +1,7 @@
 // Selección: un lienzo del tamaño del documento cuyo alfa indica cuánto está
 // seleccionado cada píxel (0 = nada, 255 = todo). null = sin selección.
 
-import { makeCanvas, ctx2d, cloneCanvas, contentBounds, Rect, getPixels, putPixels } from './canvas';
+import { makeCanvas, ctx2d, cloneCanvas, contentBounds, contentBoundsQuick, Rect, getPixels, putPixels } from './canvas';
 import { gaussianBlur } from '../filters/blur';
 
 export type SelMode = 'new' | 'add' | 'subtract' | 'intersect';
@@ -10,11 +10,17 @@ const OPS: Record<Exclude<SelMode, 'new'>, GlobalCompositeOperation> = {
   add: 'source-over', subtract: 'destination-out', intersect: 'destination-in',
 };
 
+/** Se llama cuando el borde mostrado se ha quedado atrás y conviene repintar (lo conecta el visor). */
+export let onOutlineStale: (() => void) | null = null;
+export function setOnOutlineStale(f: () => void) { onOutlineStale = f; }
+
 export class Selection {
   mask: HTMLCanvasElement | null = null;
   version = 0;
   private outlineVersion = -1;
   private outline: Path2D | null = null;
+  private outlineAt = 0;
+  private outlineTimer = 0;
   bounds: Rect | null = null;
 
   constructor(public width: number, public height: number) {}
@@ -26,7 +32,8 @@ export class Selection {
     if (this.mask) {
       // la máscara no debe quedarse con un modo de fusión de la operación anterior
       { const x = ctx2d(this.mask); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; }
-      this.bounds = contentBounds(this.mask, 0);
+      // búsqueda rápida (sobre una copia reducida y luego exacta en los bordes): no hay que leer la máscara entera
+      this.bounds = contentBoundsQuick(this.mask, this.version);
       if (!this.bounds) this.mask = null;
     } else this.bounds = null;
   }
@@ -124,32 +131,43 @@ export class Selection {
     if (shrink) this.invert();
   }
   setMask(c: HTMLCanvasElement | null) { this.mask = c ? cloneCanvas(c) : null; this.changed(); }
+  /** Usa el lienzo tal cual, sin copiarlo (para herramientas que lo van construyendo mientras se arrastra). */
+  setMaskShared(c: HTMLCanvasElement, bounds?: Rect | null) {
+    if (bounds === undefined) { this.mask = c; this.changed(); return; }
+    // con la zona ya conocida no hace falta buscarla en la máscara (más rápido mientras se arrastra)
+    this.mask = c; this.version++; this.bounds = bounds;
+  }
 
   /** Trazado del borde de la selección (para las "hormigas en marcha"). */
   getOutline(): Path2D | null {
     if (!this.mask) return null;
     if (this.outlineVersion === this.version && this.outline) return this.outline;
-    const w = this.width, h = this.height;
-    const b = this.bounds!;
-    const d = getPixels(this.mask).data;
-    const inside = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && d[(y * w + x) * 4 + 3] >= 128;
+    // mientras una herramienta la va cambiando a cada fotograma, el borde se recalcula como mucho cada 120 ms
+    // (al dejar de cambiar se pone al día enseguida)
+    const now = performance.now();
+    if (this.outline && now - this.outlineAt < 120) { if (!this.outlineTimer) this.outlineTimer = window.setTimeout(() => { this.outlineTimer = 0; onOutlineStale?.(); }, 130); return this.outline; }
+    this.outlineAt = now;
+    // solo se lee la zona seleccionada, con un borde de un píxel de «fuera» alrededor
+    const b = this.bounds!, bw = b.w, bh = b.h, PW = bw + 2;
+    const d = ctx2d(this.mask).getImageData(b.x, b.y, bw, bh).data, ins = new Uint8Array(PW * (bh + 2));
+    for (let y = 0; y < bh; y++) for (let x = 0, i = y * bw * 4 + 3, o = (y + 1) * PW + 1; x < bw; x++, i += 4, o++) ins[o] = d[i] >= 128 ? 1 : 0;
     const p = new Path2D();
-    // Bordes horizontales
-    for (let y = b.y; y <= b.y + b.h; y++) {
-      let start = -1;
-      for (let x = b.x; x <= b.x + b.w; x++) {
-        const edge = x < b.x + b.w && inside(x, y) !== inside(x, y - 1);
+    // bordes horizontales: entre la fila y-1 y la fila y (en coordenadas con margen)
+    for (let y = 1; y <= bh + 1; y++) {
+      let start = -1; const r0 = (y - 1) * PW, r1 = y * PW;
+      for (let x = 1; x <= bw + 1; x++) {
+        const edge = x <= bw && ins[r0 + x] !== ins[r1 + x];
         if (edge && start < 0) start = x;
-        else if (!edge && start >= 0) { p.moveTo(start, y); p.lineTo(x, y); start = -1; }
+        else if (!edge && start >= 0) { p.moveTo(b.x + start - 1, b.y + y - 1); p.lineTo(b.x + x - 1, b.y + y - 1); start = -1; }
       }
     }
-    // Bordes verticales
-    for (let x = b.x; x <= b.x + b.w; x++) {
+    // bordes verticales: entre la columna x-1 y la columna x
+    for (let x = 1; x <= bw + 1; x++) {
       let start = -1;
-      for (let y = b.y; y <= b.y + b.h; y++) {
-        const edge = y < b.y + b.h && inside(x, y) !== inside(x - 1, y);
+      for (let y = 1; y <= bh + 1; y++) {
+        const edge = y <= bh && ins[y * PW + x - 1] !== ins[y * PW + x];
         if (edge && start < 0) start = y;
-        else if (!edge && start >= 0) { p.moveTo(x, start); p.lineTo(x, y); start = -1; }
+        else if (!edge && start >= 0) { p.moveTo(b.x + x - 1, b.y + start - 1); p.lineTo(b.x + x - 1, b.y + y - 1); start = -1; }
       }
     }
     this.outline = p; this.outlineVersion = this.version;

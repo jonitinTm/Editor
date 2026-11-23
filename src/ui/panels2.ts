@@ -30,12 +30,17 @@ export function buildNavigatorPanel(parent: HTMLElement) {
   const renderThumb = () => {
     const d = app.doc; if (!d || !visible(body)) return;
     layout();
-    thumb = document.createElement('canvas'); thumb.width = Math.max(1, Math.round(d.width * k)); thumb.height = Math.max(1, Math.round(d.height * k));
+    viewKey = ''; thumb = document.createElement('canvas'); thumb.width = Math.max(1, Math.round(d.width * k)); thumb.height = Math.max(1, Math.round(d.height * k));
     const t = ctx2d(thumb); t.imageSmoothingQuality = 'high'; t.drawImage(d.getComposite(), 0, 0, thumb.width, thumb.height);
     renderView();
   };
+  let viewKey = '';
   const renderView = () => {
     const d = app.doc;
+    // solo si se ve el panel y la vista ha cambiado (el ratón moviéndose no cambia nada aquí)
+    if (!visible(body)) return;
+    const vp0 = app.viewport, key = d && thumb ? [thumb.width, thumb.height, d.view.zoom, d.view.panX, d.view.panY, (vp0 as any).rot ?? 0, vp0.width, vp0.height, cv.width].join('|') : '';
+    if (key && key === viewKey) return; viewKey = key;
     ctx.clearRect(0, 0, cv.width, cv.height);
     if (!d || !thumb) return;
     ctx.fillStyle = '#fff'; ctx.fillRect(ox, oy, thumb.width, thumb.height); ctx.drawImage(thumb, ox, oy);
