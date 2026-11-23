@@ -22,7 +22,7 @@ const MENUS: { label: string; items: Item[] }[] = [
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'prefs'] },
   { label: 'Imagen', items: ['autoEnhance', 'blurBg', '-', { label: 'Ajustes', items: [...filterItems('ajuste'), '-', 'variations'] }, '-', 'dupDoc', '-', 'palette', 'applyImage', 'calculations', 'freqSep', '-', 'imageSize', 'canvasSize',
     { label: 'Modo', items: ['modeRgb', 'modeGray', '-', 'filter:indexed'] },
-    { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', 'imgRotArb', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll', 'autoStraighten', 'fitImage'] },
+    { label: 'Rotación de imagen', items: ['imgRot90', 'imgRot-90', 'imgRot180', 'imgRotArb', '-', 'imgFlipH', 'imgFlipV'] }, '-', 'cropSel', 'trim', 'revealAll', 'autoStraighten', 'fitImage', '-', 'traceImage'] },
   { label: 'Capa', items: ['newLayer', 'newGroup', 'dupLayer', 'dupLayerTo', 'layerViaCopy', 'layerViaCut', 'delLayer', 'renameLayer', '-',
     'artboard',
     { label: 'Nueva capa de relleno', items: ['fill:solid', 'fill:gradient', 'fill:pattern'] },
