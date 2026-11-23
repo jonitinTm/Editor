@@ -100,9 +100,28 @@ export function exportDialog() {
   const pbRow = row('', h('label', { class: 'check' }, perBoard, ' Cada mesa de trabajo en un archivo'));
   if (!hasBoards) pbRow.style.display = 'none';
   const info = h('div', { class: 'hint' }, '');
+  // peso máximo: busca la mejor calidad que cabe (útil para webs, formularios o correos con límite)
+  const maxOn = h('input', { type: 'checkbox' }) as HTMLInputElement, maxKb = h('input', { type: 'number', min: 10, max: 50000, value: 500, class: 'num', style: { width: '80px' } }) as HTMLInputElement;
+  const maxRow = row('Peso máximo', h('label', { class: 'check' }, maxOn, ' No pasar de '), maxKb, h('span', {}, ' KB'));
+  const fitQuality = async (): Promise<number> => {
+    const lim = Math.max(10, +maxKb.value || 500) * 1024; let lo = 0.05, hi = 1, best = 0.05;
+    for (let k = 0; k < 7; k++) { const m = (lo + hi) / 2, b = await io.exportImage(d, fmt.value as any, m, scale / 100); if (b.size <= lim) { best = m; lo = m; } else hi = m; }
+    return best;
+  };
+  // vista previa: un trozo a tamaño real del original y del resultado comprimido
+  const pvA = h('canvas', { width: 150, height: 100, class: 'exp-pv' }) as HTMLCanvasElement, pvB = h('canvas', { width: 150, height: 100, class: 'exp-pv' }) as HTMLCanvasElement;
+  const pvRow = h('div', { class: 'exp-pv-row' }, h('div', {}, pvA, h('div', { class: 'hint' }, 'Original')), h('div', {}, pvB, h('div', { class: 'hint' }, 'Exportado (al 100 %)')));
+  const showPreview = async (b: Blob) => {
+    const img = await createImageBitmap(b).catch(() => null); if (!img) return;
+    const cx = Math.max(0, Math.round(img.width / 2 - 75)), cy = Math.max(0, Math.round(img.height / 2 - 50));
+    const src = d.flatten(), k = scale / 100, a = pvA.getContext('2d')!, bb = pvB.getContext('2d')!;
+    a.clearRect(0, 0, 150, 100); bb.clearRect(0, 0, 150, 100); a.imageSmoothingEnabled = bb.imageSmoothingEnabled = false;
+    a.drawImage(src, cx / k, cy / k, 150 / k, 100 / k, 0, 0, 150, 100); bb.drawImage(img, cx, cy, 150, 100, 0, 0, 150, 100);
+  };
   let timer = 0;
   const estimate = () => {
     clearTimeout(timer);
+    pvRow.style.display = maxRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
     qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
     scRow.style.display = fmt.value.startsWith('image/') || fmt.value === 'pdf' || fmt.value === 'svg' ? '' : 'none';
     exRow.style.display = fmt.value.startsWith('image/') ? '' : 'none';
@@ -116,16 +135,20 @@ export function exportDialog() {
     if (fmt.value === 'psd') { info.textContent = 'Capas, grupos, máscaras, opacidad y modos de fusión. El texto y las formas van como píxeles.'; return; }
     info.textContent = 'Calculando tamaño…';
     timer = window.setTimeout(async () => {
-      const b = await io.exportImage(d, fmt.value as any, quality / 100, scale / 100);
-      info.textContent = `${Math.round(d.width * scale / 100)} × ${Math.round(d.height * scale / 100)} px · tamaño aproximado: ${(b.size / 1024).toFixed(b.size > 1e6 ? 0 : 1)} KB`;
+      const lossy = fmt.value === 'image/jpeg' || fmt.value === 'image/webp', qq = lossy && maxOn.checked ? await fitQuality() : quality / 100;
+      const b = await io.exportImage(d, fmt.value as any, qq, scale / 100);
+      info.textContent = `${Math.round(d.width * scale / 100)} × ${Math.round(d.height * scale / 100)} px · tamaño aproximado: ${(b.size / 1024).toFixed(b.size > 1e6 ? 0 : 1)} KB` + (lossy && maxOn.checked ? ` · calidad ${Math.round(qq * 100)} %` + (b.size > (+maxKb.value || 500) * 1024 ? ' (no cabe: reduce el tamaño)' : '') : '');
+      if (lossy) showPreview(b);
     }, 200);
   };
   fmt.addEventListener('change', estimate);
+  maxOn.addEventListener('change', () => { q.el.style.opacity = maxOn.checked ? '.4' : ''; estimate(); }); maxKb.addEventListener('input', estimate);
   estimate();
   showDialog({
     title: 'Exportar como', okLabel: 'Guardar',
-    body: [row('Nombre', name), row('Formato', fmt), qRow, scRow, exRow, pbRow, info],
+    body: [row('Nombre', name), row('Formato', fmt), qRow, maxRow, scRow, exRow, pbRow, info, pvRow],
     onOk: async () => {
+      if ((fmt.value === 'image/jpeg' || fmt.value === 'image/webp') && maxOn.checked) quality = Math.round((await fitQuality()) * 100);
       if (fmt.value === 'project') { d.name = name.value || d.name; await ops.saveProject(true); return; }
       if (fmt.value === 'psd') { await ops.savePsd(name.value || d.name); return; }
       if (fmt.value === 'gif') { await ops.saveGif(name.value || d.name); return; }

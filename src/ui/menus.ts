@@ -11,12 +11,12 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
   if (group === 'ajuste') return list.map(f => 'filter:' + f.id);
   const subs = new Map<string, Item[]>();
   for (const f of list) { if (!f.submenu) continue; const k = f.submenu; if (!subs.has(k)) subs.set(k, []); subs.get(k)!.push('filter:' + f.id); }
-  const order = ['Artístico', 'Trazos de pincel', 'Bosquejar', 'Desenfocar', 'Galería de desenfoque', 'Distorsionar', 'Enfocar', 'Estilizar', 'Interpretar', 'Pixelizar', 'Ruido', 'Textura', '3D', 'Vídeo', 'Otro'];
+  const order = ['Artístico', 'Trazos de pincel', 'Bosquejar', 'Desenfocar', 'Galería de desenfoque', 'Distorsionar', 'Enfocar', 'Estilizar', 'Interpretar', 'Pixelizar', 'Retrato', 'Ruido', 'Textura', '3D', 'Vídeo', 'Otro'];
   return [...subs].sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0])).map(([label, items]) => ({ label, items }));
 };
 
 const MENUS: { label: string; items: Item[] }[] = [
-  { label: 'Archivo', items: ['new', 'templates', 'collage', 'open', 'openLayers', 'recent', 'place', '-', 'save', 'saveAs', 'quickPng', 'export', 'exportLayers', 'exportSlices', 'social', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'fileInfo', 'print', 'close'] },
+  { label: 'Archivo', items: ['new', 'templates', 'collage', 'open', 'openLayers', 'recent', 'place', '-', 'save', 'saveAs', 'quickPng', 'export', 'exportLayers', 'exportSlices', 'social', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'fileInfo', 'print', 'revert', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fade', '-', 'fill', 'contentFill', '-', 'caScale', 'puppet', 'perspWarp', 'autoAlign', 'stroke', '-', 'findReplace', 'skyReplace', '-', 'defineBrush', 'definePattern', 'defineShape', 'importPresets', '-', 'freeTransform',
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'prefs'] },
   { label: 'Imagen', items: ['autoEnhance', 'blurBg', '-', { label: 'Ajustes', items: [...filterItems('ajuste'), '-', 'variations'] }, '-', 'dupDoc', '-', 'palette', 'applyImage', 'calculations', 'freqSep', '-', 'imageSize', 'canvasSize',

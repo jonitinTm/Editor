@@ -18,7 +18,7 @@ export { TOOL_DESC };
 // ---- Palabras con las que la gente busca las cosas -----------------------------------------------------
 const SYN: Record<string, string> = {
   removeBg: 'quitar fondo borrar fondo eliminar fondo recortar persona sin fondo transparente png',
-  aiRemoveBg: 'quitar fondo borrar fondo eliminar fondo ia inteligencia artificial recortar persona transparente', aiUpscale: 'ampliar agrandar aumentar resolucion calidad ia super resolucion nitidez', aiDepthBlur: 'desenfocar fondo retrato bokeh profundidad ia camara', aiPhoto3d: 'foto 3d animada paralaje movimiento ia', aiSelTool: 'seleccionar objeto clic ia inteligente', aiSubject: 'seleccionar persona sujeto ia', aiErase: 'borrar objeto quitar persona eliminar cable mancha ia borrar algo', aiFill: 'borrar seleccion rellenar segun contenido ia eliminar',
+  aiRemoveBg: 'quitar fondo borrar fondo eliminar fondo ia inteligencia artificial recortar persona transparente', aiUpscale: 'ampliar agrandar aumentar resolucion calidad ia super resolucion nitidez', aiDepthBlur: 'desenfocar fondo retrato bokeh profundidad ia camara', aiPhoto3d: 'foto 3d animada paralaje movimiento ia', aiSelTool: 'seleccionar objeto clic ia inteligente', aiSubject: 'seleccionar persona sujeto ia', aiErase: 'borrar objeto quitar persona eliminar cable mancha ia borrar algo', aiFill: 'borrar seleccion rellenar segun contenido ia eliminar', 'filter:skinSmooth': 'suavizar piel retrato cara granos manchas arrugas belleza alisar cutis', 'filter:jpegClean': 'artefactos jpeg cuadros bloques compresion whatsapp mala calidad limpiar', revert: 'revertir volver al original deshacer todo',
   selectSubject: 'seleccionar persona objeto sujeto principal', selectSky: 'cielo', skyReplace: 'cambiar cielo poner nubes atardecer',
   'filter:gblur': 'desenfocar difuminar borroso blur', 'filter:huesat': 'saturacion colores mas vivos tono', 'filter:bw': 'blanco y negro gris sin color monocromo',
   'filter:curves': 'brillo contraste luz', 'filter:brightness': 'brillo contraste mas claro mas oscuro iluminar', 'filter:levels': 'niveles luz contraste',
@@ -127,6 +127,7 @@ export const TASKS: Task[] = [
   { label: 'Añadir texto', ic: 'text', desc: 'Toca donde quieras escribir', needDoc: true, run: tool('text', 'Toca o haz clic donde quieras escribir') },
   { label: 'Efectos de texto', ic: 'fx', desc: 'Neón, 3D, dorado…', needDoc: true, run: act('textFx') },
   { label: 'Desenfocar el fondo', ic: 'drop', desc: 'Efecto retrato con IA', needDoc: true, run: act('aiDepthBlur') },
+  { label: 'Suavizar la piel', ic: 'drop', desc: 'Retrato más limpio, sin parecer plástico', needDoc: true, run: act('filter:skinSmooth') },
   { label: 'Blanco y negro', ic: 'contrast', desc: 'Con ajuste de cada color', needDoc: true, run: act('filter:bw') },
   { label: 'Enderezar', ic: 'ruler', desc: 'Si la foto salió torcida', needDoc: true, run: act('autoStraighten') },
   { label: 'Cambiar el cielo', ic: 'cloud', desc: 'Atardecer, nubes, noche…', needDoc: true, run: act('skyReplace') },

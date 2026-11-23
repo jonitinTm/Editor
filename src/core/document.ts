@@ -58,6 +58,8 @@ export class EditorDocument {
   embedded = false;
   /** ¿Hay cambios sin guardar? */
   modified = false;
+  /** Estado en el último guardado (para Archivo › Revertir). */
+  savedSnap: import('./history').DocSnap | null = null;
   composite: HTMLCanvasElement;
   private compositeDirty: Rect | null | true = true;
   private listeners = new Set<() => void>();

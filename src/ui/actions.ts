@@ -53,6 +53,7 @@ export const ACTIONS: Action[] = [
   { id: 'exportLayers', label: 'Exportar capas a archivos…', enabled: hasDoc, run: dlg.exportLayersDialog },
   { id: 'batch', label: 'Automatizar › Lote…', enabled: () => true, run: dlg.batchDialog },
   { id: 'print', label: 'Imprimir…', keys: ['Ctrl+P'], enabled: hasDoc, run: ops.printImage },
+  { id: 'revert', label: 'Revertir', keys: ['F12'], enabled: hasDoc, run: () => { ops.revertDocument(); } },
   { id: 'close', label: 'Cerrar', keys: ['Alt+Ctrl+W'], enabled: hasDoc, run: () => ops.closeDocument() },
 
   // Edición

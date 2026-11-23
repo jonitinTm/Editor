@@ -12,6 +12,7 @@ import * as R from './artistic';
 import * as MD from './modes';
 import * as R2 from './render2';
 import * as G from './gallery';
+import * as RT from './retouch';
 import { indexColors } from './indexed';
 import { matchColor } from './matchcolor';
 
@@ -395,6 +396,9 @@ export const FILTERS: FilterDef[] = [
     { key: 'iterations', label: 'Intensidad', type: 'range', min: 1, max: 30, default: 10 }, { key: 'noise', label: 'Contener el ruido', type: 'range', min: 0, max: 100, default: 20, unit: '%' }], apply: (img, p) => R2.shakeReduction(img, p) },
   { id: 'deinterlace', name: 'Desentrelazar…', group: 'filtro', submenu: 'Vídeo', params: [
     { key: 'lines', label: 'Quitar líneas', type: 'select', default: 'odd', choices: [['odd', 'Impares'], ['even', 'Pares']] }, { key: 'mode', label: 'Rellenar con', type: 'select', default: 'interp', choices: [['interp', 'Interpolación'], ['dup', 'Duplicación']] }], apply: (img, p) => R2.deinterlace(img, p) },
+  // ---- retoque automático
+  { id: 'skinSmooth', name: 'Suavizar piel…', group: 'filtro', submenu: 'Retrato', params: [{ key: 'amount', label: 'Intensidad', type: 'range', min: 0, max: 100, default: 60, unit: '%' }, { key: 'radius', label: 'Tamaño de las imperfecciones', type: 'range', min: 2, max: 60, default: 8, unit: 'px' }, { key: 'texture', label: 'Conservar textura', type: 'range', min: 0, max: 100, default: 30, unit: '%' }, { key: 'onlySkin', label: 'Solo en los tonos de piel', type: 'checkbox', default: true }], apply: (img, p) => RT.skinSmooth(img, p) },
+  { id: 'jpegClean', name: 'Quitar artefactos JPEG…', group: 'filtro', submenu: 'Ruido', params: [{ key: 'strength', label: 'Intensidad', type: 'range', min: 0, max: 100, default: 50, unit: '%' }], apply: (img, p) => RT.jpegClean(img, p) },
   // ---- galería de filtros (algoritmos adaptados de VectorCraft, licencia MIT: ver src/filters/gallery.ts)
   { id: 'coloredPencil', name: 'Lápiz de color…', group: 'filtro', submenu: 'Artístico', params: [{ key: 'width', label: 'Anchura del lápiz', type: 'range', min: 1, max: 24, default: 5 }, { key: 'pressure', label: 'Presión del trazo', type: 'range', min: 0, max: 15, default: 5 }, { key: 'paper', label: 'Brillo del papel', type: 'range', min: 0, max: 50, default: 25 }], apply: (img, p) => G.coloredPencil(img, p) },
   { id: 'dryBrush', name: 'Pincel seco…', group: 'filtro', submenu: 'Artístico', params: [{ key: 'size', label: 'Tamaño del pincel', type: 'range', min: 1, max: 10, default: 2 }, { key: 'detail', label: 'Detalle del pincel', type: 'range', min: 0, max: 10, default: 10 }, { key: 'texture', label: 'Textura', type: 'range', min: 1, max: 3, default: 1 }], apply: (img, p) => G.dryBrush(img, p) },

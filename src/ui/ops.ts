@@ -183,7 +183,7 @@ export async function saveProject(saveAs = false) {
     const blob = await io.serializeProject(d);
     const h = await io.saveBlob(blob, d.name + io.PROJECT_EXT, saveAs ? undefined : handles.get(d));
     if (h) { handles.set(d, h); if (h.name) d.name = io.baseName(h.name); }
-    d.modified = false; app.emit('docs');
+    d.modified = false; d.savedSnap = snapshot(d); app.emit('docs');
     forget(d);
     app.toast('Proyecto guardado');
   } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
@@ -2250,4 +2250,14 @@ export function selectFocusArea(level: number, softness: number, map?: Float32Ar
   d.selection.setMask(c2);
   if (commit) d.commit('Foco');
   return M;
+}
+
+/** Archivo › Revertir: vuelve al estado del último guardado (o al de cuando se abrió). Se puede deshacer. */
+export async function revertDocument() {
+  const d = doc(); if (!d) return;
+  const snap = d.savedSnap ?? d.history.steps[0]?.snap;
+  if (!snap) return;
+  if (d.history.index === 0 && !d.savedSnap) { app.toast('No hay cambios que revertir'); return; }
+  if (!(await confirmDialog('Revertir', `¿Volver al estado ${d.savedSnap ? 'del último guardado' : 'en que se abrió'} «${d.name}»? Podrás deshacerlo con Ctrl+Z.`, 'Revertir'))) return;
+  restore(d, snap); d.commit('Revertir'); d.modified = !d.savedSnap; app.viewport.fit(true); app.emit('docs');
 }
