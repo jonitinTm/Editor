@@ -6,7 +6,7 @@ import { h } from './dom';
 import { actionById } from './actions';
 import { FILTERS } from '../filters/registry';
 
-type Item = string | '-' | { label: string; items: Item[] };
+export type Item = string | '-' | { label: string; items: Item[] };
 
 const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
   const list = FILTERS.filter(f => f.group === group && f.inMenu !== false);
@@ -17,7 +17,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
   return [...subs].sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0])).map(([label, items]) => ({ label, items }));
 };
 
-const MENUS: { label: string; items: Item[] }[] = [
+export const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Archivo', items: ['new', 'templates', 'collage', 'open', 'openGallery', 'galleryLayer', 'openLayers', 'recent', 'place', '-', 'save', 'saveAs', 'quickPng', 'export', 'exportLayers', 'exportSlices', 'social', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'fileInfo', 'print', 'revert', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fade', '-', 'fill', 'contentFill', '-', 'caScale', 'puppet', 'perspWarp', 'autoAlign', 'stroke', '-', 'findReplace', 'skyReplace', '-', 'defineBrush', 'definePattern', 'defineShape', 'importPresets', '-', 'freeTransform',
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'penSettings', 'prefs'] },
@@ -34,9 +34,9 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'Selección', items: ['selectAll', 'deselect', 'reselect', 'invertSel', 'selAllLayers', '-', 'selFromLayer', 'pathToSel', 'selToPath', 'selectSubject', 'selectSky', 'focusArea', 'colorRange', { label: 'Luminosidad', items: ['lum:lights', 'lum:darks', 'lum:mids'] }, 'refine', '-', 'quickMask', '-', 'loadSel', 'saveSel', { label: 'Modificar', items: ['border', 'smoothSel', 'expand', 'contract', 'feather'] }, 'growSel', 'similarSel', 'transformSel'] },
   { label: 'Filtro', items: ['lastFilter', '-', 'filterGallery', 'wideAngle', 'filter:develop', 'liquify', 'vanishing', 'pathBlur', 'displace', '-', ...filterItems('filtro')] },
   { label: 'IA', items: ['aiRemoveBg', 'aiSubject', 'aiSky', 'aiSelTool', '-', 'aiErase', 'aiFill', '-', 'aiDepthBlur', 'aiRelight', 'aiFog', 'aiPhoto3d', 'aiDepthLayer', '-', 'aiUpscale'] },
-  { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'proof', 'gamut', 'pixelGrid', '-', 'compare', 'comparePrev', 'compareDoc', { label: 'Simular visión', items: ['sim:none', '-', 'sim:protan', 'sim:deutan', 'sim:tritan', 'sim:achroma'] }, 'contrast', '-', 'drawMode', '-', 'extras', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'guideLayout', 'clearGuides'] },
+  { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'proof', 'gamut', 'pixelGrid', '-', 'compare', 'comparePrev', 'compareDoc', { label: 'Simular visión', items: ['sim:none', '-', 'sim:protan', 'sim:deutan', 'sim:tritan', 'sim:achroma'] }, 'contrast', '-', 'drawMode', { label: 'Asistente de perspectiva', items: ['assist:off', 'assist:p1', 'assist:p2'] }, '-', 'extras', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'guideLayout', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', 'reference', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Carácter', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Párrafo', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },
-  { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'guide', 'shortcuts', '-', 'privacy', 'about'] },
+  { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'touchTour', 'guide', 'shortcuts', '-', 'privacy', 'about'] },
 ];
 
 window.addEventListener('editor-keys', () => {
@@ -86,7 +86,7 @@ function buildList(items: Item[], close: () => void): HTMLElement {
   return ul;
 }
 
-function refreshStates(root: HTMLElement) {
+export function refreshStates(root: HTMLElement) {
   root.querySelectorAll<HTMLElement>('.menu-item[data-action]').forEach(el => {
     const a = actionById.get(el.dataset.action!)!;
     el.classList.toggle('disabled', a.enabled ? !a.enabled() : false);

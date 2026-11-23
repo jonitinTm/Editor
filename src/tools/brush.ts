@@ -12,6 +12,8 @@ import { healHole } from '../ui/ops';
 import type { Viewport } from '../ui/viewport';
 import { layerCanvasIn } from '../core/history';
 import { sampledTip, getTip, allTips, loadUserTips, removeUserTip } from '../core/brushtips';
+import { fitShape } from './quickshape';
+import { assistOn, assistBegin, assistMap, assistEnd, hitVP, moveVP, drawAssist } from './assist';
 
 const SIZE = { key: 'size', label: 'Tamaño', type: 'range' as const, min: 1, max: 1000, default: 20, unit: 'px' };
 const HARD = { key: 'hardness', label: 'Dureza', type: 'range' as const, min: 0, max: 100, default: 80, unit: '%' };
@@ -102,6 +104,7 @@ const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, 
 const TILT = { key: 'tiltMode', label: 'Inclinación del lápiz', type: 'select' as const, default: 'shade', choices: [
   { value: 'none', label: 'No hace nada' }, { value: 'shade', label: 'Sombrear (más ancho y suave)' }, { value: 'angle', label: 'Gira la punta (caligrafía)' }] };
 const TAPER = { key: 'taper', label: 'Afinar al empezar', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const QSHAPE = { key: 'quickShape', label: 'Forma rápida (mantén quieto al final)', type: 'checkbox' as const, default: true };
 const ROPE = { key: 'rope', label: 'Estabilizador (cuerda)', type: 'range' as const, min: 0, max: 100, default: 0, unit: 'px' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
@@ -222,6 +225,33 @@ abstract class StrokeTool implements Tool {
   private dab: ((x: number, y: number, p: number) => any) | null = null;
   /** Distancia recorrida en el trazo (para afinar el comienzo) y última presión (para suavizar sus saltos). */
   private travel = 0; private lastP = 1; private tapLast: { x: number; y: number } | null = null;
+  // forma rápida: puntos del trazo, temporizador de «mantener quieto» y si ya se ha convertido
+  private qsPts: { x: number; y: number; p: number }[] = []; private qsTimer = 0; private qsAnchor: { sx: number; sy: number } | null = null;
+  private qsDone = false; private qsReplay = false; private qsDown: ToolEvent | null = null;
+  /** Arrastrando un punto de fuga del asistente de perspectiva. */
+  private vpDrag = -1;
+  private hasOpt(k: string) { return this.options.some((o: any) => o.key === k); }
+  private qsOn() { return this.hasOpt('quickShape') && app.opt('quickShape', this.id) !== false && !assistOn(); }
+  private qsArm(e: ToolEvent) {
+    clearTimeout(this.qsTimer); this.qsAnchor = { sx: e.sx, sy: e.sy };
+    this.qsTimer = window.setTimeout(() => this.quickShape(), 600);
+  }
+  /** Mantener quieto al final del trazo: se cambia por la forma perfecta (línea, círculo, rectángulo…). */
+  private quickShape() {
+    if (!this.stroke || this.qsDone || !this.qsDown || this.qsPts.length < 5) return;
+    const zoom = app.viewport?.zoom || 1;
+    const f = fitShape(this.qsPts, 14 / zoom); if (!f) return;
+    const ps = this.qsPts.map(q => q.p).sort((a, b) => a - b), p = ps[Math.floor(ps.length / 2)] || 1;
+    this.stroke.cancel(); this.stroke = null;
+    this.qsReplay = true;
+    try { this.down({ ...this.qsDown, x: f.pts[0].x, y: f.pts[0].y, pressure: p, shift: false }); } finally { this.qsReplay = false; }
+    const st = this.stroke as Stroke | null; if (!st || !this.dab) return;
+    for (const q of f.pts.slice(1)) st.lineTo(q.x, q.y, p, this.spacing(p), this.dab);
+    st.update();
+    this.lastPoint = f.pts[f.pts.length - 1]; this.sm = null; this.ropePt = null; this.ropeCursor = null; this.qsDone = true;
+    app.viewport?.requestRender();
+    app.toast('Forma rápida: ' + f.name);
+  }
   /** Presión ajustada: sin saltos bruscos (lápiz) y más fina al empezar si se pide. */
   private shapeP(p: number, e: ToolEvent, x: number, y: number) {
     if (e.pointerType === 'pen') { p = this.lastP + (p - this.lastP) * 0.55; this.lastP = p; }
@@ -246,6 +276,8 @@ abstract class StrokeTool implements Tool {
   }
   down(e: ToolEvent) {
     if (e.alt && !this.erase) { this.picking = true; pickColorAt(e.x, e.y); return; }
+    // asistente de perspectiva: tocar un punto de fuga lo arrastra (no pinta)
+    if (!this.qsReplay && app.viewport) { const i = hitVP(app.viewport, e.sx, e.sy); if (i >= 0) { this.vpDrag = i; return; } }
     this.tilt = e.tilt ?? 0; this.azi = e.azimuth ?? 0;
     this.ropePt = this.ropeLen() > 0 ? { x: e.x, y: e.y } : null; this.ropeCursor = null;
     const t = getPaintTarget();
@@ -281,6 +313,11 @@ abstract class StrokeTool implements Tool {
       return r;
     };
     this.sm = { x: e.x, y: e.y, p: e.pressure };
+    if (!this.qsReplay) {
+      assistBegin(e.x, e.y);
+      this.qsDone = false; this.qsPts = [{ x: e.x, y: e.y, p: e.pressure }]; this.qsDown = e;
+      if (this.qsOn()) this.qsArm(e);
+    }
     this.travel = 0; this.lastP = e.pressure; this.tapLast = { x: e.x, y: e.y };
     if (app.opt('airbrush', this.id)) {
       // aerógrafo: mientras se mantiene pulsado, sigue soltando pintura aunque no se mueva
@@ -299,8 +336,12 @@ abstract class StrokeTool implements Tool {
   }
   move(e: ToolEvent) {
     if (this.picking) { pickColorAt(e.x, e.y); return; }
-    if (!this.stroke || !this.dab) return;
+    if (this.vpDrag >= 0) { moveVP(this.vpDrag, e.x, e.y); app.viewport?.requestRender(); return; }
+    if (!this.stroke || !this.dab || this.qsDone) return;
     let { x, y, pressure: p } = e;
+    if (assistOn()) ({ x, y } = assistMap(x, y, app.viewport?.zoom || 1));
+    // forma rápida: se guarda el recorrido y, si el puntero se queda quieto, se cuenta el tiempo
+    if (this.qsOn()) { this.qsPts.push({ x, y, p }); if (!this.qsAnchor || Math.hypot(e.sx - this.qsAnchor.sx, e.sy - this.qsAnchor.sy) > 5) this.qsArm(e); }
     if (e.tilt !== undefined) { this.tilt += (e.tilt - this.tilt) * 0.5; this.azi = e.azimuth ?? this.azi; }
     const R = this.ropeLen();
     if (R > 0 && this.ropePt) {
@@ -319,9 +360,11 @@ abstract class StrokeTool implements Tool {
   }
   private airTimer = 0;
   up(e?: ToolEvent) {
-    clearInterval(this.airTimer); this.airTimer = 0;
+    clearInterval(this.airTimer); this.airTimer = 0; clearTimeout(this.qsTimer); this.qsAnchor = null; assistEnd();
     if (this.picking) { this.picking = false; return; }
+    if (this.vpDrag >= 0) { this.vpDrag = -1; return; }
     if (!this.stroke) return;
+    if (this.qsDone) { e = undefined; this.qsDone = false; }
     // Con suavizado, el trazo termina en el punto real donde se soltó
     const roped = !!this.ropePt; this.ropePt = null; this.ropeCursor = null;
     if (e && !roped && this.sm && this.dab && (app.opt<number>('smoothing', this.id) ?? 0) > 0) { this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(e.pressure), this.dab); this.lastPoint = { x: e.x, y: e.y }; }
@@ -330,9 +373,10 @@ abstract class StrokeTool implements Tool {
     this.stroke = null;
     if (changed) { app.doc!.commit(this.historyName); if (!this.erase) import('../ui/artist').then(m => m.addRecentColor(app.fg)); }
   }
-  cancel() { this.stroke?.cancel(); this.stroke = null; }
+  cancel() { clearTimeout(this.qsTimer); this.qsDone = false; assistEnd(); this.vpDrag = -1; this.stroke?.cancel(); this.stroke = null; }
   hover() { /* el cursor se dibuja en drawOverlay */ }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    drawAssist(ctx, vp);
     const R = this.ropeLen();
     if (R > 0 && !this.stroke && vp.mouseScreen) {
       // círculo de la cuerda alrededor del puntero
@@ -352,7 +396,7 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, ROPE, TILT, TAPER, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP, { ...TEX }, TEX_SCALE, TEX_DEPTH, TEX_INV, DUAL, DUAL_SC] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, ROPE, QSHAPE, TILT, TAPER, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP, { ...TEX }, TEX_SCALE, TEX_DEPTH, TEX_INV, DUAL, DUAL_SC] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) {
     // pinceles de dibujo listos para usar (lápiz, tinta, carboncillo…)
@@ -407,7 +451,7 @@ export function tipPicker(bar: HTMLElement, toolId: string) {
 export class PencilTool extends StrokeTool {
   id = 'pencil'; name = 'Lápiz'; icon = icon('pencil'); key = 'B'; group = 'brush'; historyName = 'Lápiz';
   aliased = true;
-  options = [{ ...SIZE, default: 1 }, OPAC, SMOOTH, ROPE, SYM, { ...PRESS, default: false }] as any[];
+  options = [{ ...SIZE, default: 1 }, OPAC, SMOOTH, ROPE, QSHAPE, SYM, { ...PRESS, default: false }] as any[];
 }
 
 export class EraserTool extends StrokeTool {

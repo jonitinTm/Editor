@@ -10,7 +10,7 @@ import { app } from './ui/app';
 import { h } from './ui/dom';
 import { icon } from './ui/icons';
 import { Viewport, isTyping } from './ui/viewport';
-import { buildSideSliders } from './ui/drawing';
+import { buildSideSliders, buildPenChip } from './ui/drawing';
 import { installTouchTips } from './ui/touchtips';
 import { History } from './core/history';
 import { buildMenuBar } from './ui/menus';
@@ -78,6 +78,10 @@ app.registerTool(new AISelectTool());
 const root = document.getElementById('app')!;
 const header = h('header', { class: 'topbar' }, h('span', { class: 'logo', html: icon('logo') }, h('span', {}, 'Editor')));
 root.append(header);
+// en el móvil, un solo botón «Menú» que abre la hoja con todas las categorías (la barra de menús no cabe)
+const menuBtn = h('button', { class: 'top-btn top-menu', type: 'button', title: 'Menú: archivo, edición, imagen, capa, filtros…', 'aria-label': 'Menú', html: icon('menu') + '<span>Menú</span>' });
+menuBtn.onclick = () => import('./ui/mobilemenu').then(m => m.openMobileMenu());
+header.append(menuBtn);
 buildMenuBar(header);
 // En el móvil los paneles van en un cajón que se abre con este botón
 const sideToggle = h('button', { class: 'side-toggle', title: 'Mostrar u ocultar los paneles (capas, color, propiedades…)', html: icon('newLayer') + '<span>Paneles</span>' });
@@ -124,6 +128,7 @@ const viewHost = h('div', { class: 'view-host' });
 center.append(viewHost);
 app.viewport = new Viewport(viewHost);
 buildSideSliders(viewHost);
+buildPenChip(viewHost);
 installTouchTips();
 History.onTrim = () => app.toast('Imagen grande: se guardan menos pasos de deshacer para que todo siga fluido');
 const welcome = buildWelcome();
@@ -192,9 +197,12 @@ tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildCh
   document.body.append(handle);
   // la primera vez en el móvil se explica el gesto
   const HINT = 'editor.swipeHint';
+  let hintTries = 0;
   const showHint = () => {
     // si la guía de bienvenida está abierta, se espera a que termine (ella misma lo explica en su último paso)
-    if (document.querySelector('.tour-bubble')) { setTimeout(showHint, 1500); return; }
+    // (la guía de gestos del móvil también lo explica; si aún va a salir, se espera a ella)
+    let tourPending = false; try { tourPending = matchMedia('(pointer: coarse)').matches && !localStorage.getItem('editor.mobileTour'); } catch { /* */ }
+    if (document.querySelector('.tour-bubble, .tt-overlay') || (tourPending && hintTries++ < 20)) { setTimeout(showHint, 1500); return; }
     try { if (localStorage.getItem(HINT) || window.innerWidth > 700 || navigator.webdriver) return; localStorage.setItem(HINT, '1'); } catch { return; }
     const bub = h('div', { class: 'swipe-hint', role: 'status' },
       h('div', { class: 'swipe-anim' }, h('span', { class: 'swipe-dot' }), h('span', { class: 'swipe-arrow' }, '←')),
@@ -249,7 +257,7 @@ function renderTabs() {
 }
 app.on('docs', renderTabs);
 // guía de primera visita, al abrir la primera imagen (no en navegadores automatizados de pruebas)
-app.on('docs', () => { if (app.doc && !(navigator as any).webdriver) easy.maybeTour(); });
+app.on('docs', () => { if (app.doc && !(navigator as any).webdriver) import('./ui/touchtour').then(m => { if (!m.maybeTouchTour()) easy.maybeTour(); }); });
 app.on('doc', () => {
   // El indicador de "sin guardar" de la pestaña
   const t = tabs.querySelector('.tab.active span');

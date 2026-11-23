@@ -70,6 +70,7 @@ export function toggleDrawMode(force?: boolean) {
       const tool = (tid: string, ic: string, title: string) => { const b = h('button', { class: 'dm-btn', type: 'button', title, 'aria-label': title, 'data-tool': tid, html: icon(ic) }, h('span', { class: 'dm-lbl' }, title)); b.onclick = () => app.setTool(tid); return b; };
       const sw = h('button', { class: 'dm-btn dm-color', type: 'button', title: 'Color', 'aria-label': 'Color' }, h('span', { class: 'dm-lbl' }, 'Color'));
       sw.onclick = () => import('./artist').then(m => m.colorPopover(sw));
+      colorDraggable(sw); sw.title = 'Color (toca para cambiarlo; arrástralo a una zona para rellenarla)';
       const ref = h('button', { class: 'dm-btn', type: 'button', title: 'Imagen de referencia', 'aria-label': 'Imagen de referencia', html: icon('image') }, h('span', { class: 'dm-lbl' }, 'Referencia'));
       ref.onclick = () => import('./artist').then(m => m.toggleReference());
       const gal = h('button', { class: 'dm-btn', type: 'button', title: 'Añadir foto de la galería como capa', 'aria-label': 'Añadir foto de la galería como capa', html: icon('plus') }, h('span', { class: 'dm-lbl' }, 'Galería'));
@@ -80,7 +81,10 @@ export function toggleDrawMode(force?: boolean) {
       br.onclick = ev => { ev.stopPropagation(); if (app.tool?.id !== 'brush') app.setTool('brush'); import('./optionsbar').then(m => m.presetMenu(br, app.tool)); };
       const x = h('button', { class: 'dm-btn dm-exit', type: 'button', title: 'Salir del modo dibujo', 'aria-label': 'Salir del modo dibujo', html: icon('close') }, h('span', { class: 'dm-lbl' }, 'Salir'));
       x.onclick = () => toggleDrawMode(false);
-      miniBar = h('div', { class: 'draw-bar' }, tool('brush', 'brush', 'Pincel'), tool('eraser', 'eraser', 'Borrador'), tool('smudge', 'finger', 'Dedo'), tool('eyedropper', 'eyedropper', 'Cuentagotas'), br, sw, ref, gal, u, r, x);
+      // asistente de perspectiva: cada toque cambia sin → 1 punto → 2 puntos
+      const ps = h('button', { class: 'dm-btn dm-persp', type: 'button', title: 'Asistente de perspectiva (toca para cambiar: sin, 1 punto, 2 puntos)', 'aria-label': 'Asistente de perspectiva', html: icon('persp') }, h('span', { class: 'dm-lbl' }, 'Perspectiva'));
+      ps.onclick = () => import('../tools/assist').then(m => { const next = ({ off: 'p1', p1: 'p2', p2: 'off' } as const)[m.assist.mode]; import('./actions').then(a => a.actionById.get('assist:' + next)?.run()); ps.classList.toggle('on', next !== 'off'); });
+      miniBar = h('div', { class: 'draw-bar' }, tool('brush', 'brush', 'Pincel'), tool('eraser', 'eraser', 'Borrador'), tool('smudge', 'finger', 'Dedo'), tool('eyedropper', 'eyedropper', 'Cuentagotas'), br, sw, ref, ps, gal, u, r, x);
       document.body.append(miniBar);
       const sync = () => {
         miniBar!.querySelectorAll<HTMLElement>('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === app.tool?.id));
@@ -163,4 +167,54 @@ export function penSettingsDialog() {
     onCancel: () => { Object.assign(prefs, before); },
   });
   drawGraph();
+}
+
+/** Botón sobre el lienzo (solo cuando se ha usado un lápiz): dice qué hace el dedo y permite cambiarlo con un toque.
+ *  «Dedo: mover» = el lápiz dibuja y la mano se ignora (rechazo de la palma); «Dedo: dibujar» = el dedo también pinta. */
+export function buildPenChip(host: HTMLElement) {
+  const ico = h('span', { class: 'pc-ico' }), txt = h('span', { class: 'pc-txt' });
+  const chip = h('button', { class: 'pen-chip', type: 'button' }, ico, txt);
+  const paint = () => {
+    const vp = app.viewport, show = !!vp?.penSeen && prefs.penOnly === 'auto' && !!app.doc;
+    chip.classList.toggle('on', show); if (!show) return;
+    const move = vp.penMode();
+    ico.innerHTML = icon(move ? 'hand' : 'brush');
+    txt.textContent = move ? 'Dedo: mover' : 'Dedo: dibujar';
+    chip.title = move ? 'El lápiz dibuja; el dedo mueve, amplía y gira la vista y la palma se ignora. Toca para que el dedo también dibuje.' : 'El dedo también dibuja. Toca para volver a usar solo el lápiz (la palma se ignora).';
+    chip.setAttribute('aria-label', chip.title);
+  };
+  chip.onclick = () => { const vp = app.viewport; vp.fingerDraw = !vp.fingerDraw; paint(); app.toast(vp.fingerDraw ? 'Ahora el dedo también dibuja' : 'Ahora solo dibuja el lápiz: el dedo mueve la vista'); };
+  host.append(chip);
+  app.on('pen', paint); app.on('docs', paint); app.on('doc', paint); paint();
+}
+
+/** Arrastrar el color (de un botón de color) hasta el lienzo rellena esa zona («Soltar color»).
+ *  Un toque normal sigue abriendo el selector de color. */
+export function colorDraggable(el: HTMLElement) {
+  let st: { x: number; y: number; id: number } | null = null, ghost: HTMLElement | null = null, dragged = false;
+  el.style.touchAction = 'none';
+  el.addEventListener('pointerdown', e => { if (e.button !== 0) return; st = { x: e.clientX, y: e.clientY, id: e.pointerId }; dragged = false; });
+  window.addEventListener('pointermove', e => {
+    if (!st || e.pointerId !== st.id) return;
+    if (!dragged && Math.hypot(e.clientX - st.x, e.clientY - st.y) > 10) {
+      dragged = true; try { el.setPointerCapture(e.pointerId); } catch { /* */ }
+      ghost = h('div', { class: 'color-ghost' + (e.pointerType === 'mouse' ? ' at-ptr' : '') }); ghost.style.background = app.fg; document.body.append(ghost);
+    }
+    if (ghost) { ghost.style.left = e.clientX + 'px'; ghost.style.top = e.clientY + 'px'; }
+  });
+  const end = (e: PointerEvent) => {
+    if (!st || e.pointerId !== st.id) return;
+    st = null; ghost?.remove(); ghost = null;
+    if (!dragged) return;
+    const vp = app.viewport, r = vp.canvas.getBoundingClientRect();
+    // se suelta donde está la bola de color (un poco por encima del dedo, para verla)
+    const lift = e.pointerType === 'mouse' ? 0 : 23, cx = e.clientX, cy = e.clientY - lift;
+    if (e.type === 'pointerup' && app.doc && cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom) {
+      const d = vp.toDoc(cx - r.left, cy - r.top);
+      import('../tools/misc').then(m => { if (!m.colorDrop(d.x, d.y)) app.toast('Suelta el color dentro de la imagen', 'warn'); });
+    }
+  };
+  window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+  // después de arrastrar, el «clic» no abre el selector
+  el.addEventListener('click', e => { if (dragged) { e.stopImmediatePropagation(); e.preventDefault(); dragged = false; } }, true);
 }

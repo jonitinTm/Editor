@@ -57,6 +57,7 @@ export function buildToolbar(parent: HTMLElement) {
     if (c) w === 'fg' ? app.setColors(c, app.bg) : app.setColors(app.fg, c);
   };
   fgSw.onclick = () => pick('fg'); bgSw.onclick = () => pick('bg');
+  import('./drawing').then(m => m.colorDraggable(fgSw)); fgSw.title = 'Color frontal (clic para cambiar; arrástralo a una zona de la imagen para rellenarla)';
   swap.onclick = () => app.setColors(app.bg, app.fg);
   reset.onclick = () => app.setColors('#000000', '#ffffff');
   bar.append(h('div', { class: 'colors' }, bgSw, fgSw, swap, reset));

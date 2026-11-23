@@ -360,3 +360,21 @@ export class RotateViewTool implements Tool {
     ctx.restore();
   }
 }
+
+/** «Soltar color»: arrastrar el color hasta una zona la rellena (como el bote, mirando las líneas de todas las capas,
+ *  así se puede colorear un dibujo hecho en otra capa). El relleno crece 1 px para no dejar un halo junto a las líneas. */
+export function colorDrop(x: number, y: number): boolean {
+  const t = getPaintTarget(); const doc = app.doc;
+  if (!t || !doc || x < 0 || y < 0 || x >= doc.width || y >= doc.height) return false;
+  const res = floodMask(getPixels(t.isMask ? t.canvas : doc.flatten()), x, y, 48, true);
+  if (!res) return false;
+  const st = strokeSetup(t, false);
+  const fill = res.canvas, fc = ctx2d(fill);
+  const grown = makeCanvas(fill.width, fill.height), gc = ctx2d(grown);
+  for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) gc.drawImage(fill, dx, dy);
+  fc.clearRect(0, 0, fill.width, fill.height); fc.drawImage(grown, 0, 0);
+  fc.globalCompositeOperation = 'source-in'; fc.fillStyle = st.color; fc.fillRect(0, 0, fill.width, fill.height);
+  setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, 1, st.maskValue));
+  doc.commit('Soltar color');
+  return true;
+}

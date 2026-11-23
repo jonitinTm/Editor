@@ -872,3 +872,101 @@ html.i18n-wait body { visibility: hidden; }
 .modal.working .btn.primary { position: relative; color: transparent; }
 .modal.working .btn.primary::after { content: ''; position: absolute; inset: 0; margin: auto; width: 14px; height: 14px; border: 2px solid #fff; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+/* ---- Menú del móvil: botón «Menú» y hoja desde abajo ---- */
+.top-menu { display: none; }
+@media (max-width: 700px) {
+  .menubar { display: none; }
+  .top-menu { display: flex; }
+}
+.mm-overlay { position: fixed; inset: 0; z-index: 400; background: rgba(0,0,0,0); transition: background .18s; display: flex; align-items: flex-end; justify-content: center; }
+.mm-overlay.in { background: rgba(0,0,0,.45); }
+.mm-sheet { width: min(560px, 100vw); max-height: 86vh; height: 86vh; background: var(--panel); border: 1px solid var(--border); border-bottom: 0; border-radius: 16px 16px 0 0;
+  display: flex; flex-direction: column; transform: translateY(100%); transition: transform .18s ease-out; box-shadow: 0 -10px 30px rgba(0,0,0,.45); padding-bottom: env(safe-area-inset-bottom); }
+.mm-overlay.in .mm-sheet { transform: none; }
+.mm-grip { height: 22px; flex: none; display: grid; place-items: center; touch-action: none; cursor: grab; }
+.mm-grip::before { content: ''; width: 42px; height: 5px; border-radius: 3px; background: var(--border); }
+.mm-head { display: flex; gap: 8px; padding: 0 12px 8px; flex: none; }
+.mm-search { flex: 1; min-width: 0; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--input); color: var(--text); padding: 0 12px; font: inherit; font-size: 15px; }
+.mm-close { width: 40px; height: 40px; border: 0; border-radius: 10px; background: var(--panel-3); color: var(--text); display: grid; place-items: center; flex: none; }
+.mm-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 2px 12px 10px; flex: none; scrollbar-width: none; border-bottom: 1px solid var(--border); }
+.mm-tabs::-webkit-scrollbar { display: none; }
+.mm-tab { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 64px; padding: 7px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; }
+.mm-tab svg { width: 22px; height: 22px; }
+.mm-tab.on { background: var(--accent-soft); color: var(--accent); }
+.mm-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 6px 8px 16px; -webkit-overflow-scrolling: touch; }
+.mm-list { display: flex; flex-direction: column; }
+.mm-sub { display: none; margin: 0 0 4px 12px; padding-left: 8px; border-left: 2px solid var(--border); }
+.mm-sub.open { display: flex; }
+.mm-item { display: flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 10px; border: 0; border-radius: 10px; background: transparent; color: var(--text); font: inherit; font-size: 15px; text-align: left; width: 100%; }
+.mm-item:active { background: var(--btn-hover); }
+.mm-item.disabled { opacity: .45; }
+.mm-item .mi-check { width: 14px; flex: none; color: var(--accent); }
+.mm-label { flex: 1; min-width: 0; }
+.mm-group { font-weight: 600; }
+.mm-chev svg { width: 18px; height: 18px; transition: transform .15s; color: var(--muted); }
+.mm-group[aria-expanded=true] .mm-chev svg { transform: rotate(180deg); }
+.mm-sep { height: 1px; background: var(--border); margin: 4px 10px; }
+.mm-empty { padding: 20px; text-align: center; }
+@media (max-width: 700px) {
+  .topbar .logo > span { display: none; }
+  .top-btn.top-menu span { display: inline; font-size: 13px; }
+}
+/* botón «Dedo: mover / dibujar» (aparece al usar un lápiz) */
+.pen-chip { display: none; position: absolute; right: 12px; bottom: 12px; z-index: 7; align-items: center; gap: 6px; height: 34px; padding: 0 12px 0 9px; border-radius: 17px;
+  border: 1px solid var(--border); background: color-mix(in srgb, var(--panel) 90%, transparent); color: var(--text); font: inherit; font-size: 12px; box-shadow: 0 3px 12px rgba(0,0,0,.35); }
+.pen-chip.on { display: flex; }
+.pen-chip .pc-ico svg { width: 18px; height: 18px; display: block; }
+body.draw-mode .pen-chip { bottom: max(14px, env(safe-area-inset-bottom)); }
+/* ---- Mini tutorial de gestos (móvil y tableta) ---- */
+.tt-overlay { position: fixed; inset: 0; z-index: 8000; background: rgba(0,0,0,.6); display: grid; place-items: center; padding: 16px; }
+.tt-box { width: min(400px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px 0 14px; box-shadow: 0 12px 40px rgba(0,0,0,.5); overflow: hidden; }
+.tt-head { display: flex; align-items: center; gap: 8px; padding: 0 16px 8px; color: var(--muted); font-size: 13px; }
+.tt-head svg { width: 18px; height: 18px; color: var(--accent); }
+.tt-view { overflow: hidden; touch-action: pan-y; }
+.tt-track { display: flex; transition: transform .25s ease; }
+.tt-card { flex: 0 0 100%; padding: 0 18px; box-sizing: border-box; text-align: center; user-select: none; }
+.tt-card h3 { margin: 10px 0 6px; font-size: 17px; }
+.tt-card p { margin: 0; color: var(--muted); line-height: 1.45; font-size: 14px; min-height: 60px; }
+.tt-art { width: 100%; max-width: 280px; height: auto; display: block; margin: 0 auto; }
+.tt-canvas { fill: #f4f4f4; }
+.tt-f { fill: var(--accent); fill-opacity: .55; stroke: var(--accent); stroke-width: 2; }
+.tt-line { fill: none; stroke: #222; stroke-width: 4; stroke-linecap: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.tt-line.tt-static { stroke-dasharray: none; stroke-dashoffset: 0; }
+.tt-arrow { fill: none; stroke: #555; stroke-width: 3; stroke-linecap: round; }
+.tt-btn { fill: #d9dde4; stroke: #9aa3b2; }
+.tt-tip { fill: #2b3140; opacity: 0; }
+.tt-lbl { font: 600 14px sans-serif; fill: #555; text-anchor: middle; }
+.tt-pen { fill: #3d8bfd; }
+.tt-palm { fill: #c79a7a; fill-opacity: .45; stroke: #b07d5c; stroke-dasharray: 3 3; }
+.tt-card.cur .tt-line:not(.tt-static) { animation: tt-dash 2.2s ease-in-out infinite; }
+.tt-draw { offset-path: path('M45 80 C 70 30, 110 100, 155 40'); }
+.tt-card.cur .tt-draw { animation: tt-move 2.2s ease-in-out infinite; offset-path: path('M45 80 C 70 30, 110 100, 155 40'); offset-rotate: 0deg; }
+.tt-card.cur .tt-pin-a { animation: tt-pa 1.8s ease-in-out infinite alternate; }
+.tt-card.cur .tt-pin-b { animation: tt-pb 1.8s ease-in-out infinite alternate; }
+.tt-card.cur .tt-tap { animation: tt-tap 1.4s ease-in-out infinite; transform-origin: center; transform-box: fill-box; }
+.tt-card.cur .tt-hold { animation: tt-tap 2.4s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.tt-card.cur .tt-tip { animation: tt-tip 2.4s ease-in-out infinite; }
+.tt-card.cur .tt-slide { animation: tt-slide 2.4s ease-in-out infinite alternate; }
+@keyframes tt-dash { 0% { stroke-dashoffset: 1; } 70%, 100% { stroke-dashoffset: 0; } }
+@keyframes tt-move { 0% { offset-distance: 0%; } 70%, 100% { offset-distance: 100%; } }
+@keyframes tt-pa { to { transform: translateX(-28px); } }
+@keyframes tt-pb { to { transform: translateX(28px); } }
+@keyframes tt-tap { 0%, 100% { transform: scale(1); opacity: .9; } 50% { transform: scale(.7); opacity: 1; } }
+@keyframes tt-tip { 0%, 40% { opacity: 0; } 55%, 90% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes tt-slide { from { transform: translateX(30px); opacity: .4; } to { transform: none; opacity: 1; } }
+.tt-dots { display: flex; justify-content: center; gap: 6px; margin: 12px 0 10px; }
+.tt-dots span { width: 7px; height: 7px; border-radius: 50%; background: var(--border); cursor: pointer; }
+.tt-dots span.on { background: var(--accent); width: 18px; border-radius: 4px; }
+.tt-btns { display: flex; justify-content: space-between; padding: 0 16px; }
+.tt-btns .btn { min-height: 38px; padding: 0 16px; }
+@media (prefers-reduced-motion: reduce) { .tt-card * { animation: none !important; } .tt-line { stroke-dashoffset: 0; } }
+.color-ghost { position: fixed; z-index: 9500; width: 34px; height: 34px; margin: -40px 0 0 -17px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 14px rgba(0,0,0,.5); pointer-events: none; }
+.color-ghost.at-ptr { margin: -17px 0 0 -17px; opacity: .85; }
+/* móviles muy estrechos (≤ 400 px): sin logo ni textos en la barra de arriba para que todo quepa sin taparse
+   (mantener pulsado cualquier botón dice qué hace) */
+@media (max-width: 400px) {
+  .topbar .logo { display: none; }
+  .top-btn.top-menu span, .side-toggle span { display: none; }
+  .top-btn { padding: 0 7px; }
+  .side-toggle { padding: 0 8px; }
+}

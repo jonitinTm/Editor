@@ -1,4 +1,5 @@
 // Catálogo de acciones: cada una tiene nombre, atajo y qué hace.
+import { assist, setAssist } from '../tools/assist';
 import { t as tr } from '../i18n/i18n';
 import '../filters/matchsrc';
 // Menús y teclado se construyen a partir de esta lista.
@@ -247,6 +248,7 @@ export const ACTIONS: Action[] = [
   { id: 'autoEnhance', label: 'Mejorar la foto (automático)', enabled: hasLayer, run: () => { import('./easy').then(m => m.autoEnhance()); } },
   { id: 'blurBg', label: 'Desenfocar el fondo (efecto retrato)', enabled: hasLayer, run: () => { import('./easy').then(m => m.blurBackground()); } },
   { id: 'tour', label: 'Ver la guía de bienvenida', run: () => { import('./easy').then(m => m.startTour()); } },
+  { id: 'touchTour', label: 'Guía rápida de gestos (móvil y tableta)', run: () => { import('./touchtour').then(m => m.startTouchTour()); } },
   { id: 'perspWarp', label: 'Deformación de perspectiva', enabled: hasLayer, run: () => app.setTool('perspWarp', true) },
   { id: 'aiRemoveBg', label: 'Quitar fondo (IA)', enabled: hasLayer, run: () => { ai.aiRemoveBackground(); } },
   { id: 'aiSubject', label: 'Seleccionar sujeto (IA)', enabled: hasDoc, run: () => { ai.aiSelectSubject(); } },
@@ -340,6 +342,15 @@ export const ACTIONS: Action[] = [
   { id: 'win:timeline', label: 'Línea de tiempo (animación)', checked: () => !document.querySelector('.timeline')?.classList.contains('closed'), run: () => { document.querySelector('.timeline')?.classList.toggle('closed'); app.doc?.changed(); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:tools', label: 'Herramientas', checked: () => !document.body.classList.contains('no-tools'), run: () => { document.body.classList.toggle('no-tools'); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:options', label: 'Opciones', checked: () => !document.body.classList.contains('no-options'), run: () => { document.body.classList.toggle('no-options'); requestAnimationFrame(() => app.viewport.resize()); } },
+  ...([['off', 'Sin asistente de perspectiva'], ['p1', 'Perspectiva de 1 punto de fuga'], ['p2', 'Perspectiva de 2 puntos de fuga']] as const).map(([m, label]) => ({
+    id: 'assist:' + m, label, enabled: () => !!app.doc, checked: () => assist.mode === m,
+    run: () => {
+      setAssist(m);
+      if (m === 'off') { app.toast('Asistente de perspectiva desactivado'); return; }
+      if (!['brush', 'pencil', 'eraser'].includes(app.tool?.id)) app.setTool('brush');
+      app.toast('Perspectiva: arrastra los puntos azules para colocarlos; al pintar, el trazo sigue las líneas de fuga o la vertical');
+    },
+  })),
   { id: 'drawMode', label: 'Modo dibujo (pantalla completa)', keys: ['F'], enabled: () => !!app.doc, run: () => import('./drawing').then(m => m.toggleDrawMode()) },
   { id: 'reference', label: 'Imagen de referencia', run: () => import('./artist').then(m => m.toggleReference()) },
   { id: 'penSettings', label: 'Ajustes del lápiz…', run: () => import('./drawing').then(m => m.penSettingsDialog()) },

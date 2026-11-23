@@ -138,6 +138,8 @@ export const ICONS: Record<string, string> = {
   txtC: S('<path d="M4 6h16M7 10h10M4 14h16M7 18h10"/>'),
   txtR: S('<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>'),
   txtJ: S('<path d="M4 6h16M4 10h16M4 14h16M4 18h10"/>'),
+  persp: S('<path d="M2 9h20"/><path d="M12 9L4 21M12 9l8 12M12 9L9 21M12 9l3 12"/><circle cx="12" cy="9" r="1.6" fill="currentColor"/>'),
+  menu: S('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   logo: `<svg viewBox="0 0 32 32" width="22" height="22"><rect x="3" y="7" width="18" height="18" rx="3" fill="#3d8bfd"/><rect x="11" y="3" width="18" height="18" rx="3" fill="#f5a524" fill-opacity=".9"/><path d="M11 7h7a3 3 0 013 3v11h-7a3 3 0 01-3-3z" fill="#1d2a44" fill-opacity=".55"/></svg>`,
 };

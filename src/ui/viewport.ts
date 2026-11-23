@@ -35,8 +35,12 @@ export class Viewport {
   private pointers = new Map<number, { x: number; y: number }>();
   private pinch: { dist: number; cx: number; cy: number; zoom: number; ang: number; rot: number; rotating: boolean } | null = null;
   /** ¿Se ha usado un lápiz? Entonces (en modo automático) el dedo solo mueve la vista y el lápiz dibuja. */
-  penSeen = false;
+  penSeen = (() => { try { return localStorage.getItem('editor.penSeen') === '1'; } catch { return false; } })();
+  /** El usuario ha pedido que el dedo también dibuje aunque haya lápiz (botón del lienzo). */
+  fingerDraw = false;
   private penDown = false;
+  /** El trazo en curso lo empezó un dedo (si luego apoya el lápiz, era la palma: se anula). */
+  private strokeTouch = false;
   /** Toque con varios dedos: si se sueltan enseguida sin moverse, 2 dedos = deshacer, 3 = rehacer. */
   private tap: { t: number; n: number; moved: boolean; pts: Map<number, { x: number; y: number }> } | null = null;
   /** Mantener pulsado con el dedo (en modo lápiz): cuentagotas. */
@@ -461,11 +465,21 @@ export class Viewport {
 
   isSpaceDown() { return this.spaceDown; }
   /** ¿El dedo debe mover la vista en lugar de dibujar? (hay lápiz) */
-  penMode() { return prefs.penOnly === 'on' || (prefs.penOnly === 'auto' && this.penSeen); }
+  penMode() { return prefs.penOnly === 'on' || (prefs.penOnly === 'auto' && this.penSeen && !this.fingerDraw); }
   private notePen() {
     if (this.penSeen) return;
     this.penSeen = true; app.emit('pen');
+    try { localStorage.setItem('editor.penSeen', '1'); } catch { /* se recuerda en este aparato */ }
+    // si un dedo (o la palma) estaba pintando cuando llegó el lápiz, ese trazo se anula
+    if (this.toolActive && this.strokeTouch && prefs.penOnly === 'auto' && !this.fingerDraw) this.cancelTouchStroke();
     if (prefs.penOnly === 'auto') app.toast('Lápiz detectado: ahora el lápiz dibuja y el dedo mueve, amplía y gira la vista (mantén el dedo para coger un color)');
+  }
+  /** Anula el trazo que empezó un dedo o la palma (al apoyar el lápiz). */
+  private cancelTouchStroke() {
+    this.toolActive = false; this.strokeTouch = false;
+    app.tool?.cancel?.();
+    for (const id of [...this.pointers.keys()]) if (id !== -1) this.pointers.delete(id);
+    this.tap = null; this.requestRender();
   }
   /** Color que se está cogiendo con el dedo (para dibujar la lupa). */
   get touchPicking() { return this.touchPick; }
@@ -498,7 +512,7 @@ export class Viewport {
     cv.addEventListener('pointerdown', e => {
       if (!this.doc) return;
       const touch = e.pointerType === 'touch';
-      if (e.pointerType === 'pen') { this.notePen(); this.penDown = true; }
+      if (e.pointerType === 'pen') { this.notePen(); this.penDown = true; if (this.toolActive && this.strokeTouch && this.penMode()) this.cancelTouchStroke(); }
       // rechazo de la palma: mientras el lápiz está apoyado, los toques no cuentan
       if (touch && this.penDown) return;
       // un contacto muy grande es la palma o el canto de la mano, no un dedo
@@ -569,7 +583,7 @@ export class Viewport {
       }
       // Ctrl + arrastrar con casi cualquier herramienta: mover (y elegir la capa bajo el ratón)
       if (te.ctrl && !['move', 'transform', 'pen', 'node', 'text', 'hand', 'zoom', 'rotateView', 'crop'].includes(app.tool?.id)) { this.springMove = true; app.setTool('move', true); }
-      this.toolActive = true;
+      this.toolActive = true; this.strokeTouch = touch;
       app.tool?.down?.(te);
       this.requestRender();
     });
