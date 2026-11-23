@@ -1,6 +1,8 @@
 import './core/polyfills';
 import { prefs, applyPrefs, fmtUnit } from './ui/prefs';
 applyPrefs();
+import { startI18n, LANGS, lang } from './i18n/i18n';
+startI18n();
 // Punto de entrada: monta la interfaz y conecta teclado, arrastrar y pegar.
 
 import './styles.css';
@@ -258,6 +260,12 @@ app.on('doc', renderStatus); app.on('docs', renderStatus);
 renderStatus();
 
 // ---- Pantalla de bienvenida ------------------------------------------------------------
+/** Selector de idioma de la pantalla de inicio (con el nombre de cada idioma en su propio idioma). */
+function langPicker() {
+  const sel = h('select', { class: 'no-i18n', 'aria-label': 'Idioma / Language' }, ...LANGS.map(([v, n]) => h('option', { value: v, selected: lang === v }, n))) as HTMLSelectElement;
+  sel.onchange = () => import('./ui/dialogs').then(m => m.changeLanguage(sel.value)).then(() => { sel.value = lang; });
+  return h('label', { class: 'welcome-lang no-i18n' }, h('span', { html: icon('globe') || '🌐' }), sel);
+}
 function buildWelcome() {
   const openBtn = h('button', { class: 'btn primary big', html: icon('open') + '<span>Abrir desde el equipo</span>' });
   openBtn.onclick = async () => ops.openFiles(await io.pickFiles(io.OPEN_ACCEPT));
@@ -283,6 +291,7 @@ function buildWelcome() {
       h('div', { class: 'welcome-actions' }, openBtn, newBtn, h('button', { class: 'btn big', type: 'button', onclick: () => easy.quickTasks(), html: icon('magic') + ' ¿Qué quieres hacer?' })),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,
       recentBox,
+      langPicker(),
       h('div', { class: 'drop-hint' }, 'También puedes arrastrar aquí imágenes (PNG, JPG, WebP, GIF, TIFF…), PSD, RAW o proyectos .edp, o pegar con Ctrl+V.'),
       h('button', { class: 'link-btn', onclick: () => quickGuideDialog() }, '¿Primera vez aquí? Lee la guía rápida (F1)')));
 }

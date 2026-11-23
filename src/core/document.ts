@@ -1,4 +1,5 @@
 // Documento: tamaño, árbol de capas, selección, guías, historial y vista.
+import { tName } from '../i18n/i18n';
 
 import { makeCanvas, ctx2d, Rect } from './canvas';
 import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric , blendIfActive, hasStyles } from './layers';
@@ -65,7 +66,7 @@ export class EditorDocument {
   private listeners = new Set<() => void>();
 
   constructor(name: string, width: number, height: number) {
-    this.name = name;
+    this.name = tName(name);
     this.width = width; this.height = height;
     this.selection = new Selection(width, height);
     this.composite = makeCanvas(width, height);
@@ -92,8 +93,8 @@ export class EditorDocument {
   nextLayerName() {
     let n = 1;
     const names = new Set(this.allLayers().map(l => l.name));
-    while (names.has(`Capa ${n}`)) n++;
-    return `Capa ${n}`;
+    while (names.has(tName(`Capa ${n}`))) n++;
+    return tName(`Capa ${n}`);
   }
 
   insertAboveActive(l: Layer) {

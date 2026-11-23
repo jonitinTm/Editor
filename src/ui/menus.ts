@@ -1,4 +1,5 @@
 // Barra de menús superior con submenús.
+import { lang } from '../i18n/i18n';
 
 import { app } from './app';
 import { h } from './dom';
@@ -41,7 +42,7 @@ const MENUS: { label: string; items: Item[] }[] = [
 window.addEventListener('editor-keys', () => {
   for (const el of document.querySelectorAll<HTMLElement>('.menu-item[data-action]')) { const a = actionById.get(el.dataset.action!); const k = el.querySelector('.mi-key'); if (a && k) k.textContent = a.keys ? prettyKey(a.keys[0]) : ''; }
 });
-export function prettyKey(k: string) { return k.replace('Delete', 'Supr').replace('Backspace', 'Retroceso').replace('Shift', 'Mayús'); }
+export function prettyKey(k: string) { return lang !== 'es' ? k.replace('Delete', 'Del') : k.replace('Delete', 'Supr').replace('Backspace', 'Retroceso').replace('Shift', 'Mayús'); }
 
 const isNarrow = () => window.innerWidth <= 700;
 function buildList(items: Item[], close: () => void): HTMLElement {

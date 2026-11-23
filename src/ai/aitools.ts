@@ -1,4 +1,5 @@
 // Interfaz de las herramientas con IA (menú «IA», tareas rápidas y la herramienta «Selección con IA»).
+import { t } from '../i18n/i18n';
 
 import { app } from '../ui/app';
 import { h, numberSlider } from '../ui/dom';
@@ -169,7 +170,7 @@ export async function upscaleDialog() {
     onOk: async () => {
       const k = sel.value as 'up2' | 'up4', S = k === 'up4' ? 4 : 2;
       if (d.width * d.height * S * S > maxCanvasPixels()) { app.toast('El resultado sería demasiado grande para este dispositivo: recorta o reduce antes la imagen', 'warn'); return; }
-      if (d.width * d.height > 1.2e6 && !confirm(`La imagen es grande (${d.width} × ${d.height}); ampliarla puede tardar varios minutos. ¿Seguir?`)) return;
+      if (d.width * d.height > 1.2e6 && !confirm(t(`La imagen es grande (${d.width} × ${d.height}); ampliarla puede tardar varios minutos. ¿Seguir?`))) return;
       const out = await aiUpscale(d.flatten(), k); if (!out) return;
       const nd = new EditorDocument(d.name.replace(/\.[^.]+$/, '') + ` (×${S})`, out.width, out.height); nd.ppi = d.ppi;
       const l = new RasterLayer('Fondo', out.width, out.height); l.canvas = out; nd.root.add(l); nd.setActive(l, false);

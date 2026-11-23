@@ -1,4 +1,5 @@
 // Diálogos concretos: nuevo documento, exportar, tamaños, filtros, niveles, curvas…
+import { LANGS, lang, setLang } from '../i18n/i18n';
 
 import { app } from './app';
 import { h, numberSlider } from './dom';
@@ -293,10 +294,11 @@ export function prefsDialog() {
   const auto = h('input', { type: 'checkbox', checked: prefs.autosave });
   const gsize = h('input', { type: 'number', class: 'num', min: 2, max: 2000, value: prefs.gridSize, style: 'width:80px' }) as HTMLInputElement;
   const units = h('select', {}, ...UNIT_NAMES.map(([v, n]) => h('option', { value: v, selected: prefs.units === v }, n))) as HTMLSelectElement;
+  const langSel = h('select', { class: 'no-i18n' }, ...LANGS.map(([v, n]) => h('option', { value: v, selected: lang === v }, n))) as HTMLSelectElement;
   const gcol = h('input', { type: 'color', class: 'color-input', value: prefs.gridColor }) as HTMLInputElement, gdcol = h('input', { type: 'color', class: 'color-input', value: prefs.guideColor }) as HTMLInputElement;
   showDialog({
     title: 'Preferencias', width: 420,
-    body: [h('div', { class: 'dlg-section' }, 'Interfaz'), row('Tema', theme), row('Tamaño de la interfaz', scale),
+    body: [h('div', { class: 'dlg-section' }, 'Interfaz'), row('Idioma / Language', langSel), row('Tema', theme), row('Tamaño de la interfaz', scale),
       h('div', { class: 'dlg-section' }, 'Rendimiento'), row('Pasos de historial', hist.el),
       h('div', { class: 'dlg-section' }, 'Unidades'), row('Reglas', units),
       h('div', { class: 'dlg-section' }, 'Guías, cuadrícula y ajuste'), row('Distancia de ajuste', snapTol.el), row('Cuadrícula cada', gsize, ' px'), row('Color de la cuadrícula', gcol), row('Color de las guías', gdcol),
@@ -304,6 +306,7 @@ export function prefsDialog() {
     onOk: () => {
       Object.assign(prefs, { theme: theme.value, uiScale: +scale.value, historySteps: Math.round(histV), snapTolerance: Math.round(snapV), autosave: auto.checked, gridSize: Math.max(2, Math.round(+gsize.value) || 50), gridColor: gcol.value, guideColor: gdcol.value, units: units.value as any });
       savePrefs(); app.viewport.requestRender(); app.toast('Preferencias guardadas');
+      if (langSel.value !== lang) changeLanguage(langSel.value);
     },
     onCancel: () => { document.body.dataset.theme = before.theme; app.viewport.requestRender(); },
   });
@@ -1379,4 +1382,15 @@ export function focusAreaDialog() {
     onCancel: () => { clearTimeout(t); d.selection.setMask(before); d.invalidate(); },
   });
   run();
+}
+
+/** Cambiar de idioma recarga la página: antes se avisa si hay trabajo abierto. */
+export async function changeLanguage(l: string) {
+  if (l === lang) return;
+  if (app.docs.some(d => (d as any).savedSnap !== d.history.steps[d.history.index]?.snap)) {
+    const { confirmDialog } = await import('./dialog');
+    if (!(await confirmDialog('Idioma / Language', 'Se recargará la página para cambiar el idioma. Lo que no hayas guardado se puede recuperar al volver (copia de recuperación), pero es mejor guardarlo antes. ¿Cambiar ahora?', 'Cambiar'))) return;
+    try { await (app as any).debug?.autosave?.(); } catch { /* */ }
+  }
+  setLang(l);
 }

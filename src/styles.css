@@ -807,3 +807,6 @@ body.draw-mode .draw-bar { display: flex; position: fixed; z-index: 50; top: max
   .dm-btn[data-tool=smudge] { display: none; }
   .dm-presets { font-size: 11px; }
 }
+.welcome-lang { display: inline-flex; align-items: center; gap: 6px; margin: 10px auto 0; color: var(--muted); }
+.welcome-lang svg { width: 16px; height: 16px; }
+.welcome-lang select { min-width: 120px; }

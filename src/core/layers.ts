@@ -1,4 +1,5 @@
 // Modelo de capas. Cada tipo de capa es una clase; añadir nuevos tipos
+import { t, tName } from '../i18n/i18n';
 // (capas de ajuste, objetos inteligentes, formas vectoriales…) consiste en
 // crear otra subclase con su propio `kind` y enseñarle al compositor a pintarla.
 
@@ -217,7 +218,7 @@ export abstract class Layer {
   abstract readonly kind: 'raster' | 'text' | 'shape' | 'smart' | 'group' | 'adjust';
   /** Estilos de capa (sombra, trazo, resplandor). null = ninguno. */
   styles: LayerStyles | null = null;
-  constructor(name: string) { this.name = name; }
+  constructor(name: string) { this.name = tName(name); }
   touch() { this.version++; }
   /** ¿Está bloqueada esta capa o alguno de sus grupos padre? */
   isLocked(): boolean {
@@ -738,7 +739,7 @@ export class SmartLayer extends RasterLayer {
  */
 export class AdjustmentLayer extends Layer {
   readonly kind = 'adjust' as const;
-  constructor(name: string, public filterId: string, public params: any) { super(name); }
+  constructor(name: string, public filterId: string, public params: any) { super(name); const e = t(name + '…'); if (e !== name + '…') this.name = e.replace('…', ''); else if (this.name === name) this.name = t(name); }
 }
 
 export class GroupLayer extends Layer {

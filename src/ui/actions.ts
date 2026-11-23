@@ -1,4 +1,5 @@
 // Catálogo de acciones: cada una tiene nombre, atajo y qué hace.
+import { t as tr } from '../i18n/i18n';
 import '../filters/matchsrc';
 // Menús y teclado se construyen a partir de esta lista.
 
@@ -383,7 +384,7 @@ export function shortcutList(): [string, string][] {
 /** Muestra un panel: abre su grupo si estaba cerrado y activa su pestaña. */
 function showPanel(name: string) {
   document.body.classList.remove('hide-panels');
-  const tab = [...document.querySelectorAll('.tg-tab')].find(t => t.textContent === name) as HTMLElement | undefined;
+  const tab = [...document.querySelectorAll('.tg-tab')].find(t => t.textContent === name || t.textContent === tr(name)) as HTMLElement | undefined;
   if (!tab) return;
   tab.closest('.tab-group')?.classList.remove('closed');
   tab.click();

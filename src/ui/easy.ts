@@ -1,4 +1,5 @@
 // Para que cualquiera pueda usar Editor sin saber de programas de imagen:
+import { t as tr } from '../i18n/i18n';
 // · Buscador «¿Qué quieres hacer?» (Ctrl+K): encuentra cualquier función, herramienta o filtro con palabras normales.
 // · Tareas rápidas: botones grandes para lo más habitual (mejorar foto, quitar fondo, recortar para redes…).
 // · Descripción de cada herramienta en una frase.
@@ -39,11 +40,11 @@ function entries(): Entry[] {
   for (const a of ACTIONS) {
     const path = paths.get(a.id) ?? '';
     if (!path && !SYN[a.id]) continue; // acciones internas sin sitio en los menús
-    out.push({ id: a.id, label: a.label.replace(/…$/, ''), path, kind: 'action', hay: norm(`${a.label} ${path} ${SYN[a.id] ?? ''}`), run: a.run, enabled: () => (a.enabled ? a.enabled() : true), keys: a.keys?.[0] });
+    out.push({ id: a.id, label: a.label.replace(/…$/, ''), path, kind: 'action', hay: norm(`${a.label} ${path} ${SYN[a.id] ?? ''} ${tr(a.label)} ${path.split(' › ').map(tr).join(' ')}`), run: a.run, enabled: () => (a.enabled ? a.enabled() : true), keys: a.keys?.[0] });
   }
   for (const t of app.tools.values()) {
     if (['transform', 'puppet', 'warp', 'perspWarp', 'vanish'].includes(t.id)) continue;
-    out.push({ id: 'tool:' + t.id, label: t.name, path: 'Herramienta' + (TOOL_DESC[t.id] ? ' · ' + TOOL_DESC[t.id] : ''), kind: 'tool', hay: norm(`${t.name} herramienta ${TOOL_DESC[t.id] ?? ''}`), run: () => app.setTool(t.id), enabled: () => !!app.doc, keys: t.key });
+    out.push({ id: 'tool:' + t.id, label: t.name, path: 'Herramienta' + (TOOL_DESC[t.id] ? ' · ' + TOOL_DESC[t.id] : ''), kind: 'tool', hay: norm(`${t.name} herramienta ${TOOL_DESC[t.id] ?? ''} ${tr(t.name)} ${tr('Herramienta')} ${tr(TOOL_DESC[t.id] ?? '')}`), run: () => app.setTool(t.id), enabled: () => !!app.doc, keys: t.key });
   }
   return out;
 }
@@ -59,7 +60,7 @@ export function searchEntries(q: string, list = entries()): Entry[] {
       s += exact ? 3 : pre ? 2 : 1;
     }
     if (!ok) continue;
-    const L = norm(e.label);
+    const L = norm(tr(e.label));
     const nq = norm(q).trim();
     if (L.trim() === nq) s += 8; else if (L.startsWith(nq)) s += 4; else if (L.includes(words[0])) s += 2;
     if (e.kind === 'action' && !e.path.startsWith('Filtro')) s += 0.5;
@@ -75,7 +76,7 @@ export function openSearch() {
   const list = entries();
   const input = h('input', { type: 'search', class: 'cmd-input', placeholder: '¿Qué quieres hacer? (p. ej.: quitar fondo, girar, blanco y negro…)', autocomplete: 'off', enterkeyhint: 'go' }) as HTMLInputElement;
   const res = h('div', { class: 'cmd-results', role: 'listbox' });
-  const tips = h('div', { class: 'cmd-tips' }, ...['quitar fondo', 'mejorar foto', 'recortar', 'texto', 'blanco y negro', 'desenfocar', 'tamaño', 'sombra'].map(t => { const b = h('button', { class: 'chip', type: 'button' }, t); b.onclick = () => { input.value = t; render(); input.focus(); }; return b; }));
+  const tips = h('div', { class: 'cmd-tips' }, ...['quitar fondo', 'mejorar foto', 'recortar', 'texto', 'blanco y negro', 'desenfocar', 'tamaño', 'sombra'].map(t => { const b = h('button', { class: 'chip', type: 'button' }, t); b.onclick = () => { input.value = b.textContent || t; render(); input.focus(); }; return b; }));
   const box = h('div', { class: 'cmd-box' }, h('div', { class: 'cmd-top' }, h('span', { class: 'cmd-ico', html: icon('search') }), input, h('button', { class: 'btn icon-btn', type: 'button', title: 'Cerrar (Esc)', html: icon('close'), onclick: () => close() })), tips, res);
   const overlay = h('div', { class: 'cmd-overlay' }, box);
   overlay.addEventListener('pointerdown', e => { if (e.target === overlay) close(); });
