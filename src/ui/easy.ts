@@ -184,13 +184,15 @@ export function startTour() {
     ['.toolbar', 'Herramientas', 'Aquí están las herramientas: pincel, borrar, recortar, texto… Mantén pulsado (o clic derecho) un botón con triángulo para ver más.'],
     ['.top-quick', 'Tareas rápidas', 'Lo más habitual en un toque: mejorar la foto, quitar el fondo, recortar para redes, añadir texto…'],
     ['.top-search', 'Buscar', 'Si no sabes dónde está algo, búscalo con tus palabras: «quitar fondo», «girar», «más brillo»…'],
-    [narrow ? '.side-toggle' : '.side', 'Paneles', narrow ? 'Capas, colores, historial… Toca aquí o desliza el dedo desde el borde derecho.' : 'Capas, colores, propiedades e historial. Cada pestaña es un panel.'],
+    ['.top-undo', 'Deshacer y rehacer', 'Si algo no te gusta, vuelve atrás con esta flecha (y adelante con la otra). Puedes deshacer muchos pasos.'],
+    [narrow ? '.side-handle' : '.side', 'Capas y paneles', narrow ? 'Desliza el dedo desde el borde derecho hacia la izquierda (o toca esta pestaña) para abrir las capas, el color y el historial. Desliza hacia la derecha para cerrarlos.' : 'Capas, colores, propiedades e historial. Cada pestaña es un panel.'],
   ];
   let i = 0;
   const bubble = h('div', { class: 'tour-bubble' }), ring = h('div', { class: 'tour-ring' }), shade = h('div', { class: 'tour-shade' });
   const end = () => { bubble.remove(); ring.remove(); shade.remove(); try { localStorage.setItem(TOUR_KEY, '1'); } catch { /* */ } };
   const show = () => {
     const [sel, title, text] = steps[i], el = document.querySelector(sel) as HTMLElement | null;
+    if (sel === '.side-handle') try { localStorage.setItem('editor.swipeHint', '1'); } catch { /* la guía ya lo explica */ }
     if (!el || el.getBoundingClientRect().width === 0) { if (++i < steps.length) show(); else end(); return; }
     const r = el.getBoundingClientRect();
     Object.assign(ring.style, { left: r.left - 4 + 'px', top: r.top - 4 + 'px', width: r.width + 8 + 'px', height: Math.min(r.height, window.innerHeight - r.top - 8) + 8 + 'px' });

@@ -81,7 +81,13 @@ const quickBtn = h('button', { class: 'top-btn top-quick', type: 'button', title
 quickBtn.onclick = () => easy.quickTasks();
 const searchBtn = h('button', { class: 'top-btn top-search', type: 'button', title: '¿Qué quieres hacer? Busca cualquier función (Ctrl+F)', html: icon('search') + '<span>Buscar</span>' });
 searchBtn.onclick = () => easy.openSearch();
-header.append(h('div', { class: 'top-right' }, quickBtn, searchBtn, sideToggle));
+// deshacer y rehacer siempre a la vista (en el móvil no hay teclado para Ctrl+Z)
+const undoBtn = h('button', { class: 'top-btn top-undo', type: 'button', title: 'Deshacer (Ctrl+Z)', 'aria-label': 'Deshacer', html: icon('undo') }) as HTMLButtonElement;
+const redoBtn = h('button', { class: 'top-btn top-redo', type: 'button', title: 'Rehacer (Mayús+Ctrl+Z)', 'aria-label': 'Rehacer', html: icon('redo') }) as HTMLButtonElement;
+undoBtn.onclick = () => ops.undo(); redoBtn.onclick = () => ops.redo();
+const upUndo = () => { const hi = app.doc?.history; undoBtn.disabled = !hi?.canUndo(); redoBtn.disabled = !hi?.canRedo(); };
+app.on('doc', upUndo); app.on('docs', upUndo); upUndo();
+header.append(h('div', { class: 'top-right' }, undoBtn, redoBtn, quickBtn, searchBtn, sideToggle));
 // fondo oscuro detrás del cajón: tocarlo lo cierra
 const sideBackdrop = h('div', { class: 'side-backdrop' });
 sideBackdrop.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); document.body.classList.remove('show-side'); });
@@ -156,6 +162,26 @@ tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildCh
     if (dy > 60) return;
     if (dx < -50) document.body.classList.add('show-side'); else if (dx > 70 && !(document.activeElement instanceof HTMLInputElement)) document.body.classList.remove('show-side');
   }, { passive: true });
+  // asa en el borde derecho: recuerda que ahí están las capas (tocarla también abre el cajón)
+  const handle = h('button', { class: 'side-handle', type: 'button', 'aria-label': 'Abrir capas y paneles', title: 'Capas y paneles' });
+  handle.onclick = () => document.body.classList.add('show-side');
+  document.body.append(handle);
+  // la primera vez en el móvil se explica el gesto
+  const HINT = 'editor.swipeHint';
+  const showHint = () => {
+    // si la guía de bienvenida está abierta, se espera a que termine (ella misma lo explica en su último paso)
+    if (document.querySelector('.tour-bubble')) { setTimeout(showHint, 1500); return; }
+    try { if (localStorage.getItem(HINT) || window.innerWidth > 700 || navigator.webdriver) return; localStorage.setItem(HINT, '1'); } catch { return; }
+    const bub = h('div', { class: 'swipe-hint', role: 'status' },
+      h('div', { class: 'swipe-anim' }, h('span', { class: 'swipe-dot' }), h('span', { class: 'swipe-arrow' }, '←')),
+      h('div', {}, h('b', {}, 'Capas y paneles'), h('div', {}, 'Desliza el dedo desde el borde derecho hacia la izquierda (o toca la pestaña del borde) para abrir las capas, el color y el resto de paneles. Desliza hacia la derecha para cerrarlos.')),
+      h('button', { class: 'btn primary', type: 'button', onclick: () => bub.remove() }, 'Entendido'));
+    document.body.append(bub);
+    const off = () => { if (document.body.classList.contains('show-side')) { bub.remove(); obs.disconnect(); } };
+    const obs = new MutationObserver(off); obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  };
+  (app as any).showSwipeHint = showHint;
+  app.on('docs', () => { if (app.doc) setTimeout(showHint, 900); });
 }
 root.append(h('div', { id: 'toasts' }));
 

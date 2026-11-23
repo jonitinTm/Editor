@@ -118,7 +118,7 @@ export class Viewport {
    *  reducida en cada fotograma es lo más caro; así solo se reduce la zona que cambia. */
   private mipTmp: HTMLCanvasElement | null = null;
   private bgCache: { key: string; canvas: HTMLCanvasElement } | null = null;
-  private mip: { doc: object; canvas: HTMLCanvasElement; s: number; comp: HTMLCanvasElement } | null = null;
+  private mip: { doc: object; canvas: HTMLCanvasElement; s: number; comp: HTMLCanvasElement; rough?: boolean } | null = null;
   private drawComposite(ctx: CanvasRenderingContext2D, comp: HTMLCanvasElement) {
     const d = this.doc!, eff = d.view.zoom * this.dpr;
     const changes = d.takeCompositeChanges();
@@ -127,11 +127,19 @@ export class Viewport {
     const W = Math.max(1, Math.ceil(comp.width * s)), H = Math.max(1, Math.ceil(comp.height * s));
     let m = this.mip;
     const huge = changes && (changes === true || changes.w * changes.h > comp.width * comp.height / 3);
-    if (!m || huge || m.doc !== d || m.s !== s || m.comp !== comp || m.canvas.width !== W || m.canvas.height !== H) {
+    if (!m || huge || m.rough && !this.toolActive || m.doc !== d || m.s !== s || m.comp !== comp || m.canvas.width !== W || m.canvas.height !== H) {
+      if (huge && this.toolActive) {
+        // mientras se arrastra algo que cambia toda la imagen (degradado, mover…): un solo paso, más rápido;
+        // al soltar se rehace con calidad
+        const n = m && m.canvas.width === W && m.canvas.height === H && m.rough ? m.canvas : document.createElement('canvas');
+        n.width = W; n.height = H; const c = n.getContext('2d')!; c.imageSmoothingQuality = 'low'; c.drawImage(comp, 0, 0, W, H);
+        m = this.mip = { doc: d, canvas: n, s, comp, rough: true };
+      } else {
       // se reconstruye entera, reduciendo a la mitad en cada paso para que quede nítida
       let cur: HTMLCanvasElement = comp, k = 1;
       while (k / 2 >= s) { k /= 2; const n = document.createElement('canvas'); n.width = Math.max(1, Math.ceil(comp.width * k)); n.height = Math.max(1, Math.ceil(comp.height * k)); const c = n.getContext('2d')!; c.imageSmoothingQuality = 'high'; c.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
       m = this.mip = { doc: d, canvas: cur, s, comp };
+      }
     } else if (changes) {
       const c = m.canvas.getContext('2d')!;
       const r = changes as { x: number; y: number; w: number; h: number };

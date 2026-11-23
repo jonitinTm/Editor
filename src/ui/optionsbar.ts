@@ -9,10 +9,11 @@ export function buildOptionsBar(parent: HTMLElement) {
   const bar = h('div', { class: 'optionsbar' });
   parent.append(bar);
   let setters: (() => void)[] = [];
+  let ac = new AbortController();
 
   const render = () => {
     bar.innerHTML = '';
-    setters = [];
+    setters = []; app.clearBar(); ac.abort(); ac = new AbortController();
     const t = app.tool;
     if (!t) return;
     const presetBtn = h('button', { class: 'opt-tool btn', type: 'button', title: 'Ajustes predefinidos de la herramienta', html: t.icon + '<span class="caret">▾</span>' });
@@ -88,7 +89,7 @@ export function buildOptionsBar(parent: HTMLElement) {
       e.stopPropagation(); pop.classList.toggle('open');
       if (pop.classList.contains('open')) { const r = btn.getBoundingClientRect(); pop.style.top = r.bottom + 4 + 'px'; pop.style.right = Math.max(8, innerWidth - r.right) + 'px'; }
     };
-    document.addEventListener('pointerdown', ev => { if (!more.contains(ev.target as Node) && !(ev.target as HTMLElement).closest?.('.flyout, .slider-pop')) pop.classList.remove('open'); });
+    document.addEventListener('pointerdown', ev => { if (!more.contains(ev.target as Node) && !(ev.target as HTMLElement).closest?.('.flyout, .slider-pop')) pop.classList.remove('open'); }, { signal: ac.signal });
   };
   let rt = 0;
   window.addEventListener('resize', () => { clearTimeout(rt); rt = window.setTimeout(render, 150); });

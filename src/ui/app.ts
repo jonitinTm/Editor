@@ -43,10 +43,15 @@ class App {
     } catch { /* sin almacenamiento disponible */ }
   }
 
-  on(ev: EventName, fn: () => void) {
+  on(ev: EventName, fn: () => void): () => void {
     if (!this.handlers.has(ev)) this.handlers.set(ev, new Set());
     this.handlers.get(ev)!.add(fn);
+    return () => { this.handlers.get(ev)?.delete(fn); };
   }
+  /** Escucha que dura mientras exista la barra de opciones actual (se quita sola al redibujarla). */
+  onBar(ev: EventName, fn: () => void) { this.barOffs.push(this.on(ev, fn)); }
+  barOffs: (() => void)[] = [];
+  clearBar() { this.barOffs.forEach(f => f()); this.barOffs = []; }
   /** Emite un evento; se agrupan en el siguiente fotograma para no repintar de más. */
   emit(ev: EventName) {
     this.pending.add(ev);

@@ -95,7 +95,7 @@ export class GradientTool implements Tool {
   extraOptions(bar: HTMLElement) {
     const prev = document.createElement('canvas'); prev.width = 120; prev.height = 18; prev.className = 'grad-prev';
     const paint = () => { const c = prev.getContext('2d')!; c.clearRect(0, 0, 120, 18); const g = c.createLinearGradient(0, 0, 120, 0); for (const st of this.stops(false)) g.addColorStop(st.t, `rgba(${hexToRgb(st.color).join(',')},${st.a})`); c.fillStyle = g; c.fillRect(0, 0, 120, 18); };
-    paint(); app.on('colors', paint); app.on('options', paint);
+    paint(); app.onBar('colors', paint); app.onBar('options', paint);
     prev.title = 'Editar degradado'; prev.onclick = () => gradientEditor(this.stops(false), st => { app.setOpt(this.id, 'stops', st); app.setOpt(this.id, 'colors', 'custom'); });
     const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Editar…'; b.onclick = () => prev.click();
     bar.append(prev, b);
@@ -124,10 +124,14 @@ export class GradientTool implements Tool {
     this.t = t; this.base = cloneCanvas(t.canvas);
     this.a = { x: e.x, y: e.y }; this.b = { ...this.a };
   }
-  private render() {
-    const t = this.t!, a = this.a!, b = this.b!;
-    const doc = app.doc!;
-    const g = makeCanvas(doc.width, doc.height), ctx = ctx2d(g);
+  private gbuf: HTMLCanvasElement | null = null;
+  /** `quick`: vista previa mientras se arrastra (a menos resolución y sin tramado, para que vaya fluido). */
+  private render(quick = false) {
+    const t = this.t!, doc = app.doc!;
+    const k = quick ? Math.min(1, 1000 / Math.max(doc.width, doc.height)) : 1;
+    const W = Math.max(1, Math.round(doc.width * k)), Hh = Math.max(1, Math.round(doc.height * k));
+    const a = { x: this.a!.x * k, y: this.a!.y * k }, b = { x: this.b!.x * k, y: this.b!.y * k };
+    const g = makeCanvas(W, Hh), ctx = ctx2d(g);
     const stops = this.stops(t.isMask);
     const rgba = (st: GradStop) => `rgba(${hexToRgb(st.color).join(',')},${st.a})`;
     const type = app.opt('type', this.id);
@@ -136,13 +140,13 @@ export class GradientTool implements Tool {
       // Se calcula píxel a píxel con una tabla de 256 colores
       const lut = makeCanvas(256, 1), lc = ctx2d(lut), lg = lc.createLinearGradient(0, 0, 256, 0);
       for (const st of stops) lg.addColorStop(st.t, rgba(st)); lc.fillStyle = lg; lc.fillRect(0, 0, 256, 1);
-      const L = lc.getImageData(0, 0, 256, 1).data, img = ctx.createImageData(doc.width, doc.height), o = img.data;
+      const L = lc.getImageData(0, 0, 256, 1).data, img = ctx.createImageData(W, Hh), o = img.data;
       const cs = Math.cos(-ang), sn = Math.sin(-ang);
-      for (let y = 0; y < doc.height; y++) for (let x = 0; x < doc.width; x++) {
+      for (let y = 0; y < Hh; y++) for (let x = 0; x < W; x++) {
         const dx = x - a.x, dy = y - a.y;
         let tt = type === 'diamond' ? (Math.abs(dx * cs - dy * sn) + Math.abs(dx * sn + dy * cs)) / len : (((Math.atan2(dy, dx) - ang) / (Math.PI * 2)) % 1 + 1) % 1;
-        const k = Math.min(255, Math.max(0, Math.round(tt * 255))) * 4, i = (y * doc.width + x) * 4;
-        o[i] = L[k]; o[i + 1] = L[k + 1]; o[i + 2] = L[k + 2]; o[i + 3] = L[k + 3];
+        const kk = Math.min(255, Math.max(0, Math.round(tt * 255))) * 4, i = (y * W + x) * 4;
+        o[i] = L[kk]; o[i + 1] = L[kk + 1]; o[i + 2] = L[kk + 2]; o[i + 3] = L[kk + 3];
       }
       ctx.putImageData(img, 0, 0);
     } else {
@@ -153,14 +157,39 @@ export class GradientTool implements Tool {
       else grad = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
       if (type === 'reflected') for (const st of stops) { grad.addColorStop(0.5 + st.t / 2, rgba(st)); grad.addColorStop(0.5 - st.t / 2, rgba(st)); }
       else for (const st of stops) grad.addColorStop(st.t, rgba(st));
-      ctx.fillStyle = grad; ctx.fillRect(0, 0, doc.width, doc.height);
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, W, Hh);
+    }
+    if (quick) {
+      const blend = (app.opt<string>('blendMode', this.id) || 'source-over') as GlobalCompositeOperation;
+      if (!t.isMask && !clipMask(t) && !(t.lockAlpha && blend !== 'source-over')) {
+        // caso normal: un solo lienzo reutilizado = la capa + el degradado ampliado encima (2 dibujos por fotograma)
+        if (!this.gbuf || this.gbuf.width !== doc.width || this.gbuf.height !== doc.height) this.gbuf = makeCanvas(doc.width, doc.height);
+        const bx = ctx2d(this.gbuf), op = app.opt<number>('opacity', this.id) / 100;
+        // degradado opaco al 100 %: lo tapa todo, así que no hace falta copiar antes la capa
+        const covers = op >= 1 && blend === 'source-over' && !t.lockAlpha && stops.every(x => x.a >= 1);
+        bx.imageSmoothingQuality = 'low';
+        if (covers) { bx.globalCompositeOperation = 'copy'; bx.drawImage(g, 0, 0, doc.width, doc.height); }
+        else {
+          bx.globalCompositeOperation = 'copy'; bx.drawImage(this.base!, 0, 0);
+          bx.globalAlpha = op; bx.globalCompositeOperation = t.lockAlpha ? 'source-atop' : blend; bx.drawImage(g, 0, 0, doc.width, doc.height);
+        }
+        bx.globalAlpha = 1; bx.globalCompositeOperation = 'source-over';
+        return this.gbuf;
+      }
+      if (k < 1) { const big = makeCanvas(doc.width, doc.height), bx = ctx2d(big); bx.drawImage(g, 0, 0, doc.width, doc.height); return this.finish(big); }
+      return this.finish(g);
     }
     // tramado: un poco de ruido para que no salgan bandas en degradados suaves
     if (app.opt('dither', this.id) !== false && doc.width * doc.height <= 16e6) {
-      const id = ctx.getImageData(0, 0, doc.width, doc.height), o = id.data; let sd = 12345;
+      const id = ctx.getImageData(0, 0, W, Hh), o = id.data; let sd = 12345;
       for (let i = 0; i < o.length; i += 4) { if (!o[i + 3]) continue; sd = (sd * 1103515245 + 12345) & 0x7fffffff; const n = ((sd >> 16) & 3) - 1.5; o[i] += n; o[i + 1] += n; o[i + 2] += n; }
       ctx.putImageData(id, 0, 0);
     }
+    return this.finish(g);
+  }
+  /** Combina el degradado ya calculado con la capa (o la máscara), respetando selección, opacidad y modo. */
+  private finish(g: HTMLCanvasElement) {
+    const t = this.t!, doc = app.doc!;
     const op = app.opt<number>('opacity', this.id) / 100;
     if (t.isMask) {
       // Sustituye el valor de la máscara por el del degradado dentro de la selección
@@ -187,20 +216,24 @@ export class GradientTool implements Tool {
       x = this.a.x + Math.cos(ang) * d; y = this.a.y + Math.sin(ang) * d;
     }
     this.b = { x, y };
-    this.preview = this.render();
-    setPreview(this.t!, this.preview);
-    app.doc!.invalidate();
+    // un cálculo por fotograma como mucho, aunque el dedo o el ratón manden más movimientos
+    if (!this.raf) this.raf = requestAnimationFrame(() => {
+      this.raf = 0; if (!this.a || !this.t) return;
+      setPreview(this.t, this.render(true)); app.viewport?.requestRender(); app.doc!.invalidate();
+    });
   }
+  private raf = 0;
   up() {
     if (!this.a || !this.t) return;
     const t = this.t;
     setPreview(t, null);
     const moved = this.b && Math.hypot(this.b.x - this.a.x, this.b.y - this.a.y) > 1;
-    if (moved && this.preview) { setTargetCanvas(t, this.preview); app.doc!.commit('Degradado'); }
-    this.a = this.b = null; this.t = null; this.preview = null; this.base = null;
+    cancelAnimationFrame(this.raf); this.raf = 0;
+    if (moved) { setTargetCanvas(t, this.render(false)); app.doc!.commit('Degradado'); }
+    this.a = this.b = null; this.t = null; this.preview = null; this.base = null; this.gbuf = null;
     app.doc!.invalidate();
   }
-  cancel() { if (this.t) setPreview(this.t, null); this.a = this.b = null; this.t = null; app.doc?.invalidate(); }
+  cancel() { cancelAnimationFrame(this.raf); this.raf = 0; if (this.t) setPreview(this.t, null); this.gbuf = null; this.a = this.b = null; this.t = null; app.doc?.invalidate(); }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     if (!this.a || !this.b) return;
     const p = vp.toScreen(this.a.x, this.a.y), q = vp.toScreen(this.b.x, this.b.y);
@@ -308,7 +341,7 @@ export class RotateViewTool implements Tool {
     const deg = document.createElement('span'); deg.className = 'unit'; deg.textContent = '°';
     const reset = document.createElement('button'); reset.className = 'btn'; reset.textContent = 'Restablecer vista'; reset.onclick = () => app.viewport.setRotation(0);
     const hint = document.createElement('span'); hint.className = 'hint'; hint.textContent = 'Arrastra para girar · Mayús: de 15° en 15° · Esc: restablecer';
-    bar.append(lbl, inp, deg, reset, hint); sync(); app.on('view', sync);
+    bar.append(lbl, inp, deg, reset, hint); sync(); app.onBar('view', sync);
   }
   private angle(e: ToolEvent) { const vp = app.viewport; return Math.atan2(e.sy - vp.height / 2, e.sx - vp.width / 2); }
   down(e: ToolEvent) { this.start = { a: this.angle(e), rot: app.doc!.view.rot ?? 0 }; this.cursor = 'grabbing'; }

@@ -22,6 +22,12 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 }
 
 /** Campo numérico con deslizador, usado en diálogos y en la barra de opciones. */
+// una sola escucha para cerrar las ventanitas de los deslizadores al tocar fuera (antes había una por deslizador
+// y se iban acumulando cada vez que se redibujaba la barra de opciones)
+const openPops = new Set<HTMLElement>();
+document.addEventListener('pointerdown', e => {
+  for (const el of openPops) if (!el.contains(e.target as Node)) { el.querySelector('.slider-pop')?.classList.remove('open'); openPops.delete(el); }
+});
 export function numberSlider(opts: {
   label?: string; min: number; max: number; step?: number; value: number; unit?: string;
   onInput: (v: number) => void; compact?: boolean;
@@ -46,8 +52,7 @@ export function numberSlider(opts: {
     // En la barra de opciones el deslizador aparece en una ventanita al pulsar.
     const pop = h('div', { class: 'slider-pop' }, range);
     const btn = h('button', { class: 'pop-btn', type: 'button', html: '▾' });
-    btn.addEventListener('click', e => { e.preventDefault(); pop.classList.toggle('open'); });
-    document.addEventListener('pointerdown', e => { if (!el.contains(e.target as Node)) pop.classList.remove('open'); });
+    btn.addEventListener('click', e => { e.preventDefault(); pop.classList.toggle('open'); if (pop.classList.contains('open')) openPops.add(el); });
     el.append(btn, pop);
   }
   return { el, set: (v: number) => set(v, undefined, true) };

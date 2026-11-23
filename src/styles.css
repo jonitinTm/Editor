@@ -84,7 +84,8 @@ svg { display: block; }
 
 /* Zona principal */
 .main { flex: 1; display: flex; min-height: 0; }
-.toolbar { width: 44px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 6px 0; gap: 2px; flex-shrink: 0; overflow-y: auto; }
+.toolbar { width: 44px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 6px 0; gap: 2px; flex-shrink: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: none; }
+.toolbar::-webkit-scrollbar { display: none; }
 .tool-btn { position: relative; flex-shrink: 0; width: 34px; height: 32px; border: 0; background: transparent; border-radius: var(--radius); display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); }
 .tool-btn:hover { background: var(--panel-3); }
 .tool-btn.active { background: var(--accent-soft); color: #fff; box-shadow: inset 0 0 0 1px var(--accent); }
@@ -98,7 +99,7 @@ svg { display: block; }
 .swatch.fg { left: 2px; top: 2px; z-index: 2; }
 .swatch.bg { left: 13px; top: 13px; }
 .mini-btn { position: absolute; background: transparent; border: 0; padding: 0; cursor: pointer; color: var(--muted); }
-.mini-btn.swap { right: -2px; top: 0; }
+.mini-btn.swap { right: 0; top: 0; }
 .mini-btn.reset { left: 0; bottom: 0; width: 12px; height: 12px; }
 .mini-fg, .mini-bg { position: absolute; width: 7px; height: 7px; border: 1px solid #888; }
 .mini-fg { background: #000; left: 0; top: 0; z-index: 1; }
@@ -515,7 +516,7 @@ body[data-theme=light] .menu-item:hover { background: #b9d0f5; }
   .welcome-actions { flex-direction: column; align-items: stretch; margin: 16px 0; }
   .welcome-presets { flex-wrap: wrap; }
   .welcome h1 { font-size: 24px; }
-  .toolbar { width: 40px; }
+  .toolbar { width: 42px; }
   .optionsbar .opt-name { display: none; }
   .statusbar { font-size: 11px; }
   .modal { width: auto !important; min-width: min(94vw, 300px); max-width: 96vw; }
@@ -613,7 +614,10 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 /* Botones fáciles arriba a la derecha */
 .top-right { margin-left: auto; display: flex; align-items: stretch; height: 100%; flex-shrink: 0; }
 .top-btn { display: flex; align-items: center; gap: 5px; padding: 0 10px; border: none; border-left: 1px solid var(--border); background: transparent; color: var(--text); font-size: 12px; cursor: pointer; }
-.top-btn:hover { background: var(--panel-3); }
+.top-btn:hover:not(:disabled) { background: var(--panel-3); }
+.top-btn:disabled { opacity: .35; cursor: default; }
+.top-undo, .top-redo { padding: 0 8px; }
+.top-redo { border-left: none; }
 .top-btn svg { width: 16px; height: 16px; }
 .top-quick { color: var(--accent); font-weight: 600; }
 /* pantallas medianas (tabletas en vertical): solo iconos para que quepan los menús */
@@ -709,3 +713,18 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .ai-bar-in.indet { width: 40% !important; animation: aiindet 1.2s ease-in-out infinite; }
 @keyframes aiindet { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
 @media (max-width: 700px) { .ai-prog { bottom: auto; top: 76px; } }
+
+/* Móvil: asa del cajón de paneles y aviso del gesto */
+.side-handle, .swipe-hint { display: none; }
+@media (max-width: 700px) {
+  .side-handle { display: block; position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 100; width: 14px; height: 64px; padding: 0; border: 1px solid var(--border); border-right: none; border-radius: 8px 0 0 8px; background: var(--panel-2); box-shadow: -2px 0 8px rgba(0,0,0,.35); }
+  .side-handle::after { content: ''; position: absolute; left: 5px; top: 18px; bottom: 18px; width: 3px; border-radius: 2px; background: var(--muted); }
+  body.show-side .side-handle { display: none; }
+  .swipe-hint { display: flex; flex-direction: column; gap: 10px; position: fixed; right: 22px; top: 50%; transform: translateY(-50%); z-index: 460; width: min(78vw, 300px); padding: 14px; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.6); font-size: 13px; line-height: 1.4; }
+  .swipe-hint b { display: block; margin-bottom: 4px; font-size: 14px; }
+  .swipe-hint .btn { align-self: flex-end; }
+  .swipe-anim { position: relative; height: 28px; }
+  .swipe-dot { position: absolute; top: 4px; right: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); opacity: .85; animation: swipe 1.6s ease-in-out infinite; }
+  .swipe-arrow { position: absolute; left: 0; top: 0; font-size: 22px; color: var(--accent); }
+  @keyframes swipe { 0% { right: 0; opacity: 0; } 15% { opacity: .9; } 80% { right: 70%; opacity: .9; } 100% { right: 75%; opacity: 0; } }
+}
