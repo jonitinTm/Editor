@@ -506,7 +506,7 @@ Pendiente: revelado de CR3, ORF, RW2 y RAF, y en PSD los efectos y ajustes que a
 Funciona **en el propio dispositivo**: la imagen nunca se envía a ningún sitio. La app no pesa más: cada modelo se
 descarga solo la primera vez que se usa (se pide permiso antes, indicando el tamaño) y queda guardado en el navegador.
 Usa la tarjeta gráfica (WebGPU) si está disponible y, si no, el procesador; el cálculo va en un hilo aparte para que la
-ventana no se congele. Todos los modelos tienen licencia que permite el uso comercial (Apache 2.0 / MIT).
+ventana no se congele. Todos los modelos tienen licencia que permite el uso comercial (Apache 2.0 / MIT). Si no se puede usar la IA (sin conexión la primera vez, o si no se acepta la descarga), las herramientas que tienen método clásico lo usan.
 
 | Función | Qué hace | Modelo | Descarga |
 |---|---|---|---|
@@ -516,6 +516,7 @@ ventana no se congele. Todos los modelos tienen licencia que permite el uso come
 | Desenfoque por profundidad | Efecto retrato: toca lo que quieres nítido y el resto se desenfoca según la distancia | Depth Anything v2 | 27 MB |
 | Foto 3D animada | La foto cobra volumen con un movimiento de cámara (GIF o vídeo) | Depth Anything v2 | (el mismo) |
 | Mapa de profundidad | Capa en grises: blanco = cerca, negro = lejos | Depth Anything v2 | (el mismo) |
+| Borrar objetos con IA | Pinta encima de algo (o selecciónalo) y desaparece: la IA inventa lo que había detrás. Herramienta *Quitar* (`J`) y *IA › Borrar la selección con IA* (`Alt+Mayús+Retroceso`) | MI-GAN (Picsart) | 28 MB |
 | Ampliar con IA ×2 / ×4 | Hace la imagen más grande sin que se vea borrosa (se abre como documento nuevo) | Swin2SR | 6 / 21 MB |
 
 Tiempos medidos con un procesador normal, sin tarjeta gráfica, en una foto de 640 × 480: quitar fondo ≈ 18 s la

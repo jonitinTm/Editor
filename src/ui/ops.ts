@@ -783,6 +783,17 @@ export function healCanvas(src: HTMLCanvasElement, holeCanvas: HTMLCanvasElement
 }
 
 /** Edición › Rellenar según contenido: rellena la selección con textura del entorno. */
+/** Rellenar la selección con IA (y, si no se puede, con el método clásico). */
+export async function aiContentFill() {
+  const d = doc(); if (!d || !d.selection.mask || !d.selection.bounds) { app.toast('Haz primero una selección de lo que quieres borrar', 'warn'); return; }
+  const t = getPaintTarget(); if (!t || t.isMask) { app.toast('Elige la capa con la foto', 'warn'); return; }
+  const hole = cloneCanvas(d.selection.mask), b = d.selection.bounds;
+  const g = ctx2d(hole); g.filter = 'blur(2px)'; g.drawImage(d.selection.mask, 0, 0); g.filter = 'none';
+  const { aiInpaint } = await import('../ai/ai');
+  const out = await aiInpaint(t.canvas, hole, { x: b.x - 3, y: b.y - 3, w: b.w + 6, h: b.h + 6 });
+  if (!out) { contentAwareFill(); return; }
+  setTargetCanvas(t, out); d.commit('Borrar con IA');
+}
 export function contentAwareFill() {
   const d = doc(); if (!d || !d.selection.mask || !d.selection.bounds) { app.toast('Haz primero una selección', 'warn'); return; }
   const t = getPaintTarget(); if (!t) return;

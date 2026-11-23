@@ -615,15 +615,21 @@ export class MixerBrushTool extends StrokeTool {
 /** Quitar: pinta sobre lo que sobra (una persona, un cable, una mancha grande) y se reconstruye con el entorno. */
 export class RemoveTool extends SpotHealTool {
   id = 'remove'; name = 'Quitar'; icon = icon('remove'); key = 'J'; group = 'heal';
-  options = [{ ...SIZE, default: 60 }] as any[];
+  options = [{ ...SIZE, default: 60 }, { key: 'ai', label: 'Con IA (mejor resultado)', type: 'checkbox', default: true }] as any[];
   protected async finishHole(t: PaintTarget, hole: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }) {
     const d = app.doc!;
     // se agranda un poco lo pintado para no dejar restos del borde del objeto
     const g = makeCanvas(hole.width, hole.height), gx = ctx2d(g); gx.filter = 'blur(2px)'; gx.drawImage(hole, 0, 0); gx.drawImage(hole, 0, 0); gx.filter = 'none';
     const id = gx.getImageData(0, 0, g.width, g.height); for (let i = 3; i < id.data.length; i += 4) id.data[i] = id.data[i] > 10 ? 255 : 0; gx.putImageData(id, 0, 0);
-    app.toast('Quitando…');
-    const { inpaintCanvas } = await import('../ui/ops');
-    const out = await inpaintCanvas(t.canvas, g, { x: box.x - 3, y: box.y - 3, w: box.w + 6, h: box.h + 6 });
+    const bx = { x: box.x - 3, y: box.y - 3, w: box.w + 6, h: box.h + 6 };
+    // con IA se inventa lo que había detrás; si no se puede (sin conexión la primera vez, o se rechaza la descarga), el método clásico
+    let out: HTMLCanvasElement | null = null;
+    if (app.opt('ai', this.id) !== false && !t.isMask) { const { aiInpaint } = await import('../ai/ai'); out = await aiInpaint(t.canvas, g, bx); }
+    if (!out) {
+      app.toast('Quitando…');
+      const { inpaintCanvas } = await import('../ui/ops');
+      out = await inpaintCanvas(t.canvas, g, bx);
+    }
     if (!out) return;
     const { setTargetCanvas } = await import('./paint'); setTargetCanvas(t, out); d.commit('Quitar');
   }

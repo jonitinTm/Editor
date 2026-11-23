@@ -18,7 +18,7 @@ export { TOOL_DESC };
 // ---- Palabras con las que la gente busca las cosas -----------------------------------------------------
 const SYN: Record<string, string> = {
   removeBg: 'quitar fondo borrar fondo eliminar fondo recortar persona sin fondo transparente png',
-  aiRemoveBg: 'quitar fondo borrar fondo eliminar fondo ia inteligencia artificial recortar persona transparente', aiUpscale: 'ampliar agrandar aumentar resolucion calidad ia super resolucion nitidez', aiDepthBlur: 'desenfocar fondo retrato bokeh profundidad ia camara', aiPhoto3d: 'foto 3d animada paralaje movimiento ia', aiSelTool: 'seleccionar objeto clic ia inteligente', aiSubject: 'seleccionar persona sujeto ia',
+  aiRemoveBg: 'quitar fondo borrar fondo eliminar fondo ia inteligencia artificial recortar persona transparente', aiUpscale: 'ampliar agrandar aumentar resolucion calidad ia super resolucion nitidez', aiDepthBlur: 'desenfocar fondo retrato bokeh profundidad ia camara', aiPhoto3d: 'foto 3d animada paralaje movimiento ia', aiSelTool: 'seleccionar objeto clic ia inteligente', aiSubject: 'seleccionar persona sujeto ia', aiErase: 'borrar objeto quitar persona eliminar cable mancha ia borrar algo', aiFill: 'borrar seleccion rellenar segun contenido ia eliminar',
   selectSubject: 'seleccionar persona objeto sujeto principal', selectSky: 'cielo', skyReplace: 'cambiar cielo poner nubes atardecer',
   'filter:gblur': 'desenfocar difuminar borroso blur', 'filter:huesat': 'saturacion colores mas vivos tono', 'filter:bw': 'blanco y negro gris sin color monocromo',
   'filter:curves': 'brillo contraste luz', 'filter:brightness': 'brillo contraste mas claro mas oscuro iluminar', 'filter:levels': 'niveles luz contraste',
@@ -121,7 +121,7 @@ export const TASKS: Task[] = [
   { label: 'Quitar el fondo (IA)', ic: 'removeBg', desc: 'Deja solo a la persona u objeto', needDoc: true, run: act('aiRemoveBg') },
   { label: 'Ampliar con IA', ic: 'resize', desc: 'Más grande sin perder nitidez', needDoc: true, run: act('aiUpscale') },
   { label: 'Foto 3D animada', ic: 'magic', desc: 'La foto cobra volumen (IA)', needDoc: true, run: act('aiPhoto3d') },
-  { label: 'Borrar algo', ic: 'remove', desc: 'Pinta encima y desaparece', needDoc: true, run: tool('remove', 'Pinta sobre lo que quieras borrar y suelta') },
+  { label: 'Borrar algo', ic: 'remove', desc: 'Pinta encima y desaparece (IA)', needDoc: true, run: tool('remove', 'Pinta sobre lo que quieras borrar y suelta') },
   { label: 'Recortar', ic: 'crop', desc: 'Encuadra o cambia la proporción', needDoc: true, run: tool('crop', 'Arrastra los bordes del marco y pulsa ✓ (o Intro)') },
   { label: 'Para redes', ic: 'share', desc: 'Instagram, historias, YouTube…', needDoc: true, run: act('social') },
   { label: 'Añadir texto', ic: 'text', desc: 'Toca donde quieras escribir', needDoc: true, run: tool('text', 'Toca o haz clic donde quieras escribir') },

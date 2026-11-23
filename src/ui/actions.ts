@@ -249,6 +249,8 @@ export const ACTIONS: Action[] = [
   { id: 'aiDepthBlur', label: 'Desenfoque por profundidad (IA)…', enabled: hasLayer, run: () => { ai.depthBlurDialog(); } },
   { id: 'aiPhoto3d', label: 'Foto 3D animada (IA)…', enabled: hasDoc, run: () => { ai.photo3DDialog(); } },
   { id: 'aiDepthLayer', label: 'Mapa de profundidad (IA)', enabled: hasDoc, run: () => { ai.depthLayer(); } },
+  { id: 'aiErase', label: 'Borrar objetos con IA (pinta encima)', enabled: hasLayer, run: () => { app.setOpt('remove', 'ai', true); app.setTool('remove'); app.toast('Pinta sobre lo que quieras borrar y suelta'); } },
+  { id: 'aiFill', label: 'Borrar la selección con IA', keys: ['Alt+Shift+Backspace'], enabled: hasSel, run: () => { ops.aiContentFill(); } },
   { id: 'aiUpscale', label: 'Ampliar con IA (×2 / ×4)…', enabled: hasDoc, run: () => { ai.upscaleDialog(); } },
   { id: 'templates', label: 'Plantillas…', run: cr.templatesDialog },
   { id: 'collage', label: 'Collage…', run: cr.collageDialog },

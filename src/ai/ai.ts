@@ -20,6 +20,7 @@ export const MODELS: Record<ModelKey, { name: string; mb: number }> = {
   depth: { name: 'Profundidad', mb: 27 },
   up2: { name: 'Ampliar ×2', mb: 6 },
   up4: { name: 'Ampliar ×4 (fotos)', mb: 21 },
+  erase: { name: 'Borrar con IA', mb: 28 },
 };
 
 // ---- Hilo de fondo (con la ventana como respaldo) --------------------------------------------------------
@@ -158,6 +159,34 @@ export async function aiUpscale(src: HTMLCanvasElement, k: 'up2' | 'up4'): Promi
     // se conserva la transparencia original (ampliada de forma normal)
     const al = makeCanvas(W * S, H * S), ax = ctx2d(al); ax.imageSmoothingQuality = 'high'; ax.drawImage(src, 0, 0, W * S, H * S);
     ox.globalCompositeOperation = 'destination-in'; ox.drawImage(al, 0, 0); ox.globalCompositeOperation = 'source-over';
+    return out;
+  });
+}
+
+// ---- Borrar objetos / rellenar huecos (MI-GAN) ----------------------------------------------------------------
+/** Rellena la zona `hole` (transparencia > 0 = borrar) de `src` inventando lo que habría detrás.
+ *  Trabaja sobre un recorte alrededor del hueco (con contexto) y solo cambia los píxeles del hueco. */
+export async function aiInpaint(src: HTMLCanvasElement, hole: HTMLCanvasElement, box: { x: number; y: number; w: number; h: number }): Promise<HTMLCanvasElement | null> {
+  return runAI('erase', 'Borrando con IA', async () => {
+    const W = src.width, H = src.height, m = Math.max(48, Math.round(Math.max(box.w, box.h) * 0.75));
+    const x0 = Math.max(0, Math.floor(box.x - m)), y0 = Math.max(0, Math.floor(box.y - m)), x1 = Math.min(W, Math.ceil(box.x + box.w + m)), y1 = Math.min(H, Math.ceil(box.y + box.h + m));
+    const cw = x1 - x0, ch = y1 - y0; if (cw < 2 || ch < 2) return null;
+    // el modelo va mejor y más rápido con recortes de hasta ~1024 px
+    const k = Math.min(1, 1024 / Math.max(cw, ch)), sw = Math.max(8, Math.round(cw * k)), sh = Math.max(8, Math.round(ch * k));
+    const img = makeCanvas(sw, sh), ix = ctx2d(img); ix.imageSmoothingQuality = 'high'; ix.fillStyle = '#808080'; ix.fillRect(0, 0, sw, sh); ix.drawImage(src, x0, y0, cw, ch, 0, 0, sw, sh);
+    const hm = makeCanvas(sw, sh), hx = ctx2d(hm); hx.drawImage(hole, x0, y0, cw, ch, 0, 0, sw, sh);
+    const ha = hx.getImageData(0, 0, sw, sh).data, mask = new Uint8Array(sw * sh);
+    let any = false; for (let i = 0; i < sw * sh; i++) { const isHole = ha[i * 4 + 3] > 20; mask[i] = isHole ? 0 : 255; if (isHole) any = true; }
+    if (!any) return null;
+    const o = await call('erase', { ...pixels(img), mask: mask.buffer }, dl('erase'));
+    const od = new Uint8Array(o.data), rc = makeCanvas(o.w, o.h), rx = ctx2d(rc), id = rx.createImageData(o.w, o.h);
+    for (let i = 0; i < o.w * o.h; i++) { id.data[i * 4] = od[i * 3]; id.data[i * 4 + 1] = od[i * 3 + 1]; id.data[i * 4 + 2] = od[i * 3 + 2]; id.data[i * 4 + 3] = 255; }
+    rx.putImageData(id, 0, 0);
+    // el resultado solo dentro del hueco (con el borde suavizado para que no se note la costura)
+    const patch = makeCanvas(cw, ch), px = ctx2d(patch); px.imageSmoothingQuality = 'high'; px.drawImage(rc, 0, 0, cw, ch);
+    const fm = makeCanvas(cw, ch), fx = ctx2d(fm); fx.filter = `blur(${Math.max(1, 1.5 / k)}px)`; fx.drawImage(hole, x0, y0, cw, ch, 0, 0, cw, ch); fx.drawImage(hole, x0, y0, cw, ch, 0, 0, cw, ch); fx.filter = 'none';
+    px.globalCompositeOperation = 'destination-in'; px.drawImage(fm, 0, 0);
+    const out = makeCanvas(W, H), ox = ctx2d(out); ox.drawImage(src, 0, 0); ox.drawImage(patch, x0, y0);
     return out;
   });
 }
