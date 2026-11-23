@@ -9,6 +9,7 @@ import { h } from './ui/dom';
 import { icon } from './ui/icons';
 import { Viewport, isTyping } from './ui/viewport';
 import { buildSideSliders } from './ui/drawing';
+import { History } from './core/history';
 import { buildMenuBar } from './ui/menus';
 import { buildToolbar } from './ui/toolbar';
 import { buildOptionsBar } from './ui/optionsbar';
@@ -30,7 +31,7 @@ import { AISelectTool } from './ai/aitools';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
-(app as any).debug = { readPsd, writePsd, ops, io, uniq, more, cr };
+(app as any).debug = { filters: () => import('./filters/registry'), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), readPsd, writePsd, ops, io, uniq, more, cr };
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
@@ -106,6 +107,7 @@ const viewHost = h('div', { class: 'view-host' });
 center.append(viewHost);
 app.viewport = new Viewport(viewHost);
 buildSideSliders(viewHost);
+History.onTrim = () => app.toast('Imagen grande: se guardan menos pasos de deshacer para que todo siga fluido');
 const welcome = buildWelcome();
 viewHost.append(welcome);
 const timeline = buildTimeline(center);

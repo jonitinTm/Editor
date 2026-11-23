@@ -68,9 +68,12 @@ export class LayerMask {
     const ctx = ctx2d(this.canvas);
     ctx.save(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); ctx.restore();
-    this.touch();
+    this.touch(); this.fullVersion = this.version;
   }
   touch() { resetDrawState(this.canvas); this.version++; }
+  /** Versión en la que la máscara está entera en blanco (no tapa nada): entonces se puede ignorar al combinar. */
+  fullVersion = -1;
+  isFull() { return this.fullVersion === this.version; }
 }
 
 export interface TextProps {
@@ -170,6 +173,8 @@ export function vectorMaskCanvas(l: Layer, w: number, h: number): HTMLCanvasElem
 export function effectiveMask(l: Layer, pixel: HTMLCanvasElement | null | undefined, w: number, h: number, off?: { x: number; y: number }): HTMLCanvasElement | null {
   let v = vectorMaskCanvas(l, w, h);
   if (v && off && (off.x || off.y)) { const t = makeCanvas(w, h); ctx2d(t).drawImage(v, off.x, off.y); v = t; }
+  // una máscara entera en blanco no tapa nada: se ignora (mucho menos trabajo)
+  if (pixel && l.mask && pixel === l.mask.canvas && l.mask.isFull()) pixel = null;
   if (!v) return pixel ?? null;
   if (!pixel) return v;
   // se guarda la combinación mientras no cambien ni la máscara de píxeles ni el trazado

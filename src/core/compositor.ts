@@ -7,6 +7,7 @@ import { FILTERS } from '../filters/registry';
 import { hexToRgb, makeCanvas } from './canvas';
 import { bevelLayers } from './bevel';
 import { getPattern } from './patterns';
+import { POINTWISE, applyLutSteps, LutStep } from './adjlut';
 
 /** Sustituciones temporales usadas por las herramientas para previsualizar. */
 export interface LayerOverride {
@@ -36,7 +37,12 @@ export function compositeGroup(group: GroupLayer, ctx: CanvasRenderingContext2D,
     while (i + 1 < ch.length && ch[i + 1].clip) clipped.push(ch[++i]);
     if (layer.clip) continue; // recortada sin base válida
     if (!layer.visible || layer.opacity <= 0) continue;
-    if (layer instanceof AdjustmentLayer) applyAdjustment(layer, ctx, w, h, opts);
+    if (layer instanceof AdjustmentLayer) {
+      // varias capas de ajuste seguidas se aplican juntas (una sola tabla de color)
+      const run = [layer];
+      while (i + 1 < ch.length && ch[i + 1] instanceof AdjustmentLayer && !ch[i + 1].clip && (i + 2 >= ch.length || !ch[i + 2].clip)) { const n = ch[++i] as AdjustmentLayer; if (n.visible && n.opacity > 0) run.push(n); }
+      applyAdjustRun(run, ctx, w, h, opts);
+    }
     else if (layer instanceof GroupLayer && layer.artboard) {
       // Mesa de trabajo: fondo propio y todo recortado a su rectángulo
       const a = layer.artboard, r = borrowCanvas(w, h), rc = ctx2d(r);
@@ -108,7 +114,7 @@ function drawLayer(layer: Layer, ctx: CanvasRenderingContext2D, w: number, h: nu
     gctx.save(); clipTo(gctx, opts);
     gctx.drawImage(surface, off.x, off.y);
     for (const c of clipped) {
-      if (c instanceof AdjustmentLayer) { applyAdjustment(c, gctx, w, h, opts); continue; }
+      if (c instanceof AdjustmentLayer) { applyAdjustRun([c], gctx, w, h, opts); continue; }
       const cs = layerSurface(c, w, h, opts);
       const t = borrowCanvas(w, h), tc = ctx2d(t);
       tc.drawImage(cs.canvas, cs.off.x, cs.off.y);
@@ -332,6 +338,28 @@ export function composeStyled(ctx: CanvasRenderingContext2D, src: HTMLCanvasElem
 }
 
 const filterById = new Map(FILTERS.map(f => [f.id, f]));
+
+/** Aplica capas de ajuste seguidas: las «de color» sin máscara se juntan en una tabla; el resto, una a una. */
+export function applyAdjustRun(run: AdjustmentLayer[], ctx: CanvasRenderingContext2D, w: number, h: number, opts: CompositeOptions) {
+  let x = 0, y = 0, x1 = w, y1 = h;
+  if (opts.rect) { x = Math.max(0, Math.floor(opts.rect.x)); y = Math.max(0, Math.floor(opts.rect.y)); x1 = Math.min(w, Math.ceil(opts.rect.x + opts.rect.w)); y1 = Math.min(h, Math.ceil(opts.rect.y + opts.rect.h)); }
+  if (x1 <= x || y1 <= y) return;
+  let batch: LutStep[] = [];
+  const flush = () => { if (batch.length) applyLutSteps(ctx, batch, x, y, x1 - x, y1 - y); batch = []; };
+  for (const l of run) {
+    const def = filterById.get(l.filterId);
+    if (!def) continue;
+    const lutable = lutEnabled.on && POINTWISE.has(def.id) && !def.fill && canvasBlend(l.blendMode) === 'source-over' && !isCustomBlend(l.blendMode);
+    const mc = lutable ? effectiveMask(l, opts.overrides?.get(l)?.mask ?? (l.mask?.enabled ? l.mask.canvas : null), w, h) : null;
+    if (lutable && !mc) { batch.push({ def, params: l.params, opacity: l.opacity }); continue; }
+    flush();
+    if (lutable && mc) applyLutSteps(ctx, [{ def, params: l.params, opacity: l.opacity }], x, y, x1 - x, y1 - y, mc);
+    else applyAdjustment(l, ctx, w, h, opts);
+  }
+  flush();
+}
+/** Para comparar con el cálculo exacto (pruebas). */
+export const lutEnabled = { on: true };
 
 /** Aplica una capa de ajuste a lo ya pintado en `ctx` (respeta su máscara y opacidad). */
 function applyAdjustment(l: AdjustmentLayer, ctx: CanvasRenderingContext2D, w: number, h: number, opts: CompositeOptions) {

@@ -6,7 +6,7 @@ import { cloneCanvas } from './canvas';
 import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, SmartLayer, SmartSource, AdjustmentLayer, LayerMask, BlendMode, isParametric } from './layers';
 import type { EditorDocument } from './document';
 
-interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; }
+interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; full?: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
   blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; fillOpacity?: number; link?: number | null; clip: boolean; label?: string | null;
@@ -37,7 +37,7 @@ function snapLayer(l: Layer): LayerSnap {
   const s: LayerSnap = {
     id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,
     blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, lockPos: l.lockPos, lockPixels: l.lockPixels, fillOpacity: l.fillOpacity, link: l.link, clip: l.clip, label: l.label,
-    mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled } : null,
+    mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled, full: l.mask.isFull() } : null,
   };
   s.styles = l.styles ? JSON.stringify(l.styles) : null;
   s.vmask = l.vmask ? JSON.stringify(l.vmask) : undefined;
@@ -111,6 +111,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
       const m = new LayerMask(w, h, 'black');
       m.canvas = cloneCanvas(s.mask.canvas); m.enabled = s.mask.enabled;
       frozen.set(m, { version: m.version, canvas: s.mask.canvas });
+      if (s.mask.full) m.fullVersion = m.version;
       l.mask = m;
     }
   } else l.mask = null;
@@ -137,14 +138,42 @@ export function restore(doc: EditorDocument, snap: DocSnap) {
 /** Número máximo de pasos del historial (configurable en Preferencias). */
 export const historyConfig = { limit: 60 };
 
+/** Memoria máxima del historial (MB): según la memoria del aparato. Cada paso guarda copias de las capas
+ *  que cambian; con fotos grandes, sin límite, el navegador se queda sin memoria y todo va a tirones. */
+export function historyBudgetMB(): number {
+  const dm = (navigator as any).deviceMemory as number | undefined, mobile = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+  if (dm) return Math.max(160, Math.min(1024, dm * (mobile ? 64 : 112)));
+  return mobile ? 256 : 640;
+}
+/** Bytes de las copias distintas de una lista de pasos (las copias compartidas cuentan una vez). */
+function stepCanvases(snap: DocSnap, out: Set<HTMLCanvasElement>) {
+  const walk = (l: LayerSnap) => { if (l.canvas) out.add(l.canvas); if (l.mask) out.add(l.mask.canvas); if (l.full) out.add(l.full.canvas); l.children?.forEach(walk); };
+  walk(snap.root); if (snap.selection) out.add(snap.selection); snap.channels?.forEach(c => out.add(c.canvas));
+}
+const bytesOf = (set: Set<HTMLCanvasElement>) => { let b = 0; for (const c of set) b += c.width * c.height * 4; return b; };
+let warned = false;
+
 export class History {
   steps: HistoryStep[] = [];
   index = -1;
   get limit() { return historyConfig.limit; }
+  /** Aviso (una vez) cuando se recorta el historial por memoria. */
+  static onTrim: ((n: number) => void) | null = null;
+  /** Memoria que ocupa ahora el historial (MB). */
+  memoryMB() { const set = new Set<HTMLCanvasElement>(); for (const st of this.steps) stepCanvases(st.snap, set); return bytesOf(set) / 1048576; }
   push(doc: EditorDocument, name: string) {
     this.steps.length = this.index + 1;
     this.steps.push({ name, snap: snapshot(doc) });
     if (this.steps.length > this.limit) this.steps.splice(1, 1); // conserva el estado inicial
+    // límite de memoria: se olvidan los pasos más antiguos (siempre quedan el inicial y los 3 últimos)
+    const budget = historyBudgetMB() * 1048576;
+    let dropped = 0;
+    while (this.steps.length > 4) {
+      const set = new Set<HTMLCanvasElement>(); for (const st of this.steps) stepCanvases(st.snap, set);
+      if (bytesOf(set) <= budget) break;
+      this.steps.splice(1, 1); dropped++;
+    }
+    if (dropped && !warned) { warned = true; History.onTrim?.(this.steps.length); }
     this.index = this.steps.length - 1;
   }
   canUndo() { return this.index > 0; }
