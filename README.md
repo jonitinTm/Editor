@@ -376,6 +376,13 @@ Ya disponible:
 - **Archivo › Revertir** (`F12`), **exportar con peso máximo** («No pasar de … KB») y vista previa de la compresión,
   **Filtro › Retrato › Suavizar piel** y **Filtro › Ruido › Quitar artefactos JPEG**.
 
+- **Filtro › Gran angular adaptable** (`Alt+Mayús+Ctrl+A`): endereza lo que curvan las lentes de ojo de pez o gran
+  angular. Toca 3 puntos a lo largo de algo que debería ser recto (una pared, el horizonte) y la corrección se calcula
+  sola; con varias líneas, la que mejor las endereza todas. También se ajusta a mano, con escala para ver más o recortar.
+- **Panel Ajustes** (junto a Color): todos los ajustes con una miniatura de tu propia imagen; un toque crea la capa de
+  ajuste. Debajo, *looks* de un toque (Cálido, Frío, Más contraste, Viveza, Blanco y negro, Vintage, Cine, Luminoso)
+  que se crean como un grupo de capas de ajuste editables: se puede bajar su opacidad, ocultar o retocar cada una.
+
   Sus algoritmos están adaptados de [VectorCraft](https://github.com/storytold/vectorcraft) (licencia MIT; el aviso
   está en `LICENSES/vectorcraft-MIT.txt` y en *Ayuda › Acerca de › Licencias de terceros*).
 - **Ajustes nuevos**: *Duotono* (monotono, duotono o tritono con las tintas y el papel que elijas), *Mapa de bits* (solo
