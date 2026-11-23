@@ -133,7 +133,7 @@ export class TextTool implements Tool {
       app.setOpt(this.id, 'bold', p.bold); app.setOpt(this.id, 'italic', p.italic); app.setOpt(this.id, 'align', p.align);
       app.setOpt(this.id, 'tracking', p.tracking ?? 0); app.setOpt(this.id, 'leading', Math.round(p.lineHeight * 100)); app.setOpt(this.id, 'underline', !!p.underline); app.setOpt(this.id, 'caps', !!p.caps);
       app.setColors(p.color, app.bg);
-      this.startEditing(hit, false);
+      this.startEditing(hit, false, hit.indexAt(e.x, e.y) ?? undefined);
       return;
     }
     this.dragStart = { x: e.x, y: e.y }; this.dragNow = { x: e.x, y: e.y };
@@ -161,7 +161,7 @@ export class TextTool implements Tool {
 
   /** Empieza a editar una capa de texto existente (p. ej. con doble clic desde la herramienta Mover). */
   editLayer(layer: TextLayer) { if (!layer.isLocked()) this.startEditing(layer, false); }
-  private startEditing(layer: TextLayer, isNew: boolean) {
+  private startEditing(layer: TextLayer, isNew: boolean, caret?: number) {
     this.loaded = layer.id;
     const area = document.createElement('textarea');
     area.className = 'text-editor';
@@ -183,8 +183,8 @@ export class TextTool implements Tool {
       ev.stopPropagation();
     });
     this.position();
-    // al entrar en un texto que ya existe, el cursor va al final: antes se seleccionaba todo y la primera tecla lo borraba
-    setTimeout(() => { area.focus(); const n = area.value.length; area.setSelectionRange(n, n); }, 0);
+    // al entrar en un texto que ya existe, el cursor va donde se ha tocado (o al final si no se puede calcular)
+    setTimeout(() => { area.focus(); const n = Math.min(area.value.length, caret ?? area.value.length); area.setSelectionRange(n, n); }, 0);
   }
 
   private position() {

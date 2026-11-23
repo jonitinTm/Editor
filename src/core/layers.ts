@@ -379,6 +379,33 @@ export class TextLayer extends RasterLayer {
     lines.forEach((l, i) => { if (i > 0 && l.first) acc += sb + sa; out.push(acc); });
     return { off: out, total: acc };
   }
+  /** Posición del cursor (índice en el texto) más cercana a un punto del documento, para editar donde se toca.
+   *  null en los casos especiales (sobre trazado, vertical, deformado, con varios estilos o justificado). */
+  indexAt(x: number, y: number): number | null {
+    const p = this.props;
+    if (p.onPath || p.vertical || p.runs?.length || p.align === 'justify' || (p.warp && p.warp.style !== 'none' && p.warp.bend !== 0)) return null;
+    const L = this.layout(), lh = L.lh, hs = p.hScale ?? 1, vs = p.vScale ?? 1, blS = p.baseline ?? 0;
+    // el punto, en las coordenadas del texto sin escalar (como se dibuja en render)
+    const ux = p.x + (x - p.x) / hs, uy = p.y + (y - (p.y - blS)) / vs;
+    const po = this.paraOffsets(L.lines);
+    let li = 0; for (let i = 0; i < L.lines.length; i++) if (uy >= p.y + i * lh + po.off[i]) li = i;
+    // dónde empieza cada línea dentro del texto original
+    const cmp = p.caps ? p.text.toUpperCase() : p.text, starts: number[] = []; let from = 0;
+    for (const line of L.lines) { const k = line.text ? cmp.indexOf(line.text, from) : from; const st = k < 0 ? from : k; starts.push(st); from = st + line.text.length; }
+    const line = L.lines[li]; if (!line) return null;
+    const il = (p.indentLeft ?? 0) / hs, ir = (p.indentRight ?? 0) / hs, ifl = (p.indentFirst ?? 0) / hs;
+    const left = p.boxWidth ? p.x : p.align === 'center' ? p.x - L.width / 2 : p.align === 'right' ? p.x - L.width : p.x;
+    const inArea = (line as any).room !== undefined, ind = il + (line.first ? ifl : 0);
+    const room = inArea ? (line as any).room / hs : L.width - (p.boxWidth ? ind + ir : 0);
+    const x0 = inArea ? p.x + ((line as any).lx - p.x) / hs : left + (p.boxWidth ? ind : 0);
+    const lx = p.align === 'center' ? x0 + (room - line.w) / 2 : p.align === 'right' ? x0 + room - line.w : x0;
+    const ctx = ctx2d(this.canvas); ctx.save(); this.setupCtx(ctx);
+    // se elige el hueco entre letras más cercano (sin partir letras compuestas ni emojis)
+    let best = 0, bd = Infinity, k = 0;
+    for (const ch of ['', ...Array.from(line.text)]) { k += ch.length; const d = Math.abs(lx + ctx.measureText(line.text.slice(0, k)).width - ux); if (d < bd) { bd = d; best = k; } }
+    ctx.restore();
+    return Math.min(p.text.length, starts[li] + best);
+  }
   /** Caja que ocupa el texto (coordenadas del documento). */
   bounds() {
     const p = this.props;
