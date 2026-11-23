@@ -757,3 +757,8 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .ruler-mark-h { left: 20px; top: 0; width: 1px; height: 20px; }
 .ruler-mark-v { left: 0; top: 20px; width: 20px; height: 1px; }
 .viewport.no-rulers .ruler-mark { display: none !important; }
+.lq-side .form-row { flex-wrap: wrap; min-width: 0; }
+.lq-side .num-slider { min-width: 0; flex: 1; }
+.lq-side .num-slider input[type=range] { min-width: 50px; width: auto; flex: 1; }
+.var-adjust { flex-wrap: wrap; row-gap: 4px; }
+.var-adjust input[type=range] { min-width: 0; flex: 1 1 90px; width: auto; }

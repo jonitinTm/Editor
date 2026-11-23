@@ -111,7 +111,7 @@ const QUICK = ['templates', 'open', 'new', 'removeBg', 'filter:develop', 'social
 
 // ---- Tareas rápidas ----------------------------------------------------------------------------------------
 type Task = { label: string; ic: string; desc: string; run: () => void | Promise<void>; needDoc?: boolean };
-const act = (id: string) => () => actionById.get(id)?.run();
+const act = (id: string) => () => { const a = actionById.get(id); if (!a) return; if (a.enabled && !a.enabled()) { app.toast('Ahora no se puede: elige antes la capa adecuada (por ejemplo, la de la foto)', 'warn'); return; } return a.run(); };
 const tool = (id: string, hint: string) => () => { app.setTool(id); app.toast(hint); };
 export const TASKS: Task[] = [
   { label: 'Abrir una foto', ic: 'folder', desc: 'Desde tu equipo o el móvil', run: act('open') },

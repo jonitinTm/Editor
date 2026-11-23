@@ -1,5 +1,6 @@
 // Barra de menús superior con submenús.
 
+import { app } from './app';
 import { h } from './dom';
 import { actionById } from './actions';
 import { FILTERS } from '../filters/registry';
@@ -74,7 +75,10 @@ function buildList(items: Item[], close: () => void): HTMLElement {
     el.addEventListener('click', e => {
       e.stopPropagation();
       if (el.classList.contains('disabled')) return;
-      close(); a.run();
+      close();
+      // se comprueba también aquí: el estado puede haber cambiado desde que se abrió el menú
+      if (a.enabled && !a.enabled()) { app.toast('Ahora no se puede: elige antes una capa o una selección adecuada', 'warn'); return; }
+      a.run();
     });
     ul.append(el);
   }

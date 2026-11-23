@@ -824,6 +824,7 @@ export function quickGuideDialog() {
 
 export function warpTextDialog(l: TextLayer) {
   const d = app.doc; if (!d) return;
+  if (!(l instanceof TextLayer)) { app.toast('Selecciona una capa de texto', 'warn'); return; }
   const before = l.props.warp ? { ...l.props.warp } : undefined;
   const w = { style: before?.style ?? 'arc', bend: before?.bend ?? 50 };
   const apply = () => { l.props.warp = { ...w }; l.render(); d.invalidate(); app.viewport.requestRender(); };
@@ -1351,7 +1352,7 @@ export async function variationsDialog() {
   origCell.onclick = () => { cur = zero(); refresh(); };
   range.onchange = refresh; amount.oninput = refresh;
   const body = [
-    h('div', { class: 'form-row' }, h('span', { class: 'lbl' }, 'Ajustar'), range, h('span', { class: 'lbl' }, 'Fino'), amount, h('span', { class: 'lbl' }, 'Grueso')),
+    h('div', { class: 'form-row var-adjust' }, h('span', { class: 'lbl' }, 'Ajustar'), range, h('span', { class: 'lbl' }, 'Fino'), amount, h('span', { class: 'lbl' }, 'Grueso')),
     h('div', { class: 'var-top' }, origCell, curCell),
     h('div', { class: 'var-grid' }, ring[0], ring[1], ring[2], ring[3], curCell.cloneNode(false) as HTMLElement, ring[4], h('div', {}), ring[5]),
     h('div', { class: 'var-top' }, lighter, darker, moreSat, lessSat),
