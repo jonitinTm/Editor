@@ -9,6 +9,23 @@ export interface Pattern { id: string; name: string; canvas: HTMLCanvasElement; 
 function make(name: string, w: number, h: number, draw: (c: CanvasRenderingContext2D) => void): Pattern {
   const c = makeCanvas(w, h); draw(ctx2d(c)); return { id: 'base:' + name, name, canvas: c };
 }
+/** Ruido suave en mosaico (se repite sin costuras): base de las texturas de papel. */
+function tileNoise(n: number, cells: number, seed: number) {
+  let s = seed; const r = () => (s = (s * 16807) % 2147483647) / 2147483647, g = Array.from({ length: cells * cells }, r), out = new Float32Array(n * n);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const fx = x / n * cells, fy = y / n * cells, i = Math.floor(fx), j = Math.floor(fy), tx = fx - i, ty = fy - j, sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty);
+    const at = (a: number, b: number) => g[((b % cells) * cells) + (a % cells)];
+    out[y * n + x] = (at(i, j) * (1 - sx) + at(i + 1, j) * sx) * (1 - sy) + (at(i, j + 1) * (1 - sx) + at(i + 1, j + 1) * sx) * sy;
+  }
+  return out;
+}
+function noiseTex(name: string, n: number, octaves: [number, number][], contrast: number, seed: number) {
+  return make(name, n, n, c => {
+    const acc = new Float32Array(n * n); let tot = 0; octaves.forEach(([cells, wgt], k) => { const o = tileNoise(n, cells, seed + k * 101); for (let i = 0; i < acc.length; i++) acc[i] += o[i] * wgt; tot += wgt; });
+    const img = c.createImageData(n, n); for (let i = 0; i < acc.length; i++) { const v = Math.max(0, Math.min(255, 128 + (acc[i] / tot - 0.5) * contrast * 255)); img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255; }
+    c.putImageData(img, 0, 0);
+  });
+}
 const BUILTIN: Pattern[] = [
   make('Damero', 16, 16, c => { c.fillStyle = '#fff'; c.fillRect(0, 0, 16, 16); c.fillStyle = '#bbb'; c.fillRect(0, 0, 8, 8); c.fillRect(8, 8, 8, 8); }),
   make('Rayas diagonales', 12, 12, c => { c.fillStyle = '#fff'; c.fillRect(0, 0, 12, 12); c.strokeStyle = '#333'; c.lineWidth = 3; c.beginPath(); for (const o of [-12, 0, 12]) { c.moveTo(o, 12); c.lineTo(o + 12, 0); } c.stroke(); }),
@@ -16,6 +33,9 @@ const BUILTIN: Pattern[] = [
   make('Cuadrícula', 24, 24, c => { c.fillStyle = '#fff'; c.fillRect(0, 0, 24, 24); c.fillStyle = '#9ab'; c.fillRect(0, 0, 24, 1); c.fillRect(0, 0, 1, 24); }),
   make('Ladrillos', 40, 20, c => { c.fillStyle = '#b5532f'; c.fillRect(0, 0, 40, 20); c.fillStyle = '#ddd'; c.fillRect(0, 9, 40, 2); c.fillRect(0, 19, 40, 1); c.fillRect(19, 0, 2, 9); c.fillRect(0, 11, 1, 8); c.fillRect(39, 11, 1, 8); }),
   make('Ruido', 64, 64, c => { const img = c.createImageData(64, 64); let s = 1; for (let i = 0; i < img.data.length; i += 4) { s = (s * 16807) % 2147483647; const v = 90 + s % 120; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; } c.putImageData(img, 0, 0); }),
+  // texturas para pinceles (y para rellenar): papel de dibujo y grano grueso
+  noiseTex('Papel', 128, [[64, 1], [32, 0.6], [8, 0.3]], 2.2, 7),
+  noiseTex('Grano grueso', 128, [[24, 1], [12, 0.5]], 3, 13),
   make('Lienzo', 8, 8, c => { c.fillStyle = '#e9e2d0'; c.fillRect(0, 0, 8, 8); c.fillStyle = 'rgba(120,100,70,.25)'; c.fillRect(0, 0, 8, 1); c.fillRect(0, 4, 8, 1); c.fillRect(0, 0, 1, 8); c.fillRect(4, 0, 1, 8); }),
 ];
 

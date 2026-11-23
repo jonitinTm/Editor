@@ -179,6 +179,10 @@ export class Stroke {
       setPreview(target, this.preview);
     }
   }
+  /** Limita todo el trazo con una máscara más (p. ej. la textura del pincel), además de la selección. */
+  addMask(m: HTMLCanvasElement) {
+    if (this.sel) { const c = cloneCanvas(this.sel), x = ctx2d(c); x.globalCompositeOperation = 'destination-in'; x.drawImage(m, 0, 0); this.sel = c; } else this.sel = m;
+  }
   private clearExtra() {
     const doc = app.doc!, ov = doc.overrides.get(this.target.layer);
     if (!ov) return;

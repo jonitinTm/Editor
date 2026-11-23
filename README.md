@@ -370,6 +370,12 @@ Ya disponible:
   - *Distorsionar*: Resplandor difuso y Ondas oceánicas. *Textura*: Granulado (10 tipos), Teselas de mosaico y Retazos.
     *Vídeo*: Colores NTSC.
 
+- **Pincel: textura y pincel doble** (como en el panel de pinceles de Photoshop). *Textura*: el trazo entero toma el
+  grano de un motivo (Papel, Grano grueso, Lienzo…), anclado a la imagen, con escala, profundidad e invertir. *Pincel
+  doble*: cada pincelada recortada por una segunda punta dispersa, para bordes rotos como de tiza o esponja.
+- **Archivo › Revertir** (`F12`), **exportar con peso máximo** («No pasar de … KB») y vista previa de la compresión,
+  **Filtro › Retrato › Suavizar piel** y **Filtro › Ruido › Quitar artefactos JPEG**.
+
   Sus algoritmos están adaptados de [VectorCraft](https://github.com/storytold/vectorcraft) (licencia MIT; el aviso
   está en `LICENSES/vectorcraft-MIT.txt` y en *Ayuda › Acerca de › Licencias de terceros*).
 - **Ajustes nuevos**: *Duotono* (monotono, duotono o tritono con las tintas y el papel que elijas), *Mapa de bits* (solo

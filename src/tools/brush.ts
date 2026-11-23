@@ -69,6 +69,22 @@ const ANG_JIT = { key: 'angleJitter', label: 'Variar ángulo', type: 'range' as 
 const OPAC_JIT = { key: 'opacityJitter', label: 'Variar opacidad', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
 const WET = { key: 'wetEdges', label: 'Bordes húmedos', type: 'checkbox' as const, default: false };
 const NOISE = { key: 'brushNoise', label: 'Ruido', type: 'checkbox' as const, default: false };
+// Textura: el trazo toma el grano de un motivo (lienzo, papel…) fijo a la imagen. Pincel doble: cada pincelada recortada por otra punta.
+const TEX = { key: 'texture', label: 'Textura', type: 'select' as const, default: '', choices: [] as { value: string; label: string }[] };
+const TEX_SCALE = { key: 'texScale', label: 'Escala de la textura', type: 'range' as const, min: 10, max: 400, default: 100, unit: '%' };
+const TEX_DEPTH = { key: 'texDepth', label: 'Profundidad', type: 'range' as const, min: 0, max: 100, default: 60, unit: '%' };
+const TEX_INV = { key: 'texInvert', label: 'Invertir textura', type: 'checkbox' as const, default: false };
+const DUAL = { key: 'dualSize', label: 'Pincel doble', type: 'range' as const, min: 0, max: 100, default: 0, unit: '%' };
+const DUAL_SC = { key: 'dualScatter', label: 'Dispersión del doble', type: 'range' as const, min: 0, max: 100, default: 50, unit: '%' };
+/** Transparencia del motivo para usarlo de textura: lo claro deja pasar la pintura, lo oscuro la frena. */
+const texAlpha = new Map<string, HTMLCanvasElement>();
+function textureAlpha(id: string, depth: number, invert: boolean): HTMLCanvasElement | null {
+  const key = `${id}|${depth}|${invert}`; const hit = texAlpha.get(key); if (hit) return hit;
+  const pat = getPattern(id); if (!pat) return null;
+  const c = cloneCanvas(pat.canvas), x = ctx2d(c), im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+  for (let i = 0; i < d.length; i += 4) { let l = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) / 255; if (invert) l = 1 - l; d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = 255 * (1 - depth * (1 - l)); }
+  x.putImageData(im, 0, 0); if (texAlpha.size > 12) texAlpha.clear(); texAlpha.set(key, c); return c;
+}
 /** Punta modificada: bordes húmedos (más pintura en el borde, como la acuarela) y/o ruido (textura granulada). */
 const modTips = new WeakMap<HTMLCanvasElement, Map<string, HTMLCanvasElement>>();
 function modTip(tip: HTMLCanvasElement, wet: boolean, noise: boolean): HTMLCanvasElement {
@@ -147,6 +163,9 @@ abstract class StrokeTool implements Tool {
     };
     const wetE = !!app.opt('wetEdges', this.id) && !this.aliased, noiseE = !!app.opt('brushNoise', this.id);
     const sj = (app.opt<number>('sizeJitter', this.id) ?? 0) / 100, aj = (app.opt<number>('angleJitter', this.id) ?? 0) / 100, oj = (app.opt<number>('opacityJitter', this.id) ?? 0) / 100;
+    // textura y pincel doble (solo en las herramientas que tienen esas opciones)
+    const dualK = this.options.some((o: any) => o.key === 'dualSize') ? (app.opt<number>('dualSize', this.id) ?? 0) / 100 : 0, dualSc = (app.opt<number>('dualScatter', this.id) ?? 50) / 100;
+    const modC = makeCanvas(4, 4), dualC = makeCanvas(4, 4);
     return (x, y, p) => {
       // dinámica de forma: cada pincelada con tamaño, ángulo y opacidad algo distintos
       const size = sj > 0 ? Math.max(1, this.size(p) * (1 - Math.random() * sj)) : this.size(p);
@@ -162,6 +181,18 @@ abstract class StrokeTool implements Tool {
       if (scatter > 0) { x += (Math.random() * 2 - 1) * scatter * size; y += (Math.random() * 2 - 1) * scatter * size; }
       let dx = x - tip.width / 2, dy = y - tip.height / 2;
       if (this.aliased) { dx = Math.round(dx); dy = Math.round(dy); }
+      if (dualK > 0 && !this.aliased) {
+        if (modC.width !== tip.width || modC.height !== tip.height) { modC.width = tip.width; modC.height = tip.height; }
+        const m = ctx2d(modC); m.globalCompositeOperation = 'copy'; m.drawImage(tip, 0, 0); m.globalCompositeOperation = 'destination-in';
+        {
+          if (dualC.width !== tip.width || dualC.height !== tip.height) { dualC.width = tip.width; dualC.height = tip.height; }
+          const dc = ctx2d(dualC), r = Math.max(0.6, size * dualK * 0.3), spread = size * 0.5 * (0.2 + dualSc), n = 3 + Math.round(5 * dualSc);
+          dc.globalCompositeOperation = 'copy'; dc.clearRect(0, 0, tip.width, tip.height); dc.globalCompositeOperation = 'source-over'; dc.fillStyle = '#fff';
+          for (let k = 0; k < n; k++) { const a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * spread; dc.beginPath(); dc.arc(tip.width / 2 + Math.cos(a) * rr, tip.height / 2 + Math.sin(a) * rr, r, 0, 7); dc.fill(); }
+          m.drawImage(dualC, 0, 0);
+        }
+        m.globalCompositeOperation = 'source-over'; tip = modC;
+      }
       // con tableta, la presión también puede controlar la opacidad de cada pincelada
       if (app.opt('pressureOpacity', this.id)) {
         // las pinceladas se solapan: cada una aporta lo justo para que el trazo llegue a la opacidad de la presión
@@ -187,6 +218,13 @@ abstract class StrokeTool implements Tool {
     this.target = t;
     const s = strokeSetup(t, this.erase);
     this.stroke = new Stroke(t, s.mode, app.opt<number>('opacity', this.id) / 100, s.maskValue, (s.mode === 'paint' ? app.opt<string>('blendMode', this.id) : undefined) as GlobalCompositeOperation || 'source-over');
+    // textura: todo el trazo se ve a través del grano del motivo (anclado a la imagen), así no se pierde al repasar
+    const texId = this.options.some((o: any) => o.key === 'texture') ? app.opt<string>('texture', this.id) || '' : '';
+    const texC = texId ? textureAlpha(texId, (app.opt<number>('texDepth', this.id) ?? 60) / 100, !!app.opt('texInvert', this.id)) : null;
+    if (texC) {
+      const m = makeCanvas(t.canvas.width, t.canvas.height), mx = ctx2d(m), pat = mx.createPattern(texC, 'repeat')!, k = (app.opt<number>('texScale', this.id) ?? 100) / 100;
+      pat.setTransform(new DOMMatrix().scaleSelf(k, k)); mx.fillStyle = pat; mx.fillRect(0, 0, m.width, m.height); this.stroke.addMask(m);
+    }
     const dab0 = this.makeDab(s.color), sym = app.opt<string>('symmetry', this.id) || 'none';
     // bordes húmedos: al terminar, el centro del trazo se aclara y el borde se queda con más pintura
     if (app.opt('wetEdges', this.id) && !this.aliased) {
@@ -252,9 +290,13 @@ abstract class StrokeTool implements Tool {
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP, { ...TEX }, TEX_SCALE, TEX_DEPTH, TEX_INV, DUAL, DUAL_SC] as any[];
   extraFirst = true;
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
+  activate() {
+    // la lista de motivos para la textura puede cambiar (motivos definidos por el usuario)
+    const o = this.options.find((x: any) => x.key === 'texture'); o.choices = [{ value: '', label: 'Sin textura' }, ...allPatterns().map(p => ({ value: p.id, label: p.name }))];
+  }
 }
 
 /** Selector de punta (redonda o con imagen) para la barra de opciones. */
