@@ -184,6 +184,8 @@ tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildCh
   app.on('docs', () => { if (app.doc) setTimeout(showHint, 900); });
 }
 root.append(h('div', { id: 'toasts' }));
+// app instalada: «Abrir con → Editor» desde el explorador de archivos del sistema
+if ('launchQueue' in window) (window as any).launchQueue.setConsumer(async (p: any) => { if (p.files?.length) ops.openFiles(await Promise.all(p.files.map((f: any) => f.getFile()))); });
 
 // Separador ajustable entre paneles
 {

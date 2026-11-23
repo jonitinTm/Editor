@@ -536,6 +536,10 @@ profundidad ≈ 10 s. Con tarjeta gráfica es bastante más rápido.
 > El navegador se reserva algunas combinaciones (`Ctrl+N`, `Ctrl+T`, `Ctrl+W`). Por eso **Nuevo** es `Alt+Ctrl+N`
 > y **Transformación libre** es `Alt+Ctrl+T`.
 
+## Publicar
+
+Los pasos para publicar la web y la app de Google Play están en [`docs/PUBLICAR.md`](docs/PUBLICAR.md). Los textos y las imágenes de la ficha de la tienda están en `docs/play-store/`. La política de privacidad es `privacidad.html`, también enlazada desde *Ayuda › Privacidad*.
+
 ## Para programadores
 
 Tecnología: **TypeScript + Vite**, sin librerías en tiempo de ejecución. El dibujo usa Canvas 2D.

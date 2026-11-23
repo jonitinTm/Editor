@@ -732,7 +732,21 @@ export function aboutDialog() {
       h('p', {}, h('b', {}, 'Editor'), ' — editor de imágenes por capas que funciona en tu navegador.'),
       h('p', {}, 'Todo se procesa en tu equipo: tus imágenes no se envían a ningún servidor.'),
       h('p', {}, 'Funciona sin conexión una vez abierto y se puede instalar como aplicación desde el navegador.'),
+      h('p', {}, h('a', { href: './privacidad.html', target: '_blank', rel: 'noopener' }, 'Política de privacidad')),
       h('p', { class: 'hint' }, `Versión 1.0 · ${typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : ''}`),
+    ],
+  });
+}
+/** Resumen de privacidad dentro de la app (la política completa está en privacidad.html). */
+export function privacyDialog() {
+  showDialog({
+    title: 'Privacidad', cancelLabel: null, okLabel: 'Cerrar', width: 440,
+    body: [
+      h('p', {}, h('b', {}, 'Tus imágenes no salen de tu dispositivo.'), ' Se editan aquí mismo, también con la inteligencia artificial.'),
+      h('p', {}, 'Sin cuentas, sin publicidad, sin cookies de seguimiento y sin estadísticas de uso.'),
+      h('p', {}, 'Solo se descarga de internet lo necesario: las tipografías (Google Fonts) y, la primera vez que usas la IA, su motor y sus modelos. En esas descargas no va ninguna imagen tuya.'),
+      h('p', {}, 'Tus preferencias y la copia de seguridad automática se guardan en este navegador; puedes borrarlas desde sus ajustes («Borrar datos del sitio»).'),
+      h('p', {}, h('a', { href: './privacidad.html', target: '_blank', rel: 'noopener' }, 'Leer la política de privacidad completa')),
     ],
   });
 }

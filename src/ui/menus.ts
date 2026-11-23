@@ -34,7 +34,7 @@ const MENUS: { label: string; items: Item[] }[] = [
   { label: 'IA', items: ['aiRemoveBg', 'aiSubject', 'aiSelTool', '-', 'aiDepthBlur', 'aiPhoto3d', 'aiDepthLayer', '-', 'aiUpscale'] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', '-', 'proof', 'gamut', 'pixelGrid', '-', 'compare', 'comparePrev', 'compareDoc', { label: 'Simular visión', items: ['sim:none', '-', 'sim:protan', 'sim:deutan', 'sim:tritan', 'sim:achroma'] }, 'contrast', '-', 'extras', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'guideLayout', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Carácter', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Párrafo', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'win:all'] },
-  { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'guide', 'shortcuts', '-', 'about'] },
+  { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'guide', 'shortcuts', '-', 'privacy', 'about'] },
 ];
 
 window.addEventListener('editor-keys', () => {

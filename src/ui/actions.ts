@@ -333,6 +333,7 @@ export const ACTIONS: Action[] = [
   { id: 'guide', label: 'Guía rápida', keys: ['F1'], run: dlg.quickGuideDialog },
   { id: 'shortcuts', label: 'Lista de atajos de teclado', run: () => dlg.shortcutsDialog(shortcutList()) },
   { id: 'about', label: 'Acerca de Editor', run: dlg.aboutDialog },
+  { id: 'privacy', label: 'Privacidad', run: dlg.privacyDialog },
 ];
 
 // Ajustes y filtros desde el registro
