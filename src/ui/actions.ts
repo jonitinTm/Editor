@@ -288,6 +288,7 @@ export const ACTIONS: Action[] = [
   { id: 'social', label: 'Exportar para redes sociales…', enabled: hasDoc, run: uniq.socialDialog },
   { id: 'timelapse', label: 'Timelapse de la edición…', enabled: () => (app.doc?.history.index ?? 0) > 0, run: uniq.timelapseDialog },
   { id: 'palette', label: 'Paleta de la imagen…', enabled: hasDoc, run: uniq.paletteDialog },
+  { id: 'pathEffects', label: 'Efectos de trazado (fruncir, rugoso, zigzag, retorcer…)…', enabled: () => !!app.doc?.active && (app.doc.active.kind === 'shape' || !!(app.doc.active as any).vmask), run: async () => (await import('./patheffects')).pathEffectsDialog() },
   { id: 'traceImage', label: 'Calco de imagen (vectorizar)…', enabled: hasDoc, run: async () => (await import('./trace')).traceDialog() },
   { id: 'wideAngle', label: 'Gran angular adaptable…', keys: ['Alt+Shift+Ctrl+A'], enabled: hasLayer, run: async () => (await import('./wideangle')).wideAngleDialog() },
   { id: 'filterGallery', label: 'Galería de filtros…', enabled: hasLayer, run: () => dlg.filterGalleryDialog() },
