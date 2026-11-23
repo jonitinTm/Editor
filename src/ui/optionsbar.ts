@@ -104,6 +104,16 @@ const KEY = 'editor.toolPresets';
 /** Algunos ajustes de serie para empezar. */
 const BUILTIN: Record<string, Preset[]> = {
   brush: [
+    // pinceles de dibujo (pensados para lápiz: presión e inclinación)
+    { name: 'Lápiz HB', opts: { size: 4, hardness: 50, opacity: 85, flow: 100, smoothing: 15, spacing: 10, pressure: true, pressureOpacity: true, tiltMode: 'shade', texture: 'base:Papel', texScale: 50, texDepth: 50 } },
+    { name: 'Lápiz 2B (blando)', opts: { size: 7, hardness: 40, opacity: 95, flow: 100, smoothing: 10, spacing: 10, pressure: true, pressureOpacity: true, tiltMode: 'shade', texture: 'base:Papel', texScale: 70, texDepth: 60, blendMode: 'multiply' } },
+    { name: 'Entintado', opts: { size: 8, hardness: 100, opacity: 100, flow: 100, smoothing: 45, spacing: 5, pressure: true, tiltMode: 'none' } },
+    { name: 'Rotulador fino', opts: { size: 5, hardness: 95, opacity: 100, flow: 100, smoothing: 30, spacing: 5, pressure: false, tiltMode: 'none' } },
+    { name: 'Caligrafía', opts: { size: 18, hardness: 100, opacity: 100, flow: 100, smoothing: 30, spacing: 4, pressure: true, tiltMode: 'angle', angle: 45, roundness: 22 } },
+    { name: 'Carboncillo', opts: { size: 22, hardness: 40, opacity: 100, flow: 70, smoothing: 10, spacing: 12, pressure: true, pressureOpacity: true, tiltMode: 'shade', tip: 'base:Tiza', tipJitter: true, texture: 'base:Papel', texScale: 150, texDepth: 70, blendMode: 'multiply' } },
+    { name: 'Pincel seco (óleo)', opts: { size: 40, hardness: 60, opacity: 100, flow: 80, smoothing: 20, spacing: 6, pressure: true, tiltMode: 'angle', tip: 'base:Pincel seco', texture: 'base:Lienzo', texScale: 100, texDepth: 25 } },
+    { name: 'Pintura suave (gouache)', opts: { size: 40, hardness: 70, opacity: 100, flow: 60, smoothing: 15, spacing: 8, pressure: true, pressureOpacity: true, tiltMode: 'shade' } },
+    { name: 'Línea estable (cuerda)', opts: { size: 6, hardness: 100, opacity: 100, flow: 100, smoothing: 0, rope: 40, spacing: 5, pressure: true, tiltMode: 'none' } },
     { name: 'Aerógrafo suave', opts: { size: 120, hardness: 0, opacity: 100, flow: 12, spacing: 8 } },
     { name: 'Tinta dura', opts: { size: 6, hardness: 100, opacity: 100, flow: 100, smoothing: 40, pressure: true } },
     { name: 'Rotulador', opts: { size: 24, hardness: 90, opacity: 70, flow: 100, blendMode: 'multiply' } },
@@ -117,9 +127,12 @@ const BUILTIN: Record<string, Preset[]> = {
 };
 function loadPresets(): Record<string, Preset[]> { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; } }
 function savePresets(p: Record<string, Preset[]>) { try { localStorage.setItem(KEY, JSON.stringify(p)); } catch { app.toast('No se pudo guardar el ajuste', 'warn'); } }
-function applyPreset(t: any, pr: Preset) { for (const [k, v] of Object.entries(pr.opts)) app.setOpt(t.id, k, v); app.toast(`Ajuste «${pr.name}»`); }
+function applyPreset(t: any, pr: Preset) {
+  // los pinceles de serie parten de cero, así no se arrastra nada del anterior (punta, textura…)
+  if (BUILTIN[t.id]?.includes(pr)) { for (const o of t.options ?? []) if ('default' in o && o.key !== 'size') app.setOpt(t.id, o.key, o.default); app.setOpt(t.id, 'tip', ''); app.setOpt(t.id, 'tipJitter', false); }
+  for (const [k, v] of Object.entries(pr.opts)) app.setOpt(t.id, k, v); app.toast(`Ajuste «${pr.name}»`); }
 
-function presetMenu(anchor: HTMLElement, t: any) {
+export function presetMenu(anchor: HTMLElement, t: any) {
   document.querySelector('.preset-fly')?.remove();
   const fly = h('div', { class: 'flyout preset-fly' });
   const r = anchor.getBoundingClientRect(); fly.style.left = r.left + 'px'; fly.style.top = r.bottom + 4 + 'px';

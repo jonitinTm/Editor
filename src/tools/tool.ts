@@ -9,6 +9,10 @@ export interface ToolEvent {
   sx: number; sy: number;
   shift: boolean; alt: boolean; ctrl: boolean;
   pressure: number;
+  /** Inclinación del lápiz: 0 = vertical, 1 = tumbado. */
+  tilt?: number;
+  /** Hacia dónde apunta el lápiz (radianes, en coordenadas del documento). */
+  azimuth?: number;
   pointerType: string;
   button: number;
   detail: number;

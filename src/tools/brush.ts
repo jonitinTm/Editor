@@ -98,6 +98,10 @@ function modTip(tip: HTMLCanvasElement, wet: boolean, noise: boolean): HTMLCanva
 }
 const AIRBRUSH = { key: 'airbrush', label: 'Aerógrafo (acumula al quedarse quieto)', type: 'checkbox' as const, default: false };
 const SCATTER = { key: 'scatter', label: 'Dispersión', type: 'range' as const, min: 0, max: 500, default: 0, unit: '%' };
+// Lápiz digital: la inclinación puede sombrear (como un lápiz de lado) o girar la punta (caligrafía). Estabilizador de cuerda.
+const TILT = { key: 'tiltMode', label: 'Inclinación del lápiz', type: 'select' as const, default: 'shade', choices: [
+  { value: 'none', label: 'No hace nada' }, { value: 'shade', label: 'Sombrear (más ancho y suave)' }, { value: 'angle', label: 'Gira la punta (caligrafía)' }] };
+const ROPE = { key: 'rope', label: 'Estabilizador (cuerda)', type: 'range' as const, min: 0, max: 100, default: 0, unit: 'px' };
 const SPACING = { key: 'spacing', label: 'Espaciado', type: 'range' as const, min: 1, max: 200, default: 12, unit: '%' };
 
 /** Toma el color de la imagen combinada en (x, y) como color frontal (Alt mientras se pinta). */
@@ -147,7 +151,7 @@ abstract class StrokeTool implements Tool {
     const hard = (app.opt<number>('hardness', this.id) ?? 100) / 100;
     const flow = (app.opt<number>('flow', this.id) ?? 100) / 100;
     const ctx = ctx2d(this.stroke!.buffer);
-    const round = (app.opt<number>('roundness', this.id) ?? 100) / 100, angle0 = app.opt<number>('angle', this.id) ?? 0, scatter = (app.opt<number>('scatter', this.id) ?? 0) / 100;
+    const round0 = (app.opt<number>('roundness', this.id) ?? 100) / 100, angle0 = app.opt<number>('angle', this.id) ?? 0, scatter = (app.opt<number>('scatter', this.id) ?? 0) / 100;
     const tipId = this.aliased ? '' : (app.opt<string>('tip', this.id) ?? ''), jitter = !!app.opt('tipJitter', this.id);
     // dinámica de color: cada pincelada con un color algo distinto
     const fj = (app.opt<number>('fgbgJitter', this.id) ?? 0) / 100, hj = (app.opt<number>('hueJitter', this.id) ?? 0) / 100, bj = (app.opt<number>('briJitter', this.id) ?? 0) / 100;
@@ -166,10 +170,17 @@ abstract class StrokeTool implements Tool {
     // textura y pincel doble (solo en las herramientas que tienen esas opciones)
     const dualK = this.options.some((o: any) => o.key === 'dualSize') ? (app.opt<number>('dualSize', this.id) ?? 0) / 100 : 0, dualSc = (app.opt<number>('dualScatter', this.id) ?? 50) / 100;
     const modC = makeCanvas(4, 4), dualC = makeCanvas(4, 4);
+    const tiltMode = this.options.some((o: any) => o.key === 'tiltMode') && !this.aliased ? app.opt<string>('tiltMode', this.id) || 'none' : 'none';
     return (x, y, p) => {
       // dinámica de forma: cada pincelada con tamaño, ángulo y opacidad algo distintos
-      const size = sj > 0 ? Math.max(1, this.size(p) * (1 - Math.random() * sj)) : this.size(p);
-      const angle = aj > 0 ? angle0 + (Math.random() * 2 - 1) * aj * 180 : angle0;
+      let size = sj > 0 ? Math.max(1, this.size(p) * (1 - Math.random() * sj)) : this.size(p);
+      let angle = aj > 0 ? angle0 + (Math.random() * 2 - 1) * aj * 180 : angle0;
+      let round = round0, tiltAlpha = 1;
+      // lápiz inclinado: con «sombrear» la marca se ensancha, se alarga hacia donde apunta y se aclara; con «girar» la punta sigue al lápiz
+      // (al escribir normal el lápiz va a unos 55°: solo cuenta cuando se tumba bastante)
+      const tl = this.tilt > 0.5 ? Math.min(1, (this.tilt - 0.5) / 0.38) : 0;
+      if (tiltMode === 'shade' && tl > 0) { size = Math.round(size * (1 + 2 * tl)); round = Math.round(Math.max(0.2, round * (1 - 0.65 * tl)) * 20) / 20; angle = Math.round(-this.azi * 180 / Math.PI / 6) * 6; tiltAlpha = 1 - 0.7 * tl; }
+      else if (tiltMode === 'angle' && this.tilt > 0.05) angle = Math.round((angle0 - this.azi * 180 / Math.PI) / 6) * 6;
       // punta con imagen (si hay) o la redonda de siempre
       let tip = (tipId && sampledTip(tipId, size, dyn ? '#ffffff' : color, jitter ? Math.random() * 360 : angle, round)) || brushTip(size, hard, dyn ? '#ffffff' : color, this.aliased, round, angle);
       if (wetE || noiseE) tip = modTip(tip, wetE, noiseE);
@@ -194,10 +205,12 @@ abstract class StrokeTool implements Tool {
         m.globalCompositeOperation = 'source-over'; tip = modC;
       }
       // con tableta, la presión también puede controlar la opacidad de cada pincelada
-      if (app.opt('pressureOpacity', this.id)) {
-        // las pinceladas se solapan: cada una aporta lo justo para que el trazo llegue a la opacidad de la presión
+      // (y la inclinación, al sombrear, la rebaja)
+      const target = (app.opt('pressureOpacity', this.id) ? Math.min(1, Math.max(0.02, p)) : 1) * tiltAlpha;
+      if (target < 1) {
+        // las pinceladas se solapan: cada una aporta lo justo para que el trazo llegue a la opacidad buscada
         const overlap = Math.max(1, size / Math.max(0.5, this.spacing(p)));
-        ctx.globalAlpha = flow * (1 - Math.pow(1 - Math.min(1, Math.max(0.02, p)), 1 / overlap));
+        ctx.globalAlpha = flow * (1 - Math.pow(1 - target, 1 / overlap));
       } else ctx.globalAlpha = flow;
       if (oj > 0) ctx.globalAlpha *= 1 - Math.random() * oj;
       ctx.drawImage(tip, dx, dy);
@@ -206,6 +219,12 @@ abstract class StrokeTool implements Tool {
   }
 
   private dab: ((x: number, y: number, p: number) => any) | null = null;
+  /** Inclinación y dirección del lápiz en el último punto. */
+  protected tilt = 0; protected azi = 0;
+  /** Estabilizador de cuerda: la punta solo avanza cuando el lápiz se aleja más que la cuerda. */
+  private ropePt: { x: number; y: number } | null = null;
+  private ropeCursor: { x: number; y: number } | null = null;
+  private ropeLen() { return this.options.some((o: any) => o.key === 'rope') ? (app.opt<number>('rope', this.id) ?? 0) / (app.viewport?.zoom || 1) : 0; }
 
   protected spacing(p: number) {
     const k = (app.opt<number>('spacing', this.id) ?? (this.aliased ? 25 : 12)) / 100;
@@ -213,6 +232,8 @@ abstract class StrokeTool implements Tool {
   }
   down(e: ToolEvent) {
     if (e.alt && !this.erase) { this.picking = true; pickColorAt(e.x, e.y); return; }
+    this.tilt = e.tilt ?? 0; this.azi = e.azimuth ?? 0;
+    this.ropePt = this.ropeLen() > 0 ? { x: e.x, y: e.y } : null; this.ropeCursor = null;
     const t = getPaintTarget();
     if (!t) return;
     this.target = t;
@@ -264,6 +285,15 @@ abstract class StrokeTool implements Tool {
     if (this.picking) { pickColorAt(e.x, e.y); return; }
     if (!this.stroke || !this.dab) return;
     let { x, y, pressure: p } = e;
+    if (e.tilt !== undefined) { this.tilt += (e.tilt - this.tilt) * 0.5; this.azi = e.azimuth ?? this.azi; }
+    const R = this.ropeLen();
+    if (R > 0 && this.ropePt) {
+      this.ropeCursor = { x, y };
+      const dx = x - this.ropePt.x, dy = y - this.ropePt.y, dist = Math.hypot(dx, dy);
+      if (dist <= R) return;
+      this.ropePt.x += dx * (dist - R) / dist; this.ropePt.y += dy * (dist - R) / dist;
+      x = this.ropePt.x; y = this.ropePt.y;
+    }
     const k = Math.min(0.95, (app.opt<number>('smoothing', this.id) ?? 0) / 100 * 0.93);
     if (k > 0 && this.sm) { this.sm.x += (x - this.sm.x) * (1 - k); this.sm.y += (y - this.sm.y) * (1 - k); this.sm.p += (p - this.sm.p) * (1 - k); x = this.sm.x; y = this.sm.y; p = this.sm.p; }
     this.stroke.lineTo(x, y, p, this.spacing(p), this.dab);
@@ -276,7 +306,8 @@ abstract class StrokeTool implements Tool {
     if (this.picking) { this.picking = false; return; }
     if (!this.stroke) return;
     // Con suavizado, el trazo termina en el punto real donde se soltó
-    if (e && this.sm && this.dab && (app.opt<number>('smoothing', this.id) ?? 0) > 0) { this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(e.pressure), this.dab); this.lastPoint = { x: e.x, y: e.y }; }
+    const roped = !!this.ropePt; this.ropePt = null; this.ropeCursor = null;
+    if (e && !roped && this.sm && this.dab && (app.opt<number>('smoothing', this.id) ?? 0) > 0) { this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(e.pressure), this.dab); this.lastPoint = { x: e.x, y: e.y }; }
     this.sm = null;
     const changed = this.stroke.finish();
     this.stroke = null;
@@ -284,15 +315,34 @@ abstract class StrokeTool implements Tool {
   }
   cancel() { this.stroke?.cancel(); this.stroke = null; }
   hover() { /* el cursor se dibuja en drawOverlay */ }
-  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) { drawBrushCursor(ctx, vp, app.opt<number>('size', this.id)); }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    const R = this.ropeLen();
+    if (R > 0 && !this.stroke && vp.mouseScreen) {
+      // círculo de la cuerda alrededor del puntero
+      ctx.save(); ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(61,139,253,.8)'; ctx.beginPath(); ctx.arc(vp.mouseScreen.x, vp.mouseScreen.y, R * vp.zoom, 0, 7); ctx.stroke(); ctx.restore();
+    }
+    if (this.ropePt && this.ropeCursor) {
+      const a = vp.toScreen(this.ropePt.x, this.ropePt.y), b = vp.toScreen(this.ropeCursor.x, this.ropeCursor.y);
+      ctx.save(); ctx.strokeStyle = 'rgba(61,139,253,.9)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.fillStyle = 'rgba(61,139,253,.9)'; ctx.beginPath(); ctx.arc(b.x, b.y, 3, 0, 7); ctx.fill(); ctx.restore();
+      const ms = vp.mouseScreen; (vp as any).mouseScreen = a; drawBrushCursor(ctx, vp, app.opt<number>('size', this.id)); (vp as any).mouseScreen = ms;
+      return;
+    }
+    drawBrushCursor(ctx, vp, app.opt<number>('size', this.id));
+  }
   docChanged() { this.lastPoint = null; }
 }
 
 export class BrushTool extends StrokeTool {
   id = 'brush'; name = 'Pincel'; icon = icon('brush'); key = 'B'; group = 'brush'; historyName = 'Pincel';
-  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP, { ...TEX }, TEX_SCALE, TEX_DEPTH, TEX_INV, DUAL, DUAL_SC] as any[];
+  options = [SIZE, HARD, BLEND, OPAC, FLOW, SMOOTH, ROPE, TILT, SYM, AIRBRUSH, WET, NOISE, SPACING, ANGLE, ROUND, SCATTER, SIZE_JIT, ANG_JIT, OPAC_JIT, FGBG_JIT, HUE_JIT, BRI_JIT, PRESS, PRESS_OP, { ...TEX }, TEX_SCALE, TEX_DEPTH, TEX_INV, DUAL, DUAL_SC] as any[];
   extraFirst = true;
-  extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
+  extraOptions(bar: HTMLElement) {
+    // pinceles de dibujo listos para usar (lápiz, tinta, carboncillo…)
+    const b = document.createElement('button'); b.className = 'btn brush-presets'; b.type = 'button'; b.title = 'Pinceles de dibujo listos para usar'; b.textContent = 'Pinceles ▾';
+    b.onclick = ev => { ev.stopPropagation(); import('../ui/optionsbar').then(m => m.presetMenu(b, this)); };
+    bar.append(b); tipPicker(bar, this.id);
+  }
   activate() {
     // la lista de motivos para la textura puede cambiar (motivos definidos por el usuario)
     const o = this.options.find((x: any) => x.key === 'texture'); o.choices = [{ value: '', label: 'Sin textura' }, ...allPatterns().map(p => ({ value: p.id, label: p.name }))];
@@ -310,7 +360,7 @@ export function tipPicker(bar: HTMLElement, toolId: string) {
     if (t) { x.drawImage(sampledTip(t.id, 20, '#ddd')!, 1, 1, 20, 20); } else { x.fillStyle = '#ddd'; x.beginPath(); x.arc(11, 11, 8, 0, 7); x.fill(); }
     btn.append(c, document.createTextNode(' ' + (t ? t.name : 'Redonda') + ' ▾'));
   };
-  paint();
+  paint(); app.onBar('options', paint);
   btn.onclick = e => {
     e.stopPropagation();
     document.querySelector('.tip-fly')?.remove();
@@ -340,7 +390,7 @@ export function tipPicker(bar: HTMLElement, toolId: string) {
 export class PencilTool extends StrokeTool {
   id = 'pencil'; name = 'Lápiz'; icon = icon('pencil'); key = 'B'; group = 'brush'; historyName = 'Lápiz';
   aliased = true;
-  options = [{ ...SIZE, default: 1 }, OPAC, SMOOTH, SYM, { ...PRESS, default: false }] as any[];
+  options = [{ ...SIZE, default: 1 }, OPAC, SMOOTH, ROPE, SYM, { ...PRESS, default: false }] as any[];
 }
 
 export class EraserTool extends StrokeTool {
@@ -349,7 +399,7 @@ export class EraserTool extends StrokeTool {
   extraOptions(bar: HTMLElement) { tipPicker(bar, this.id); }
   erase = true;
   options = [{ key: 'eraseMode', label: 'Modo', type: 'select', default: 'brush', choices: [{ value: 'brush', label: 'Pincel' }, { value: 'pencil', label: 'Lápiz' }, { value: 'block', label: 'Bloque' }] },
-    SIZE, HARD, OPAC, FLOW, SMOOTH, SYM, SPACING, ANGLE, ROUND, SCATTER, PRESS, PRESS_OP] as any[];
+    SIZE, HARD, OPAC, FLOW, SMOOTH, ROPE, TILT, SYM, SPACING, ANGLE, ROUND, SCATTER, PRESS, PRESS_OP] as any[];
   private mode() { return app.opt<string>('eraseMode', this.id) || 'brush'; }
   down(e: ToolEvent) { this.aliased = this.mode() !== 'brush'; super.down(e); }
   protected size(p: number) { return this.mode() === 'block' ? Math.max(1, Math.round(16 / (app.viewport?.zoom || 1))) : super.size(p); }

@@ -5,7 +5,7 @@ import { EditorDocument } from '../core/document';
 import type { Tool } from '../tools/tool';
 import type { Viewport } from './viewport';
 
-type EventName = 'docs' | 'doc' | 'tool' | 'colors' | 'view' | 'options' | 'brushes';
+type EventName = 'docs' | 'doc' | 'tool' | 'colors' | 'view' | 'options' | 'brushes' | 'pen';
 
 class App {
   docs: EditorDocument[] = [];

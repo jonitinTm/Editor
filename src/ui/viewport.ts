@@ -3,7 +3,7 @@
 
 import { setOnOutlineStale } from '../core/selection';
 import { app } from './app';
-import { prefs, savePrefs, pxPerUnit, UNIT_NAMES } from './prefs';
+import { prefs, savePrefs, pxPerUnit, UNIT_NAMES, penPressure } from './prefs';
 import type { ToolEvent } from '../tools/tool';
 import { h } from './dom';
 import { drawSnap } from '../tools/snap';
@@ -30,7 +30,18 @@ export class Viewport {
   private panning: { x: number; y: number; px: number; py: number } | null = null;
   private toolActive = false;
   private pointers = new Map<number, { x: number; y: number }>();
-  private pinch: { dist: number; cx: number; cy: number; zoom: number; px: number; py: number } | null = null;
+  private pinch: { dist: number; cx: number; cy: number; zoom: number; ang: number; rot: number; rotating: boolean } | null = null;
+  /** ¿Se ha usado un lápiz? Entonces (en modo automático) el dedo solo mueve la vista y el lápiz dibuja. */
+  penSeen = false;
+  private penDown = false;
+  /** Toque con varios dedos: si se sueltan enseguida sin moverse, 2 dedos = deshacer, 3 = rehacer. */
+  private tap: { t: number; n: number; moved: boolean; pts: Map<number, { x: number; y: number }> } | null = null;
+  /** Mantener pulsado con el dedo (en modo lápiz): cuentagotas. */
+  private holdTimer = 0;
+  private touchPick: { x: number; y: number; color: string } | null = null;
+  /** Herramienta puesta por el lápiz (goma del lápiz). */
+  private penSpring = false;
+  private penPick = false
   /** Guía que se está arrastrando. */
   private guideDrag: { axis: 'h' | 'v'; index: number; pos: number } | null = null;
   private checker: CanvasPattern | null = null;
@@ -368,6 +379,7 @@ export class Viewport {
     if (app.tool?.id !== 'colorSampler' && !app.hideExtras) (app as any).drawSamplers?.(ctx, this);
     if (app.tool?.id !== 'note' && !app.hideExtras) (app as any).drawNotes?.(ctx, this);
     app.tool?.drawOverlay?.(ctx, this);
+    this.drawTouchPick(ctx);
     ctx.restore();
     drawSnap(ctx, this);
     this.renderRulers();
@@ -438,11 +450,21 @@ export class Viewport {
     const p = this.toDoc(sx, sy);
     return {
       x: p.x, y: p.y, sx, sy, shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey,
-      pressure: e.pointerType === 'pen' ? (e.pressure || 0.5) : 1, pointerType: e.pointerType, button: e.button, detail: e.detail,
+      pressure: e.pointerType === 'pen' ? penPressure(e.pressure || 0.5) : 1, pointerType: e.pointerType, button: e.button, detail: e.detail,
+      ...(e.pointerType === 'pen' ? penTilt(e, this.rot) : {}),
     };
   }
 
   isSpaceDown() { return this.spaceDown; }
+  /** ¿El dedo debe mover la vista en lugar de dibujar? (hay lápiz) */
+  penMode() { return prefs.penOnly === 'on' || (prefs.penOnly === 'auto' && this.penSeen); }
+  private notePen() {
+    if (this.penSeen) return;
+    this.penSeen = true; app.emit('pen');
+    if (prefs.penOnly === 'auto') app.toast('Lápiz detectado: ahora el lápiz dibuja y el dedo mueve, amplía y gira la vista (mantén el dedo para coger un color)');
+  }
+  /** Color que se está cogiendo con el dedo (para dibujar la lupa). */
+  get touchPicking() { return this.touchPick; }
   /** ¿Hay una operación con el ratón en curso? */
   isBusy() { return this.toolActive; }
 
@@ -471,16 +493,43 @@ export class Viewport {
 
     cv.addEventListener('pointerdown', e => {
       if (!this.doc) return;
+      const touch = e.pointerType === 'touch';
+      if (e.pointerType === 'pen') { this.notePen(); this.penDown = true; }
+      // rechazo de la palma: mientras el lápiz está apoyado, los toques no cuentan
+      if (touch && this.penDown) return;
       (document.activeElement as HTMLElement | null)?.blur?.();
       try { cv.setPointerCapture(e.pointerId); } catch { /* puntero sintético */ }
       const r = cv.getBoundingClientRect();
-      this.pointers.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
-      if (this.pointers.size === 2 && e.pointerType === 'touch') {
+      const sp = { x: e.clientX - r.left, y: e.clientY - r.top };
+      this.pointers.set(e.pointerId, sp);
+      if (touch) {
+        const n = [...this.pointers.keys()].length;
+        if (n === 1) this.tap = { t: performance.now(), n: 1, moved: false, pts: new Map([[e.pointerId, sp]]) };
+        else if (this.tap) { this.tap.n = Math.max(this.tap.n, n); this.tap.pts.set(e.pointerId, sp); if (performance.now() - this.tap.t > 400) this.tap.moved = true; }
+      }
+      if (this.pointers.size >= 2 && touch) {
         // Gesto de pellizco: cancela el trazo en curso.
-        if (this.toolActive) { this.toolActive = false; app.tool?.cancel?.(); }
-        this.startPinch(); return;
+        clearTimeout(this.holdTimer); this.touchPick = null; this.panning = null;
+        if (this.toolActive) { this.toolActive = false; app.tool?.cancel?.(); if (this.springMove) { this.springMove = false; app.restoreTool(); } }
+        if (this.pointers.size === 2) this.startPinch();
+        return;
       }
       const te = this.makeEvent(e);
+      // con lápiz, un dedo mueve la vista (y mantenerlo quieto coge el color)
+      if (touch && this.penMode()) {
+        this.panning = { x: te.sx, y: te.sy, px: this.doc.view.panX, py: this.doc.view.panY };
+        clearTimeout(this.holdTimer);
+        if (typeof app.opt('size', app.tool?.id) === 'number' || app.tool?.id === 'eyedropper') this.holdTimer = window.setTimeout(() => {
+          if (!this.panning || this.pointers.size !== 1) return;
+          this.doc!.view.panX = this.panning.px; this.doc!.view.panY = this.panning.py; this.panning = null;
+          this.pickTouch(te.sx, te.sy);
+        }, 450);
+        return;
+      }
+      // botón lateral del lápiz: cuentagotas con las herramientas de pintar
+      if (e.pointerType === 'pen' && e.button === 2 && typeof app.opt('size', app.tool?.id) === 'number') { this.penPick = true; this.pickTouch(te.sx, te.sy); return; }
+      // goma del lápiz (el otro extremo): borra mientras se use
+      if (e.pointerType === 'pen' && (e.buttons & 32) && app.tool?.id !== 'eraser') { this.penSpring = true; app.setTool('eraser', true); }
       // clic en el nombre de una mesa de trabajo: la selecciona
       const lab = e.button === 0 && this.boardLabels.find(b => te.sx >= b.x && te.sx <= b.x + b.w && te.sy >= b.y && te.sy <= b.y + b.h);
       if (lab) { this.doc.setActive(lab.g); app.emit('doc'); this.requestRender(); return; }
@@ -492,7 +541,7 @@ export class Viewport {
         this.panning = { x: te.sx, y: te.sy, px: this.doc.view.panX, py: this.doc.view.panY };
         this.updateCursor(); return;
       }
-      if (e.button !== 0 && e.button !== 2) return;
+      if (e.button !== 0 && e.button !== 2 && !this.penSpring) return;
       if (app.tool?.id === 'move' && e.button === 0) {
         const g = this.guideAt(te.sx, te.sy);
         if (g) {
@@ -522,9 +571,17 @@ export class Viewport {
     cv.addEventListener('pointermove', e => {
       if (!this.doc) return;
       const r = cv.getBoundingClientRect();
-      if (this.pointers.has(e.pointerId)) this.pointers.set(e.pointerId, { x: e.clientX - r.left, y: e.clientY - r.top });
+      if (e.pointerType === 'pen') this.notePen();
+      if (e.pointerType === 'touch' && !this.pointers.has(e.pointerId)) return;
+      if (this.pointers.has(e.pointerId)) {
+        const q = { x: e.clientX - r.left, y: e.clientY - r.top }; this.pointers.set(e.pointerId, q);
+        const t0 = this.tap?.pts.get(e.pointerId); if (t0 && Math.hypot(q.x - t0.x, q.y - t0.y) > 12) this.tap!.moved = true;
+      }
       if (this.pinch) { this.updatePinch(); return; }
+      if (this.pointers.size > 1 && e.pointerType === 'touch') return;
       const te = this.makeEvent(e);
+      if (this.touchPick || this.penPick) { if (this.pointers.has(e.pointerId)) this.pickTouch(te.sx, te.sy); return; }
+      if (this.panning && e.pointerType === 'touch' && Math.hypot(te.sx - this.panning.x, te.sy - this.panning.y) > 8) clearTimeout(this.holdTimer);
       this.mouse = { x: te.x, y: te.y }; this.mouseScreen = { x: te.sx, y: te.sy };
       app.emit('view');
       if (this.panning) {
@@ -553,8 +610,21 @@ export class Viewport {
     });
 
     const end = (e: PointerEvent) => {
-      this.pointers.delete(e.pointerId);
-      if (this.pinch) { if (this.pointers.size < 2) this.pinch = null; return; }
+      if (e.pointerType === 'pen') this.penDown = false;
+      const had = this.pointers.delete(e.pointerId);
+      if (e.pointerType === 'touch') {
+        if (!had) return;
+        clearTimeout(this.holdTimer);
+        if (!this.pointers.size && this.tap) {
+          // toque rápido con 2 o 3 dedos: deshacer / rehacer
+          const t = this.tap; this.tap = null;
+          if (prefs.touchGestures && !t.moved && t.n >= 2 && performance.now() - t.t < 400) {
+            import('./ops').then(o => { if (t.n === 2) { if (app.doc?.history.canUndo()) { o.undo(); app.toast('Deshacer (toque con 2 dedos)'); } } else if (app.doc?.history.canRedo()) { o.redo(); app.toast('Rehacer (toque con 3 dedos)'); } });
+          }
+        }
+      }
+      if (this.touchPick || this.penPick) { if (!this.pointers.size) { this.touchPick = null; this.penPick = false; this.requestRender(); } return; }
+      if (this.pinch) { if (this.pointers.size < 2) { this.pinch = null; this.panning = null; } return; }
       if (!this.doc) return;
       if (this.panning) { this.panning = null; this.updateCursor(); return; }
       if (this.brushResize) { this.brushResize = null; app.saveOpts(); return; }
@@ -569,6 +639,7 @@ export class Viewport {
         this.toolActive = false;
         app.tool?.up?.(this.makeEvent(e));
         if (this.springMove) { this.springMove = false; app.restoreTool(); }
+        if (this.penSpring) { this.penSpring = false; app.restoreTool(); }
         this.requestRender();
       }
     };
@@ -652,15 +723,46 @@ export class Viewport {
   private startPinch() {
     const [a, b] = [...this.pointers.values()];
     const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2, dp = this.toDoc(cx, cy);
-    this.pinch = { dist: Math.hypot(a.x - b.x, a.y - b.y), cx: dp.x, cy: dp.y, zoom: this.zoom, px: 0, py: 0 };
+    this.pinch = { dist: Math.max(1, Math.hypot(a.x - b.x, a.y - b.y)), cx: dp.x, cy: dp.y, zoom: this.zoom, ang: Math.atan2(b.y - a.y, b.x - a.x), rot: this.rot, rotating: false };
   }
   private updatePinch() {
     const p = this.pinch!, d = this.doc!;
     const [a, b] = [...this.pointers.values()];
     const dist = Math.hypot(a.x - b.x, a.y - b.y), cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
     const z = Math.min(64, Math.max(0.01, p.zoom * dist / p.dist));
-    d.view.zoom = z; this.placeDocPoint(p.cx, p.cy, { x: cx, y: cy });
+    d.view.zoom = z;
+    if (prefs.pinchRotate) {
+      // girar con dos dedos: empieza tras un pequeño giro (para no girar sin querer al ampliar) y se imanta a 0°, 90°…
+      let da = Math.atan2(b.y - a.y, b.x - a.x) - p.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (!p.rotating && Math.abs(da) > 0.2) { p.rotating = true; p.ang += da; da = 0; }
+      if (p.rotating) {
+        let r = p.rot + da; const q = Math.round(r / (Math.PI / 2)) * Math.PI / 2;
+        if (Math.abs(r - q) < 0.07) r = q;
+        r = Math.atan2(Math.sin(r), Math.cos(r)); d.view.rot = Math.abs(r) < 1e-6 ? 0 : r;
+      }
+    }
+    this.placeDocPoint(p.cx, p.cy, { x: cx, y: cy });
     app.emit('view'); this.requestRender();
+  }
+  /** Coge el color bajo el dedo o el lápiz (y lo muestra en una lupa). */
+  private pickTouch(sx: number, sy: number) {
+    const p = this.toDoc(sx, sy), d = this.doc!, px = Math.floor(p.x), py = Math.floor(p.y);
+    if (px >= 0 && py >= 0 && px < d.width && py < d.height) {
+      const c = d.getComposite().getContext('2d')!.getImageData(px, py, 1, 1).data;
+      if (c[3]) app.setColors('#' + [c[0], c[1], c[2]].map(v => v.toString(16).padStart(2, '0')).join(''), app.bg);
+    }
+    this.touchPick = { x: sx, y: sy, color: app.fg }; this.requestRender();
+  }
+  /** Lupa del cuentagotas táctil: un anillo con el color nuevo arriba y el de antes abajo. */
+  drawTouchPick(ctx: CanvasRenderingContext2D) {
+    const t = this.touchPick; if (!t) return;
+    const y = t.y - 70 < 40 ? t.y + 70 : t.y - 70;
+    ctx.save(); ctx.lineWidth = 14;
+    ctx.strokeStyle = t.color; ctx.beginPath(); ctx.arc(t.x, y, 34, Math.PI, 0); ctx.stroke();
+    ctx.strokeStyle = app.bg; ctx.beginPath(); ctx.arc(t.x, y, 34, 0, Math.PI); ctx.stroke();
+    ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.beginPath(); ctx.arc(t.x, y, 41.5, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.arc(t.x, y, 26.5, 0, 7); ctx.stroke();
+    ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.moveTo(t.x - 5, t.y); ctx.lineTo(t.x + 5, t.y); ctx.moveTo(t.x, t.y - 5); ctx.lineTo(t.x, t.y + 5); ctx.stroke();
+    ctx.restore();
   }
 }
 
@@ -669,4 +771,16 @@ export function isTyping() {
   if (!a) return false;
   const tag = a.tagName;
   return (tag === 'INPUT' && !['range', 'checkbox', 'button', 'radio', 'color'].includes((a as HTMLInputElement).type)) || tag === 'TEXTAREA' || tag === 'SELECT' || a.isContentEditable;
+}
+
+/** Inclinación y dirección del lápiz (con altitudeAngle/azimuthAngle si el navegador los da, si no con tiltX/tiltY). */
+function penTilt(e: PointerEvent, viewRot: number): { tilt: number; azimuth: number } {
+  const ev = e as any;
+  let alt: number, az: number;
+  if (typeof ev.altitudeAngle === 'number' && typeof ev.azimuthAngle === 'number' && (ev.tiltX || ev.tiltY || ev.altitudeAngle !== Math.PI / 2)) { alt = ev.altitudeAngle; az = ev.azimuthAngle; }
+  else {
+    const tx = Math.tan((e.tiltX || 0) * Math.PI / 180), ty = Math.tan((e.tiltY || 0) * Math.PI / 180);
+    alt = Math.atan2(1, Math.hypot(tx, ty)); az = Math.atan2(ty, tx);
+  }
+  return { tilt: Math.max(0, Math.min(1, 1 - alt / (Math.PI / 2))), azimuth: az - viewRot };
 }

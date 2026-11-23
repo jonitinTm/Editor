@@ -762,3 +762,48 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .lq-side .num-slider input[type=range] { min-width: 50px; width: auto; flex: 1; }
 .var-adjust { flex-wrap: wrap; row-gap: 4px; }
 .var-adjust input[type=range] { min-width: 0; flex: 1 1 90px; width: auto; }
+
+/* ---- Dibujo con lápiz: barras laterales, modo dibujo y ajustes del lápiz ---- */
+.side-sliders { position: absolute; left: 30px; top: 50%; transform: translateY(-50%); z-index: 6; display: none; flex-direction: column; align-items: center; gap: 8px;
+  padding: 10px 6px; background: color-mix(in srgb, var(--panel) 88%, transparent); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.35); touch-action: none; user-select: none; }
+.side-sliders.on { display: flex; }
+.ss-bar { position: relative; width: 26px; height: 150px; border-radius: 13px; background: var(--input); border: 1px solid var(--border); cursor: ns-resize; touch-action: none; overflow: visible; }
+.ss-fill { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 12px; background: var(--accent-soft); pointer-events: none; }
+.ss-knob { position: absolute; left: 1px; right: 1px; height: 18px; border-radius: 9px; background: var(--text); box-shadow: 0 1px 4px rgba(0,0,0,.5); pointer-events: none; }
+.ss-tip { position: absolute; left: 34px; top: 50%; transform: translateY(-50%); white-space: nowrap; background: var(--panel-3); color: var(--text); border-radius: 4px; padding: 3px 7px; font-size: 12px; opacity: 0; pointer-events: none; transition: opacity .15s; }
+.ss-bar.drag .ss-tip { opacity: 1; }
+.ss-gap { height: 4px; }
+.ss-btn { width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--text); display: grid; place-items: center; padding: 0; }
+.ss-btn:active { background: var(--btn-hover); }
+.ss-btn svg { width: 18px; height: 18px; }
+@media (max-width: 700px) { .side-sliders { left: 6px; } .ss-bar { height: 110px; } }
+body.draw-mode .side, body.draw-mode .toolbar, body.draw-mode .optionsbar, body.draw-mode .menubar, body.draw-mode .topbar, body.draw-mode .side-handle, body.draw-mode .tabs, body.draw-mode .statusbar, body.draw-mode .timeline { display: none !important; }
+body.draw-mode .viewport { grid-template-columns: 0 minmax(0, 1fr); grid-template-rows: 0 minmax(0, 1fr); }
+body.draw-mode .ruler, body.draw-mode .ruler-corner, body.draw-mode .ruler-mark { display: none; }
+body.draw-mode .side-sliders { left: 10px; }
+.draw-bar { display: none; }
+body.draw-mode .draw-bar { display: flex; position: fixed; z-index: 50; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); gap: 4px; padding: 5px; max-width: calc(100vw - 20px); overflow-x: auto;
+  background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+.dm-btn { min-width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: var(--text); display: grid; place-items: center; padding: 0 8px; font: inherit; flex: none; }
+.dm-btn svg { width: 22px; height: 22px; }
+.dm-btn.on { background: var(--accent-soft); color: var(--accent); }
+.dm-btn:active { background: var(--btn-hover); }
+.dm-color { width: 40px; border: 2px solid var(--text); border-radius: 50%; }
+.dm-exit { font-size: 18px; }
+.pen-curve { display: flex; gap: 12px; align-items: flex-start; }
+.pen-graph { width: 120px; height: 120px; border-radius: 6px; flex: none; }
+.pen-curve-ctl { flex: 1; min-width: 0; }
+.pen-curve-ctl .form-row input[type=range] { flex: 1; min-width: 0; }
+.pen-presets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.pen-pad { display: block; width: 100%; height: auto; aspect-ratio: 360 / 150; margin-top: 10px; border-radius: 6px; touch-action: none; cursor: crosshair; }
+.pen-pad-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.pen-pad-row .pen-live { flex: 1; }
+@media (max-width: 480px) { .pen-curve { flex-direction: column; } }
+@media (max-width: 480px) {
+  body.draw-mode .draw-bar { gap: 2px; padding: 4px; }
+  .dm-btn { min-width: 34px; height: 36px; padding: 0 4px; }
+  .dm-btn svg { width: 20px; height: 20px; }
+  .dm-color { width: 34px; min-width: 34px; height: 34px; }
+  .dm-btn[data-tool=smudge] { display: none; }
+  .dm-presets { font-size: 11px; }
+}

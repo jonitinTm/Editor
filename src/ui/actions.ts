@@ -336,6 +336,8 @@ export const ACTIONS: Action[] = [
   { id: 'win:timeline', label: 'Línea de tiempo (animación)', checked: () => !document.querySelector('.timeline')?.classList.contains('closed'), run: () => { document.querySelector('.timeline')?.classList.toggle('closed'); app.doc?.changed(); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:tools', label: 'Herramientas', checked: () => !document.body.classList.contains('no-tools'), run: () => { document.body.classList.toggle('no-tools'); requestAnimationFrame(() => app.viewport.resize()); } },
   { id: 'win:options', label: 'Opciones', checked: () => !document.body.classList.contains('no-options'), run: () => { document.body.classList.toggle('no-options'); requestAnimationFrame(() => app.viewport.resize()); } },
+  { id: 'drawMode', label: 'Modo dibujo (pantalla completa)', keys: ['F'], enabled: () => !!app.doc, run: () => import('./drawing').then(m => m.toggleDrawMode()) },
+  { id: 'penSettings', label: 'Ajustes del lápiz…', run: () => import('./drawing').then(m => m.penSettingsDialog()) },
   { id: 'win:all', label: 'Ocultar / mostrar todos los paneles', keys: ['Tab'], run: () => { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); } },
 
   // Ayuda
