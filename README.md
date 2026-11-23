@@ -450,6 +450,20 @@ Ya disponible:
   - *Imagen › Cálculos…*: mezcla dos canales (rojo, verde, azul, gris o transparencia de capas o canales) y crea un
     canal, una selección o una capa (para máscaras precisas de pelo o cielos).
 - En el móvil, los botones ✓ (aplicar) y ✕ (cancelar) de recortar, transformar o deformar se quedan siempre a la vista.
+- **Crear sin saber diseño** (funciones propias de Editor):
+  - *Archivo › Plantillas…*: 8 diseños listos para editar (oferta para Instagram, historia, miniatura de YouTube,
+    invitación, tarjeta de visita, frase, cartel de evento y meme). Todo son capas normales: textos editables, formas y
+    marcos para fotos (doble clic en un marco gris para poner tu foto).
+  - *Archivo › Collage…*: elige de 1 a 9 fotos, una distribución, la separación, las esquinas redondeadas y el fondo;
+    cada foto queda en su marco y se puede mover o cambiar.
+  - *Capa › Texto › Efectos de texto…*: neón, 3D, contorno, retro, dorado, pegatina, cromado, fuego y sombra suave en un
+    clic (luego se ajustan en Estilo de capa).
+  - *Capa › Crear › Fondos generativos…*: degradado de malla, burbujas, ondas o puntos con 6 paletas y variaciones.
+  - *Capa › Crear › Código QR…*: de una web, un teléfono o un texto, con los colores que quieras (comprobado con un lector
+    independiente).
+  - *Capa › Crear › Armonías de color…*: complementario, análogos, tríada, complementario dividido, tétrada y
+    monocromático a partir del color frontal, para usarlos o añadirlos a Muestras.
+  - Las plantillas usan fuentes de Google (Anton, Playfair Display, Montserrat) para verse igual en todos los dispositivos.
 - **Guía rápida** (`F1` o *Ayuda › Guía rápida*, también desde la pantalla de inicio) y lista de atajos
   (`Alt+Mayús+Ctrl+K`).
 - **Pantallas pequeñas**: si las opciones de una herramienta no caben en la barra, las últimas pasan a «Más ▾».

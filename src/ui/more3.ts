@@ -155,10 +155,10 @@ const loadTS = (): TStyle[] => { try { const v = JSON.parse(localStorage.getItem
 const saveTS = (l: TStyle[]) => { try { localStorage.setItem(TS_KEY, JSON.stringify(l)); } catch { /* */ } };
 const BUILTIN_TS: TStyle[] = [
   { name: 'Título', props: { font: 'Arial', size: 72, bold: true, tracking: -20, lineHeight: 1.05 } },
-  { name: 'Subtítulo', props: { font: 'Georgia', size: 36, italic: true, bold: false, lineHeight: 1.2 } },
+  { name: 'Subtítulo', props: { font: 'Playfair Display', size: 36, italic: true, bold: false, lineHeight: 1.2 } },
   { name: 'Texto normal', props: { font: 'Arial', size: 18, bold: false, italic: false, tracking: 0, lineHeight: 1.45 } },
   { name: 'Pie de foto', props: { font: 'Arial', size: 13, italic: true, color: '#666666', lineHeight: 1.3 } },
-  { name: 'Cartel', props: { font: 'Impact', size: 96, caps: true, tracking: 40, lineHeight: 1 } },
+  { name: 'Cartel', props: { font: 'Anton', size: 96, caps: true, tracking: 40, lineHeight: 1 } },
 ];
 export function textStylesDialog() {
   const d = app.doc;

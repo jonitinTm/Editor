@@ -106,7 +106,7 @@ export function openSearch() {
   render(); setTimeout(() => input.focus(), 30);
 }
 /** Lo que se ofrece antes de escribir nada. */
-const QUICK = ['open', 'new', 'removeBg', 'filter:develop', 'social', 'export', 'tool:text', 'tool:crop', 'tool:remove', 'imageSize'];
+const QUICK = ['templates', 'open', 'new', 'removeBg', 'filter:develop', 'social', 'export', 'tool:text', 'tool:crop', 'tool:remove', 'imageSize'];
 
 // ---- Tareas rápidas ----------------------------------------------------------------------------------------
 type Task = { label: string; ic: string; desc: string; run: () => void | Promise<void>; needDoc?: boolean };
@@ -114,12 +114,15 @@ const act = (id: string) => () => actionById.get(id)?.run();
 const tool = (id: string, hint: string) => () => { app.setTool(id); app.toast(hint); };
 export const TASKS: Task[] = [
   { label: 'Abrir una foto', ic: 'folder', desc: 'Desde tu equipo o el móvil', run: act('open') },
+  { label: 'Usar una plantilla', ic: 'comps', desc: 'Posts, historias, invitaciones…', run: act('templates') },
+  { label: 'Hacer un collage', ic: 'swatches', desc: 'Varias fotos juntas', run: act('collage') },
   { label: 'Mejorar la foto', ic: 'magic', desc: 'Luz y color automáticos', needDoc: true, run: () => autoEnhance() },
   { label: 'Quitar el fondo', ic: 'removeBg', desc: 'Deja solo a la persona u objeto', needDoc: true, run: act('removeBg') },
   { label: 'Borrar algo', ic: 'remove', desc: 'Pinta encima y desaparece', needDoc: true, run: tool('remove', 'Pinta sobre lo que quieras borrar y suelta') },
   { label: 'Recortar', ic: 'crop', desc: 'Encuadra o cambia la proporción', needDoc: true, run: tool('crop', 'Arrastra los bordes del marco y pulsa ✓ (o Intro)') },
   { label: 'Para redes', ic: 'share', desc: 'Instagram, historias, YouTube…', needDoc: true, run: act('social') },
   { label: 'Añadir texto', ic: 'text', desc: 'Toca donde quieras escribir', needDoc: true, run: tool('text', 'Toca o haz clic donde quieras escribir') },
+  { label: 'Efectos de texto', ic: 'fx', desc: 'Neón, 3D, dorado…', needDoc: true, run: act('textFx') },
   { label: 'Desenfocar el fondo', ic: 'drop', desc: 'Efecto retrato', needDoc: true, run: () => blurBackground() },
   { label: 'Blanco y negro', ic: 'contrast', desc: 'Con ajuste de cada color', needDoc: true, run: act('filter:bw') },
   { label: 'Enderezar', ic: 'ruler', desc: 'Si la foto salió torcida', needDoc: true, run: act('autoStraighten') },

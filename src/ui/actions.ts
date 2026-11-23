@@ -11,6 +11,7 @@ import * as s3d from './shadow3d';
 import * as more from './more';
 import * as more2 from './more2';
 import * as more3 from './more3';
+import * as cr from './create';
 
 import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
@@ -241,6 +242,13 @@ export const ACTIONS: Action[] = [
   { id: 'blurBg', label: 'Desenfocar el fondo (efecto retrato)', enabled: hasLayer, run: () => { import('./easy').then(m => m.blurBackground()); } },
   { id: 'tour', label: 'Ver la guía de bienvenida', run: () => { import('./easy').then(m => m.startTour()); } },
   { id: 'perspWarp', label: 'Deformación de perspectiva', enabled: hasLayer, run: () => app.setTool('perspWarp', true) },
+  { id: 'templates', label: 'Plantillas…', run: cr.templatesDialog },
+  { id: 'collage', label: 'Collage…', run: cr.collageDialog },
+  { id: 'framePhoto', label: 'Poner una foto en el marco', enabled: hasDoc, run: () => { cr.photoIntoFrame(); } },
+  { id: 'textFx', label: 'Efectos de texto…', enabled: hasLayer, run: cr.textEffectsDialog },
+  { id: 'genBg', label: 'Fondos generativos…', run: cr.backgroundDialog },
+  { id: 'qr', label: 'Código QR…', enabled: hasDoc, run: cr.qrDialog },
+  { id: 'harmony', label: 'Armonías de color…', run: cr.harmonyDialog },
   { id: 'textInShape', label: 'Texto dentro de la forma', enabled: hasLayer, run: () => { more3.textInShape(); } },
   { id: 'vanishing', label: 'Punto de fuga (pegar en perspectiva)…', enabled: hasLayer, run: more3.vanishingDialog },
   { id: 'pathBlur', label: 'Desenfoque de trazado…', enabled: hasLayer, run: more3.pathBlurDialog },
