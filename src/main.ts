@@ -14,6 +14,7 @@ import { buildOptionsBar } from './ui/optionsbar';
 import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel, buildColorPanel, buildSwatchesPanel } from './ui/panels';
 import { ACTIONS } from './ui/actions';
 import * as ops from './ui/ops';
+import { buildAdjustmentsPanel } from './ui/adjpanel';
 import { dialogOpen } from './ui/dialog';
 import { newDocumentDialog, quickGuideDialog, recentGrid } from './ui/dialogs';
 import { keyString } from './ui/keys';
@@ -129,7 +130,7 @@ function tabGroup(parent: HTMLElement, id: string, tabs: [string, (el: HTMLEleme
   parent.append(group);
   return group;
 }
-tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel], ['Estilos', buildStylesPanel]]);
+tabGroup(sideTop, 'color', [['Color', buildColorPanel], ['Ajustes', buildAdjustmentsPanel], ['Muestras', buildSwatchesPanel], ['Pinceles', buildBrushesPanel], ['Estilos', buildStylesPanel]]);
 tabGroup(sideTop, 'props', [['Propiedades', buildPropertiesPanel], ['Historial', buildHistoryPanel], ['Navegador', buildNavigatorPanel], ['Histograma', buildHistogramPanel], ['Info', buildInfoPanel], ['Carácter', buildCharacterPanel], ['Párrafo', buildParagraphPanel]]);
 tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildChannelsPanel], ['Trazados', buildPathsPanel], ['Composiciones', buildCompsPanel], ['Acciones', buildActionsPanel]]);
 
@@ -137,7 +138,7 @@ tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildCh
 {
   const ENTRIES: [string, string, number, string][] = [
     ['Capas', 'layers', 0, 'layers'], ['Color', 'color', 0, 'colorPanel'], ['Propiedades', 'props', 0, 'props'], ['Historial', 'props', 1, 'history'],
-    ['Muestras', 'color', 1, 'swatches'], ['Pinceles', 'color', 2, 'brush'], ['Estilos', 'color', 3, 'fx'], ['Carácter', 'props', 5, 'text'], ['Párrafo', 'props', 6, 'text'],
+    ['Ajustes', 'color', 1, 'contrast'], ['Muestras', 'color', 2, 'swatches'], ['Pinceles', 'color', 3, 'brush'], ['Estilos', 'color', 4, 'fx'], ['Carácter', 'props', 5, 'text'], ['Párrafo', 'props', 6, 'text'],
     ['Canales', 'layers', 1, 'channels'], ['Trazados', 'layers', 2, 'pen'], ['Navegador', 'props', 2, 'zoom'], ['Histograma', 'props', 3, 'histogram'], ['Info', 'props', 4, 'info'],
     ['Composiciones', 'layers', 3, 'comps'], ['Acciones', 'layers', 4, 'actions'],
   ];
