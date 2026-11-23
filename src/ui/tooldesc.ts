@@ -4,6 +4,7 @@ export const TOOL_DESC: Record<string, string> = {
   move: 'Mueve capas o lo seleccionado', artboardTool: 'Crea mesas de trabajo (diseños de varios tamaños)',
   marqueeRect: 'Selecciona un rectángulo', marqueeEllipse: 'Selecciona un óvalo o círculo', marqueeRow: 'Selecciona una fila de 1 píxel', marqueeCol: 'Selecciona una columna de 1 píxel',
   lasso: 'Selecciona dibujando a mano alzada', polyLasso: 'Selecciona con líneas rectas, clic a clic', magLasso: 'Selecciona siguiendo los bordes solo',
+  aiSel: 'Toca un objeto y la IA lo selecciona entero',
   objectSel: 'Rodea un objeto y lo selecciona solo', quickSel: 'Pinta sobre algo para seleccionarlo', wand: 'Selecciona zonas del mismo color con un clic',
   crop: 'Recorta la imagen (o ajusta su proporción)', perspCrop: 'Recorta y endereza algo fotografiado de lado', slice: 'Divide un diseño en trozos para la web', frame: 'Hueco donde colocar fotos que se recortan solas',
   eyedropper: 'Toma un color de la imagen', colorSampler: 'Fija puntos para vigilar su color', ruler: 'Mide distancias y ángulos; endereza', note: 'Pega notas de texto sobre la imagen', count: 'Numera y cuenta objetos',

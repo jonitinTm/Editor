@@ -10,7 +10,7 @@ import type { Tool } from '../tools/tool';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
-  ['move', 'artboardTool'], ['marqueeRect', 'marqueeEllipse', 'marqueeRow', 'marqueeCol'], ['lasso', 'polyLasso', 'magLasso'], ['objectSel', 'quickSel', 'wand'], ['crop', 'perspCrop', 'slice'], ['frame'], ['eyedropper', 'colorSampler', 'ruler', 'note', 'count'],
+  ['move', 'artboardTool'], ['marqueeRect', 'marqueeEllipse', 'marqueeRow', 'marqueeCol'], ['lasso', 'polyLasso', 'magLasso'], ['objectSel', 'aiSel', 'quickSel', 'wand'], ['crop', 'perspCrop', 'slice'], ['frame'], ['eyedropper', 'colorSampler', 'ruler', 'note', 'count'],
   ['spotHeal', 'remove', 'heal', 'patch', 'contentMove', 'redEye'], ['clone', 'patternStamp'], ['historyBrush', 'artHistory'], ['brush', 'pencil', 'colorReplace', 'mixer'], ['eraser', 'bgEraser', 'magicEraser'], ['gradient', 'bucket'], ['blurTool', 'sharpenTool', 'smudge'], ['dodge', 'burn', 'sponge'], ['text', 'textV', 'typeMaskV', 'typeMask'], ['pen', 'freePen', 'curvPen', 'addAnchor', 'delAnchor', 'convertPoint'], ['pathSelect', 'node'], ['shape'], ['hand', 'rotateView'], ['zoom'],
 ];
 

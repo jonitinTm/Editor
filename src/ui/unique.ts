@@ -170,7 +170,7 @@ export function timelapseDialog() {
     } });
 }
 /** Graba unos cuadros como vídeo con el grabador del navegador (WebM; MP4 en Safari). */
-async function recordFrames(frames: { canvas: HTMLCanvasElement; delay: number }[], base: string) {
+export async function recordFrames(frames: { canvas: HTMLCanvasElement; delay: number }[], base: string) {
   const mime = typeof MediaRecorder === 'undefined' ? null : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4;codecs=avc1', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m));
   const c = makeCanvas(frames[0].canvas.width, frames[0].canvas.height), x = ctx2d(c);
   if (!mime || typeof (c as any).captureStream !== 'function') { app.toast('Este navegador no graba vídeo: usa GIF', 'warn'); return; }

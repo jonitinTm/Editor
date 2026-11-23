@@ -12,6 +12,7 @@ import * as more from './more';
 import * as more2 from './more2';
 import * as more3 from './more3';
 import * as cr from './create';
+import * as ai from '../ai/aitools';
 
 import { FILTERS } from '../filters/registry';
 import { quickTransform, TransformTool } from '../tools/transform';
@@ -242,6 +243,13 @@ export const ACTIONS: Action[] = [
   { id: 'blurBg', label: 'Desenfocar el fondo (efecto retrato)', enabled: hasLayer, run: () => { import('./easy').then(m => m.blurBackground()); } },
   { id: 'tour', label: 'Ver la guía de bienvenida', run: () => { import('./easy').then(m => m.startTour()); } },
   { id: 'perspWarp', label: 'Deformación de perspectiva', enabled: hasLayer, run: () => app.setTool('perspWarp', true) },
+  { id: 'aiRemoveBg', label: 'Quitar fondo (IA)', enabled: hasLayer, run: () => { ai.aiRemoveBackground(); } },
+  { id: 'aiSubject', label: 'Seleccionar sujeto (IA)', enabled: hasDoc, run: () => { ai.aiSelectSubject(); } },
+  { id: 'aiSelTool', label: 'Seleccionar objeto con un clic (IA)', enabled: hasDoc, run: () => app.setTool('aiSel') },
+  { id: 'aiDepthBlur', label: 'Desenfoque por profundidad (IA)…', enabled: hasLayer, run: () => { ai.depthBlurDialog(); } },
+  { id: 'aiPhoto3d', label: 'Foto 3D animada (IA)…', enabled: hasDoc, run: () => { ai.photo3DDialog(); } },
+  { id: 'aiDepthLayer', label: 'Mapa de profundidad (IA)', enabled: hasDoc, run: () => { ai.depthLayer(); } },
+  { id: 'aiUpscale', label: 'Ampliar con IA (×2 / ×4)…', enabled: hasDoc, run: () => { ai.upscaleDialog(); } },
   { id: 'templates', label: 'Plantillas…', run: cr.templatesDialog },
   { id: 'collage', label: 'Collage…', run: cr.collageDialog },
   { id: 'framePhoto', label: 'Poner una foto en el marco', enabled: hasDoc, run: () => { cr.photoIntoFrame(); } },

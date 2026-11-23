@@ -2,6 +2,7 @@
 
 Editor de imágenes por capas que funciona en el navegador, con la interfaz en español.
 **Todo ocurre en tu equipo**: las imágenes no se suben a ningún servidor y funciona sin conexión a internet.
+(Las herramientas de IA descargan su modelo la primera vez que se usan; después también funcionan sin conexión.)
 
 ## Abrirlo en la web
 
@@ -500,6 +501,27 @@ Ya disponible:
 
 Pendiente: revelado de CR3, ORF, RW2 y RAF, y en PSD los efectos y ajustes que aún no existen en el editor (biselado, motivos, mapa de degradado…).
 
+### Inteligencia artificial (menú *IA*)
+
+Funciona **en el propio dispositivo**: la imagen nunca se envía a ningún sitio. La app no pesa más: cada modelo se
+descarga solo la primera vez que se usa (se pide permiso antes, indicando el tamaño) y queda guardado en el navegador.
+Usa la tarjeta gráfica (WebGPU) si está disponible y, si no, el procesador; el cálculo va en un hilo aparte para que la
+ventana no se congele. Todos los modelos tienen licencia que permite el uso comercial (Apache 2.0 / MIT).
+
+| Función | Qué hace | Modelo | Descarga |
+|---|---|---|---|
+| Quitar fondo (IA) | Deja solo el objeto o la persona, con una máscara editable | ORMBG | 44 MB |
+| Seleccionar sujeto (IA) | Selecciona el objeto principal | ORMBG | (el mismo) |
+| Selección con IA (herramienta, `W`) | Toca un objeto y se selecciona entero; más toques añaden partes, `Alt` las quita | SlimSAM | 14 MB |
+| Desenfoque por profundidad | Efecto retrato: toca lo que quieres nítido y el resto se desenfoca según la distancia | Depth Anything v2 | 27 MB |
+| Foto 3D animada | La foto cobra volumen con un movimiento de cámara (GIF o vídeo) | Depth Anything v2 | (el mismo) |
+| Mapa de profundidad | Capa en grises: blanco = cerca, negro = lejos | Depth Anything v2 | (el mismo) |
+| Ampliar con IA ×2 / ×4 | Hace la imagen más grande sin que se vea borrosa (se abre como documento nuevo) | Swin2SR | 6 / 21 MB |
+
+Tiempos medidos con un procesador normal, sin tarjeta gráfica, en una foto de 640 × 480: quitar fondo ≈ 18 s la
+primera vez (incluida la descarga), seleccionar con un toque ≈ 14 s el primero y menos de 1 s los siguientes,
+profundidad ≈ 10 s. Con tarjeta gráfica es bastante más rápido.
+
 ### Atajos principales
 
 `V` mover · `M` marcos (Mayús+M alterna) · `L` lazo · `W` varita · `C` recortar · `I` cuentagotas · `S` tampón ·
@@ -534,6 +556,7 @@ src/
   tools/     una clase por herramienta (interfaz común en tool.ts)
   filters/   ajustes y filtros (funciones puras sobre ImageData) y su catálogo
   io/        abrir, exportar y formato de proyecto .edp
+  ai/        IA en el dispositivo: aicore.ts (modelos, sin interfaz), aiworker.ts (hilo), ai.ts y aitools.ts (interfaz)
   ui/        interfaz: menús, paneles, diálogos, visor, acciones y atajos
 ```
 

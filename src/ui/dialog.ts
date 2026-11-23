@@ -49,7 +49,8 @@ export function showDialog(o: DialogOptions) {
     const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   });
-  setTimeout(() => (form.querySelector('input:not([type=range]):not([type=checkbox]), select') as HTMLElement | null)?.focus(), 0);
+  // en pantallas táctiles no se enfoca nada: abriría el teclado y taparía medio cuadro
+  if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => (form.querySelector('input:not([type=range]):not([type=checkbox]), select') as HTMLElement | null)?.focus(), 0);
   return { close, form };
 }
 

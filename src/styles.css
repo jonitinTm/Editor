@@ -698,3 +698,14 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
 .harm-row b { grid-area: n; font-size: 13px; } .harm-row .btn { grid-area: b; }
 .harm-sw { grid-area: s; display: flex; height: 34px; border-radius: 6px; overflow: hidden; }
 .harm-c { flex: 1; border: 0; cursor: pointer; }
+
+/* Progreso de la IA */
+.ai-prog { position: fixed; left: 50%; bottom: 56px; transform: translateX(-50%); z-index: 470; display: flex; gap: 12px; align-items: center; background: var(--panel); border: 1px solid var(--accent); border-radius: 10px; padding: 12px 16px; box-shadow: 0 12px 36px rgba(0,0,0,.55); width: min(460px, calc(100vw - 24px)); }
+.ai-spin { width: 22px; height: 22px; border: 3px solid rgba(61,139,253,.25); border-top-color: var(--accent); border-radius: 50%; animation: aispin .8s linear infinite; flex-shrink: 0; }
+@keyframes aispin { to { transform: rotate(360deg); } }
+.ai-body { flex: 1; min-width: 0; } .ai-txt { font-size: 13px; margin-bottom: 6px; }
+.ai-bar { height: 6px; background: rgba(255,255,255,.1); border-radius: 3px; overflow: hidden; }
+.ai-bar-in { height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+.ai-bar-in.indet { width: 40% !important; animation: aiindet 1.2s ease-in-out infinite; }
+@keyframes aiindet { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
+@media (max-width: 700px) { .ai-prog { bottom: auto; top: 76px; } }
