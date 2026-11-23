@@ -11,7 +11,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
   if (group === 'ajuste') return list.map(f => 'filter:' + f.id);
   const subs = new Map<string, Item[]>();
   for (const f of list) { if (!f.submenu) continue; const k = f.submenu; if (!subs.has(k)) subs.set(k, []); subs.get(k)!.push('filter:' + f.id); }
-  const order = ['Artístico', 'Bosquejar', 'Desenfocar', 'Galería de desenfoque', 'Distorsionar', 'Enfocar', 'Estilizar', 'Interpretar', 'Pixelizar', 'Ruido', 'Textura', '3D', 'Vídeo', 'Otro'];
+  const order = ['Artístico', 'Trazos de pincel', 'Bosquejar', 'Desenfocar', 'Galería de desenfoque', 'Distorsionar', 'Enfocar', 'Estilizar', 'Interpretar', 'Pixelizar', 'Ruido', 'Textura', '3D', 'Vídeo', 'Otro'];
   return [...subs].sort((x, y) => order.indexOf(x[0]) - order.indexOf(y[0])).map(([label, items]) => ({ label, items }));
 };
 

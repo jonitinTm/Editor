@@ -728,3 +728,5 @@ button.opt-tool .caret { font-size: 9px; opacity: .7; }
   .swipe-arrow { position: absolute; left: 0; top: 0; font-size: 22px; color: var(--accent); }
   @keyframes swipe { 0% { right: 0; opacity: 0; } 15% { opacity: .9; } 80% { right: 70%; opacity: .9; } 100% { right: 75%; opacity: 0; } }
 }
+
+.license-text { white-space: pre-wrap; font-size: 11px; max-height: 45vh; overflow: auto; background: var(--panel-2); padding: 10px; border-radius: 6px; }

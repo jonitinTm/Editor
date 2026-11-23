@@ -18,7 +18,7 @@ CAPAS COMO EN LOS PROGRAMAS PROFESIONALES
 HERRAMIENTAS
 • Pinceles, borrador, tampón, pincel corrector, borrar objetos, degradados, formas, pluma y texto con tipografías.
 • Selección rápida, varita mágica, lazos, seleccionar sujeto y cielo.
-• Más de cien filtros y ajustes: curvas, niveles, tono/saturación, revelado tipo cámara, desenfoques, efectos artísticos…
+• 140 filtros y ajustes: curvas, niveles, tono/saturación, revelado tipo cámara, desenfoques, efectos artísticos…
 
 INTELIGENCIA ARTIFICIAL EN TU DISPOSITIVO
 • Quitar el fondo con un toque.

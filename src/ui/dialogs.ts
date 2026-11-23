@@ -732,10 +732,18 @@ export function aboutDialog() {
       h('p', {}, h('b', {}, 'Editor'), ' — editor de imágenes por capas que funciona en tu navegador.'),
       h('p', {}, 'Todo se procesa en tu equipo: tus imágenes no se envían a ningún servidor.'),
       h('p', {}, 'Funciona sin conexión una vez abierto y se puede instalar como aplicación desde el navegador.'),
-      h('p', {}, h('a', { href: './privacidad.html', target: '_blank', rel: 'noopener' }, 'Política de privacidad')),
+      h('p', {}, h('a', { href: './privacidad.html', target: '_blank', rel: 'noopener' }, 'Política de privacidad'), ' · ', h('a', { href: '#', onclick: (e: Event) => { e.preventDefault(); thirdPartyDialog(); } }, 'Licencias de terceros')),
       h('p', { class: 'hint' }, `Versión 1.0 · ${typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : ''}`),
     ],
   });
+}
+/** Avisos de las licencias del código de otros proyectos incluido en la app. */
+export async function thirdPartyDialog() {
+  const { default: vc } = await import('../../LICENSES/vectorcraft-MIT.txt?raw');
+  showDialog({ title: 'Licencias de terceros', cancelLabel: null, okLabel: 'Cerrar', width: 520,
+    body: [h('p', {}, 'Los filtros de la galería «Artístico», «Trazos de pincel», «Bosquejar» y parte de «Textura» y «Distorsionar» están adaptados de ',
+      h('a', { href: 'https://github.com/storytold/vectorcraft', target: '_blank', rel: 'noopener' }, 'VectorCraft'), ', con licencia MIT:'),
+      h('pre', { class: 'license-text' }, vc)] });
 }
 /** Resumen de privacidad dentro de la app (la política completa está en privacidad.html). */
 export function privacyDialog() {
@@ -1253,7 +1261,7 @@ export function duplicateToDialog() {
 export async function filterGalleryDialog() {
   const d = app.doc; if (!d) return;
   const { FILTERS } = await import('../filters/registry');
-  const groups = ['Artístico', 'Bosquejar', 'Textura', 'Estilizar'];
+  const groups = ['Artístico', 'Trazos de pincel', 'Bosquejar', 'Textura', 'Distorsionar', 'Estilizar'];
   const list = FILTERS.filter(f => f.group === 'filtro' && f.inMenu !== false && groups.includes(f.submenu ?? ''));
   // vista previa pequeña: el centro de la capa activa (o de la imagen combinada)
   const src = d.activeRaster()?.canvas ?? d.getComposite(), side = 150;

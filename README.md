@@ -357,8 +357,21 @@ Ya disponible:
   *Textura* (Cuarteado, Texturizador —lienzo, arpillera, ladrillo, arenisca—, Vidriera), *Pixelizar › Grabado*,
   *Desenfocar › Desenfoque inteligente*, *Distorsionar › Cizalla* y *Ruido › Destramar*. Todos con vista previa, como
   capa de ajuste/filtro inteligente y deshacer.
-- **Filtro › Galería de filtros…**: miniaturas de tu imagen con cada efecto artístico, de boceto, de textura y de
-  estilizar; clic en uno para ajustarlo y aplicarlo.
+- **Filtro › Galería de filtros…**: miniaturas de tu imagen con cada efecto artístico, de trazos de pincel, de boceto,
+  de textura, de distorsión y de estilizar; clic en uno para ajustarlo y aplicarlo.
+- **La galería de filtros clásica, completa (35 filtros más)**, con los mismos controles y valores iniciales que la de
+  Photoshop:
+  - *Artístico*: Lápiz de color, Pincel seco, Fresco, Manchas de pintura, Espátula, Envoltura plástica, Pastel grueso,
+    Barra difuminada, Esponja y Pintura base.
+  - *Trazos de pincel* (submenú nuevo): Bordes acentuados, Trazos en ángulo, Sombreado cruzado, Trazos oscuros,
+    Salpicadura, Trazos pulverizados y Sumi-e.
+  - *Bosquejar*: Bajorrelieve, Cromo, Carboncillo, Creta, Pluma gráfica, Trama de semitonos, Papel de notas, Fotocopia,
+    Yeso, Reticulación, Bordes rasgados y Papel húmedo.
+  - *Distorsionar*: Resplandor difuso y Ondas oceánicas. *Textura*: Granulado (10 tipos), Teselas de mosaico y Retazos.
+    *Vídeo*: Colores NTSC.
+
+  Sus algoritmos están adaptados de [VectorCraft](https://github.com/storytold/vectorcraft) (licencia MIT; el aviso
+  está en `LICENSES/vectorcraft-MIT.txt` y en *Ayuda › Acerca de › Licencias de terceros*).
 - **Ajustes nuevos**: *Duotono* (monotono, duotono o tritono con las tintas y el papel que elijas), *Mapa de bits* (solo
   blanco y negro: umbral, tramado de motivo, difusión o trama de semitonos) y *Tonos HDR* (realce local de detalle, con
   radio, intensidad, gamma, exposición, sombras, iluminaciones y saturación).
