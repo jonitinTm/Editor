@@ -387,6 +387,16 @@ Ya disponible:
   con la ventana del ajuste), recortar a la capa de debajo, ver sin el ajuste manteniendo pulsado el ojo, restablecer
   y eliminar. Al elegir una capa de ajuste, el panel va directo a sus controles.
 
+- **Imagen › Calco de imagen**: convierte fotos, logotipos o dibujos en formas vectoriales (una capa por color, con
+  huecos), con ajustes para logotipo, blanco y negro, boceto, grises, póster y foto; y «Guardar SVG».
+- **Abrir SVG como vectores**: cada forma del SVG (trazados, rectángulos, círculos, polígonos…, con sus transformaciones
+  y huecos) es una capa vectorial editable; los trazos, formas con trazo. Se ve igual que en el navegador.
+- **Capa › Combinar formas › Efectos de trazado**: fruncir y engordar, hacer rugoso, zigzag, retorcer, redondear
+  esquinas y desplazar trazado, sobre formas y máscaras vectoriales; el resultado sigue siendo vectorial.
+- **IA**: *Quitar fondo* y *Seleccionar sujeto* con bordes ajustados a la foto (filtro guiado) y sin halo del color del
+  fondo (descontaminar colores); *Iluminación con IA* (pon una luz con un toque: relieve a partir de la profundidad);
+  *Niebla por profundidad*; *Seleccionar cielo (IA)*. Sin descargas nuevas: usan los modelos de profundidad y de fondo.
+
   Sus algoritmos están adaptados de [VectorCraft](https://github.com/storytold/vectorcraft) (licencia MIT; el aviso
   está en `LICENSES/vectorcraft-MIT.txt` y en *Ayuda › Acerca de › Licencias de terceros*).
 - **Ajustes nuevos**: *Duotono* (monotono, duotono o tritono con las tintas y el papel que elijas), *Mapa de bits* (solo

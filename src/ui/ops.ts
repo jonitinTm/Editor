@@ -52,6 +52,12 @@ export async function openFiles(files: File[], asLayers = false, remember = true
     const before = app.docs.length;
     try {
       if (io.isProjectFile(f)) { app.addDocument(await io.openProject(f)); continue; }
+      // SVG: como capas vectoriales editables (si no tiene formas que convertir, se abre como imagen)
+      if (!asLayers && (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name))) {
+        const { openSvgAsVectors } = await import('../io/svgimport');
+        const r = await openSvgAsVectors(await f.text(), io.baseName(f.name)).catch(() => null);
+        if (r) { app.addDocument(r.doc); app.toast(`SVG abierto como ${r.count} capa${r.count > 1 ? 's' : ''} vectorial${r.count > 1 ? 'es' : ''}` + (r.skipped ? ` (${r.skipped} elemento${r.skipped > 1 ? 's' : ''} sin convertir: textos o imágenes)` : '')); continue; }
+      }
       if (io.isPsdFile(f)) {
         const { doc: pd, warnings } = await readPsd(await f.arrayBuffer(), io.baseName(f.name));
         const host = app.doc;
