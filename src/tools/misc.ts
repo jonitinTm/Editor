@@ -125,6 +125,7 @@ export class GradientTool implements Tool {
     this.a = { x: e.x, y: e.y }; this.b = { ...this.a };
   }
   private gbuf: HTMLCanvasElement | null = null;
+  private baseSmall: HTMLCanvasElement | null = null;
   /** `quick`: vista previa mientras se arrastra (a menos resolución y sin tramado, para que vaya fluido). */
   private render(quick = false) {
     const t = this.t!, doc = app.doc!;
@@ -162,17 +163,12 @@ export class GradientTool implements Tool {
     if (quick) {
       const blend = (app.opt<string>('blendMode', this.id) || 'source-over') as GlobalCompositeOperation;
       if (!t.isMask && !clipMask(t) && !(t.lockAlpha && blend !== 'source-over')) {
-        // caso normal: un solo lienzo reutilizado = la capa + el degradado ampliado encima (2 dibujos por fotograma)
-        if (!this.gbuf || this.gbuf.width !== doc.width || this.gbuf.height !== doc.height) this.gbuf = makeCanvas(doc.width, doc.height);
+        // caso normal: la vista previa se hace al tamaño reducido del degradado (W×Hh) y se estira al mostrarla
+        if (!this.baseSmall || this.baseSmall.width !== W || this.baseSmall.height !== Hh) { this.baseSmall = makeCanvas(W, Hh); const bs = ctx2d(this.baseSmall); bs.imageSmoothingQuality = 'high'; bs.drawImage(this.base!, 0, 0, W, Hh); }
+        if (!this.gbuf || this.gbuf.width !== W || this.gbuf.height !== Hh) this.gbuf = makeCanvas(W, Hh);
         const bx = ctx2d(this.gbuf), op = app.opt<number>('opacity', this.id) / 100;
-        // degradado opaco al 100 %: lo tapa todo, así que no hace falta copiar antes la capa
-        const covers = op >= 1 && blend === 'source-over' && !t.lockAlpha && stops.every(x => x.a >= 1);
-        bx.imageSmoothingQuality = 'low';
-        if (covers) { bx.globalCompositeOperation = 'copy'; bx.drawImage(g, 0, 0, doc.width, doc.height); }
-        else {
-          bx.globalCompositeOperation = 'copy'; bx.drawImage(this.base!, 0, 0);
-          bx.globalAlpha = op; bx.globalCompositeOperation = t.lockAlpha ? 'source-atop' : blend; bx.drawImage(g, 0, 0, doc.width, doc.height);
-        }
+        bx.globalCompositeOperation = 'copy'; bx.drawImage(this.baseSmall, 0, 0);
+        bx.globalAlpha = op; bx.globalCompositeOperation = t.lockAlpha ? 'source-atop' : blend; bx.drawImage(g, 0, 0);
         bx.globalAlpha = 1; bx.globalCompositeOperation = 'source-over';
         return this.gbuf;
       }
@@ -230,7 +226,7 @@ export class GradientTool implements Tool {
     const moved = this.b && Math.hypot(this.b.x - this.a.x, this.b.y - this.a.y) > 1;
     cancelAnimationFrame(this.raf); this.raf = 0;
     if (moved) { setTargetCanvas(t, this.render(false)); app.doc!.commit('Degradado'); }
-    this.a = this.b = null; this.t = null; this.preview = null; this.base = null; this.gbuf = null;
+    this.a = this.b = null; this.t = null; this.preview = null; this.base = null; this.gbuf = null; this.baseSmall = null;
     app.doc!.invalidate();
   }
   cancel() { cancelAnimationFrame(this.raf); this.raf = 0; if (this.t) setPreview(this.t, null); this.gbuf = null; this.a = this.b = null; this.t = null; app.doc?.invalidate(); }

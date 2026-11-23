@@ -30,6 +30,7 @@ export function startCompare(what: 'first' | 'prev' = 'first') {
   const i = what === 'first' ? 0 : Math.max(0, d.history.index - 1);
   const before = stateComposite(d, i);
   if (!before) { app.toast('No hay un estado anterior con el que comparar', 'warn'); return; }
+  if (d.history.index === 0) app.toast('Aún no hay cambios: los dos lados se ven iguales. Edita la foto y vuelve a comparar.');
   cmp = { doc: d, before, split: cmp?.doc === d ? cmp.split : 0.5, label: what === 'first' ? 'Original' : 'Paso anterior' };
   ensureHandle(); app.viewport.requestRender(); app.emit('view');
 }

@@ -72,8 +72,13 @@ function clipTo(ctx: CanvasRenderingContext2D, opts: CompositeOptions) {
 
 /** Contenido de una capa (con su máscara aplicada) sin opacidad ni modo de fusión. */
 function layerSurface(layer: Layer, w: number, h: number, opts: CompositeOptions): { canvas: HTMLCanvasElement; off: { x: number; y: number }; temp: HTMLCanvasElement | null } {
-  const ov = opts.overrides?.get(layer);
+  let ov = opts.overrides?.get(layer);
   const mask = effectiveMask(layer, ov?.mask ?? (layer.mask?.enabled ? layer.mask.canvas : null), w, h, ov?.vmOffset);
+  // vista previa a tamaño reducido (p. ej. del degradado mientras se arrastra): se estira al tamaño del documento
+  if (ov?.canvas && (ov.canvas.width !== w || ov.canvas.height !== h) && isRaster(layer) && !ov.offset) {
+    const big = borrowCanvas(w, h), bx = ctx2d(big); bx.imageSmoothingQuality = 'low'; bx.drawImage(ov.canvas, 0, 0, w, h);
+    ov = { ...ov, canvas: big };
+  }
   if (isRaster(layer) && !mask && !ov?.extra) return { canvas: ov?.canvas ?? layer.canvas, off: ov?.offset ?? { x: 0, y: 0 }, temp: null };
   // Sin estilos, todo lo que se dibuje queda recortado a la zona: basta con vaciar esa zona
   const temp = borrowCanvas(w, h, hasStyles(layer.styles) ? null : opts.rect);

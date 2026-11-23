@@ -1,7 +1,7 @@
 // Documento: tamaño, árbol de capas, selección, guías, historial y vista.
 
 import { makeCanvas, ctx2d, Rect } from './canvas';
-import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric , blendIfActive } from './layers';
+import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric , blendIfActive, hasStyles } from './layers';
 import { Selection } from './selection';
 import { History } from './history';
 import { renderComposite, compositeGroup, LayerOverride } from './compositor';
@@ -170,19 +170,69 @@ export class EditorDocument {
     const sig = (x: Layer): string => x === skip ? 'X' : `${x.id}:${x.version}:${+x.visible}:${x.opacity}:${x.blendMode}:${+x.clip}:${x.mask ? x.mask.version + '' + +x.mask.enabled : ''}:${x.styles ? JSON.stringify(x.styles) : ''}:${x.kind === 'adjust' ? JSON.stringify((x as any).params) : ''}` + (x instanceof GroupLayer ? '(' + x.children.map(sig).join(',') + ')' : '');
     return `${this.width}x${this.height}|` + this.root.children.map(sig).join(',');
   }
+  private buildIcache(l: Layer, key: string) {
+    const ch = this.root.children, i = ch.indexOf(l);
+    const below = makeCanvas(this.width, this.height), above = makeCanvas(this.width, this.height);
+    renderComposite({ children: ch.slice(0, i) } as GroupLayer, below, {});
+    renderComposite({ children: ch.slice(i + 1) } as GroupLayer, above, {});
+    this.icache = { key, layer: l, below, above }; this.pcache = null;
+  }
+  private pcache: { key: string; s: number; below: HTMLCanvasElement; above: HTMLCanvasElement } | null = null;
+  /** Mientras se arrastra algo que cambia toda la imagen (mover una capa, degradado…), una vista previa ya reducida a la
+   *  escala de la pantalla `s` (< 1): mucho menos trabajo por fotograma que combinar a tamaño completo y luego reducir.
+   *  null si no se puede hacer de forma exacta (máscaras, estilos, modos de fusión…): entonces se combina como siempre. */
+  interactivePreview(s: number): HTMLCanvasElement | null {
+    const dirty = this.compositeDirty; if (!dirty || s >= 1) return null;
+    if (dirty !== true && dirty.w * dirty.h < this.width * this.height / 3) return null;
+    const l = this.interactionLayer();
+    if (!l || !isRaster(l) || l.mask || hasStyles(l.styles) || l.clip || (l.blendMode !== 'source-over' && l.blendMode !== 'pass-through')) return null;
+    const ov = this.overrides.get(l); if (!ov || ov.mask) return null;
+    const key = this.signature(l);
+    if (!this.icache || this.icache.layer !== l || this.icache.key !== key) this.buildIcache(l, key);
+    const W = Math.max(1, Math.ceil(this.width * s)), H = Math.max(1, Math.ceil(this.height * s));
+    if (!this.pcache || this.pcache.key !== key || this.pcache.s !== s) {
+      const shrink = (c: HTMLCanvasElement) => { const o = makeCanvas(W, H), x = ctx2d(o); x.imageSmoothingQuality = 'high'; x.drawImage(c, 0, 0, W, H); return o; };
+      this.pcache = { key, s, below: shrink(this.icache!.below), above: shrink(this.icache!.above) };
+    }
+    if (!this.pview || this.pview.width !== W || this.pview.height !== H) this.pview = makeCanvas(W, H);
+    const c = ctx2d(this.pview);
+    c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'copy'; c.drawImage(this.pcache.below, 0, 0); c.globalCompositeOperation = 'source-over';
+    if (l.visible) {
+      const lc = ov.canvas ?? (l as RasterLayer).canvas, dw = ov.canvas ? this.width : lc.width, dh = ov.canvas ? this.height : lc.height;
+      let src: HTMLCanvasElement | null = null;
+      if (ov.extra) {
+        // la capa y su «extra» (trazo, transformación…) en un lienzo propio a esta escala: así el extra solo afecta a la capa
+        if (!this.pextra || this.pextra.width !== W || this.pextra.height !== H) this.pextra = makeCanvas(W, H);
+        const e = ctx2d(this.pextra); e.setTransform(1, 0, 0, 1, 0, 0); e.globalAlpha = 1; e.globalCompositeOperation = 'source-over'; e.clearRect(0, 0, W, H);
+        e.setTransform(s, 0, 0, s, 0, 0); e.imageSmoothingQuality = 'low'; e.drawImage(lc, ov.offset?.x ?? 0, ov.offset?.y ?? 0, dw, dh);
+        ov.extra(e); e.setTransform(1, 0, 0, 1, 0, 0); src = this.pextra;
+      }
+      // al mover una capa su contenido no cambia: se reduce una vez y en cada fotograma solo se coloca
+      if (!src && !ov.canvas) {
+        const lk = `${l.id}:${l.version}:${s}`;
+        if (!this.player || this.player.key !== lk) { const sm = makeCanvas(Math.max(1, Math.ceil(lc.width * s)), Math.max(1, Math.ceil(lc.height * s))), x = ctx2d(sm); x.imageSmoothingQuality = 'high'; x.drawImage(lc, 0, 0, sm.width, sm.height); this.player = { key: lk, canvas: sm }; }
+      }
+      c.save(); c.globalAlpha = l.opacity * ((l as any).fillOpacity ?? 1); c.imageSmoothingQuality = 'low';
+      if (src) c.drawImage(src, 0, 0);
+      else if (!ov.canvas && this.player) c.drawImage(this.player.canvas, (ov.offset?.x ?? 0) * s, (ov.offset?.y ?? 0) * s);
+      else { c.setTransform(s, 0, 0, s, 0, 0); c.drawImage(lc, ov.offset?.x ?? 0, ov.offset?.y ?? 0, dw, dh); }
+      c.restore();
+    }
+    c.drawImage(this.pcache.above, 0, 0);
+    return this.pview;
+  }
+  private pview: HTMLCanvasElement | null = null;
+  private pextra: HTMLCanvasElement | null = null;
+  private player: { key: string; canvas: HTMLCanvasElement } | null = null;
   private renderWithCache(rect: Rect | null, allowBuild: boolean): boolean {
     const l = this.interactionLayer();
     if (!l) { this.icache = null; return false; }
     const key = this.signature(l);
     if (!this.icache || this.icache.layer !== l || this.icache.key !== key) {
       if (!allowBuild) return false;
-      const ch = this.root.children, i = ch.indexOf(l);
-      const below = makeCanvas(this.width, this.height), above = makeCanvas(this.width, this.height);
-      renderComposite({ children: ch.slice(0, i) } as GroupLayer, below, {});
-      renderComposite({ children: ch.slice(i + 1) } as GroupLayer, above, {});
-      this.icache = { key, layer: l, below, above };
+      this.buildIcache(l, key);
     }
-    const c = this.icache, ctx = ctx2d(this.composite);
+    const c = this.icache!, ctx = ctx2d(this.composite);
     ctx.save();
     if (rect) { ctx.beginPath(); ctx.rect(rect.x, rect.y, rect.w, rect.h); ctx.clip(); ctx.clearRect(rect.x, rect.y, rect.w, rect.h); }
     else ctx.clearRect(0, 0, this.width, this.height);

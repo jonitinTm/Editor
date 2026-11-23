@@ -263,13 +263,15 @@ export class Viewport {
     }
     ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(this.bgCache.canvas, 0, 0); ctx.restore();
 
-    // Imagen combinada
-    const comp = d.getComposite();
+    // Imagen combinada (mientras se arrastra algo que cambia toda la imagen, una vista previa ya reducida)
+    const eff = d.view.zoom * this.dpr; let ps = 1; while (ps / 2 >= eff && ps > 1 / 32) ps /= 2;
+    const quick = this.toolActive && ps < 1 ? d.interactivePreview(ps) : null;
     ctx.save();
     this.areaPath(ctx); ctx.clip();
     ctx.imageSmoothingEnabled = zoom < 1 || (rot !== 0 && zoom < 4);
     ctx.imageSmoothingQuality = 'high';
-    this.drawComposite(ctx, comp);
+    if (quick) { ctx.imageSmoothingQuality = 'low'; this.docTransform(ctx); ctx.drawImage(quick, 0, 0, quick.width / ps, quick.height / ps); }
+    else this.drawComposite(ctx, d.getComposite());
     // papel cebolla: el cuadro anterior de la animación, en transparencia
     const onion = (app as any).onionCanvas?.(d) as HTMLCanvasElement | null;
     if (onion) { ctx.save(); ctx.globalAlpha = 0.3; this.docTransform(ctx); ctx.drawImage(onion, 0, 0); ctx.restore(); }
@@ -310,7 +312,7 @@ export class Viewport {
       oc.globalCompositeOperation = 'copy';
       if (rp.mode === 'overlay') { oc.fillStyle = 'rgba(255,0,0,.5)'; oc.fillRect(0, 0, d.width, d.height); oc.globalCompositeOperation = 'destination-out'; oc.drawImage(rp.mask, 0, 0); }
       else {
-        oc.drawImage(comp, 0, 0); oc.globalCompositeOperation = 'destination-in'; oc.drawImage(rp.mask, 0, 0);
+        oc.drawImage(d.getComposite(), 0, 0); oc.globalCompositeOperation = 'destination-in'; oc.drawImage(rp.mask, 0, 0);
         if (rp.mode !== 'transparent') { oc.globalCompositeOperation = 'destination-over'; oc.fillStyle = rp.mode === 'black' ? '#000' : '#fff'; oc.fillRect(0, 0, d.width, d.height); }
         else { ctx.save(); this.docPath(ctx); ctx.clip(); ctx.fillStyle = this.checkerPattern(); ctx.fillRect(0, 0, this.width, this.height); ctx.restore(); }
       }
