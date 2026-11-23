@@ -23,7 +23,7 @@ export function showDialog(o: DialogOptions) {
   const okBtn = h('button', { class: 'btn primary', type: 'submit' }, o.okLabel ?? 'Aceptar');
   const cancelBtn = o.cancelLabel === null ? null : h('button', { class: 'btn', type: 'button' }, o.cancelLabel ?? 'Cancelar');
   const header = h('div', { class: 'modal-title' }, o.title);
-  const form = h('form', { class: 'modal', style: { width: (o.width ?? 380) + 'px' } },
+  const form = h('form', { class: 'modal', novalidate: true, style: { width: (o.width ?? 380) + 'px' } },
     header,
     h('div', { class: 'modal-body' }, ...(Array.isArray(o.body) ? o.body : [o.body])),
     h('div', { class: 'modal-buttons' }, ...(o.extraButtons ?? []), h('span', { style: { flex: '1' } }), cancelBtn, okBtn));

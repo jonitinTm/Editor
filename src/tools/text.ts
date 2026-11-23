@@ -183,7 +183,8 @@ export class TextTool implements Tool {
       ev.stopPropagation();
     });
     this.position();
-    setTimeout(() => { area.focus(); area.select(); }, 0);
+    // al entrar en un texto que ya existe, el cursor va al final: antes se seleccionaba todo y la primera tecla lo borraba
+    setTimeout(() => { area.focus(); const n = area.value.length; area.setSelectionRange(n, n); }, 0);
   }
 
   private position() {

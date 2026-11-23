@@ -37,7 +37,9 @@ export function numberSlider(opts: {
   const range = h('input', { type: 'range', min: opts.min, max: opts.max, step, value: String(opts.value) });
   const set = (v: number, from?: HTMLInputElement, silent = false) => {
     if (isNaN(v)) return;
-    v = Math.min(opts.max, Math.max(opts.min, v));
+    // se ajusta al paso del deslizador (si alguien escribe 70,5 donde solo valen enteros, queda 71)
+    v = Math.min(opts.max, Math.max(opts.min, Math.round((v - opts.min) / step) * step + opts.min));
+    v = +v.toFixed(6);
     if (from !== num) num.value = String(+v.toFixed(2));
     if (from !== range) range.value = String(v);
     if (!silent) opts.onInput(v);
