@@ -17,7 +17,11 @@ const docKey = () => { const d = app.doc!; return `${(d as any).__aiId ??= Math.
 // ---- Quitar fondo con IA -------------------------------------------------------------------------------------
 export async function aiRemoveBackground() {
   const d = app.doc, l = d?.active; if (!d || !l || !isRaster(l)) { app.toast('Elige la capa con la foto', 'warn'); return; }
-  const m = await aiSubjectMask((l as RasterLayer).canvas); if (!m) return;
+  const m0 = await aiSubjectMask((l as RasterLayer).canvas); if (!m0) return;
+  // bordes ajustados a la foto (pelo, pelusa) con el filtro guiado
+  const { refineMask, decontaminate } = await import('./aitools2'); const m = refineMask((l as RasterLayer).canvas, m0);
+  // sin halo del color del fondo en el borde (solo cambian los píxeles semitransparentes del borde)
+  if (!l.mask) { decontaminate((l as RasterLayer).canvas, m); (l as RasterLayer).touch(); }
   if (l.mask) { const mc = ctx2d(l.mask.canvas); mc.globalCompositeOperation = 'destination-in'; mc.drawImage(m, 0, 0); mc.globalCompositeOperation = 'source-over'; l.mask.enabled = true; l.mask.touch(); }
   else { const mk = new LayerMask(d.width, d.height, 'white'); mk.canvas = m; mk.touch(); l.mask = mk; }
   d.editMask = false; d.invalidate(); d.commit('Quitar fondo (IA)');
@@ -25,8 +29,9 @@ export async function aiRemoveBackground() {
 }
 export async function aiSelectSubject() {
   const d = app.doc; if (!d) return;
-  const m = await aiSubjectMask(d.getComposite()); if (!m) return;
-  d.selection.setMask(m); d.commit('Seleccionar sujeto (IA)');
+  const comp = d.getComposite(), m0 = await aiSubjectMask(comp); if (!m0) return;
+  const { refineMask } = await import('./aitools2');
+  d.selection.setMask(refineMask(comp, m0)); d.commit('Seleccionar sujeto (IA)');
 }
 
 // ---- Herramienta: seleccionar objeto con un clic -----------------------------------------------------------------
