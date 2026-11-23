@@ -2,21 +2,37 @@
 // (y plantillas para los textos con partes variables: «Capa {0}», «{0} × {1} px»…). Lo que se ve en pantalla se traduce
 // solo: menús, botones, ventanas, avisos y descripciones, también lo que se crea después (se vigila el documento).
 
-import en from './en.json';
+// Los textos van como cadenas (no como objetos): solo se interpreta el idioma elegido, así arranca igual de rápido.
+import KEYS_RAW from './data/keys.json?raw';
+import en from './data/en.json?raw';
+import fr from './data/fr.json?raw';
+import pt from './data/pt.json?raw';
+import it from './data/it.json?raw';
+import de from './data/de.json?raw';
+import ru from './data/ru.json?raw';
+import zh from './data/zh.json?raw';
+import ja from './data/ja.json?raw';
 
 type Dict = { s: Record<string, string>; t: [string, string][] };
-export const LANGS: [string, string][] = [['es', 'Español'], ['en', 'English']];
-const DICTS: Record<string, Dict> = { en: en as unknown as Dict };
+/** Idiomas disponibles, cada uno con su nombre en su propio idioma. */
+export const LANGS: [string, string][] = [['es', 'Español'], ['en', 'English'], ['fr', 'Français'], ['pt', 'Português'], ['it', 'Italiano'], ['de', 'Deutsch'], ['ru', 'Русский'], ['zh', '中文（简体）'], ['ja', '日本語']];
+const RAW: Record<string, string> = { en, fr, pt, it, de, ru, zh, ja };
+function loadDict(l: string): Dict | null {
+  const raw = RAW[l]; if (!raw) return null;
+  const keys = JSON.parse(KEYS_RAW) as string[], vals = JSON.parse(raw) as (string | null)[], d: Dict = { s: {}, t: [] };
+  keys.forEach((k, i) => { const v = vals[i]; if (!v) return; if (k.startsWith('T:')) d.t.push([k.slice(2), v]); else d.s[k] = v; });
+  return d;
+}
 const KEY = 'editor.lang';
 
 function pick(): string {
-  try { const v = localStorage.getItem(KEY); if (v && (v === 'es' || DICTS[v])) return v; } catch { /* sin almacenamiento */ }
+  try { const v = localStorage.getItem(KEY); if (v && (v === 'es' || RAW[v])) return v; } catch { /* sin almacenamiento */ }
   // primera vez: el idioma del navegador si lo tenemos; si no, inglés (el español solo si el navegador está en español)
-  for (const l of navigator.languages ?? [navigator.language]) { const c = (l || '').slice(0, 2).toLowerCase(); if (c === 'es' || DICTS[c]) return c; }
+  for (const l of navigator.languages ?? [navigator.language]) { const c = (l || '').slice(0, 2).toLowerCase(); if (c === 'es' || RAW[c]) return c; }
   return 'en';
 }
 export const lang = pick();
-const dict = DICTS[lang] ?? null;
+const dict = lang === 'es' ? null : loadDict(lang);
 
 /** Cambia el idioma (se recarga la página para rehacer toda la interfaz). */
 export function setLang(l: string) {
@@ -43,7 +59,7 @@ function lookup(s: string): string | null {
   if (!s.endsWith('…') && (s + '…') in d) return d[s + '…'].replace(/…$/, '');
   for (const p of tmpls) {
     const m = p.re.exec(s); if (!m) continue;
-    return p.tr.replace(/\{(\d)\}/g, (_, i) => { const v = m[+i + 1] ?? ''; return lookup1(v) ?? v; });
+    return p.tr.replace(/\{(\d)\}/g, (_, i) => { const v = m[+i + 1] ?? ''; return v.length > 1 && /[A-Za-zÁÉÍÓÚáéíóúÑñ]/.test(v) ? t(v) : v; });
   }
   return null;
 }
@@ -78,17 +94,18 @@ export function t(s: string): string {
       if (m && (m[1] || m[3]) && m[2]) { const r = lookup(m[2]); if (r !== null) out = m[1] + r + m[3]; }
     }
     if (out === null) {
-      // «Interletraje (milésimas de em) (arrastra para cambiar)»: lo de dentro del último paréntesis aparte
-      const m = /^([\s\S]+) (\([^()]+\))$/.exec(core);
-      if (m) { const a = t(m[1]), b = lookup(m[2]); if (b !== null || a !== m[1]) out = a + ' ' + (b ?? m[2]); }
-    }
-    if (out === null) {
       // frases unidas con « — », «: » o « · »: cada trozo por su lado
       for (const dl of [' · ', ' — ', ': ']) {
         if (!core.includes(dl)) continue;
-        const parts = core.split(dl), tr = parts.map(x => t(x));
+        const parts = splitTop(core, dl); if (parts.length < 2) continue;
+        const tr = parts.map(x => t(x));
         if (tr.some((x, i) => x !== parts[i])) { out = tr.join(dl); break; }
       }
+    }
+    if (out === null) {
+      // «Interletraje (milésimas de em) (arrastra para cambiar)»: lo de dentro del último paréntesis aparte
+      const m = /^([\s\S]+) (\([^()]+\))$/.exec(core);
+      if (m) { const a = t(m[1]), b = lookup(m[2]); if (b !== null || a !== m[1]) out = a + ' ' + (b ?? m[2]); }
     }
     if (out === null && /( — |: | · | \()/.test(core)) {
       // textos compuestos («Duotono: se añade como capa de ajuste», «#ff0000 (Alt+clic…)», «Tinta — 3 px»): por partes
@@ -103,6 +120,16 @@ export function t(s: string): string {
   cache.set(s, out); return out ?? s;
 }
 
+/** Parte el texto por el separador, pero no dentro de paréntesis o comillas «…». */
+function splitTop(s: string, dl: string): string[] {
+  const out: string[] = []; let depth = 0, last = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c === '(' || c === '«' || c === '（') depth++; else if ((c === ')' || c === '»' || c === '）') && depth > 0) depth--;
+    else if (depth === 0 && s.startsWith(dl, i)) { out.push(s.slice(last, i)); i += dl.length - 1; last = i + 1; }
+  }
+  out.push(s.slice(last)); return out;
+}
 /** Atajos de teclado: «Mayús+Ctrl+D» → «Shift+Ctrl+D». */
 const KEYS = /^(?:(?:Ctrl|Alt|Mayús|Shift|Cmd|Meta)\+)+[^\s]{1,12}$|^(?:Retroceso|Supr|Intro|Espacio|Mayús|Re ?Pág|Av ?Pág|Inicio|Fin)$/;
 function keyName(k: string) { return k.replace(/Mayús/g, 'Shift').replace(/Retroceso/g, 'Backspace').replace(/Supr/g, 'Del').replace(/Intro/g, 'Enter').replace(/Espacio/g, 'Space'); }
@@ -116,16 +143,22 @@ const ATTRS = ['title', 'placeholder', 'aria-label'];
 /** Partes con texto del usuario: no se tocan. */
 const SKIP = 'textarea, input, [contenteditable], .lname, .no-i18n, script, style, .fp-name';
 function skip(el: Element | null) { return !!el && !!el.closest(SKIP); }
+/** Lo que escribió la propia traducción en cada nodo o atributo: no se vuelve a traducir (evita idas y vueltas «Recortar ↔ Cortar»). */
+const wroteText = new WeakMap<Text, string>(), wroteAttr = new WeakMap<Element, Record<string, string>>();
 function doText(n: Text) {
-  const v = n.nodeValue; if (!v || v.length < 2 || skip(n.parentElement)) return;
+  const v = n.nodeValue; if (!v || v.length < 2 || wroteText.get(n) === v || skip(n.parentElement)) return;
   // títulos de menú: algunos se traducen distinto que la misma palabra en otro sitio («Selección» → «Select»)
   const ctx = n.parentElement?.classList.contains('menu-title') ? dict?.s['menu:' + v.trim()] : undefined;
-  const r = ctx ?? t(v); if (r !== v) n.nodeValue = r;
+  const r = ctx ?? t(v); if (r !== v) { wroteText.set(n, r); n.nodeValue = r; }
 }
 const SKIP_ATTR = '.lname, .no-i18n, [contenteditable]';
 function doAttrs(el: Element) {
   if (el.closest(SKIP_ATTR)) return;
-  for (const a of ATTRS) { const v = el.getAttribute(a); if (v && v.length > 1) { const r = t(v); if (r !== v) el.setAttribute(a, r); } }
+  for (const a of ATTRS) {
+    const v = el.getAttribute(a); if (!v || v.length < 2) continue;
+    const w = wroteAttr.get(el); if (w && w[a] === v) continue;
+    const r = t(v); if (r !== v) { (w ?? (wroteAttr.set(el, {}), wroteAttr.get(el)!))[a] = r; el.setAttribute(a, r); }
+  }
 }
 function doTree(root: Node) {
   if (root.nodeType === 3) { doText(root as Text); return; }
@@ -139,6 +172,7 @@ function doTree(root: Node) {
 
 /** Empieza a traducir la página (y todo lo que se añada después). */
 export function startI18n() {
+  (window as any).__t = t;
   document.documentElement.lang = lang;
   if (!dict) return;
   doTree(document.body);
