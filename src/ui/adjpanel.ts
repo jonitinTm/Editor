@@ -28,6 +28,26 @@ const LOOKS: Look[] = [
   { name: 'Luminoso', desc: 'Más luz y suavidad', layers: [['brightness', { brightness: 22, contrast: -8 }], ['vibrance', { vibrance: 12, sat: 0 }]] },
 ];
 
+// looks propios (se guardan en este navegador)
+const LOOK_KEY = 'editor.looks';
+function myLooks(): Look[] { try { const v = JSON.parse(localStorage.getItem(LOOK_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+function saveMyLooks(v: Look[]) { try { localStorage.setItem(LOOK_KEY, JSON.stringify(v)); } catch { app.toast('No se pudo guardar el look', 'warn'); } }
+/** Las capas de ajuste del grupo activo (o las seleccionadas), de abajo arriba. */
+function adjustmentsForLook(): [string, any][] {
+  const d = app.doc; if (!d) return [];
+  const a = d.active, sel = d.allLayers().filter(l => d.selectedIds?.has(l.id));
+  const src = a instanceof GroupLayer ? a.children : sel.length ? sel : a ? [a] : [];
+  return src.filter((l): l is AdjustmentLayer => l instanceof AdjustmentLayer).map(l => [l.filterId, JSON.parse(JSON.stringify(l.params))]);
+}
+async function saveLook(after: () => void) {
+  const layers = adjustmentsForLook();
+  if (!layers.length) { app.toast('Selecciona un grupo con capas de ajuste (o varias capas de ajuste) para guardarlas como look', 'warn'); return; }
+  const { promptDialog } = await import('./dialog');
+  const d = app.doc!, base = d.active instanceof GroupLayer ? d.active.name.replace(/^Look: /, '') : 'Mi look';
+  const name = (await promptDialog('Guardar como look', `Nombre (${layers.length} ajuste${layers.length > 1 ? 's' : ''})`, base))?.trim(); if (!name) return;
+  saveMyLooks([...myLooks().filter(l => l.name !== name), { name, desc: 'Mío', layers }]); after(); app.toast(`Look «${name}» guardado: aparece en «Mis looks»`);
+}
+
 /** Crea un look: un grupo con sus capas de ajuste (se puede ocultar, bajar de opacidad o editar cada una). */
 function applyLook(look: Look) {
   const d = app.doc; if (!d) return;
@@ -44,7 +64,7 @@ function applyLook(look: Look) {
 
 export function buildAdjustmentsPanel(parent: HTMLElement) {
   const list = FILTERS.filter(f => f.group === 'ajuste' && !f.noLayer);
-  const grid = h('div', { class: 'adj-grid' }), looks = h('div', { class: 'adj-grid adj-looks' });
+  const grid = h('div', { class: 'adj-grid' }), looks = h('div', { class: 'adj-grid adj-looks' }), mine = h('div', { class: 'adj-grid adj-looks adj-mine' });
   const thumbs: { c: HTMLCanvasElement; run: (src: ImageData) => void }[] = [];
   for (const f of list) {
     const c = h('canvas', { width: 72, height: 48, class: 'adj-thumb' }) as HTMLCanvasElement;
@@ -53,19 +73,32 @@ export function buildAdjustmentsPanel(parent: HTMLElement) {
     grid.append(b);
     thumbs.push({ c, run: src => { const im = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height); try { f.apply(im, demoParams(f)); } catch { /* algún ajuste necesita más datos */ } ctx2d(c).putImageData(im, 0, 0); } });
   }
-  for (const L of LOOKS) {
+  const lookThumbs: typeof thumbs = [];
+  const addLook = (L: Look, into: HTMLElement, del?: () => void) => {
     const c = h('canvas', { width: 72, height: 48, class: 'adj-thumb' }) as HTMLCanvasElement;
     const b = h('button', { class: 'adj-item', type: 'button', title: L.desc }, c, h('span', {}, L.name));
-    b.onclick = () => applyLook(L); looks.append(b);
-    thumbs.push({ c, run: src => {
+    b.onclick = () => applyLook(L); into.append(b);
+    if (del) { const x = h('span', { class: 'adj-del', title: 'Borrar este look', role: 'button' }, '✕'); x.onclick = e => { e.stopPropagation(); del(); }; b.append(x); }
+    lookThumbs.push({ c, run: src => {
       const im = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
       for (const [id, params] of L.layers) { const f = FILTERS.find(x => x.id === id); if (f) try { f.apply(im, { ...defaultParams(f), ...(params ?? {}) }); } catch { /* */ } }
       ctx2d(c).putImageData(im, 0, 0);
     } });
-  }
+  };
+  for (const L of LOOKS) addLook(L, looks);
+  const builtinThumbs = lookThumbs.length;
+  const fillMine = () => {
+    mine.innerHTML = ''; lookThumbs.length = builtinThumbs;
+    const list = myLooks(); mineHead.style.display = list.length ? '' : 'none';
+    list.forEach(L => addLook(L, mine, () => { saveMyLooks(myLooks().filter(x => x.name !== L.name)); fillMine(); }));
+    last = ''; refresh();
+  };
+  const mineHead = h('div', { class: 'adj-head' }, 'Mis looks');
+  const saveBtn = h('button', { class: 'btn adj-save', type: 'button', title: 'Guarda las capas de ajuste del grupo seleccionado para usarlas en otras fotos' }, '＋ Guardar como look');
+  saveBtn.onclick = () => saveLook(fillMine);
   parent.append(h('div', { class: 'panel-body adj-panel' },
     h('div', { class: 'hint' }, 'Toca un ajuste: se añade como capa encima (la foto no se estropea) y lo cambias en Propiedades.'),
-    grid, h('div', { class: 'adj-head' }, 'Looks de un toque'), looks));
+    grid, h('div', { class: 'adj-head' }, 'Looks de un toque'), looks, mineHead, mine, saveBtn));
   // miniaturas con la imagen actual (solo cuando el panel se ve, y sin prisa)
   let t = 0, last = '';
   const refresh = () => {
@@ -75,12 +108,13 @@ export function buildAdjustmentsPanel(parent: HTMLElement) {
       const key = `${(d as any).__adjId ??= Math.random()}:${d.history.index}`; if (key === last) return; last = key;
       const comp = d.getComposite(), k = Math.max(72 / comp.width, 48 / comp.height), s = makeCanvas(72, 48), x = ctx2d(s);
       x.fillStyle = '#fff'; x.fillRect(0, 0, 72, 48); x.drawImage(comp, (72 - comp.width * k) / 2, (48 - comp.height * k) / 2, comp.width * k, comp.height * k);
-      const src = x.getImageData(0, 0, 72, 48); let i = 0;
+      const src = x.getImageData(0, 0, 72, 48), all = [...thumbs, ...lookThumbs]; let i = 0;
       // de pocas en pocas para no bloquear la ventana
-      const step = () => { const end = Math.min(thumbs.length, i + 6); for (; i < end; i++) thumbs[i].run(src); if (i < thumbs.length) requestAnimationFrame(step); };
+      const step = () => { const end = Math.min(all.length, i + 6); for (; i < end; i++) all[i].run(src); if (i < all.length) requestAnimationFrame(step); };
       step();
     }, 700);
   };
   app.on('doc', refresh); app.on('docs', refresh);
+  fillMine();
   new IntersectionObserver(e => { if (e.some(x => x.isIntersecting)) refresh(); }).observe(parent);
 }

@@ -1233,11 +1233,11 @@ export async function applyImageDialog() {
 // ---- Ajustes predefinidos de los filtros ------------------------------------------------------
 
 const PRESET_KEY = 'editor.filterPresets';
-type Preset = { name: string; params: any };
-function userPresets(id: string): Preset[] { try { const all = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); return Array.isArray(all[id]) ? all[id] : []; } catch { return []; } }
-function saveUserPresets(id: string, list: Preset[]) { try { const all = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); all[id] = list; localStorage.setItem(PRESET_KEY, JSON.stringify(all)); } catch { /* sin almacenamiento */ } }
+export type Preset = { name: string; params: any };
+export function userPresets(id: string): Preset[] { try { const all = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); return Array.isArray(all[id]) ? all[id] : []; } catch { return []; } }
+export function saveUserPresets(id: string, list: Preset[]) { try { const all = JSON.parse(localStorage.getItem(PRESET_KEY) || '{}'); all[id] = list; localStorage.setItem(PRESET_KEY, JSON.stringify(all)); } catch { /* sin almacenamiento */ } }
 const curve = (rgb: number[][], r?: number[][], g?: number[][], b?: number[][]) => ({ rgb, r: r ?? [[0, 0], [255, 255]], g: g ?? [[0, 0], [255, 255]], b: b ?? [[0, 0], [255, 255]] });
-const BUILTIN_PRESETS: Record<string, Preset[]> = {
+export const BUILTIN_PRESETS: Record<string, Preset[]> = {
   curves: [
     { name: 'Más contraste', params: curve([[0, 0], [64, 48], [192, 208], [255, 255]]) },
     { name: 'Contraste suave', params: curve([[0, 0], [64, 58], [192, 198], [255, 255]]) },

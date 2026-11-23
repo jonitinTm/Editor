@@ -382,6 +382,10 @@ Ya disponible:
 - **Panel Ajustes** (junto a Color): todos los ajustes con una miniatura de tu propia imagen; un toque crea la capa de
   ajuste. Debajo, *looks* de un toque (Cálido, Frío, Más contraste, Viveza, Blanco y negro, Vintage, Cine, Luminoso)
   que se crean como un grupo de capas de ajuste editables: se puede bajar su opacidad, ocultar o retocar cada una.
+  *Guardar como look* guarda el grupo seleccionado para usarlo en otras fotos (aparece en «Mis looks»).
+- **Propiedades de las capas de ajuste**, como en Photoshop: ajustes predefinidos (de serie y los tuyos, compartidos
+  con la ventana del ajuste), recortar a la capa de debajo, ver sin el ajuste manteniendo pulsado el ojo, restablecer
+  y eliminar. Al elegir una capa de ajuste, el panel va directo a sus controles.
 
   Sus algoritmos están adaptados de [VectorCraft](https://github.com/storytold/vectorcraft) (licencia MIT; el aviso
   está en `LICENSES/vectorcraft-MIT.txt` y en *Ayuda › Acerca de › Licencias de terceros*).

@@ -75,6 +75,8 @@ export const ICONS: Record<string, string> = {
   info: S('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'),
   comps: S('<rect x="3" y="5" width="14" height="10" rx="1"/><rect x="7" y="9" width="14" height="10" rx="1"/>'),
   actions: S('<path d="M6 4l14 8-14 8z"/>'),
+  clip: S('<rect x="4" y="13" width="16" height="7" rx="1.5"/><path d="M8 4h8M12 4v6M9 7.5l3 3 3-3"/>'),
+  reset: S('<path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/>'),
   undo: S('<path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>'),
   redo: S('<path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/>'),
   search: S('<circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/>'),

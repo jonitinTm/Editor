@@ -13,7 +13,8 @@ import { WARP_STYLES } from '../tools/warpmesh';
 import { actionById } from './actions';
 import { promptDialog, row as formRow } from './dialog';
 import { createPicker, SWATCHES } from './colorpicker';
-import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect, warpTextDialog, lutPicker, gradientButton } from './dialogs';
+import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect, warpTextDialog, lutPicker, gradientButton, BUILTIN_PRESETS, userPresets, saveUserPresets } from './dialogs';
+import { defaultParams } from '../filters/registry';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';
 
@@ -356,6 +357,7 @@ export function buildHistoryPanel(parent: HTMLElement) {
 
 // ---- Propiedades ---------------------------------------------------------------------
 
+let lastAdjId = -1;
 export function buildPropertiesPanel(parent: HTMLElement) {
   const body = h('div', { class: 'panel-body props' });
   parent.append(panel('Propiedades', body, undefined, 'panel-props'));
@@ -445,6 +447,43 @@ export function buildPropertiesPanel(parent: HTMLElement) {
       let timer = 0;
       // Cambios en vivo; se anota un solo paso de historial al terminar de ajustar
       const changed = () => { d.invalidate(); app.viewport.requestRender(); clearTimeout(timer); timer = window.setTimeout(() => { skipRender = true; d.commit('Editar ajuste'); }, 500); };
+      // barra como la de Photoshop: predefinidos, recortar a la capa de debajo, ver sin el ajuste, restablecer, ocultar y eliminar
+      if (def) {
+        const apply = (params: any, name: string) => { l.params = JSON.parse(JSON.stringify({ ...defaultParams(def), ...params })); d.invalidate(); d.commit(name); };
+        const pre = h('select', { class: 'adj-preset', title: 'Ajustes predefinidos' }) as HTMLSelectElement;
+        const builtin = BUILTIN_PRESETS[def.id] ?? [], mine = userPresets(def.id);
+        pre.append(h('option', { value: '' }, 'Predefinido…'));
+        if (builtin.length) pre.append(h('optgroup', { label: 'De serie' }, ...builtin.map((p, i) => h('option', { value: 'b' + i }, p.name))));
+        if (mine.length) pre.append(h('optgroup', { label: 'Míos' }, ...mine.map((p, i) => h('option', { value: 'u' + i }, p.name))));
+        pre.append(h('option', { value: 'save' }, '＋ Guardar los valores actuales…'));
+        if (mine.length) pre.append(h('option', { value: 'del' }, '🗑 Borrar uno de los míos…'));
+        pre.onchange = async () => {
+          const v = pre.value; pre.value = '';
+          if (v === 'save') { const n = (await promptDialog('Guardar ajuste predefinido', 'Nombre', ''))?.trim(); if (n) { saveUserPresets(def.id, [...userPresets(def.id), { name: n, params: JSON.parse(JSON.stringify(l.params)) }]); app.toast('Guardado: también aparece al usar este ajuste desde el menú'); skipRender = false; app.emit('doc'); } return; }
+          if (v === 'del') { const m = userPresets(def.id), n = await promptDialog('Borrar ajuste predefinido', 'Nombre exacto (' + m.map(x => x.name).join(', ') + ')', ''); const i = m.findIndex(x => x.name === n); if (i >= 0) { m.splice(i, 1); saveUserPresets(def.id, m); app.emit('doc'); } return; }
+          const p = v[0] === 'b' ? builtin[+v.slice(1)] : mine[+v.slice(1)]; if (p) apply(p.params, 'Ajuste: ' + p.name);
+        };
+        const ib = (ic: string, title: string, on: boolean | null, fn: () => void) => { const b = h('button', { class: 'btn icon-btn adj-tb' + (on ? ' on' : ''), type: 'button', title, html: icon(ic) || '' }); b.onclick = fn; return b; };
+        const peek = ib('eye', 'Ver sin el ajuste (mantén pulsado)', null, () => {});
+        const hide = () => { l.visible = false; d.invalidate(); app.viewport.requestRender(); }, show = () => { if (!l.visible) { l.visible = true; d.invalidate(); app.viewport.requestRender(); } };
+        peek.addEventListener('pointerdown', e => { e.preventDefault(); hide(); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) peek.addEventListener(ev, show);
+        body.append(h('div', { class: 'adj-bar' }, pre,
+          ib('clip', 'Recortar a la capa de debajo (solo la afecta a ella)', !!l.clip, () => ops.toggleClip()),
+          peek,
+          ib('reset', 'Restablecer los valores por defecto', null, () => apply({}, 'Restablecer ajuste')),
+          ib('trash', 'Eliminar esta capa de ajuste', null, () => actionById.get('delLayer')?.run())));
+        if (l.clip) body.append(h('div', { class: 'hint' }, 'Solo afecta a la capa de debajo.'));
+        // al elegir otra capa de ajuste, el panel baja hasta sus controles (lo de arriba es el documento)
+        const bar = body.querySelector('.adj-bar') as HTMLElement | null;
+        if (bar && lastAdjId !== l.id) {
+          lastAdjId = l.id;
+          // solo se desplaza el propio panel (scrollIntoView movería también los contenedores de la barra lateral)
+          requestAnimationFrame(() => {
+            let sc = bar.parentElement; while (sc && !(/(auto|scroll)/.test(getComputedStyle(sc).overflowY) && sc.scrollHeight > sc.clientHeight)) sc = sc.parentElement;
+            if (sc && !sc.classList.contains('side')) sc.scrollTop += bar.getBoundingClientRect().top - sc.getBoundingClientRect().top - 6;
+          });
+        }
+      }
       if (def?.custom) {
         const below = getPixels(d.getComposite());
         body.append(...(def.custom === 'levels' ? levelsBody : curvesBody)(below, l.params, changed));
