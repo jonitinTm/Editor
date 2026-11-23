@@ -76,7 +76,7 @@ export function buildColorPanel(parent: HTMLElement) {
   const showView = () => {
     const wheel = view === 'wheel'; picker.el.style.display = wheel ? 'none' : ''; wheelBox.style.display = wheel ? '' : 'none';
     if (wheel && !wheelBox.firstChild) import('./artist').then(m => wheelBox.append(m.colorWheel(176)));
-    toggle.textContent = wheel ? '▦ Cuadrado' : '◎ Rueda';
+    toggle.textContent = wheel ? 'Cuadrado' : 'Rueda';
   };
   toggle.onclick = () => { view = view === 'wheel' ? 'square' : 'wheel'; try { localStorage.setItem(VKEY, view); } catch { /* */ } showView(); };
   const recentBox = h('div', { class: 'cp-recent' });
@@ -111,7 +111,7 @@ export function buildSwatchesPanel(parent: HTMLElement) {
   };
   const foot = h('div', { class: 'panel-foot' },
     h('button', { class: 'btn', title: 'Importar muestras de Adobe (.aco, .ase)', onclick: async () => { const io = await import('../io/files'); for (const f of await io.pickFiles('.aco,.ase')) await importSwatches(f); } }, 'Importar…'),
-    h('button', { class: 'btn icon-btn', title: 'Vaciar mis muestras', onclick: () => { if (userSwatches().length) saveUserSwatches([]); } }, '🗑'),
+    h('button', { class: 'btn icon-btn', title: 'Vaciar mis muestras', onclick: () => { if (userSwatches().length) saveUserSwatches([]); }, html: icon('trash') }),
     h('button', { class: 'btn icon-btn', title: 'Añadir el color frontal a las muestras', onclick: () => saveUserSwatches([{ name: '', color: app.fg }, ...userSwatches()]) }, '＋'));
   render(); window.addEventListener('editor-swatches', render);
   parent.append(panel('Muestras', h('div', { class: 'brush-panel' }, h('div', { class: 'panel-body' }, grid), foot)));
@@ -469,7 +469,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         if (builtin.length) pre.append(h('optgroup', { label: 'De serie' }, ...builtin.map((p, i) => h('option', { value: 'b' + i }, p.name))));
         if (mine.length) pre.append(h('optgroup', { label: 'Míos' }, ...mine.map((p, i) => h('option', { value: 'u' + i }, p.name))));
         pre.append(h('option', { value: 'save' }, '＋ Guardar los valores actuales…'));
-        if (mine.length) pre.append(h('option', { value: 'del' }, '🗑 Borrar uno de los míos…'));
+        if (mine.length) pre.append(h('option', { value: 'del' }, 'Borrar uno de los míos…'));
         pre.onchange = async () => {
           const v = pre.value; pre.value = '';
           if (v === 'save') { const n = (await promptDialog('Guardar ajuste predefinido', 'Nombre', ''))?.trim(); if (n) { saveUserPresets(def.id, [...userPresets(def.id), { name: n, params: JSON.parse(JSON.stringify(l.params)) }]); app.toast('Guardado: también aparece al usar este ajuste desde el menú'); skipRender = false; app.emit('doc'); } return; }
@@ -479,7 +479,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         const ib = (ic: string, title: string, on: boolean | null, fn: () => void) => { const b = h('button', { class: 'btn icon-btn adj-tb' + (on ? ' on' : ''), type: 'button', title, html: icon(ic) || '' }); b.onclick = fn; return b; };
         const peek = ib('eye', 'Ver sin el ajuste (mantén pulsado)', null, () => {});
         const hide = () => { l.visible = false; d.invalidate(); app.viewport.requestRender(); }, show = () => { if (!l.visible) { l.visible = true; d.invalidate(); app.viewport.requestRender(); } };
-        peek.addEventListener('pointerdown', e => { e.preventDefault(); hide(); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) peek.addEventListener(ev, show);
+        peek.dataset.hold = '1'; peek.addEventListener('pointerdown', e => { e.preventDefault(); hide(); }); for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) peek.addEventListener(ev, show);
         body.append(h('div', { class: 'adj-bar' }, pre,
           ib('clip', 'Recortar a la capa de debajo (solo la afecta a ella)', !!l.clip, () => ops.toggleClip()),
           peek,
@@ -547,8 +547,8 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           const on = h('input', { type: 'checkbox', checked: f.enabled, title: 'Mostrar u ocultar' }); on.onchange = () => ops.toggleSmartFilter(l, i);
           const name = h('span', { class: 'sf-name', title: def?.params || def?.custom ? 'Doble clic para editar' : '' }, (def?.name ?? f.id).replace('…', ''));
           if (def && (def.params || def.custom)) name.ondblclick = () => filterDialog(def, { layer: l, index: i });
-          const edit = h('button', { class: 'btn icon-btn', title: 'Editar', disabled: !(def?.params || def?.custom) }, '✎'); edit.onclick = () => def && filterDialog(def, { layer: l, index: i });
-          const del = h('button', { class: 'btn icon-btn', title: 'Eliminar' }, '✕'); del.onclick = () => ops.removeSmartFilter(l, i);
+          const edit = h('button', { class: 'btn icon-btn', title: 'Editar', disabled: !(def?.params || def?.custom), html: icon('edit') }); edit.onclick = () => def && filterDialog(def, { layer: l, index: i });
+          const del = h('button', { class: 'btn icon-btn', title: 'Eliminar', html: icon('trash') }); del.onclick = () => ops.removeSmartFilter(l, i);
           body.append(h('div', { class: 'prop-row sf-row' }, on, name, edit, del));
         });
       }

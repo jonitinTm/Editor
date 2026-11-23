@@ -61,8 +61,7 @@ const GLYPHS: [string, string][] = [
   ['Monedas', '€$£¥¢₩₹₽₺₿¤'],
   ['Matemáticas', '±×÷≈≠≤≥∞√∑∏∫∂∆πΩµ°¹²³¼½¾‰∈∉∩∪∧∨¬'],
   ['Flechas', '←→↑↓↔↕↖↗↘↙⇐⇒⇑⇓⇔➔➜➤➡⬅⬆⬇↩↪⟲⟳'],
-  ['Símbolos', '©®™℗℠✓✔✗✘★☆✦✧♥♡♦♣♠●○◆◇■□▲△▼▽◀▶☀☁☂☃☎✉✂✏✒⚑⚐⚠⚡♪♫☯☮✝☪✡'],
-  ['Emojis', '😀😂😍🥰😎🤔😢😡👍👏🙏💪🎉🎂🎁❤️🔥⭐✨🌈☀️🌙🌸🌹🍀🍕☕🎵📷📌✅❌⚽🏆🚀✈️🏠💡💬'],
+  ['Símbolos', '©®™℗℠✓✔✗✘★☆✦✧♥♡♦♣♠●○◆◇■□▲△▼▽◀▶⚑⚐♪♫☯☮✝☪✡'],
 ];
 /** Caracteres «visibles» (un emoji con modificadores cuenta como uno); sin Intl.Segmenter, uno por punto de código. */
 function graphemes(s: string): string[] { const S = (Intl as any).Segmenter; if (S) return [...new S('es', { granularity: 'grapheme' }).segment(s)].map((x: any) => x.segment); return [...s].filter(c => c !== '\uFE0F'); }

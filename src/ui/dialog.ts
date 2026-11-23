@@ -35,10 +35,20 @@ export function showDialog(o: DialogOptions) {
   const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); } };
   document.addEventListener('keydown', onKey, true);
   cancelBtn?.addEventListener('click', cancel);
+  let working = false;
   form.addEventListener('submit', async e => {
     e.preventDefault();
-    const r = await o.onOk?.();
-    if (r !== false) close();
+    if (working) return;
+    // mientras se aplica (p. ej. un filtro en una foto grande) los botones se bloquean y se ve que está trabajando
+    working = true;
+    const btns = ([...form.querySelectorAll('button')] as HTMLButtonElement[]).filter(b => !b.disabled);
+    const slow = window.setTimeout(() => { form.classList.add('working'); btns.forEach(b => b.disabled = true); }, 120);
+    try {
+      const r = await o.onOk?.();
+      if (r !== false) close();
+    } finally {
+      clearTimeout(slow); working = false; form.classList.remove('working'); btns.forEach(b => b.disabled = false);
+    }
   });
   // Arrastrar por la barra de título
   header.addEventListener('pointerdown', e => {

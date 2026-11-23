@@ -14,6 +14,7 @@ import { GroupLayer, RasterLayer, ShapeLayer, TextLayer, type LayerStyles, type 
 import { BEVEL_DEFAULT } from '../core/bevel';
 import { ctx2d, makeCanvas } from '../core/canvas';
 import { encodeQR } from '../io/qr';
+import { icon } from './icons';
 
 type R = { x: number; y: number; w: number; h: number };
 
@@ -282,7 +283,7 @@ export function backgroundDialog() {
   const draw = () => { const s = 260 / Math.max(W, H); prev.width = Math.round(W * s); prev.height = Math.round(H * s); ctx2d(prev).drawImage(renderBackground(prev.width, prev.height, kind, BG_PALETTES[pal], seed), 0, 0); };
   const kinds = h('div', { class: 'btn-group' }, ...[['mesh', 'Malla'], ['blobs', 'Burbujas'], ['waves', 'Ondas'], ['dots', 'Puntos']].map(([v, t]) => { const b = h('button', { class: 'btn' + (v === kind ? ' on' : ''), type: 'button' }, t); b.onclick = () => { kind = v; kinds.querySelectorAll('.btn').forEach(x => x.classList.toggle('on', x === b)); draw(); }; return b; }));
   const pals = h('div', { class: 'bg-pals' }, ...BG_PALETTES.map((p, i) => { const b = h('button', { class: 'bg-pal' + (i === pal ? ' on' : ''), type: 'button', style: { background: `linear-gradient(90deg, ${p.join(',')})` } }); b.onclick = () => { pal = i; pals.querySelectorAll('.bg-pal').forEach(x => x.classList.toggle('on', x === b)); draw(); }; return b; }));
-  const again = h('button', { class: 'btn', type: 'button', onclick: () => { seed++; draw(); } }, '🎲 Otra variación');
+  const again = h('button', { class: 'btn', type: 'button', onclick: () => { seed++; draw(); }, html: icon('dice') + '<span>Otra variación</span>' });
   draw();
   showDialog({ title: 'Fondos generativos', width: 440, body: [kinds, pals, h('div', { class: 'bg-prev-wrap' }, prev), again, h('div', { class: 'hint' }, d ? 'Se añade como capa al fondo del documento.' : 'Se crea un documento nuevo con el fondo.')],
     okLabel: 'Usar este fondo',

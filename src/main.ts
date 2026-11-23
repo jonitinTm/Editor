@@ -1,7 +1,7 @@
 import './core/polyfills';
 import { prefs, applyPrefs, fmtUnit } from './ui/prefs';
 applyPrefs();
-import { startI18n, LANGS, lang } from './i18n/i18n';
+import { startI18n, LANGS, lang, langChosen, keepLang, browserLang, setLang } from './i18n/i18n';
 startI18n();
 // Punto de entrada: monta la interfaz y conecta teclado, arrastrar y pegar.
 
@@ -11,6 +11,7 @@ import { h } from './ui/dom';
 import { icon } from './ui/icons';
 import { Viewport, isTyping } from './ui/viewport';
 import { buildSideSliders } from './ui/drawing';
+import { installTouchTips } from './ui/touchtips';
 import { History } from './core/history';
 import { buildMenuBar } from './ui/menus';
 import { buildToolbar } from './ui/toolbar';
@@ -123,9 +124,11 @@ const viewHost = h('div', { class: 'view-host' });
 center.append(viewHost);
 app.viewport = new Viewport(viewHost);
 buildSideSliders(viewHost);
+installTouchTips();
 History.onTrim = () => app.toast('Imagen grande: se guardan menos pasos de deshacer para que todo siga fluido');
 const welcome = buildWelcome();
 viewHost.append(welcome);
+if (!langChosen()) askLanguage();
 const timeline = buildTimeline(center);
 const status = h('div', { class: 'statusbar' });
 center.append(status);
@@ -273,12 +276,31 @@ app.on('view', () => { if (document.activeElement?.classList.contains('zoom-inpu
 app.on('doc', renderStatus); app.on('docs', renderStatus);
 renderStatus();
 
+// ---- Primera vez: la app sale en inglés y pregunta si se quiere otro idioma ----------------
+function askLanguage() {
+  const sug = browserLang();
+  const close = () => { keepLang(); ov.remove(); };
+  const choose = (l: string) => { if (l === lang) { close(); return; } ov.querySelectorAll('button').forEach(b => (b as HTMLButtonElement).disabled = true); setLang(l); };
+  const btn = (l: string, n: string, cls = '') => h('button', { class: 'btn ' + cls, type: 'button', lang: l, onclick: () => choose(l) }, n);
+  const others = LANGS.filter(([l]) => l !== 'en' && l !== sug);
+  const box = h('div', { class: 'first-lang', role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Language' },
+    h('div', { class: 'fl-ico', html: icon('globe') }),
+    h('h2', {}, 'Language'),
+    h('p', {}, 'The app is in English. Do you want to use another language? You can change it at any time with the globe button at the top.'),
+    h('div', { class: 'fl-main' }, btn('en', 'Keep English', 'primary'), sug && sug !== 'en' ? btn(sug, LANGS.find(x => x[0] === sug)![1], 'primary') : null),
+    h('div', { class: 'fl-list' }, ...others.map(([l, n]) => btn(l, n))));
+  const ov = h('div', { class: 'first-lang-ov no-i18n' }, box);
+  ov.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  document.body.append(ov);
+  (box.querySelector('.btn.primary') as HTMLElement)?.focus();
+}
+
 // ---- Pantalla de bienvenida ------------------------------------------------------------
 /** Selector de idioma de la pantalla de inicio (con el nombre de cada idioma en su propio idioma). */
 function langPicker() {
   const sel = h('select', { class: 'no-i18n', 'aria-label': 'Idioma / Language' }, ...LANGS.map(([v, n]) => h('option', { value: v, selected: lang === v }, n))) as HTMLSelectElement;
   sel.onchange = () => import('./ui/dialogs').then(m => m.changeLanguage(sel.value)).then(() => { sel.value = lang; });
-  return h('label', { class: 'welcome-lang no-i18n' }, h('span', { html: icon('globe') || '🌐' }), sel);
+  return h('label', { class: 'welcome-lang no-i18n' }, h('span', { html: icon('globe') }), sel);
 }
 function buildWelcome() {
   const openBtn = h('button', { class: 'btn primary big', html: icon('open') + '<span>Abrir desde el equipo</span>' });

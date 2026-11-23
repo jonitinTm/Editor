@@ -124,7 +124,7 @@ export function toggleReference() {
   };
   const cur = h('button', { class: 'btn', type: 'button', title: 'Usar una copia de la imagen actual' }, 'Imagen actual');
   cur.onclick = () => { const d = app.doc; if (!d) { app.toast('Abre primero una imagen', 'warn'); return; } const c = document.createElement('canvas'); c.width = d.width; c.height = d.height; c.getContext('2d')!.drawImage(d.getComposite(), 0, 0); setSrc(c); };
-  const fl = h('button', { class: 'btn icon-btn', type: 'button', title: 'Voltear horizontal' }, '⇋'); fl.onclick = () => { flip = !flip; draw(); };
+  const fl = h('button', { class: 'btn icon-btn', type: 'button', title: 'Voltear horizontal', html: icon('flipH') }); fl.onclick = () => { flip = !flip; draw(); };
   const gr = h('button', { class: 'btn icon-btn', type: 'button', title: 'Ver en gris (para comparar valores)' }, 'Gris'); gr.onclick = () => { gray = !gray; gr.classList.toggle('on', gray); draw(); };
   const close = h('button', { class: 'btn icon-btn', type: 'button', title: 'Cerrar', html: icon('close') }); close.onclick = () => toggleReference();
   const head = h('div', { class: 'ref-head' }, h('span', { class: 'ref-title' }, 'Referencia'), open, cur, fl, gr, close);

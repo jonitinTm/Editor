@@ -2,6 +2,7 @@
 
 import { app } from './app';
 import { h } from './dom';
+import { icon } from './icons';
 import { TextLayer, type TextProps } from '../core/layers';
 import { fontPicker } from './fontpicker';
 import { colorDialog } from './colorpicker';
@@ -35,7 +36,7 @@ function numField(icon: string, title: string, get: () => number, set: (v: numbe
 }
 
 function toggle(label: string, title: string, get: () => boolean, set: (v: boolean) => void, style = '') {
-  const b = h('button', { class: 'btn icon-btn tp-tog', title, style }, label) as HTMLButtonElement;
+  const b = h('button', { class: 'btn icon-btn tp-tog', title, style, 'aria-label': title, html: label.startsWith('<svg') ? label : undefined }, label.startsWith('<svg') ? '' : label) as HTMLButtonElement;
   b.onclick = () => set(!get());
   return { el: b, sync: () => b.classList.toggle('on', get()) };
 }
@@ -97,7 +98,7 @@ export function buildCharacterPanel(parent: HTMLElement) {
 export function buildParagraphPanel(parent: HTMLElement) {
   shell(parent, body => {
     const P = () => activeText()!.props;
-    const al = ([['left', '⯇', 'Alinear a la izquierda'], ['center', '≡', 'Centrar'], ['right', '⯈', 'Alinear a la derecha'], ['justify', '☰', 'Justificar (texto de párrafo; la última línea a la izquierda)']] as const)
+    const al = ([['left', icon('txtL'), 'Alinear a la izquierda'], ['center', icon('txtC'), 'Centrar'], ['right', icon('txtR'), 'Alinear a la derecha'], ['justify', icon('txtJ'), 'Justificar (texto de párrafo; la última línea a la izquierda)']] as const)
       .map(([v, ic, t]) => toggle(ic, t, () => P().align === v, () => change('Párrafo', p => { p.align = v; })));
     const f = (ic: string, t: string, k: 'indentLeft' | 'indentRight' | 'indentFirst' | 'spaceBefore' | 'spaceAfter') => numField(ic, t, () => P()[k] ?? 0, v => change('Párrafo', p => { p[k] = v; }), { min: -2000, max: 2000, unit: 'px' });
     const fields = [f('⇥', 'Sangría izquierda', 'indentLeft'), f('⇤', 'Sangría derecha', 'indentRight'), f('↳', 'Sangría de primera línea', 'indentFirst'), f('⤒', 'Espacio antes del párrafo', 'spaceBefore'), f('⤓', 'Espacio después del párrafo', 'spaceAfter')];

@@ -1115,6 +1115,7 @@ export class FilterSession {
   private job = 0;
   private waiting = new Map<number, (img: ImageData) => void>();
   private last: { key: string; img: ImageData } | null = null;
+  private pending: { key: string; promise: Promise<ImageData> } | null = null;
   constructor(t: PaintTarget, public def: FilterDef, useWorker = true) {
     const d = doc()!;
     this.t = t;
@@ -1152,11 +1153,14 @@ export class FilterSession {
       const img = computeFilter(this.orig, this.sel?.data ?? null, this.def.apply, p, !!this.t.isMask, !!this.t.lockAlpha);
       this.last = { key, img }; return img;
     }
+    if (this.pending?.key === key) return this.pending.promise; // ya se está calculando esto mismo
     const job = ++this.job;
-    return new Promise(res => {
-      this.waiting.set(job, img => { this.last = { key, img }; res(img); });
+    const promise = new Promise<ImageData>(res => {
+      this.waiting.set(job, img => { this.last = { key, img }; if (this.pending?.promise === promise) this.pending = null; res(img); });
       this.worker!.postMessage({ type: 'run', session: this.id, job, params: p });
     });
+    this.pending = { key, promise };
+    return promise;
   }
   render(params: any) {
     const show = (img: ImageData) => {
@@ -1183,6 +1187,8 @@ export class FilterSession {
   async commit(params: any) {
     // Si la vista previa ya calculó estos valores se reutilizan; si no, se calcula aquí mismo
     const p = { ...params, seed: this.seed }, key = JSON.stringify(p);
+    // en imágenes grandes se espera al hilo de fondo (la pantalla no se congela mientras tanto)
+    if (this.last?.key !== key && this.worker && !this.ended) await this.compute(params);
     const r = this.last?.key === key ? this.last.img : computeFilter(this.orig, this.sel?.data ?? null, this.def.apply, p, !!this.t.isMask, !!this.t.lockAlpha);
     this.end();
     const out = cloneCanvas(this.t.canvas);

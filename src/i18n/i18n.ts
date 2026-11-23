@@ -29,10 +29,17 @@ const KEY = 'editor.lang';
 
 function pick(): string {
   try { const v = localStorage.getItem(KEY); if (v && AVAILABLE.has(v)) return v; } catch { /* sin almacenamiento */ }
-  // primera vez: el idioma del navegador si lo tenemos; si no, inglés (el español solo si el navegador está en español)
-  for (const l of navigator.languages ?? [navigator.language]) { const c = (l || '').slice(0, 2).toLowerCase(); if (AVAILABLE.has(c)) return c; }
+  // primera vez: en inglés; al empezar se pregunta si se quiere otro idioma (ver askLanguage en main.ts)
   return 'en';
 }
+/** Idioma del navegador si lo tenemos (para sugerirlo la primera vez), o null. */
+export function browserLang(): string | null {
+  for (const l of navigator.languages ?? [navigator.language]) { const c = (l || '').slice(0, 2).toLowerCase(); if (AVAILABLE.has(c)) return c; }
+  return null;
+}
+/** true si nunca se ha elegido idioma en este dispositivo. */
+export function langChosen(): boolean { try { return !!localStorage.getItem(KEY); } catch { return true; } }
+export function keepLang() { try { localStorage.setItem(KEY, lang); } catch { /* */ } }
 export const lang = pick();
 let dict: Dict | null = lang === 'es' ? null : cachedDict(lang);
 

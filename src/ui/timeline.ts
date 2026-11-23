@@ -48,16 +48,16 @@ export function framesFromLayers(d: EditorDocument) {
 export function buildTimeline(parent: HTMLElement) {
   const strip = h('div', { class: 'tl-frames' });
   let timer = 0;
-  const stop = () => { clearTimeout(timer); timer = 0; playBtn.textContent = '▶'; };
+  const stop = () => { clearTimeout(timer); timer = 0; playBtn.innerHTML = icon('play'); };
   const play = () => {
     const d = app.doc; if (!d || d.frames.length < 2) return;
     if (timer) { stop(); return; }
-    playBtn.textContent = '■';
+    playBtn.innerHTML = icon('stop');
     const tick = () => { const dd = app.doc; if (!dd || dd.frames.length < 2) { stop(); return; } applyFrame(dd, (dd.frameIndex + 1) % dd.frames.length); timer = window.setTimeout(tick, dd.frames[dd.frameIndex].delay); };
     timer = window.setTimeout(tick, d.frames[d.frameIndex]?.delay ?? 100);
   };
   const btn = (label: string, title: string, fn: () => void) => { const b = h('button', { class: 'btn', title }, label); b.onclick = fn; return b; };
-  const playBtn = btn('▶', 'Reproducir / detener', play);
+  const playBtn = btn('', 'Reproducir / detener', play); playBtn.innerHTML = icon('play'); playBtn.classList.add('icon-btn');
   const bar = h('div', { class: 'tl-bar' }, h('b', {}, 'Línea de tiempo'), playBtn,
     btn('+ Cuadro', 'Duplicar el cuadro actual', () => { const d = app.doc; if (!d) return; if (!d.frames.length) d.frames.push({ delay: 100, visible: visibleIds(d) }); d.frames.splice(d.frameIndex + 1, 0, { delay: d.frames[d.frameIndex].delay, visible: visibleIds(d) }); applyFrame(d, d.frameIndex + 1); }),
     btn('Eliminar', 'Eliminar el cuadro actual', () => { const d = app.doc; if (!d || !d.frames.length) return; d.frames.splice(d.frameIndex, 1); if (d.frames.length) applyFrame(d, Math.min(d.frameIndex, d.frames.length - 1)); else d.changed(); }),

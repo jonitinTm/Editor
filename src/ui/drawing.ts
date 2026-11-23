@@ -42,7 +42,8 @@ export function buildSideSliders(host: HTMLElement) {
   const redo = h('button', { class: 'ss-btn', type: 'button', title: 'Rehacer', 'aria-label': 'Rehacer', html: icon('redo') });
   undo.onclick = () => ops.undo(); redo.onclick = () => ops.redo();
   host.append(preview);
-  const wrap = h('div', { class: 'side-sliders' }, size.el, h('div', { class: 'ss-gap' }), op.el, undo, redo);
+  const name = (t: string) => h('span', { class: 'ss-name' }, t);
+  const wrap = h('div', { class: 'side-sliders' }, name('Tamaño'), size.el, h('div', { class: 'ss-gap' }), name('Opacidad'), op.el, undo, redo);
   host.append(wrap);
   const update = () => {
     const want = prefs.sideSliders === 'on' || (prefs.sideSliders === 'auto' && (app.viewport?.penSeen || document.body.classList.contains('draw-mode') || (matchMedia('(pointer: coarse)').matches && innerWidth >= 700)));
@@ -66,18 +67,18 @@ export function toggleDrawMode(force?: boolean) {
   document.body.classList.toggle('draw-mode', on);
   if (on) {
     if (!miniBar) {
-      const tool = (tid: string, ic: string, title: string) => { const b = h('button', { class: 'dm-btn', type: 'button', title, 'aria-label': title, 'data-tool': tid, html: icon(ic) }); b.onclick = () => app.setTool(tid); return b; };
-      const sw = h('button', { class: 'dm-btn dm-color', type: 'button', title: 'Color', 'aria-label': 'Color' });
+      const tool = (tid: string, ic: string, title: string) => { const b = h('button', { class: 'dm-btn', type: 'button', title, 'aria-label': title, 'data-tool': tid, html: icon(ic) }, h('span', { class: 'dm-lbl' }, title)); b.onclick = () => app.setTool(tid); return b; };
+      const sw = h('button', { class: 'dm-btn dm-color', type: 'button', title: 'Color', 'aria-label': 'Color' }, h('span', { class: 'dm-lbl' }, 'Color'));
       sw.onclick = () => import('./artist').then(m => m.colorPopover(sw));
-      const ref = h('button', { class: 'dm-btn', type: 'button', title: 'Imagen de referencia', 'aria-label': 'Imagen de referencia', html: icon('image') || '🖼' });
+      const ref = h('button', { class: 'dm-btn', type: 'button', title: 'Imagen de referencia', 'aria-label': 'Imagen de referencia', html: icon('image') }, h('span', { class: 'dm-lbl' }, 'Referencia'));
       ref.onclick = () => import('./artist').then(m => m.toggleReference());
-      const gal = h('button', { class: 'dm-btn', type: 'button', title: 'Añadir foto de la galería como capa', 'aria-label': 'Añadir foto de la galería como capa', html: icon('plus') });
+      const gal = h('button', { class: 'dm-btn', type: 'button', title: 'Añadir foto de la galería como capa', 'aria-label': 'Añadir foto de la galería como capa', html: icon('plus') }, h('span', { class: 'dm-lbl' }, 'Galería'));
       gal.onclick = async () => { const io = await import('../io/files'); ops.openAsLayers(await io.pickFiles('image/*')); };
-      const u = h('button', { class: 'dm-btn', type: 'button', title: 'Deshacer', html: icon('undo') }), r = h('button', { class: 'dm-btn', type: 'button', title: 'Rehacer', html: icon('redo') });
+      const u = h('button', { class: 'dm-btn', type: 'button', title: 'Deshacer', 'aria-label': 'Deshacer', html: icon('undo') }, h('span', { class: 'dm-lbl' }, 'Deshacer')), r = h('button', { class: 'dm-btn', type: 'button', title: 'Rehacer', 'aria-label': 'Rehacer', html: icon('redo') }, h('span', { class: 'dm-lbl' }, 'Rehacer'));
       u.onclick = () => ops.undo(); r.onclick = () => ops.redo();
       const br = h('button', { class: 'dm-btn dm-presets', type: 'button', title: 'Pinceles' }, 'Pinceles');
       br.onclick = ev => { ev.stopPropagation(); if (app.tool?.id !== 'brush') app.setTool('brush'); import('./optionsbar').then(m => m.presetMenu(br, app.tool)); };
-      const x = h('button', { class: 'dm-btn dm-exit', type: 'button', title: 'Salir del modo dibujo', 'aria-label': 'Salir del modo dibujo' }, '✕');
+      const x = h('button', { class: 'dm-btn dm-exit', type: 'button', title: 'Salir del modo dibujo', 'aria-label': 'Salir del modo dibujo', html: icon('close') }, h('span', { class: 'dm-lbl' }, 'Salir'));
       x.onclick = () => toggleDrawMode(false);
       miniBar = h('div', { class: 'draw-bar' }, tool('brush', 'brush', 'Pincel'), tool('eraser', 'eraser', 'Borrador'), tool('smudge', 'finger', 'Dedo'), tool('eyedropper', 'eyedropper', 'Cuentagotas'), br, sw, ref, gal, u, r, x);
       document.body.append(miniBar);

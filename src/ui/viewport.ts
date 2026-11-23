@@ -9,6 +9,9 @@ import { h } from './dom';
 import { drawSnap } from '../tools/snap';
 import { GroupLayer, tracePath } from '../core/layers';
 
+/** Móvil con poca memoria: se ahorra resolución de pantalla al dibujar el lienzo. */
+const LOW_END = ((navigator as any).deviceMemory ?? 8) <= 3 || (navigator.hardwareConcurrency ?? 8) <= 2;
+
 const RULER = 20;
 
 export class Viewport {
@@ -184,8 +187,9 @@ export class Viewport {
 
   resize() {
     const wrap = this.canvas.parentElement!;
-    // en pantallas muy densas (3×) se dibuja a 2×: se ve igual de nítido y es mucho más ligero
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    // en pantallas muy densas (3×) se dibuja a 2×: se ve igual de nítido y es mucho más ligero;
+    // en móviles con poca memoria (≤ 3 GB), a 1,5× (casi la mitad de píxeles por fotograma)
+    this.dpr = Math.min(LOW_END ? 1.5 : 2, window.devicePixelRatio || 1);
     this.width = wrap.clientWidth; this.height = wrap.clientHeight;
     for (const [c, w, hh] of [[this.canvas, this.width, this.height], [this.rulerH, this.width, RULER], [this.rulerV, RULER, this.height]] as const) {
       c.width = Math.max(1, Math.round(w * this.dpr)); c.height = Math.max(1, Math.round(hh * this.dpr));

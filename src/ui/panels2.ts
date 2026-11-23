@@ -133,11 +133,11 @@ export function buildInfoPanel(parent: HTMLElement) {
 
 export function buildChannelsPanel(parent: HTMLElement) {
   const list = h('div', { class: 'layer-list' });
-  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn }, label);
+  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn, 'aria-label': title, html: icon(label) || label });
   const foot = h('div', { class: 'panel-foot' },
-    btn('Cargar el canal seleccionado como selección', '◌', () => { if (selId) ops.loadChannel(selId); }),
+    btn('Cargar el canal seleccionado como selección', 'pathToSel', () => { if (selId) ops.loadChannel(selId); }),
     btn('Guardar la selección como canal nuevo', '＋', () => ops.saveSelectionAsChannel()),
-    btn('Eliminar el canal seleccionado', '🗑', () => { if (selId) { ops.deleteChannel(selId); selId = 0; } }));
+    btn('Eliminar el canal seleccionado', 'trash', () => { if (selId) { ops.deleteChannel(selId); selId = 0; } }));
   const body = h('div', { class: 'panel-body layers' }, list, foot);
   parent.append(body);
   let selId = 0;
@@ -178,10 +178,10 @@ export function buildActionsPanel(parent: HTMLElement) {
   const list = h('div', { class: 'layer-list act-list' });
   let sel = 0;
   const open = new Set<string>();
-  const recBtn = h('button', { class: 'btn icon-btn rec', title: 'Grabar una acción nueva' }, '●');
-  const stopBtn = h('button', { class: 'btn icon-btn', title: 'Detener la grabación' }, '■');
-  const playBtn = h('button', { class: 'btn icon-btn', title: 'Reproducir la acción seleccionada' }, '▶');
-  const delBtn = h('button', { class: 'btn icon-btn', title: 'Eliminar la acción seleccionada' }, '🗑');
+  const recBtn = h('button', { class: 'btn icon-btn rec', title: 'Grabar una acción nueva', html: icon('record') });
+  const stopBtn = h('button', { class: 'btn icon-btn', title: 'Detener la grabación', html: icon('stop') });
+  const playBtn = h('button', { class: 'btn icon-btn', title: 'Reproducir la acción seleccionada', html: icon('play') });
+  const delBtn = h('button', { class: 'btn icon-btn', title: 'Eliminar la acción seleccionada', html: icon('trash') });
   const batchBtn = h('button', { class: 'btn', title: 'Aplicar a muchas imágenes' }, 'Lote…');
   recBtn.onclick = async () => { const n = await promptDialog('Nueva acción', 'Nombre', 'Acción ' + (M.macros().filter(m => !m.builtin).length + 1)); if (n !== null) { M.startRecording(n || 'Acción'); sel = 0; app.toast('Grabando: lo que hagas ahora (filtros, ajustes, tamaño, giros, capas…) se añadirá a la acción'); } };
   stopBtn.onclick = () => M.stopRecording();
@@ -215,13 +215,13 @@ export function buildActionsPanel(parent: HTMLElement) {
 export function buildPathsPanel(parent: HTMLElement) {
   const list = h('div', { class: 'layer-list' });
   const act = (fn: (i: number) => void) => () => { const d = app.doc; if (d && d.activePath >= 0) fn(d.activePath); else app.toast('Selecciona un trazado', 'warn'); };
-  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn }, label);
+  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn, 'aria-label': title, html: icon(label) || label });
   const foot = h('div', { class: 'panel-foot' },
-    btn('Rellenar el trazado con el color frontal', '●', act(ops.fillDocPath)),
-    btn('Contornear el trazado con el pincel (color frontal y tamaño del pincel)', '○', act(ops.strokeDocPath)),
-    btn('Cargar el trazado como selección', '◌', act(ops.docPathToSelection)),
-    btn('Crear un trazado a partir de la selección', '⬚', () => ops.selectionToPath()),
-    btn('Eliminar el trazado', '🗑', act(ops.deleteDocPath)));
+    btn('Rellenar el trazado con el color frontal', 'fillPath', act(ops.fillDocPath)),
+    btn('Contornear el trazado con el pincel (color frontal y tamaño del pincel)', 'strokePath', act(ops.strokeDocPath)),
+    btn('Cargar el trazado como selección', 'pathToSel', act(ops.docPathToSelection)),
+    btn('Crear un trazado a partir de la selección', 'selToPath', () => ops.selectionToPath()),
+    btn('Eliminar el trazado', 'trash', act(ops.deleteDocPath)));
   const body = h('div', { class: 'panel-body layers' }, list, foot);
   parent.append(body);
   const render = () => {
@@ -239,7 +239,7 @@ export function buildPathsPanel(parent: HTMLElement) {
       row.querySelector('.lname')!.addEventListener('dblclick', async ev => { ev.stopPropagation(); const n = await promptDialog('Cambiar nombre de trazado', 'Nombre', p.name); if (n) { p.name = n; d.commit('Cambiar nombre de trazado'); } });
       list.append(row);
     });
-    if (!d.paths.length) list.append(h('div', { class: 'hint ch-empty' }, 'Dibuja con la Pluma en modo «Trazado», o crea uno desde una selección (botón ⬚).'));
+    if (!d.paths.length) list.append(h('div', { class: 'hint ch-empty' }, 'Dibuja con la Pluma en modo «Trazado», o crea uno desde una selección.'));
   };
   let t = 0;
   app.on('doc', () => { clearTimeout(t); t = window.setTimeout(render, 150); }); app.on('docs', render);
@@ -251,7 +251,7 @@ export function buildPathsPanel(parent: HTMLElement) {
 export function buildCompsPanel(parent: HTMLElement) {
   const list = h('div', { class: 'layer-list' });
   let sel = -1;
-  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn }, label);
+  const btn = (title: string, label: string, fn: () => void) => h('button', { class: 'btn icon-btn', title, onclick: fn, 'aria-label': title, html: icon(label) || label });
   const newComp = async () => {
     const d = app.doc; if (!d) return;
     const name = h('input', { type: 'text', class: 'wide', value: `Composición ${d.layerComps.length + 1}` });
@@ -263,7 +263,7 @@ export function buildCompsPanel(parent: HTMLElement) {
   const foot = h('div', { class: 'panel-foot' },
     btn('Actualizar la composición seleccionada con el estado actual', '⟳', () => { const d = app.doc; const c = d?.layerComps[sel]; if (c) { ops.captureLayerComp(c.name, c, sel); app.toast('Composición actualizada'); } else app.toast('Selecciona una composición', 'warn'); }),
     btn('Nueva composición a partir del estado actual', '＋', newComp),
-    btn('Eliminar la composición seleccionada', '🗑', () => { if (sel >= 0) { ops.deleteLayerComp(sel); sel = -1; render(); } }));
+    btn('Eliminar la composición seleccionada', 'trash', () => { if (sel >= 0) { ops.deleteLayerComp(sel); sel = -1; render(); } }));
   const body = h('div', { class: 'panel-body layers' }, list, foot);
   parent.append(body);
   const render = () => {

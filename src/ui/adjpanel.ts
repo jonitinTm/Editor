@@ -9,6 +9,7 @@ import { AdjustmentLayer, GroupLayer, LayerMask } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
 import * as ops from './ops';
 import { prefs, savePrefs } from './prefs';
+import { icon } from './icons';
 
 /** Valores para la miniatura: los de por defecto suelen no cambiar nada, así que se exagera el primer control. */
 function demoParams(f: FilterDef) {
@@ -92,7 +93,7 @@ export function buildAdjustmentsPanel(parent: HTMLElement) {
     const c = h('canvas', { width: 72, height: 48, class: 'adj-thumb' }) as HTMLCanvasElement;
     const b = h('button', { class: 'adj-item', type: 'button', title: L.desc }, c, h('span', {}, L.name));
     b.onclick = () => applyLook(L); into.append(b);
-    if (del) { const x = h('span', { class: 'adj-del', title: 'Borrar este look', role: 'button' }, '✕'); x.onclick = e => { e.stopPropagation(); del(); }; b.append(x); }
+    if (del) { const x = h('span', { class: 'adj-del', title: 'Borrar este look', role: 'button', html: icon('close') }); x.onclick = e => { e.stopPropagation(); del(); }; b.append(x); }
     lookThumbs.push({ c, run: src => {
       const im = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height);
       for (const [id, params] of L.layers) { const f = FILTERS.find(x => x.id === id); if (f) try { f.apply(im, { ...defaultParams(f), ...(params ?? {}) }); } catch { /* */ } }

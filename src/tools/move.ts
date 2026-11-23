@@ -57,15 +57,15 @@ export class MoveTool implements Tool {
     const sep = document.createElement('span'); sep.className = 'opt-sep'; bar.append(sep);
     const lbl = document.createElement('span'); lbl.className = 'lbl hint'; lbl.textContent = 'Alinear:'; bar.append(lbl);
     const g = document.createElement('div'); g.className = 'btn-group';
-    for (const [m, t, title] of [['left', '⇤', 'Bordes izquierdos'], ['hcenter', '↔', 'Centros horizontales'], ['right', '⇥', 'Bordes derechos'], ['top', '⤒', 'Bordes superiores'], ['vcenter', '↕', 'Centros verticales'], ['bottom', '⤓', 'Bordes inferiores']] as const) {
-      const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; b.title = title + ' (varias capas: entre sí; una: respecto a la selección o al lienzo)'; b.dataset.align = m;
+    for (const [m, t, title] of [['left', 'alignL', 'Bordes izquierdos'], ['hcenter', 'alignHC', 'Centros horizontales'], ['right', 'alignR', 'Bordes derechos'], ['top', 'alignT', 'Bordes superiores'], ['vcenter', 'alignVC', 'Centros verticales'], ['bottom', 'alignB', 'Bordes inferiores']] as const) {
+      const b = document.createElement('button'); b.className = 'btn icon-btn'; b.innerHTML = icon(t); b.title = title + ' (varias capas: entre sí; una: respecto a la selección o al lienzo)'; b.dataset.align = m;
       b.onclick = () => alignLayer(m); g.append(b);
     }
     bar.append(g);
     const l2 = document.createElement('span'); l2.className = 'lbl hint'; l2.textContent = 'Distribuir:'; bar.append(l2);
     const g2 = document.createElement('div'); g2.className = 'btn-group';
-    for (const [m, t, title] of [['hcenter', '⫼', 'Centros horizontales'], ['vcenter', '☰', 'Centros verticales'], ['hspace', '↔|', 'Mismo espacio horizontal'], ['vspace', '↕|', 'Mismo espacio vertical']] as const) {
-      const b = document.createElement('button'); b.className = 'btn'; b.textContent = t; b.title = 'Distribuir: ' + title + ' (3 o más capas seleccionadas)'; b.dataset.dist = m;
+    for (const [m, t, title] of [['hcenter', 'distHC', 'Centros horizontales'], ['vcenter', 'distVC', 'Centros verticales'], ['hspace', 'distHS', 'Mismo espacio horizontal'], ['vspace', 'distVS', 'Mismo espacio vertical']] as const) {
+      const b = document.createElement('button'); b.className = 'btn icon-btn'; b.innerHTML = icon(t); b.title = 'Distribuir: ' + title + ' (3 o más capas seleccionadas)'; b.dataset.dist = m;
       b.onclick = () => distributeLayers(m); g2.append(b);
     }
     bar.append(g2);

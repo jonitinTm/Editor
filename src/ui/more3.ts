@@ -63,8 +63,8 @@ export class VanishingTool {
     const fit = h('select', {}, h('option', { value: 'fill' }, 'Llenar el plano'), h('option', { value: 'fit' }, 'Encajar sin deformar')) as HTMLSelectElement;
     fit.onchange = () => { this.fit = fit.value as any; this.preview(); };
     bar.append(h('span', { class: 'lbl' }, 'Pegar'), sel, fit,
-      h('button', { class: 'btn icon-btn ok', type: 'button', title: 'Aplicar (Intro)', html: '✓', onclick: () => this.apply() }),
-      h('button', { class: 'btn icon-btn', type: 'button', title: 'Cancelar (Esc)', html: '✕', onclick: () => this.cancel() }));
+      h('button', { class: 'btn icon-btn ok', type: 'button', title: 'Aplicar (Intro)', html: icon('check'), onclick: () => this.apply() }),
+      h('button', { class: 'btn icon-btn', type: 'button', title: 'Cancelar (Esc)', html: icon('close'), onclick: () => this.cancel() }));
   }
   private render(): HTMLCanvasElement | null {
     const d = app.doc!, s = this.src; if (!s) return null;
@@ -176,7 +176,7 @@ export function textStylesDialog() {
     for (const { s, user } of all) {
       const p = s.props, prev = h('span', { class: 'ts-prev', style: { fontFamily: `${JSON.stringify(p.font ?? 'Arial')}, sans-serif`, fontWeight: p.bold ? 'bold' : 'normal', fontStyle: p.italic ? 'italic' : 'normal', textTransform: p.caps ? 'uppercase' : 'none', color: p.color ?? '' } }, s.name);
       const row2 = h('div', { class: 'ts-row' }, prev, h('span', { class: 'hint' }, `${p.font ?? ''} ${p.size ? p.size + ' px' : ''}`), h('button', { class: 'btn', type: 'button', onclick: () => apply(s) }, 'Aplicar'),
-        user ? h('button', { class: 'btn icon-btn', type: 'button', title: 'Borrar estilo', onclick: () => { saveTS(loadTS().filter(x => x.name !== s.name)); render(); } }, '✕') : null);
+        user ? h('button', { class: 'btn icon-btn', type: 'button', title: 'Borrar estilo', onclick: () => { saveTS(loadTS().filter(x => x.name !== s.name)); render(); }, html: icon('trash') }) : null);
       list.append(row2);
     }
   };

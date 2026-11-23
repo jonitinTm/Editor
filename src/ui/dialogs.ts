@@ -428,7 +428,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
     if (builtin.length) presetSel.append(h('optgroup', { label: 'De serie' }, ...builtin.map((p, i) => h('option', { value: 'b' + i }, p.name))));
     if (mine.length) presetSel.append(h('optgroup', { label: 'Míos' }, ...mine.map((p, i) => h('option', { value: 'u' + i }, p.name))));
     presetSel.append(h('option', { value: 'save' }, '＋ Guardar los valores actuales…'));
-    if (mine.length) presetSel.append(h('option', { value: 'del' }, '🗑 Borrar uno de los míos…'));
+    if (mine.length) presetSel.append(h('option', { value: 'del' }, 'Borrar uno de los míos…'));
   };
   fillPresets();
   presetSel.addEventListener('change', async () => {
