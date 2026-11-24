@@ -43,12 +43,20 @@ export class BackgroundEraserTool implements Tool {
   ] as any[];
   /** Qué se hace con cada píxel parecido: aquí, borrarlo. */
   protected apply(d: Uint8ClampedArray, i: number, f: number) { d[i + 3] = d[i + 3] * (1 - f); }
+  /** En qué color se convierte el color muestreado (null si la herramienta no cambia el color). */
+  protected replaced(_rgb: number[]): number[] | null { return null; }
   private t: PaintTarget | null = null; private work: HTMLCanvasElement | null = null; private last: { x: number; y: number } | null = null;
   private sample: number[] | null = null; private changed = false;
+  /** Cobertura máxima alcanzada por cada píxel durante el trazo (0-255): el efecto no se acumula dab tras dab y el
+   *  color se compara siempre con los píxeles de antes del trazo (si no, los bordes de cada dab, ya medio cambiados,
+   *  dejaban de parecerse al color muestreado y quedaban arcos). */
+  private cover: Uint8Array | null = null;
+  /** Ancho del borde suave del pincel (fracción del radio). */
+  protected softEdge = 1 / 3;
   down(e: ToolEvent) {
     const t = getPaintTarget(); if (!t || t.isMask) return;
     if (t.lockAlpha && this.id === 'bgEraser') { app.toast('La transparencia de la capa está bloqueada', 'warn'); return; }
-    this.t = t; this.work = cloneCanvas(t.canvas); this.changed = false; this.sample = null;
+    this.t = t; this.work = cloneCanvas(t.canvas); this.changed = false; this.sample = null; this.cover = new Uint8Array(t.canvas.width * t.canvas.height);
     setPreview(t, this.work); this.last = { x: e.x, y: e.y }; this.dab(e.x, e.y);
   }
   move(e: ToolEvent) {
@@ -62,20 +70,36 @@ export class BackgroundEraserTool implements Tool {
     const x0 = Math.max(0, Math.floor(cx - r)), y0 = Math.max(0, Math.floor(cy - r)), x1 = Math.min(c.width, Math.ceil(cx + r)), y1 = Math.min(c.height, Math.ceil(cy + r));
     const w = x1 - x0, hh = y1 - y0; if (w < 1 || hh < 1) return;
     const ctx = ctx2d(c), img = ctx.getImageData(x0, y0, w, hh), d = img.data;
+    // píxeles de antes del trazo (la capa no cambia hasta soltar): con ellos se muestrea y se compara
+    const orig = ctx2d(this.t!.canvas).getImageData(x0, y0, w, hh).data, cover = this.cover!, CW = c.width;
     const ci = (Math.min(hh - 1, Math.max(0, Math.round(cy) - y0)) * w + Math.min(w - 1, Math.max(0, Math.round(cx) - x0))) * 4;
-    if (!this.sample || app.opt('sampling', this.id) === 'continuous') { if (d[ci + 3] > 0) this.sample = [d[ci], d[ci + 1], d[ci + 2]]; }
+    if (!this.sample || app.opt('sampling', this.id) === 'continuous') { if (orig[ci + 3] > 0) this.sample = [orig[ci], orig[ci + 1], orig[ci + 2]]; }
     const s = this.sample; if (!s) return;
+    // dirección del color muestreado a su sustituto (solo en Sustitución de color)
+    const sr = this.replaced(s), rep = sr ? [sr[0] - s[0], sr[1] - s[1], sr[2] - s[2], 0] : null;
+    if (rep) { rep[3] = rep[0] * rep[0] + rep[1] * rep[1] + rep[2] * rep[2]; if (rep[3] < 1) rep.length = 0; }
+    const repOk = rep && rep.length ? rep : null;
     const fg = app.opt('protect', this.id) ? parseInt(app.fg.slice(1), 16) : -1, fr = fg >> 16 & 255, fgc = fg >> 8 & 255, fb = fg & 255;
     const sel = app.doc!.selection.mask ? ctx2d(app.doc!.selection.mask).getImageData(x0, y0, w, hh).data : null;
     for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
       const dist = Math.hypot(x0 + x + 0.5 - cx, y0 + y + 0.5 - cy) / r; if (dist >= 1) continue;
-      const i = (y * w + x) * 4; if (!d[i + 3]) continue;
-      const cd = Math.max(Math.abs(d[i] - s[0]), Math.abs(d[i + 1] - s[1]), Math.abs(d[i + 2] - s[2]));
+      const i = (y * w + x) * 4; if (!orig[i + 3]) continue;
+      // parecido al color muestreado… o a medio camino entre él y su sustituto (bordes de una pasada anterior)
+      let qr = s[0], qg = s[1], qb = s[2], tt = 0;
+      if (repOk) { const rep = repOk; const vr = orig[i] - s[0], vg = orig[i + 1] - s[1], vb = orig[i + 2] - s[2]; tt = Math.max(0, Math.min(1, (vr * rep[0] + vg * rep[1] + vb * rep[2]) / rep[3])); qr += rep[0] * tt; qg += rep[1] * tt; qb += rep[2] * tt; }
+      const cd = Math.max(Math.abs(orig[i] - qr), Math.abs(orig[i + 1] - qg), Math.abs(orig[i + 2] - qb));
       if (cd > tol) continue;
-      if (fg >= 0 && Math.max(Math.abs(d[i] - fr), Math.abs(d[i + 1] - fgc), Math.abs(d[i + 2] - fb)) < 20) continue;
+      if (fg >= 0 && Math.max(Math.abs(orig[i] - fr), Math.abs(orig[i + 1] - fgc), Math.abs(orig[i + 2] - fb)) < 20) continue;
       // borde suave del pincel y de la tolerancia
-      const f = Math.min(1, (1 - dist) * 3) * Math.min(1, (tol - cd) / Math.max(1, tol * 0.25)) * (sel ? sel[i + 3] / 255 : 1);
-      this.apply(d, i, f);
+      const f = Math.min(1, (1 - dist) / this.softEdge) * Math.min(1, (tol - cd) / Math.max(1, tol * 0.25)) * (sel ? sel[i + 3] / 255 : 1);
+      // solo si este dab cubre más que los anteriores; se parte siempre del píxel original
+      const ci2 = (y0 + y) * CW + x0 + x, fq = Math.round(f * 255); if (fq <= cover[ci2]) continue;
+      cover[ci2] = fq;
+      d[i] = orig[i]; d[i + 1] = orig[i + 1]; d[i + 2] = orig[i + 2]; d[i + 3] = orig[i + 3];
+      // píxel ya cambiado en parte por una pasada anterior: se recupera cómo era antes (si no, se tomaba su luminosidad,
+      // más baja, y quedaba una línea oscura entre pasadas) y se completa el cambio
+      if (repOk && tt > 0.02) { d[i] = orig[i] - repOk[0] * tt; d[i + 1] = orig[i + 1] - repOk[1] * tt; d[i + 2] = orig[i + 2] - repOk[2] * tt; }
+      this.apply(d, i, Math.max(fq / 255, repOk ? tt : 0));
     }
     ctx.putImageData(img, x0, y0); this.changed = true;
     app.doc!.invalidate({ x: x0, y: y0, w, h: hh });
@@ -84,9 +108,9 @@ export class BackgroundEraserTool implements Tool {
     const t = this.t; if (!t || !this.work) return;
     setPreview(t, null);
     if (this.changed) { const z = setTargetCanvas(t, this.work, 'auto'); app.doc!.commit(this.name, z); }
-    this.t = null; this.work = null; this.last = null;
+    this.t = null; this.work = null; this.last = null; this.cover = null;
   }
-  cancel() { if (this.t) setPreview(this.t, null); this.t = null; this.work = null; app.doc?.invalidate(); }
+  cancel() { if (this.t) setPreview(this.t, null); this.t = null; this.work = null; this.cover = null; app.doc?.invalidate(); }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     drawBrushCursor(ctx, vp, app.opt<number>('size', this.id));
     if (vp.mouseScreen) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.moveTo(vp.mouseScreen.x - 3, vp.mouseScreen.y - 3); ctx.lineTo(vp.mouseScreen.x + 3, vp.mouseScreen.y + 3); ctx.stroke(); }
@@ -119,9 +143,11 @@ export class RedEyeTool implements Tool {
     for (let y = 0; y < hh; y++) for (let x = 0; x < w; x++) {
       const dist = Math.hypot(x0 + x + 0.5 - cx, y0 + y + 0.5 - cy) / r; if (dist > 1) continue;
       const i = (y * w + x) * 4, R = p[i], G = p[i + 1], B = p[i + 2];
-      const redness = R - Math.max(G, B);
-      if (R < 60 || redness < 30) continue;
-      const k = Math.min(1, (redness - 30) / 50) * Math.min(1, (1 - dist) * 4);
+      // rojo de pupila: el rojo domina claramente (proporción frente a verde y azul), no solo «más rojo que los demás»:
+      // la piel también es rojiza (p. ej. 242, 200, 160) y no se debe oscurecer
+      const redness = R - Math.max(G, B), ratio = R / Math.max(1, (G + B) / 2);
+      if (R < 60 || redness < 40 || ratio < 1.6) continue;
+      const k = Math.min(1, (ratio - 1.6) / 0.8) * Math.min(1, (1 - dist) * 4);
       const v = (G + B) / 2 * dark;
       p[i] = R + (v - R) * k; p[i + 1] = G + (G * dark - G) * k; p[i + 2] = B + (B * dark - B) * k; n2++;
     }
@@ -180,6 +206,8 @@ export class RulerTool implements Tool {
 /** Sustitución de color: cambia el tono y la saturación de los colores parecidos al muestreado, conservando la luz. */
 export class ColorReplaceTool extends BackgroundEraserTool {
   id = 'colorReplace'; name = 'Sustitución de color'; icon = icon('colorReplace'); key = 'B'; group = 'brush'; cursor = 'none';
+  // borde casi duro (como en Photoshop): con borde muy suave, cada pasada dejaba anillos a medio cambiar
+  protected softEdge = 0.12;
   options = [
     { key: 'size', label: 'Tamaño', type: 'range', min: 1, max: 500, default: 40, unit: 'px' },
     { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 1, max: 100, default: 30, unit: '%' },
@@ -194,6 +222,7 @@ export class ColorReplaceTool extends BackgroundEraserTool {
     const [r, g, b] = hsl2rgb(h0, s0, l0);
     d[i] += (r - d[i]) * f; d[i + 1] += (g - d[i + 1]) * f; d[i + 2] += (b - d[i + 2]) * f;
   }
+  protected replaced(rgb: number[]) { const d = new Uint8ClampedArray([rgb[0], rgb[1], rgb[2], 255]); this.apply(d, 0, 1); return [d[0], d[1], d[2]]; }
 }
 
 /** Muestra de color: hasta 4 puntos fijos cuyo color se ve en el panel Info (Alt+clic quita uno). */
