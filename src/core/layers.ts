@@ -489,9 +489,38 @@ export class TextLayer extends RasterLayer {
     const h = Math.max(1, ...lines.map(l => [...l].length)) * step;
     return { x: p.x - colW * lines.length, y: p.y, w: colW * lines.length, h };
   }
+  // Zona del lienzo donde quedó dibujado el texto la última vez (válida mientras nadie más toque los píxeles):
+  // al reescribir solo se borra y se avisa de esa zona, no de la imagen entera.
+  private drawn: { canvas: HTMLCanvasElement; version: number; rect: Rect } | null = null;
+  /** Zona que cambió en el último render (null = toda la capa). */
+  lastChange: Rect | null = null;
   render() {
-    clearCanvas(this.canvas);
     const p = this.props;
+    const warped0 = p.warp && p.warp.style !== 'none' && p.warp.bend !== 0;
+    const boxed = !p.onPath && !p.vertical && !warped0 && !p.area?.length;
+    const old = boxed && this.drawn && this.drawn.canvas === this.canvas && this.drawn.version === this.version ? this.drawn.rect : null;
+    this.drawn = null;
+    if (old) ctx2d(this.canvas).clearRect(old.x, old.y, old.w, old.h); else clearCanvas(this.canvas);
+    this.renderInner();
+    if (!boxed || !old) { this.lastChange = null; if (boxed) this.drawn = { canvas: this.canvas, version: this.version, rect: this.drawnRect() }; return; }
+    const nw = this.drawnRect(), x = Math.min(old.x, nw.x), y = Math.min(old.y, nw.y);
+    const u = { x, y, w: Math.max(old.x + old.w, nw.x + nw.w) - x, h: Math.max(old.y + old.h, nw.y + nw.h) - y };
+    // renderInner ya llamó a touch(): se rebaja a un cambio solo en esa zona para el historial
+    this.version--; this.dirty = this.dirtyBefore; this.pendingBefore = null; this.touchRect(u);
+    this.lastChange = u;
+    this.drawn = { canvas: this.canvas, version: this.version, rect: nw };
+  }
+  private dirtyBefore: RasterLayer['dirty'] = 'all';
+  /** Caja con margen (las letras pueden salirse un poco de su caja: cursivas, acentos, colas), en píxeles enteros. */
+  private drawnRect(): Rect {
+    const p = this.props, b = this.bounds(), pad = Math.ceil(Math.max(p.size, ...(p.runs ?? []).map(r => r.size ?? 0)) * 0.8 * Math.max(1, p.hScale ?? 1, p.vScale ?? 1) + Math.abs(p.tracking ?? 0) / 1000 * p.size + 4);
+    const x0 = Math.max(0, Math.floor(b.x - pad)), y0 = Math.max(0, Math.floor(b.y - pad));
+    const x1 = Math.min(this.canvas.width, Math.ceil(b.x + b.w + pad)), y1 = Math.min(this.canvas.height, Math.ceil(b.y + b.h + pad));
+    return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+  }
+  private renderInner() {
+    const p = this.props;
+    this.dirtyBefore = this.dirty;
     // fuente de la biblioteca aún sin descargar: se pide y el texto se redibuja al llegar
     if (needsDownload(p.font)) ensureFont(p.font);
     p.keepPixels = false; delete p.psdTySh;

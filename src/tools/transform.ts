@@ -18,6 +18,7 @@ interface Item {
   layer: RasterLayer;
   src: HTMLCanvasElement;   // píxeles a transformar
   rect: Rect;               // posición original de esos píxeles
+  from?: Rect;              // zona de la capa que se vació al empezar (si no es la misma que rect)
   hole: HTMLCanvasElement;  // la capa sin esos píxeles
   /** Objeto inteligente: no se tocan píxeles, solo se compone su matriz. */
   m0?: Matrix;
@@ -60,6 +61,9 @@ function prepare(): Session | null {
   if (chosen.some(l => l.posLocked())) { app.toast(chosen.some(l => l.isLocked()) ? 'La capa está bloqueada' : 'La posición de la capa está bloqueada', 'warn'); return null; }
   const layers = [...new Set(chosen.flatMap(l => l instanceof GroupLayer ? [...walkLayers(l)] : [l]))].filter(l => isRaster(l) && !l.isLocked());
   const sel = doc.selection.mask;
+  // con selección solo importa su zona: se trabaja con ese trozo y no con la capa entera
+  const selBox = sel ? contentBounds(sel) : null;
+  if (sel && !selBox) { app.toast('No hay píxeles que transformar', 'warn'); return null; }
   const items: Item[] = [];
   let union: Rect | null = null;
   for (let layer of layers) {
@@ -75,9 +79,12 @@ function prepare(): Session | null {
     if (isParametric(layer)) layer = rasterizeLayer(layer as RasterLayer);
     const l = layer as RasterLayer;
     // Sin selección se usa el contenido completo (incluido lo que esté fuera del lienzo)
-    const f = sel ? { canvas: l.canvas, x: 0, y: 0 } : l.fullContent();
-    const pixels = cloneCanvas(f.canvas);
-    if (sel) { const c = ctx2d(pixels); c.globalCompositeOperation = 'destination-in'; c.drawImage(sel, 0, 0); c.globalCompositeOperation = 'source-over'; }
+    let f: { canvas: HTMLCanvasElement; x: number; y: number }, pixels: HTMLCanvasElement;
+    if (sel && selBox) {
+      pixels = makeCanvas(selBox.w, selBox.h); const c = ctx2d(pixels);
+      c.drawImage(l.canvas, -selBox.x, -selBox.y); c.globalCompositeOperation = 'destination-in'; c.drawImage(sel, -selBox.x, -selBox.y); c.globalCompositeOperation = 'source-over';
+      f = { canvas: pixels, x: selBox.x, y: selBox.y };
+    } else { f = l.fullContent(); pixels = f.canvas; }
     const b = contentBounds(pixels);
     if (!b) continue;
     const src = makeCanvas(b.w, b.h);
@@ -87,7 +94,7 @@ function prepare(): Session | null {
     if (sel) { hc.globalCompositeOperation = 'destination-out'; hc.drawImage(sel, 0, 0); hc.globalCompositeOperation = 'source-over'; }
     else hc.clearRect(0, 0, hole.width, hole.height);
     const rect = { x: b.x + f.x, y: b.y + f.y, w: b.w, h: b.h };
-    items.push({ layer: l, src, rect, hole });
+    items.push({ layer: l, src, rect, hole, from: selBox ?? undefined });
     union = rectUnion(union, rect);
   }
   if (!items.length || !union) { app.toast('No hay píxeles que transformar', 'warn'); return null; }
@@ -194,22 +201,46 @@ function drawItem(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, rect: R
 function clearOverrides(s: Session) { for (const it of s.items) app.doc?.overrides.delete(it.layer); }
 
 /** Aplica una sesión: pinta el resultado en las capas y transforma la selección. */
+/** Caja (en el documento) donde puede caer el resultado de la transformación, con margen para el suavizado. */
+function outputBox(s: Session): Rect {
+  let pts: P[];
+  if (s.mesh) { const xs = s.mesh.map(q => q.x), ys = s.mesh.map(q => q.y), w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys); pts = [...s.mesh, { x: Math.min(...xs) - w * 0.15, y: Math.min(...ys) - h * 0.15 }, { x: Math.max(...xs) + w * 0.15, y: Math.max(...ys) + h * 0.15 }]; }
+  else if (s.quad) pts = s.quad;
+  else { const m = sessionMatrix(s), r = s.rect; pts = [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].map(([x, y]) => ({ x: m[0] * x + m[2] * y + m[4], y: m[1] * x + m[3] * y + m[5] })); }
+  const xs = pts.map(q => q.x), ys = pts.map(q => q.y);
+  const x0 = Math.floor(Math.min(...xs)) - 2, y0 = Math.floor(Math.min(...ys)) - 2;
+  return { x: x0, y: y0, w: Math.ceil(Math.max(...xs)) + 2 - x0, h: Math.ceil(Math.max(...ys)) + 2 - y0 };
+}
+function clampRect(r: Rect, W: number, H: number): Rect | null {
+  const x0 = Math.max(0, r.x), y0 = Math.max(0, r.y), x1 = Math.min(W, r.x + r.w), y1 = Math.min(H, r.y + r.h);
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+
 function applySession(s: Session, name: string) {
   const doc = app.doc!;
   clearOverrides(s);
+  // solo cambia la zona de origen y la de destino: el historial guarda ese trozo y solo se recompone eso
+  let out: Rect | null = null;
+  try { const b = outputBox(s); if ([b.x, b.y, b.w, b.h].every(Number.isFinite)) out = b; } catch { out = null; }
+  let changed: Rect | null = out ? null : { x: 0, y: 0, w: doc.width, h: doc.height }, partial = !!out;
   for (const it of s.items) {
-    if (it.m0 && !s.quad && it.layer instanceof SmartLayer) { it.layer.applyMatrix(sessionMatrix(s)); continue; }
+    if (it.m0 && !s.quad && it.layer instanceof SmartLayer) { it.layer.applyMatrix(sessionMatrix(s)); partial = false; continue; }
     let layer = it.layer;
-    if (it.toRaster) layer = rasterizeLayer(layer);
+    if (it.toRaster) { layer = rasterizeLayer(layer); partial = false; }
     { const hx = ctx2d(it.hole); hx.globalCompositeOperation = 'source-over'; hx.globalAlpha = 1; drawItem(hx, it.src, it.rect, s, undefined, true); }
-    layer.canvas = it.hole; layer.touch();
+    const sameSize = layer.canvas.width === it.hole.width && layer.canvas.height === it.hole.height;
+    layer.canvas = it.hole;
+    const src = out && sameSize ? clampRect(rectUnion(it.from ?? it.rect, out)!, it.hole.width, it.hole.height) : null;
+    if (src) { layer.touchRect(src); changed = rectUnion(changed, src); } else { layer.touch(); partial = false; }
   }
   if (s.selMask) {
     const m = makeCanvas(doc.width, doc.height);
     drawItem(ctx2d(m), s.selMask, s.rect, s, undefined, true);
-    doc.selection.setMask(m);
+    // la zona de la nueva selección se busca solo dentro de donde puede haber caído
+    const area = out ? clampRect(out, m.width, m.height) : null, b = area ? contentBounds(m, 0, area) : contentBounds(m);
+    if (b) doc.selection.setMaskShared(m, b); else doc.selection.clear();
   }
-  doc.commit(name);
+  doc.commit(name, partial && changed ? changed : undefined);
 }
 
 /** Voltea o gira la capa activa sin pasar por el modo interactivo. */

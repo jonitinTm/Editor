@@ -5,7 +5,7 @@ import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
-import { TextLayer, walkLayers } from '../core/layers';
+import { TextLayer, walkLayers, hasStyles } from '../core/layers';
 
 export const FONTS = ['Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Segoe UI', 'Georgia', 'Times New Roman', 'Garamond', 'Courier New', 'Consolas', 'Impact', 'Comic Sans MS', 'serif', 'sans-serif', 'monospace', 'cursive'];
 
@@ -175,7 +175,9 @@ export class TextTool implements Tool {
       if (layer.props.runs?.length) layer.props.runs = shiftRuns(layer.props.runs, layer.props.text, area.value);
       layer.props.text = area.value;
       layer.render();
-      app.touchDoc();
+      // solo se recompone la zona del texto (si no tiene estilos que se extiendan fuera, como sombras)
+      const d = app.doc!, local = layer.parent === d.root && !hasStyles(layer.styles);
+      d.invalidate(local ? layer.lastChange : null); d.changed();
       this.position();
     });
     area.addEventListener('keydown', ev => {

@@ -1,3 +1,4 @@
+import { contentBounds } from './core/canvas';
 import './core/polyfills';
 import { prefs, applyPrefs, fmtUnit } from './ui/prefs';
 applyPrefs();
@@ -37,7 +38,7 @@ import { VanishingTool } from './ui/more3';
 import { AISelectTool } from './ai/aitools';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
-(app as any).debug = { filters: () => import('./filters/registry').then(async r => { await r.loadFilterImpls(); return r; }), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS };
+(app as any).debug = { filters: () => import('./filters/registry').then(async r => { await r.loadFilterImpls(); return r; }), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS, contentBounds };
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';

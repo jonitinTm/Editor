@@ -82,17 +82,36 @@ export function rectInt(r: Rect): Rect {
 }
 
 /** Caja que contiene los píxeles no transparentes de un lienzo, o null si está vacío. */
-export function contentBounds(c: HTMLCanvasElement, threshold = 0): Rect | null {
-  const { width: w, height: h } = c;
-  const d = getPixels(c).data;
-  // se busca desde cada borde hacia dentro y se para en cuanto aparece algo (rápido en imágenes llenas)
-  const rowHas = (y: number) => { for (let i = y * w * 4 + 3, e = i + w * 4; i < e; i += 4) if (d[i] > threshold) return true; return false; };
-  let top = 0; while (top < h && !rowHas(top)) top++;
-  if (top === h) return null;
-  let bottom = h - 1; while (bottom > top && !rowHas(bottom)) bottom--;
-  const colHas = (x: number) => { for (let y = top, i = (top * w + x) * 4 + 3; y <= bottom; y++, i += w * 4) if (d[i] > threshold) return true; return false; };
-  let left = 0; while (left < w && !colHas(left)) left++;
-  let right = w - 1; while (right > left && !colHas(right)) right--;
+export function contentBounds(c: HTMLCanvasElement, threshold = 0, area?: Rect): Rect | null {
+  const ax = Math.max(0, Math.floor(area?.x ?? 0)), ay = Math.max(0, Math.floor(area?.y ?? 0));
+  const aw = Math.min(c.width, Math.ceil((area ? area.x + area.w : c.width))) - ax, ah = Math.min(c.height, Math.ceil((area ? area.y + area.h : c.height))) - ay;
+  if (aw <= 0 || ah <= 0) return null;
+  const ctx = ctx2d(c);
+  // se lee por franjas desde cada borde hacia dentro y se para en cuanto aparece algo: en una imagen llena basta
+  // con unas pocas filas y columnas en vez de leer todos los píxeles (las franjas crecen si no hay nada)
+  const rows = (y: number, h: number, down: boolean): number => {
+    const d = ctx.getImageData(ax, y, aw, h).data, row = aw * 4;
+    for (let k = 0; k < h; k++) { const r = down ? k : h - 1 - k; for (let i = r * row + 3, e = i + row; i < e; i += 4) if (d[i] > threshold) return y + r; }
+    return -1;
+  };
+  let top = -1, band = 16;
+  for (let y = ay; y < ay + ah && top < 0; y += band, band = Math.min(512, band * 2)) top = rows(y, Math.min(band, ay + ah - y), true);
+  if (top < 0) return null;
+  let bottom = -1; band = 16;
+  for (let y1 = ay + ah; y1 > top && bottom < 0; y1 -= band, band = Math.min(512, band * 2)) { const y = Math.max(top, y1 - band); bottom = rows(y, y1 - y, false); }
+  if (bottom < 0) bottom = top;
+  const H = bottom - top + 1;
+  const cols = (x: number, w: number, right: boolean): number => {
+    const d = ctx.getImageData(x, top, w, H).data, row = w * 4;
+    for (let k = 0; k < w; k++) { const cx = right ? w - 1 - k : k; for (let y = 0, i = cx * 4 + 3; y < H; y++, i += row) if (d[i] > threshold) return x + cx; }
+    return -1;
+  };
+  let left = -1; band = 16;
+  for (let x = ax; x < ax + aw && left < 0; x += band, band = Math.min(512, band * 2)) left = cols(x, Math.min(band, ax + aw - x), false);
+  if (left < 0) left = ax;
+  let right = -1; band = 16;
+  for (let x1 = ax + aw; x1 > left && right < 0; x1 -= band, band = Math.min(512, band * 2)) { const x = Math.max(left, x1 - band); right = cols(x, x1 - x, true); }
+  if (right < 0) right = left;
   return { x: left, y: top, w: right - left + 1, h: bottom - top + 1 };
 }
 
