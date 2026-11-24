@@ -34,7 +34,7 @@ import { AISelectTool } from './ai/aitools';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 import { readPsd, writePsd } from './io/psd';
-(app as any).debug = { filters: () => import('./filters/registry'), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), readPsd, writePsd, ops, io, uniq, more, cr };
+(app as any).debug = { filters: () => import('./filters/registry'), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), readPsd, writePsd, ops, io, uniq, more, cr, actions: ACTIONS };
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
@@ -43,7 +43,7 @@ import { retouchTools } from './tools/retouch';
 import { QuickSelectTool, ObjectSelectTool } from './tools/quicksel';
 import { CropTool, PerspectiveCropTool, SliceTool, ArtboardTool } from './tools/crop';
 import { BrushTool, PencilTool, EraserTool, CloneTool, HealTool, SpotHealTool, PatternStampTool, MixerBrushTool, RemoveTool } from './tools/brush';
-import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool, RotateViewTool } from './tools/misc';
+import { BucketTool, GradientTool, EyedropperTool, HandTool, ZoomTool, RotateViewTool, LassoFillTool } from './tools/misc';
 import { TextTool, TypeMaskTool, VerticalTextTool, VerticalTypeMaskTool } from './tools/text';
 import { ShapeTool, FrameTool } from './tools/shape';
 import { TransformTool } from './tools/transform';
@@ -61,7 +61,7 @@ import { TextLayer } from './core/layers';
 
 // ---- Herramientas ----------------------------------------------------------------
 for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSelectTool, WandTool, CropTool, EyedropperTool, CloneTool,
-  BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, RotateViewTool, ZoomTool, TransformTool]) {
+  BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, LassoFillTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, RotateViewTool, ZoomTool, TransformTool]) {
   app.registerTool(new T());
 }
 app.registerTool(new PolyLassoTool());
@@ -357,6 +357,7 @@ window.addEventListener('keyup', e => {
   if (performance.now() - h0.t > 400 && app.tool.id !== h0.prev && !app.viewport.isSpaceDown() && !app.viewport.isBusy()) app.setTool(h0.prev);
 });
 
+let numBuf: { d: string; t: number; shift: boolean } | null = null;
 window.addEventListener('keydown', e => {
   if (dialogOpen()) return;
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'f' && !isTyping()) { e.preventDefault(); easy.openSearch(); return; }
@@ -386,15 +387,29 @@ window.addEventListener('keydown', e => {
   const key = e.key.toUpperCase();
   if (e.key === 'Tab') { e.preventDefault(); document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); return; }
   if (key === 'F' && !e.shiftKey) { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.().catch(() => {}); return; }
-  if (/^[0-9]$/.test(e.key) && app.doc) {
-    // Teclas numéricas: opacidad de la herramienta de pintura o, si no la tiene, de la capa
-    const v = e.key === '0' ? 100 : +e.key * 10;
-    if (typeof app.opt('opacity', app.tool.id) === 'number') app.setOpt(app.tool.id, 'opacity', v);
-    else if (app.doc.active) ops.setLayerProp(app.doc.active, 'opacity', v / 100);
+  if (/^Digit[0-9]$/.test(e.code) && app.doc) {
+    // Teclas numéricas (como en Photoshop): opacidad de la herramienta de pintura o, si no la tiene, de la capa.
+    // Dos cifras seguidas y rápidas = ese valor exacto («4» «5» = 45 %); «0» = 100 %, «0» «0» = 0 %.
+    // Con Mayús, el flujo del pincel.
+    const dgt = e.code.slice(5), now = performance.now();
+    const two = numBuf && now - numBuf.t < 450 && numBuf.shift === e.shiftKey;
+    let v = two ? +(numBuf!.d + dgt) : (dgt === '0' ? 100 : +dgt * 10);
+    if (two && numBuf!.d === '0' && dgt === '0') v = 0;
+    numBuf = two ? null : { d: dgt, t: now, shift: e.shiftKey };
+    const key = e.shiftKey ? 'flow' : 'opacity';
+    v = Math.max(key === 'flow' ? 1 : 0, Math.min(100, v));
+    if (typeof app.opt(key, app.tool.id) === 'number') { app.setOpt(app.tool.id, key, Math.max(1, v)); app.toast((key === 'flow' ? 'Flujo' : 'Opacidad') + ': ' + Math.max(1, v) + ' %'); }
+    else if (!e.shiftKey && app.doc.active) ops.setLayerProp(app.doc.active, 'opacity', v / 100);
     return;
   }
   if (key === 'D' && !e.shiftKey) { app.setColors('#000000', '#ffffff'); return; }
   if (key === 'X' && !e.shiftKey) { app.setColors(app.bg, app.fg); return; }
+  // Mayús + [ / ]: dureza del pincel en pasos del 25 % (como en Photoshop)
+  if (e.shiftKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')) {
+    const t = app.tool, hd = app.opt<number>('hardness', t.id);
+    if (typeof hd === 'number') { const n = Math.max(0, Math.min(100, Math.round(hd / 25) * 25 + (e.code === 'BracketRight' ? 25 : -25))); app.setOpt(t.id, 'hardness', n); app.toast('Dureza: ' + n + ' %'); app.viewport.requestRender(); }
+    return;
+  }
   if (e.key === '[' || e.key === ']') {
     const t = app.tool; const s = app.opt<number>('size', t.id);
     if (typeof s === 'number') {

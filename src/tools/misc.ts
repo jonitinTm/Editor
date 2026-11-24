@@ -5,7 +5,7 @@ import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
 import { getPaintTarget, setPreview, setTargetCanvas, strokeSetup, PaintTarget, clipMask } from './paint';
-import { floodMask } from './floodfill';
+import { floodMask, floodMaskGaps } from './floodfill';
 import { cloneCanvas, ctx2d, getPixels, makeCanvas, rgbToHex, hexToRgb } from '../core/canvas';
 import { gradientEditor, GradStop } from '../ui/gradienteditor';
 import { allPatterns, getPattern } from '../core/patterns';
@@ -38,6 +38,7 @@ export class BucketTool implements Tool {
     { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 0, max: 255, default: 32 },
     { key: 'opacity', label: 'Opacidad', type: 'range', min: 1, max: 100, default: 100, unit: '%' },
     { key: 'contiguous', label: 'Contiguo', type: 'checkbox', default: true },
+    { key: 'gap', label: 'Cerrar huecos', type: 'range', min: 0, max: 20, default: 0, unit: 'px' },
     { key: 'all', label: 'Todas las capas', type: 'checkbox', default: false },
     { key: 'source', label: 'Relleno', type: 'select', default: 'fg', choices: [{ value: 'fg', label: 'Color frontal' }, { value: 'pattern', label: 'Motivo' }] },
     { key: 'pattern', label: 'Motivo', type: 'select', default: 'base:Damero', choices: [] },
@@ -51,7 +52,8 @@ export class BucketTool implements Tool {
     if (!t) return;
     const doc = app.doc!;
     const src = app.opt('all', this.id) && !t.isMask ? doc.flatten() : t.canvas;
-    const res = floodMask(getPixels(src), e.x, e.y, app.opt('tolerance', this.id), app.opt('contiguous', this.id));
+    const gap = app.opt<number>('gap', this.id) ?? 0;
+    const res = gap > 0 && app.opt('contiguous', this.id) ? floodMaskGaps(getPixels(src), e.x, e.y, app.opt('tolerance', this.id), gap) : floodMask(getPixels(src), e.x, e.y, app.opt('tolerance', this.id), app.opt('contiguous', this.id));
     if (!res) return;
     const st = strokeSetup(t, false);
     const fill = res.canvas; const fc = ctx2d(fill);
@@ -366,7 +368,9 @@ export class RotateViewTool implements Tool {
 export function colorDrop(x: number, y: number): boolean {
   const t = getPaintTarget(); const doc = app.doc;
   if (!t || !doc || x < 0 || y < 0 || x >= doc.width || y >= doc.height) return false;
-  const res = floodMask(getPixels(t.isMask ? t.canvas : doc.flatten()), x, y, 48, true);
+  // usa «Cerrar huecos» del bote de pintura (3 px si no se ha tocado: los dibujos a mano suelen tener aberturas)
+  const gap = app.opt<number>('gap', 'bucket') || 3;
+  const res = floodMaskGaps(getPixels(t.isMask ? t.canvas : doc.flatten()), x, y, 48, gap);
   if (!res) return false;
   const st = strokeSetup(t, false);
   const fill = res.canvas, fc = ctx2d(fill);
@@ -377,4 +381,45 @@ export function colorDrop(x: number, y: number): boolean {
   setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, 1, st.maskValue));
   doc.commit('Soltar color');
   return true;
+}
+
+/** Relleno con lazo: se dibuja el contorno a mano y, al soltar, se rellena con el color frontal (o se borra).
+ *  Muy útil para colorear y para manchar sombras grandes de golpe. */
+export class LassoFillTool implements Tool {
+  id = 'lassoFill'; name = 'Relleno con lazo'; icon = icon('lassoFill'); key = 'G'; group = 'fill'; cursor = 'crosshair';
+  options = [
+    { key: 'opacity', label: 'Opacidad', type: 'range', min: 1, max: 100, default: 100, unit: '%' },
+    { key: 'erase', label: 'Borrar en vez de rellenar', type: 'checkbox', default: false },
+    { key: 'aa', label: 'Bordes suaves', type: 'checkbox', default: true },
+  ] as any[];
+  private pts: { x: number; y: number }[] = [];
+  down(e: ToolEvent) { this.pts = [{ x: e.x, y: e.y }]; }
+  move(e: ToolEvent) {
+    if (!this.pts.length) return;
+    const l = this.pts[this.pts.length - 1];
+    if (Math.hypot(e.x - l.x, e.y - l.y) * app.viewport.zoom > 1.5) { this.pts.push({ x: e.x, y: e.y }); app.viewport.requestRender(); }
+  }
+  up() {
+    const pts = this.pts; this.pts = [];
+    const t = getPaintTarget(), doc = app.doc;
+    if (!t || !doc || pts.length < 3) { app.viewport.requestRender(); return; }
+    const erase = !!app.opt('erase', this.id), st = strokeSetup(t, erase);
+    const fill = makeCanvas(t.canvas.width, t.canvas.height), fc = ctx2d(fill);
+    fc.imageSmoothingEnabled = !!app.opt('aa', this.id);
+    fc.fillStyle = t.isMask || !erase ? st.color : '#000';
+    fc.beginPath(); pts.forEach((q, i) => i ? fc.lineTo(q.x, q.y) : fc.moveTo(q.x, q.y)); fc.closePath(); fc.fill();
+    if (!app.opt('aa', this.id)) { const im = fc.getImageData(0, 0, fill.width, fill.height), D = im.data; for (let i = 3; i < D.length; i += 4) D[i] = D[i] >= 128 ? 255 : 0; fc.putImageData(im, 0, 0); }
+    const blend: GlobalCompositeOperation = erase && !t.isMask ? 'destination-out' : 'source-over';
+    setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, app.opt<number>('opacity', this.id) / 100, st.maskValue, blend));
+    doc.commit(erase ? 'Borrar con lazo' : 'Relleno con lazo');
+  }
+  cancel() { this.pts = []; }
+  drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
+    if (this.pts.length < 2) return;
+    ctx.save(); ctx.beginPath();
+    this.pts.forEach((q, i) => { const s = vp.toScreen(q.x, q.y); i ? ctx.lineTo(s.x, s.y) : ctx.moveTo(s.x, s.y); }); ctx.closePath();
+    ctx.globalAlpha = 0.35; ctx.fillStyle = app.opt('erase', this.id) ? '#ff4d6d' : app.fg; ctx.fill();
+    ctx.globalAlpha = 1; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]); ctx.strokeStyle = '#fff'; ctx.stroke(); ctx.lineDashOffset = 4.5; ctx.strokeStyle = '#000'; ctx.stroke();
+    ctx.restore();
+  }
 }

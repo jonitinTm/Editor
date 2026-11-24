@@ -7,7 +7,7 @@ import type { FilterDef } from '../filters/registry';
 import { makeCanvas, ctx2d } from './canvas';
 
 /** Ajustes que dependen solo del color de cada píxel (comprobado en las pruebas). Umbral y posterizar no: tienen saltos bruscos. */
-export const POINTWISE = new Set(['brightness', 'levels', 'curves', 'huesat', 'bw', 'desaturate', 'invert', 'exposure', 'vibrance', 'colorbalance', 'mixer', 'gradmap', 'photofilter', 'selcolor', 'colorlookup', 'duotone', 'variations']);
+export const POINTWISE = new Set(['brightness', 'levels', 'curves', 'huesat', 'bw', 'desaturate', 'invert', 'exposure', 'vibrance', 'colorbalance', 'colorgrade', 'mixer', 'gradmap', 'photofilter', 'selcolor', 'colorlookup', 'duotone', 'variations']);
 
 /** Puntos por lado de la tabla (65 → cada casilla abarca 4 niveles: el error es de ±1). */
 const N = 65;

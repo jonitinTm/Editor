@@ -15,6 +15,7 @@ import * as G from './gallery';
 import * as RT from './retouch';
 import { indexColors } from './indexed';
 import { matchColor } from './matchcolor';
+import { colorGrade } from './colorgrade';
 
 export type ParamDef =
   | { key: string; label: string; type: 'range'; min: number; max: number; step?: number; default: number; unit?: string; section?: string; showIf?: [string, string] }
@@ -24,7 +25,8 @@ export type ParamDef =
   | { key: string; label: string; type: 'checkbox'; default: boolean }
   | { key: string; label: string; type: 'color'; default: string }
   | { key: string; label: string; type: 'pattern'; default: string }
-  | { key: string; label: string; type: 'matrix'; default: number[] };
+  | { key: string; label: string; type: 'matrix'; default: number[] }
+  | { key: string; label: string; type: 'wheel'; default: [number, number] };
 
 export interface FilterDef {
   id: string;
@@ -104,6 +106,22 @@ export const FILTERS: FilterDef[] = [
       { key: 'sat', label: 'Saturación', type: 'range', min: -100, max: 100, default: 0 },
     ],
     apply: (img, p) => A.vibrance(img, p.vibrance, p.sat),
+  },
+  {
+    id: 'colorgrade', name: 'Gradación de color…', group: 'ajuste',
+    params: [
+      { key: 'shadows', label: 'Sombras', type: 'wheel', default: [220, 0] },
+      { key: 'mids', label: 'Medios tonos', type: 'wheel', default: [40, 0] },
+      { key: 'highs', label: 'Iluminaciones', type: 'wheel', default: [45, 0] },
+      { key: 'lumS', label: 'Luminancia de sombras', type: 'range', min: -100, max: 100, default: 0 },
+      { key: 'lumM', label: 'Luminancia de medios tonos', type: 'range', min: -100, max: 100, default: 0 },
+      { key: 'lumH', label: 'Luminancia de iluminaciones', type: 'range', min: -100, max: 100, default: 0 },
+      { key: 'global', label: 'Global', type: 'wheel', default: [0, 0] },
+      { key: 'balance', label: 'Equilibrio', type: 'range', min: -100, max: 100, default: 0 },
+      { key: 'blending', label: 'Fusión', type: 'range', min: 0, max: 100, default: 50 },
+      { key: 'preserve', label: 'Conservar luminosidad', type: 'checkbox', default: true },
+    ],
+    apply: (img, p) => colorGrade(img, p),
   },
   {
     id: 'colorbalance', name: 'Equilibrio de color…', group: 'ajuste', shortcut: 'Ctrl+B',

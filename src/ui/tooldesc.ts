@@ -12,7 +12,7 @@ export const TOOL_DESC: Record<string, string> = {
   clone: 'Copia una zona pintando (Alt+clic para el origen)', patternStamp: 'Pinta con un motivo', historyBrush: 'Pinta devolviendo cómo estaba al principio', artHistory: 'Pinta trazos artísticos con los colores originales',
   brush: 'Pinta trazos suaves', pencil: 'Pinta trazos de borde duro (pixel art)', colorReplace: 'Cambia el color de lo que pintas sin perder detalle', mixer: 'Pinta mezclando con los colores de la imagen',
   eraser: 'Borra', bgEraser: 'Borra el fondo alrededor de un objeto', magicEraser: 'Borra con un clic una zona de color',
-  gradient: 'Rellena con un degradado', bucket: 'Rellena una zona con un color', blurTool: 'Desenfoca donde pintas', sharpenTool: 'Enfoca donde pintas', smudge: 'Arrastra la pintura como con el dedo',
+  gradient: 'Rellena con un degradado', bucket: 'Rellena una zona con un color', lassoFill: 'Dibuja un contorno y se rellena con el color al soltar', blurTool: 'Desenfoca donde pintas', sharpenTool: 'Enfoca donde pintas', smudge: 'Arrastra la pintura como con el dedo',
   dodge: 'Aclara donde pintas', burn: 'Oscurece donde pintas', sponge: 'Satura o quita color donde pintas',
   text: 'Escribe texto', textV: 'Escribe texto en vertical', typeMask: 'Escribe y obtienes una selección con forma de letras', typeMaskV: 'Selección con forma de letras, en vertical',
   pen: 'Dibuja trazados y formas con curvas precisas', freePen: 'Dibuja a mano y se convierte en curvas', curvPen: 'Dibuja curvas suaves clic a clic', addAnchor: 'Añade puntos a un trazado', delAnchor: 'Quita puntos de un trazado', convertPoint: 'Cambia un punto entre esquina y curva',

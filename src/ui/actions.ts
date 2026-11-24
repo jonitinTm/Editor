@@ -23,7 +23,7 @@ import { promptDialog } from './dialog';
 import { liquifyDialog } from './liquify';
 import { recordAction } from './macros';
 import { refineDialog } from './refine';
-import { isParametric, hasStyles } from '../core/layers';
+import { isParametric, hasStyles, BLEND_MODES, GroupLayer } from '../core/layers';
 
 export interface Action {
   id: string;
@@ -37,6 +37,34 @@ export interface Action {
 
 const hasDoc = () => !!app.doc;
 const hasLayer = () => !!app.doc?.active;
+
+/** Letras de Alt+Mayús+letra para los modos de fusión (las mismas que en Photoshop). */
+const BLEND_KEYS: [string, string][] = [['N', 'source-over'], ['I', 'dissolve'], ['K', 'darken'], ['M', 'multiply'], ['B', 'color-burn'], ['A', 'linear-burn'], ['G', 'lighten'], ['S', 'screen'], ['D', 'color-dodge'], ['W', 'lighter'], ['O', 'overlay'], ['F', 'soft-light'], ['H', 'hard-light'], ['V', 'vivid-light'], ['J', 'linear-light'], ['Z', 'pin-light'], ['L', 'hard-mix'], ['E', 'difference'], ['X', 'exclusion'], ['U', 'hue'], ['T', 'saturation'], ['C', 'color'], ['Y', 'luminosity']];
+/** Con una herramienta de pintar que tiene modo, cambia el modo de la herramienta; si no, el de la capa (como en Photoshop). */
+function blendTarget(): { list: string[]; get: () => string; set: (v: string) => void; name: string } | null {
+  const t = app.tool, o = t?.options?.find((x: any) => x.key === 'blendMode') as any;
+  if (o) return { list: o.choices.map((c: any) => c.value), get: () => app.opt<string>('blendMode', t.id), set: v => app.setOpt(t.id, 'blendMode', v), name: t.name };
+  const l = app.doc?.active; if (!l) return null;
+  return { list: BLEND_MODES.filter(b => b.id !== 'pass-through' || l instanceof GroupLayer).map(b => b.id as string), get: () => l.blendMode as string, set: v => ops.setLayerProp(l, 'blendMode', v), name: l.name };
+}
+const blendLabel = (id: string) => BLEND_MODES.find(b => b.id === id)?.label ?? id;
+function setBlend(id: string) {
+  const b = blendTarget(); if (!b) return;
+  if (!b.list.includes(id)) { app.toast('Este modo no está disponible aquí', 'warn'); return; }
+  b.set(id); app.toast(tr('Modo de fusión') + ': ' + tr(blendLabel(id)));
+}
+function cycleBlend(dir: number) {
+  const b = blendTarget(); if (!b) return;
+  const i = b.list.indexOf(b.get()), n = b.list[(i + dir + b.list.length) % b.list.length];
+  b.set(n); app.toast(tr('Modo de fusión') + ': ' + tr(blendLabel(n)));
+}
+/** Alt+[ / Alt+]: la capa de abajo o de arriba (en el orden del panel). */
+function stepLayer(dir: number) {
+  const d = app.doc; if (!d?.active) return;
+  const all = d.allLayers(), i = all.indexOf(d.active); if (i < 0) return;
+  const j = Math.max(0, Math.min(all.length - 1, i + dir)); if (j === i) return;
+  d.setActive(all[j]);
+}
 const hasSel = () => !!app.doc?.selection.active;
 const hasMask = () => !!app.doc?.active?.mask;
 
@@ -323,7 +351,7 @@ export const ACTIONS: Action[] = [
     id: 'win:' + g, label, checked: () => !(document.querySelector(`[data-group=${g}]`) as HTMLElement)?.classList.contains('closed'),
     run: () => { document.querySelector(`[data-group=${g}]`)?.classList.toggle('closed'); },
   })),
-  { id: 'panel:Capas', label: 'Capas', run: () => showPanel('Capas') },
+  { id: 'panel:Capas', label: 'Capas', keys: ['F7'], run: () => showPanel('Capas') },
   { id: 'panel:Canales', label: 'Canales', run: () => showPanel('Canales') },
   { id: 'panel:Carácter', label: 'Carácter', run: () => showPanel('Carácter') },
   { id: 'panel:Párrafo', label: 'Párrafo', run: () => showPanel('Párrafo') },
@@ -335,8 +363,8 @@ export const ACTIONS: Action[] = [
   { id: 'panel:Historial', label: 'Historial', run: () => showPanel('Historial') },
   { id: 'panel:Navegador', label: 'Navegador', run: () => showPanel('Navegador') },
   { id: 'panel:Histograma', label: 'Histograma', run: () => showPanel('Histograma') },
-  { id: 'panel:Info', label: 'Info', run: () => showPanel('Info') },
-  { id: 'panel:Color', label: 'Color', run: () => showPanel('Color') },
+  { id: 'panel:Info', label: 'Info', keys: ['F8'], run: () => showPanel('Info') },
+  { id: 'panel:Color', label: 'Color', keys: ['F6'], run: () => showPanel('Color') },
   { id: 'panel:Muestras', label: 'Muestras', run: () => showPanel('Muestras') },
   { id: 'panel:Pinceles', label: 'Pinceles', run: () => showPanel('Pinceles') },
   { id: 'win:timeline', label: 'Línea de tiempo (animación)', checked: () => !document.querySelector('.timeline')?.classList.contains('closed'), run: () => { document.querySelector('.timeline')?.classList.toggle('closed'); app.doc?.changed(); requestAnimationFrame(() => app.viewport.resize()); } },
@@ -351,6 +379,20 @@ export const ACTIONS: Action[] = [
       app.toast('Perspectiva: arrastra los puntos azules para colocarlos; al pintar, el trazo sigue las líneas de fuga o la vertical');
     },
   })),
+  // ---- Atajos como en Photoshop: capas, fusión, vista ----
+  { id: 'flipView', label: 'Voltear la vista en horizontal (espejo)', keys: ['Shift+H'], enabled: hasDoc, checked: () => !!app.doc?.view.flip, run: () => { app.viewport.toggleFlip(); app.toast(app.doc!.view.flip ? 'Vista en espejo: la imagen no cambia, solo cómo la ves' : 'Vista normal'); } },
+  { id: 'layerAbove', label: 'Seleccionar la capa de arriba', keys: ['Alt+]'], enabled: hasLayer, run: () => stepLayer(1) },
+  { id: 'layerBelow', label: 'Seleccionar la capa de abajo', keys: ['Alt+['], enabled: hasLayer, run: () => stepLayer(-1) },
+  { id: 'layerTop', label: 'Seleccionar la capa superior', keys: ['Alt+.'], enabled: hasLayer, run: () => stepLayer(1e6) },
+  { id: 'layerBottom', label: 'Seleccionar la capa inferior', keys: ['Alt+,'], enabled: hasLayer, run: () => stepLayer(-1e6) },
+  { id: 'lockAlphaToggle', label: 'Bloquear o desbloquear la transparencia de la capa', keys: ['/'], enabled: hasLayer, checked: () => !!app.doc?.active?.lockAlpha, run: () => { const l = app.doc!.active!; ops.setLayerProp(l, 'lockAlpha', !l.lockAlpha); app.toast(l.lockAlpha ? 'Transparencia bloqueada: solo se pinta sobre lo que ya hay' : 'Transparencia desbloqueada'); } },
+  { id: 'blendNext', label: 'Siguiente modo de fusión', keys: ['Shift++', 'Shift+NumpadAdd', 'Shift+='], enabled: hasLayer, run: () => cycleBlend(1) },
+  { id: 'blendPrev', label: 'Modo de fusión anterior', keys: ['Shift+-', 'Shift+NumpadSubtract'], enabled: hasLayer, run: () => cycleBlend(-1) },
+  ...BLEND_KEYS.map(([k, id]) => ({ id: 'blend:' + id, label: 'Modo de fusión: ' + (BLEND_MODES.find(b => b.id === id)?.label ?? id), keys: ['Alt+Shift+' + k], enabled: hasLayer, run: () => setBlend(id) })),
+  { id: 'panelsOnlyTools', label: 'Ocultar los paneles (deja las herramientas)', keys: ['Shift+Tab'], run: () => { document.body.classList.toggle('hide-side-only'); requestAnimationFrame(() => app.viewport.resize()); } },
+  { id: 'newLayerQuiet', label: 'Nueva capa (sin preguntar)', keys: ['Alt+Shift+Ctrl+N'], enabled: hasDoc, run: ops.newLayer },
+  { id: 'watermark', label: 'Añadir marca de agua…', enabled: hasDoc, run: () => import('./watermark').then(m => m.watermarkDialog()) },
+  { id: 'circleCrop', label: 'Recorte circular (foto de perfil)', enabled: hasDoc, run: () => import('./watermark').then(m => m.circleCrop()) },
   { id: 'drawMode', label: 'Modo dibujo (pantalla completa)', keys: ['F'], enabled: () => !!app.doc, run: () => import('./drawing').then(m => m.toggleDrawMode()) },
   { id: 'reference', label: 'Imagen de referencia', run: () => import('./artist').then(m => m.toggleReference()) },
   { id: 'penSettings', label: 'Ajustes del lápiz…', run: () => import('./drawing').then(m => m.penSettingsDialog()) },
@@ -390,7 +432,7 @@ export function shortcutList(): [string, string][] {
   const out: [string, string][] = [];
   for (const t of app.tools.values()) if (t.key) out.push([t.key, 'Herramienta: ' + t.name]);
   out.push(['Mayús + letra', 'Alternar herramientas del mismo grupo'], ['Espacio (mantener)', 'Desplazar con la mano'],
-    ['[ y ]', 'Reducir / aumentar tamaño del pincel'], ['D', 'Colores por defecto'], ['X', 'Intercambiar colores'], ['1 … 9, 0', 'Opacidad 10 % … 90 %, 100 % (herramienta o capa)'], ['F', 'Pantalla completa'],
+    ['[ y ]', 'Reducir / aumentar tamaño del pincel'], ['D', 'Colores por defecto'], ['X', 'Intercambiar colores'], ['1 … 9, 0', 'Opacidad 10 % … 90 %, 100 % (herramienta o capa)'], ['Dos cifras seguidas', 'Opacidad exacta (4 y 5 = 45 %)'], ['Mayús + 1 … 0', 'Flujo del pincel'], ['Mayús + [ y ]', 'Reducir / aumentar la dureza del pincel'], ['Alt + Mayús + clic derecho', 'Selector de color rápido junto al puntero'], ['Alt + clic derecho y arrastrar', 'Tamaño (horizontal) y dureza (vertical) del pincel'], ['F', 'Pantalla completa'],
     ['Alt + rueda', 'Zoom'], ['Flechas', 'Mover la capa 1 px (Mayús: 10 px)'], ['Intro / Esc', 'Aplicar / cancelar (recorte, transformación, texto)']);
   for (const a of ACTIONS) if (a.keys) out.push([a.keys[0], a.label.replace('…', '')]);
   return out;

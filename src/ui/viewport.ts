@@ -81,15 +81,17 @@ export class Viewport {
 
   // ---- Coordenadas ----------------------------------------------------
   // pantalla = giro(rot) · (documento · zoom) + pan
+  // con la vista volteada (espejo), la x del documento cambia de signo antes del zum y el giro
   toDoc(sx: number, sy: number) {
-    const v = this.doc!.view, r = v.rot ?? 0;
+    const v = this.doc!.view, r = v.rot ?? 0, f = v.flip ? -1 : 1;
     const dx = sx - v.panX, dy = sy - v.panY;
-    if (!r) return { x: dx / v.zoom, y: dy / v.zoom };
+    if (!r) return { x: f * dx / v.zoom, y: dy / v.zoom };
     const c = Math.cos(-r), s = Math.sin(-r);
-    return { x: (dx * c - dy * s) / v.zoom, y: (dx * s + dy * c) / v.zoom };
+    return { x: f * (dx * c - dy * s) / v.zoom, y: (dx * s + dy * c) / v.zoom };
   }
   toScreen(x: number, y: number) {
     const v = this.doc!.view, r = v.rot ?? 0;
+    if (v.flip) x = -x;
     if (!r) return { x: x * v.zoom + v.panX, y: y * v.zoom + v.panY };
     const c = Math.cos(r), s = Math.sin(r), X = x * v.zoom, Y = y * v.zoom;
     return { x: X * c - Y * s + v.panX, y: X * s + Y * c + v.panY };
@@ -99,10 +101,21 @@ export class Viewport {
   docTransform(ctx: CanvasRenderingContext2D) {
     const v = this.doc!.view, r = v.rot ?? 0, c = Math.cos(r) * v.zoom, s = Math.sin(r) * v.zoom;
     ctx.transform(c, s, -s, c, v.panX, v.panY);
+    if (v.flip) ctx.scale(-1, 1);
+  }
+  /** Vista girada o volteada: los atajos de dibujo «alineado al píxel» y las reglas no valen. */
+  get skewed() { const v = this.doc?.view; return !!v && (!!v.rot || !!v.flip); }
+  /** Voltea la vista en horizontal (espejo) alrededor del centro de la pantalla; la imagen no cambia. */
+  toggleFlip() {
+    const d = this.doc; if (!d) return;
+    const c = { x: this.width / 2, y: this.height / 2 }, dc = this.toDoc(c.x, c.y);
+    d.view.flip = !d.view.flip;
+    this.placeDocPoint(dc.x, dc.y, c);
+    app.emit('view'); this.requestRender(); this.renderRulers?.();
   }
   /** Coloca el punto del documento (x, y) en el punto de pantalla p. */
   placeDocPoint(x: number, y: number, p: { x: number; y: number }) {
-    const v = this.doc!.view, r = v.rot ?? 0, c = Math.cos(r), s = Math.sin(r), X = x * v.zoom, Y = y * v.zoom;
+    const v = this.doc!.view, r = v.rot ?? 0, c = Math.cos(r), s = Math.sin(r), X = (v.flip ? -x : x) * v.zoom, Y = y * v.zoom;
     v.panX = p.x - (X * c - Y * s); v.panY = p.y - (X * s + Y * c);
   }
   /** Gira la vista alrededor del centro de la pantalla (no cambia la imagen). */
@@ -131,7 +144,7 @@ export class Viewport {
   /** Línea entre dos puntos del documento; sin giro se alinea al píxel para que sea nítida. */
   private docLine(ctx: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) {
     const a = this.toScreen(x0, y0), b = this.toScreen(x1, y1);
-    if (!this.rot) { if (x0 === x1) { a.x = b.x = Math.round(a.x) + .5; } if (y0 === y1) { a.y = b.y = Math.round(a.y) + .5; } }
+    if (!this.skewed) { if (x0 === x1) { a.x = b.x = Math.round(a.x) + .5; } if (y0 === y1) { a.y = b.y = Math.round(a.y) + .5; } }
     ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y);
   }
   /** Dibuja una imagen del tamaño del documento en su sitio. */
@@ -225,7 +238,7 @@ export class Viewport {
     if (center) {
       d.view.zoom = z;
       this.placeDocPoint(d.width / 2, d.height / 2, { x: this.width / 2, y: this.height / 2 });
-      if (!this.rot) { d.view.panX = Math.round(d.view.panX); d.view.panY = Math.round(d.view.panY); }
+      if (!this.skewed) { d.view.panX = Math.round(d.view.panX); d.view.panY = Math.round(d.view.panY); }
     } else {
       const p = at ?? { x: this.width / 2, y: this.height / 2 };
       const dp = this.toDoc(p.x, p.y);
@@ -270,7 +283,7 @@ export class Viewport {
     // Fondo, sombra y cuadrícula de transparencia: solo cambian al mover la vista, así que se
     // preparan una vez (la sombra difuminada es cara de pintar en cada fotograma)
     const areas = d.root.children.map(g => (g as any).artboard && g.visible ? `${(g as any).artboard.x},${(g as any).artboard.y},${(g as any).artboard.w},${(g as any).artboard.h}` : '').join('|');
-    const bgKey = `${zoom}|${d.view.panX}|${d.view.panY}|${rot}|${this.width}|${this.height}|${this.dpr}|${bgColor}|${d.width}|${d.height}|${areas}`;
+    const bgKey = `${zoom}|${d.view.panX}|${d.view.panY}|${rot}|${d.view.flip ? 1 : 0}|${this.width}|${this.height}|${this.dpr}|${bgColor}|${d.width}|${d.height}|${areas}`;
     if (!this.bgCache || this.bgCache.key !== bgKey) {
       const c = this.bgCache?.canvas ?? document.createElement('canvas');
       c.width = this.canvas.width; c.height = this.canvas.height;
@@ -287,7 +300,7 @@ export class Viewport {
     const quick = this.toolActive && ps < 1 ? d.interactivePreview(ps) : null;
     ctx.save();
     this.areaPath(ctx); ctx.clip();
-    ctx.imageSmoothingEnabled = zoom < 1 || (rot !== 0 && zoom < 4);
+    ctx.imageSmoothingEnabled = zoom < 1 || (this.skewed && zoom < 4);
     ctx.imageSmoothingQuality = 'high';
     if (quick) { ctx.imageSmoothingQuality = 'low'; this.docTransform(ctx); ctx.drawImage(quick, 0, 0, quick.width / ps, quick.height / ps); }
     else this.drawComposite(ctx, d.getComposite());
@@ -410,10 +423,10 @@ export class Viewport {
     if (!app.showRulers) return;
     const d = this.doc;
     // marca del ratón: solo se mueve (barato); las reglas se redibujan solo si cambia el zum, el desplazamiento o el tamaño
-    const m = d && this.mouse && !this.rot ? { x: d.view.panX + this.mouse.x * d.view.zoom, y: d.view.panY + this.mouse.y * d.view.zoom } : null;
+    const m = d && this.mouse && !this.skewed ? { x: d.view.panX + this.mouse.x * d.view.zoom, y: d.view.panY + this.mouse.y * d.view.zoom } : null;
     this.markH.style.display = this.markV.style.display = m ? '' : 'none';
     if (m) { this.markH.style.transform = `translateX(${Math.round(m.x)}px)`; this.markV.style.transform = `translateY(${Math.round(m.y)}px)`; }
-    const key = d ? [this.width, this.height, this.dpr, d.view.zoom, d.view.panX, d.view.panY, this.rot, prefs.units, d.ppi, d.width, d.height, document.documentElement.dataset.theme ?? ''].join('|') : 'x' + this.width + 'x' + this.height;
+    const key = d ? [this.width, this.height, this.dpr, d.view.zoom, d.view.panX, d.view.panY, this.rot, d.view.flip ? 1 : 0, prefs.units, d.ppi, d.width, d.height, document.documentElement.dataset.theme ?? ''].join('|') : 'x' + this.width + 'x' + this.height;
     if (key === this.rulerKey) return;
     this.rulerKey = key;
     const css = getComputedStyle(document.body), cv = (n: string, f: string) => css.getPropertyValue(n).trim() || f;
@@ -424,7 +437,7 @@ export class Viewport {
       const len = horiz ? this.width : this.height;
       ctx.fillStyle = cv('--panel', '#2b2d31'); ctx.fillRect(0, 0, horiz ? len : RULER, horiz ? RULER : len);
       ctx.fillStyle = cv('--border', '#3a3c42'); horiz ? ctx.fillRect(0, RULER - 1, len, 1) : ctx.fillRect(RULER - 1, 0, 1, len);
-      if (!d || this.rot) continue;
+      if (!d || this.skewed) continue;
       const pan = horiz ? d.view.panX : d.view.panY;
       // en otras unidades se trabaja en «unidades» y se pasa a píxeles con el factor
       const ppu = pxPerUnit(prefs.units, d.ppi || 72, horiz ? d.width : d.height), zoom = d.view.zoom * ppu;
@@ -574,6 +587,8 @@ export class Viewport {
       if (e.button === 2) {
         // Alt + clic derecho y arrastrar: tamaño (horizontal) y dureza (vertical) del pincel
         const t = app.tool;
+        // Alt + Mayús + clic derecho: selector de color rápido junto al puntero
+        if (e.altKey && e.shiftKey) { import('./artist').then(m => m.colorHud(e.clientX, e.clientY)); return; }
         if (e.altKey && typeof app.opt('size', t.id) === 'number') {
           this.brushResize = { sx: te.sx, sy: te.sy, size: app.opt<number>('size', t.id), hard: app.opt<number>('hardness', t.id) ?? null };
           return;

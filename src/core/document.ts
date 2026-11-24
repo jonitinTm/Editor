@@ -7,7 +7,7 @@ import { Selection } from './selection';
 import { History } from './history';
 import { renderComposite, compositeGroup, LayerOverride } from './compositor';
 
-export interface ViewState { zoom: number; panX: number; panY: number; /** Giro de la vista en radianes (no afecta a la imagen). */ rot?: number; }
+export interface ViewState { zoom: number; panX: number; panY: number; /** Giro de la vista en radianes (no afecta a la imagen). */ rot?: number; /** Vista volteada en horizontal (espejo; no afecta a la imagen). */ flip?: boolean; }
 
 export interface DocPath { name: string; subpaths: { closed: boolean; pts: import('./layers').PathPoint[] }[] }
 

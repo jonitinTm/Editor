@@ -17,6 +17,7 @@ import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect, 
 import { defaultParams } from '../filters/registry';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';
+import { gradeWheel } from './gradewheel';
 
 function panel(title: string, body: HTMLElement, extraHeader?: HTMLElement, cls = '') {
   return h('section', { class: 'panel ' + cls },
@@ -516,6 +517,9 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           body.append(formRow(pd.label, patternSelect(l.params[pd.key], v => { l.params[pd.key] = v; changed(); })));
         } else if (pd.type === 'gradient') {
           body.append(formRow(pd.label, gradientButton(l.params[pd.key] ?? [{ t: 0, color: l.params.c1 ?? '#000000', a: 1 }, { t: 1, color: l.params.c2 ?? '#ffffff', a: 1 }], s => { l.params[pd.key] = s; changed(); })));
+        } else if (pd.type === 'wheel') {
+          const w = gradeWheel(pd.label, l.params[pd.key] ?? pd.default, v => { l.params[pd.key] = [...v]; changed(); }, 76);
+          const last = body.lastElementChild; if (last?.classList.contains('gw-row')) last.append(w); else body.append(h('div', { class: 'gw-row' }, w));
         } else if (pd.type === 'lut') {
           body.append(formRow(pd.label, lutPicker(l.params, changed)));
         } else if (pd.type === 'select') {

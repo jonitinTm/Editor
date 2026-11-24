@@ -99,6 +99,20 @@ export function colorPopover(anchor: HTMLElement) {
   setTimeout(() => document.addEventListener('pointerdown', function close(ev) { if (!pop.contains(ev.target as Node) && ev.target !== anchor) { pop.remove(); document.removeEventListener('pointerdown', close); } }), 0);
 }
 
+/** Selector de color rápido junto al puntero (Alt + Mayús + clic derecho, como el de Photoshop). */
+export function colorHud(x: number, y: number) {
+  document.querySelector('.color-pop')?.remove();
+  const pop = h('div', { class: 'flyout color-pop color-hud' }, colorWheel(200), recentRow());
+  document.body.append(pop);
+  const w = pop.offsetWidth, hh = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(innerWidth - w - 8, x - w / 2)) + 'px';
+  pop.style.top = Math.max(8, Math.min(innerHeight - hh - 8, y - hh / 2)) + 'px';
+  const close = () => { pop.remove(); document.removeEventListener('pointerdown', out, true); document.removeEventListener('keydown', esc, true); };
+  const out = (ev: Event) => { if (!pop.contains(ev.target as Node)) close(); };
+  const esc = (ev: KeyboardEvent) => { if (ev.key === 'Escape' || ev.key === 'Enter') { ev.preventDefault(); close(); } };
+  setTimeout(() => { document.addEventListener('pointerdown', out, true); document.addEventListener('keydown', esc, true); }, 0);
+}
+
 // ---- Imagen de referencia ---------------------------------------------------------------------
 let refWin: HTMLElement | null = null;
 /** Abre (o cierra) la ventana de referencia. Sin imagen, ofrece abrir una o usar la imagen actual. */

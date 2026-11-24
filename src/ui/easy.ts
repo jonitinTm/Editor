@@ -124,6 +124,8 @@ export const TASKS: Task[] = [
   { label: 'Foto 3D animada', ic: 'magic', desc: 'La foto cobra volumen (IA)', needDoc: true, run: act('aiPhoto3d') },
   { label: 'Borrar algo', ic: 'remove', desc: 'Pinta encima y desaparece (IA)', needDoc: true, run: tool('remove', 'Pinta sobre lo que quieras borrar y suelta') },
   { label: 'Recortar', ic: 'crop', desc: 'Encuadra o cambia la proporción', needDoc: true, run: tool('crop', 'Arrastra los bordes del marco y pulsa ✓ (o Intro)') },
+  { label: 'Foto de perfil redonda', ic: 'marqueeEllipse', desc: 'Recorta en círculo con fondo transparente', needDoc: true, run: act('circleCrop') },
+  { label: 'Marca de agua', ic: 'text', desc: 'Tu nombre o © en una esquina o repetido', needDoc: true, run: act('watermark') },
   { label: 'Para redes', ic: 'share', desc: 'Instagram, historias, YouTube…', needDoc: true, run: act('social') },
   { label: 'Añadir texto', ic: 'text', desc: 'Toca donde quieras escribir', needDoc: true, run: tool('text', 'Toca o haz clic donde quieras escribir') },
   { label: 'Efectos de texto', ic: 'fx', desc: 'Neón, 3D, dorado…', needDoc: true, run: act('textFx') },

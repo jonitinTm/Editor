@@ -139,6 +139,7 @@ export const ICONS: Record<string, string> = {
   txtR: S('<path d="M4 6h16M10 10h10M4 14h16M10 18h10"/>'),
   txtJ: S('<path d="M4 6h16M4 10h16M4 14h16M4 18h10"/>'),
   persp: S('<path d="M2 9h20"/><path d="M12 9L4 21M12 9l8 12M12 9L9 21M12 9l3 12"/><circle cx="12" cy="9" r="1.6" fill="currentColor"/>'),
+  lassoFill: S('<path d="M12 4c5 0 8.500 2.200 8.500 5.200S17 14.500 12 14.500 3.500 12.300 3.500 9.200 7 4 12 4z" fill="currentColor" fill-opacity=".45"/><path d="M6 13.500c-1 1.500-.5 3 1 3.500 1.200.4 1.500 1.500.8 3"/>'),
   menu: S('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   plus: S('<path d="M12 5v14M5 12h14"/>'),
   logo: `<svg viewBox="0 0 32 32" width="22" height="22"><rect x="3" y="7" width="18" height="18" rx="3" fill="#3d8bfd"/><rect x="11" y="3" width="18" height="18" rx="3" fill="#f5a524" fill-opacity=".9"/><path d="M11 7h7a3 3 0 013 3v11h-7a3 3 0 01-3-3z" fill="#1d2a44" fill-opacity=".55"/></svg>`,

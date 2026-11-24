@@ -22,6 +22,7 @@ import { prefs, savePrefs, UNIT_NAMES } from './prefs';
 import { maxCanvasPixels } from '../core/polyfills';
 import { BEVEL_DEFAULT } from '../core/bevel';
 import { shiftRuns } from '../core/textruns';
+import { gradeWheel } from './gradewheel';
 
 const numInput = (value: number, min = 1, max = 30000) => h('input', { type: 'number', value: String(value), min: String(min), max: String(max), class: 'num' });
 
@@ -382,6 +383,8 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
   if (def.custom === 'levels') body = levelsBody(session.source(), params, update);
   else if (def.custom === 'curves') body = curvesBody(session.source(), params, update);
   else body = (def.params ?? []).flatMap(p => [...((p as any).section ? [h('div', { class: 'dlg-section' }, (p as any).section)] : []), paramRow(p)]);
+  // las ruedas de color seguidas van juntas en una fila
+  body = body.reduce<HTMLElement[]>((out, el) => { if (el.classList.contains('gw')) { const last = out[out.length - 1]; if (last?.classList.contains('gw-row')) last.append(el); else out.push(h('div', { class: 'gw-row' }, el)); } else out.push(el); return out; }, []);
   syncShow();
   function paramRow(p: any): HTMLElement {
     if (p.type === 'checkbox') {
@@ -405,6 +408,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
     }
     if (p.type === 'pattern') return row(p.label, patternSelect(params[p.key], v => { params[p.key] = v; update(); }));
     if (p.type === 'lut') return row(p.label, lutPicker(params, update));
+    if (p.type === 'wheel') return gradeWheel(p.label, params[p.key] ?? p.default, v => { params[p.key] = [...v]; update(); });
     if (p.type === 'gradient') return row(p.label, gradientButton(params[p.key], s => { params[p.key] = s; update(); }));
     if (p.type === 'select') {
       const sel = h('select', {}, ...p.choices.map(([v, n]: [string, string]) => h('option', { value: v, selected: params[p.key] === v }, n)));
