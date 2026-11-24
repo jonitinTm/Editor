@@ -6,7 +6,7 @@ import { cloneCanvas, makeCanvas } from './canvas';
 import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, SmartLayer, SmartSource, AdjustmentLayer, LayerMask, BlendMode, isParametric } from './layers';
 import type { EditorDocument } from './document';
 
-interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; full?: boolean; }
+interface MaskSnap { /** copia entera (si la hay) */ canvas?: HTMLCanvasElement; ref: FrozenRef; enabled: boolean; full?: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
   blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; fillOpacity?: number; link?: number | null; clip: boolean; label?: string | null;
@@ -24,15 +24,6 @@ export interface DocSnap {
 }
 export interface HistoryStep { name: string; icon?: string; snap: DocSnap; }
 
-// Copias congeladas asociadas a cada objeto vivo (capa o máscara).
-const frozen = new WeakMap<object, { version: number; canvas: HTMLCanvasElement }>();
-function freeze(owner: object, version: number, canvas: HTMLCanvasElement): HTMLCanvasElement {
-  const f = frozen.get(owner);
-  if (f && f.version === version) return f.canvas;
-  const c = cloneCanvas(canvas);
-  frozen.set(owner, { version, canvas: c });
-  return c;
-}
 
 // ---- Capas de píxeles: copia entera o parche sobre el estado anterior ----
 // Un trazo solo cambia una zona: en vez de copiar la capa entera en cada paso (48 MB con una foto de 12 MP),
@@ -57,8 +48,10 @@ export function materialize(r: FrozenRef): HTMLCanvasElement {
 function refCanvases(r: FrozenRef, out: Set<HTMLCanvasElement>) {
   for (let q: FrozenRef | null = r; q; q = q.kind === 'patch' ? q.base : null) { if (q.kind === 'full') out.add(q.canvas); else if (q.kind === 'patch') { out.add(q.patch); if (q.before) out.add(q.before); } }
 }
-const frozenL = new WeakMap<RasterLayer, { version: number; ref: FrozenRef }>();
-function freezeLayer(l: RasterLayer): FrozenRef {
+/** Lo que se ha copiado de cada capa o máscara viva (versión y estado guardado). */
+type PixelOwner = { canvas: HTMLCanvasElement; version: number; dirty: { x: number; y: number; w: number; h: number } | 'all' | null; pendingBefore: { rect: { x: number; y: number; w: number; h: number }; canvas: HTMLCanvasElement } | null };
+const frozenL = new WeakMap<object, { version: number; ref: FrozenRef }>();
+function freezeLayer(l: PixelOwner): FrozenRef {
   const f = frozenL.get(l), c = l.canvas;
   if (f && f.version === l.version) { l.dirty = null; return f.ref; }
   const dirty = l.dirty, before = l.pendingBefore; l.dirty = null; l.pendingBefore = null;
@@ -81,7 +74,7 @@ function snapLayer(l: Layer): LayerSnap {
   const s: LayerSnap = {
     id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,
     blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, lockPos: l.lockPos, lockPixels: l.lockPixels, fillOpacity: l.fillOpacity, link: l.link, clip: l.clip, label: l.label,
-    mask: l.mask ? { canvas: freeze(l.mask, l.mask.version, l.mask.canvas), enabled: l.mask.enabled, full: l.mask.isFull() } : null,
+    mask: l.mask ? (() => { const ref = freezeLayer(l.mask!); return { ref, canvas: ref.kind === 'full' ? ref.canvas : undefined, enabled: l.mask!.enabled, full: l.mask!.isFull() }; })() : null,
   };
   s.styles = l.styles ? JSON.stringify(l.styles) : null;
   s.vmask = l.vmask ? JSON.stringify(l.vmask) : undefined;
@@ -160,12 +153,24 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
   l.styles = s.styles ? JSON.parse(s.styles) : null;
   l.vmask = s.vmask ? JSON.parse(s.vmask) : undefined;
   if (s.mask) {
-    const om = old?.mask, fm = om ? frozen.get(om) : undefined;
-    if (om && fm && fm.version === om.version && fm.canvas === s.mask.canvas && om.canvas.width === w && om.canvas.height === h) { om.enabled = s.mask.enabled; l.mask = om; }
+    const om = old?.mask, fm = om ? frozenL.get(om) : undefined, sm = s.mask;
+    const okSize = !!om && om.canvas.width === w && om.canvas.height === h;
+    // un paso de un trazo en la máscara: se pone el parche (o lo de antes) sobre la máscara actual
+    const mstep = om && fm && okSize && fm.version === om.version && fm.ref !== sm.ref
+      ? (sm.ref.kind === 'patch' && sm.ref.base === fm.ref ? { rect: sm.ref.rect, px: sm.ref.patch } : fm.ref.kind === 'patch' && fm.ref.base === sm.ref && fm.ref.before ? { rect: fm.ref.rect, px: fm.ref.before } : null) : null;
+    if (om && fm && okSize && fm.version === om.version && fm.ref === sm.ref) { om.enabled = sm.enabled; l.mask = om; }
+    else if (om && mstep) {
+      const x = om.canvas.getContext('2d')!;
+      x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+      x.clearRect(mstep.rect.x, mstep.rect.y, mstep.rect.w, mstep.rect.h); x.drawImage(mstep.px, mstep.rect.x, mstep.rect.y); x.restore();
+      om.touch(); om.dirty = null; frozenL.set(om, { version: om.version, ref: sm.ref }); om.enabled = sm.enabled;
+      if (sm.full) om.fullVersion = om.version;
+      l.mask = om;
+    }
     else {
       const m = new LayerMask(w, h, 'black');
-      m.canvas = cloneCanvas(s.mask.canvas); m.enabled = s.mask.enabled;
-      frozen.set(m, { version: m.version, canvas: s.mask.canvas });
+      m.canvas = materialize(sm.ref); m.enabled = sm.enabled; m.dirty = null;
+      frozenL.set(m, { version: m.version, ref: sm.ref });
       if (s.mask.full) m.fullVersion = m.version;
       l.mask = m;
     }
@@ -202,7 +207,7 @@ export function historyBudgetMB(): number {
 }
 /** Bytes de las copias distintas de una lista de pasos (las copias compartidas cuentan una vez). */
 function stepCanvases(snap: DocSnap, out: Set<HTMLCanvasElement>) {
-  const walk = (l: LayerSnap) => { if (l.ref) refCanvases(l.ref, out); else if (l.canvas) out.add(l.canvas); if (l.mask) out.add(l.mask.canvas); if (l.full) out.add(l.full.canvas); l.children?.forEach(walk); };
+  const walk = (l: LayerSnap) => { if (l.ref) refCanvases(l.ref, out); else if (l.canvas) out.add(l.canvas); if (l.mask) refCanvases(l.mask.ref, out); if (l.full) out.add(l.full.canvas); l.children?.forEach(walk); };
   walk(snap.root); if (snap.selection) out.add(snap.selection); snap.channels?.forEach(c => out.add(c.canvas));
 }
 const bytesOf = (set: Set<HTMLCanvasElement>) => { let b = 0; for (const c of set) b += c.width * c.height * 4; return b; };
@@ -263,7 +268,13 @@ function onlyPatchBetween(a: DocSnap, b: DocSnap): { x: number; y: number; w: nu
   const walk = (x: LayerSnap, y: LayerSnap): boolean => {
     for (const k of KEYS) if (x[k] !== y[k]) return false;
     if (JSON.stringify(x.props) !== JSON.stringify(y.props) || JSON.stringify(x.artboard) !== JSON.stringify(y.artboard)) return false;
-    if ((x.mask?.canvas ?? null) !== (y.mask?.canvas ?? null) || (x.mask?.enabled ?? null) !== (y.mask?.enabled ?? null)) return false;
+    if (!!x.mask !== !!y.mask || (x.mask?.enabled ?? null) !== (y.mask?.enabled ?? null)) return false;
+    if (x.mask && y.mask && x.mask.ref !== y.mask.ref) {
+      const p = x.mask.ref, q = y.mask.ref;
+      const r = q.kind === 'patch' && q.base === p ? q.rect : p.kind === 'patch' && p.base === q ? p.rect : null;
+      if (!r || ++diffs > 1) return false;
+      rect = { ...r };
+    }
     if ((x.full?.canvas ?? null) !== (y.full?.canvas ?? null)) return false;
     if (x.ref !== y.ref) {
       const p = x.ref, q = y.ref;

@@ -65,7 +65,8 @@ class App {
   registerTool(t: Tool) {
     this.tools.set(t.id, t);
     const o = (this.opts[t.id] ??= {});
-    for (const d of t.options ?? []) if (!(d.key in o)) o[d.key] = d.default;
+    // valores guardados que no encajan con la opción (de una versión anterior o dañados): se usa el de serie
+    for (const d of t.options ?? []) if (!(d.key in o) || !optValid(d, o[d.key])) o[d.key] = d.default;
   }
 
   setTool(id: string, temporary = false) {
@@ -89,6 +90,8 @@ class App {
 
   opt<T = any>(key: string, toolId = this.tool.id): T { return this.opts[toolId]?.[key]; }
   setOpt(toolId: string, key: string, value: any) {
+    const d = this.tools.get(toolId)?.options?.find((x: any) => x.key === key);
+    if (d && !optValid(d, value)) value = d.default;
     (this.opts[toolId] ??= {})[key] = value;
     this.saveOpts();
     this.emit('options');
@@ -146,3 +149,11 @@ class App {
 
 export const app = new App();
 (window as any).editorApp = app; // útil para depurar desde la consola
+
+/** ¿El valor sirve para esa opción? (mismo tipo que el de serie; los números, finitos) */
+function optValid(d: any, v: any): boolean {
+  if (d.default === undefined || d.default === null) return true;
+  if (typeof v !== typeof d.default) return false;
+  if (typeof v === 'number') return Number.isFinite(v);
+  return true;
+}

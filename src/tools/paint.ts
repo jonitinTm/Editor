@@ -281,8 +281,8 @@ export class Stroke {
     const ctx = ctx2d(dest);
     ctx.save();
     ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
-    ctx.globalCompositeOperation = 'copy';
-    ctx.drawImage(this.original, 0, 0);
+    // sobre la propia capa (al terminar el trazo) ya está lo de debajo; en la vista previa hay que copiarlo
+    if (dest !== this.original) { ctx.globalCompositeOperation = 'copy'; ctx.drawImage(this.original, 0, 0); }
     // Búfer recortado por la selección
     let src = this.buffer;
     if (this.sel) { this.clipToSelection(r); src = this.tmp!; }
@@ -315,16 +315,19 @@ export class Stroke {
       if (this.fast) { this.clearExtra(); this.fast = false; }
       this.preview = cloneCanvas(this.original);
       this.composeInto(this.preview, this.bounds);
-    } else if (this.fast) {
-      this.clearExtra(); this.fast = false;
-      if (!this.bounds) { app.doc!.invalidate(); returnBuffer(this.buffer, null); return false; }
+    } else if (!this.target.quick) {
+      const wasFast = this.fast;
+      if (wasFast) { this.clearExtra(); this.fast = false; }
+      if (!this.bounds) { setPreview(this.target, null); app.doc!.invalidate(); returnBuffer(this.buffer, null); return false; }
       // pintura normal: se aplica directamente sobre la capa, solo en la zona del trazo (sin copiar la capa
       // entera; el historial ya guarda su propia copia del estado anterior)
       // solo cambia la zona del trazo: el historial guardará solo ese parche (y lo que había antes, para deshacer)
-      const tl = !this.target.isMask && !this.target.quick && this.target.layer instanceof RasterLayer ? this.target.layer : null;
+      // (también en máscaras, con «bloquear transparencia» y con modos de fusión)
+      const tl = this.target.isMask ? (this.target.layer.mask && this.target.layer.mask.canvas === this.original ? this.target.layer.mask : null)
+        : this.target.layer instanceof RasterLayer && this.target.layer.canvas === this.original ? this.target.layer : null;
       let before: HTMLCanvasElement | undefined;
       if (tl) { const b = this.bounds; before = makeCanvas(b.w, b.h); ctx2d(before).drawImage(this.original, -b.x, -b.y); }
-      this.applyInPlace(this.bounds);
+      if (wasFast) this.applyInPlace(this.bounds); else this.composeInto(this.original, this.bounds);
       setPreview(this.target, null);
       if (tl) tl.touchRect(this.bounds, before); else touchTarget(this.target);
       app.doc!.invalidate(this.bounds);

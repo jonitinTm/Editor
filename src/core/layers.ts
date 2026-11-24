@@ -71,7 +71,17 @@ export class LayerMask {
     ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); ctx.restore();
     this.touch(); this.fullVersion = this.version;
   }
-  touch() { resetDrawState(this.canvas); this.version++; }
+  touch() { resetDrawState(this.canvas); this.version++; this.dirty = 'all'; this.pendingBefore = null; }
+  /** Zona cambiada desde la última copia del historial y lo que había antes en ella (como en las capas de píxeles). */
+  dirty: { x: number; y: number; w: number; h: number } | 'all' | null = 'all';
+  pendingBefore: { rect: { x: number; y: number; w: number; h: number }; canvas: HTMLCanvasElement } | null = null;
+  touchRect(r: { x: number; y: number; w: number; h: number }, before?: HTMLCanvasElement) {
+    resetDrawState(this.canvas); this.version++;
+    const d = this.dirty;
+    this.pendingBefore = d === null && before ? { rect: { ...r }, canvas: before } : null;
+    if (d === 'all') return;
+    this.dirty = d ? { x: Math.min(d.x, r.x), y: Math.min(d.y, r.y), w: Math.max(d.x + d.w, r.x + r.w) - Math.min(d.x, r.x), h: Math.max(d.y + d.h, r.y + r.h) - Math.min(d.y, r.y) } : { ...r };
+  }
   /** Versión en la que la máscara está entera en blanco (no tapa nada): entonces se puede ignorar al combinar. */
   fullVersion = -1;
   isFull() { return this.fullVersion === this.version; }
