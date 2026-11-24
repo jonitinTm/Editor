@@ -18,7 +18,7 @@ const psdMod = () => import('../io/psd');
 import { heal, findSource } from '../filters/heal';
 import { computeFilter } from '../filters/compute';
 import { record } from './macros';
-import { snapshot, restore, shareFrozen } from '../core/history';
+import { snapshot, restore, shareFrozen, startBlank } from '../core/history';
 import { FILTERS } from '../filters/registry';
 const FILTERS_BY_ID = new Map(FILTERS.map(x => [x.id, x]));
 import { addPattern, getPattern, patternFill } from '../core/patterns';
@@ -142,6 +142,10 @@ export async function openFiles(files: File[], asLayers = false, remember = true
 }
 
 /** Coloca una imagen como capa nueva, centrada (o en la posición indicada). */
+function clampToDoc(r: Rect, d: { width: number; height: number }): Rect | null {
+  const x0 = Math.max(0, Math.floor(r.x)), y0 = Math.max(0, Math.floor(r.y)), x1 = Math.min(d.width, Math.ceil(r.x + r.w)), y1 = Math.min(d.height, Math.ceil(r.y + r.h));
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
 export async function placeImage(src: Blob | HTMLCanvasElement, name: string, pos?: { x: number; y: number }, smart = false) {
   const d = doc(); if (!d) return;
   const c = src instanceof HTMLCanvasElement ? src : await io.imageToCanvas(src);
@@ -171,9 +175,13 @@ export async function placeImage(src: Blob | HTMLCanvasElement, name: string, po
   }
   const l = new RasterLayer(name, d.width, d.height);
   const x = pos?.x ?? Math.round((d.width - c.width) / 2), y = pos?.y ?? Math.round((d.height - c.height) / 2);
+  // capa nueva con contenido solo en una zona: el historial guarda ese trozo y solo se recompone esa zona
+  startBlank(l);
   ctx2d(l.canvas).drawImage(c, x, y);
+  const r = clampToDoc({ x, y, w: c.width, h: c.height }, d);
+  if (r) l.touchRect(r); else l.touch();
   d.insertAboveActive(l);
-  d.commit('Pegar');
+  d.commit('Pegar', r ?? undefined);
 }
 
 export async function closeDocument(d = doc()) {
@@ -881,12 +889,15 @@ function selectedPixels(merged: boolean): { canvas: HTMLCanvasElement; rect: Rec
   const d = doc(); if (!d) return null;
   const src = merged ? d.flatten() : d.activeRaster()?.canvas;
   if (!src) { app.toast('Selecciona una capa de píxeles', 'warn'); return null; }
-  const tmp = cloneCanvas(src);
-  if (d.selection.mask) { const c = ctx2d(tmp); c.globalCompositeOperation = 'destination-in'; c.drawImage(d.selection.mask, 0, 0); }
-  const rect = d.selection.active ? (contentBounds(tmp) ?? null) : { x: 0, y: 0, w: d.width, h: d.height };
-  if (!rect) { app.toast('La zona seleccionada está vacía', 'warn'); return null; }
-  const out = makeCanvas(rect.w, rect.h); ctx2d(out).drawImage(tmp, -rect.x, -rect.y);
-  return { canvas: out, rect };
+  if (!d.selection.active || !d.selection.mask || !d.selection.bounds) { const out = cloneCanvas(src); return { canvas: out, rect: { x: 0, y: 0, w: d.width, h: d.height } }; }
+  // solo se trabaja con la zona de la selección, no con la capa entera
+  const sb = d.selection.bounds, tmp = makeCanvas(sb.w, sb.h), c = ctx2d(tmp);
+  c.drawImage(src, -sb.x, -sb.y); c.globalCompositeOperation = 'destination-in'; c.drawImage(d.selection.mask, -sb.x, -sb.y); c.globalCompositeOperation = 'source-over';
+  const b = contentBounds(tmp);
+  if (!b) { app.toast('La zona seleccionada está vacía', 'warn'); return null; }
+  if (b.x === 0 && b.y === 0 && b.w === sb.w && b.h === sb.h) return { canvas: tmp, rect: { ...sb } };
+  const out = makeCanvas(b.w, b.h); ctx2d(out).drawImage(tmp, -b.x, -b.y);
+  return { canvas: out, rect: { x: sb.x + b.x, y: sb.y + b.y, w: b.w, h: b.h } };
 }
 
 export async function copy(merged = false) {
@@ -1018,9 +1029,12 @@ export function layerVia(cutting: boolean) {
     editInPlace(t, d.selection.bounds, c => { c.globalCompositeOperation = 'destination-out'; c.drawImage(sel, 0, 0); });
   }
   const l = new RasterLayer(d.nextLayerName(), d.width, d.height);
+  startBlank(l);
   ctx2d(l.canvas).drawImage(p.canvas, p.rect.x, p.rect.y);
+  l.touchRect(p.rect);
   d.insertAboveActive(l);
-  d.commit(cutting ? 'Capa vía cortar' : 'Capa vía copiar');
+  // la imagen no cambia al copiar (la copia queda encima, igual); al cortar, solo en esa zona
+  d.commit(cutting ? 'Capa vía cortar' : 'Capa vía copiar', p.rect);
 }
 
 // ---- Imagen ---------------------------------------------------------------------
@@ -1086,11 +1100,16 @@ export function transformImage(kind: 'rot90' | 'rot-90' | 'rot180' | 'flipH' | '
     else if (isRaster(l)) { l.canvas = tf(l.canvas); l.touch(); }
     if (l.mask) { l.mask.canvas = tf(l.mask.canvas); l.mask.touch(); }
   }
-  const sel = d.selection.mask ? tf(d.selection.mask) : null;
+  // una selección rectangular sigue siendo un rectángulo: se gira su caja en vez de la máscara entera
+  const info = d.selection.info(), rr = info?.rect;
+  const sel = d.selection.mask && !rr ? tf(d.selection.mask) : null;
   d.channels = d.channels.map(c => ({ ...c, canvas: tf(c.canvas) }));
   d.width = nw; d.height = nh;
   d.selection.width = nw; d.selection.height = nh;
-  d.selection.setMask(sel);
+  if (rr) {
+    const xs = [rr.x, rr.x + rr.w].flatMap(x => [rr.y, rr.y + rr.h].map(y => D[0] * x + D[2] * y + D[4])), ys = [rr.x, rr.x + rr.w].flatMap(x => [rr.y, rr.y + rr.h].map(y => D[1] * x + D[3] * y + D[5]));
+    d.selection.rect({ x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) }, 'new');
+  } else d.selection.setMask(sel);
   d.guides = { h: [], v: [] };
   d.invalidate();
   const names = { rot90: 'Rotar lienzo 90° horario', 'rot-90': 'Rotar lienzo 90° antihorario', rot180: 'Rotar lienzo 180°', flipH: 'Voltear lienzo horizontal', flipV: 'Voltear lienzo vertical' };
@@ -1152,7 +1171,10 @@ export class FilterSession {
     if (useWorker && this.region.w * this.region.h > 400_000) {
       this.worker = getFilterWorker();
       if (this.worker) {
-        this.worker.postMessage({ type: 'init', session: this.id, w: this.orig.width, h: this.orig.height, data: this.orig.data.buffer.slice(0), sel: this.sel ? this.sel.data.buffer.slice(0) : null, filterId: def.id, isMask: !!t.isMask, lockAlpha: !!t.lockAlpha });
+        // sin ventana (sin vista previa ni histogramas) los píxeles se pasan al hilo sin copiarlos
+        const give = !quickPreview, data = give ? this.orig.data.buffer : this.orig.data.buffer.slice(0), sb = this.sel ? (give ? this.sel.data.buffer : this.sel.data.buffer.slice(0)) : null;
+        this.worker.postMessage({ type: 'init', session: this.id, w: this.orig.width, h: this.orig.height, data, sel: sb, filterId: def.id, isMask: !!t.isMask, lockAlpha: !!t.lockAlpha }, give ? [data as ArrayBuffer, ...(sb ? [sb as ArrayBuffer] : [])] : []);
+        if (give) this.given = true;
         this.worker.addEventListener('message', this.onMsg);
         // imagen grande: además, una copia reducida para enseñar algo al momento mientras se calcula la de verdad
         const area = this.region.w * this.region.h, qw = quickPreview && area > 2_500_000 ? getQuickWorker() : null;
@@ -1169,6 +1191,8 @@ export class FilterSession {
       }
     }
   }
+  /** Los píxeles originales se pasaron al hilo (ya no están aquí): el resultado tiene que venir de él. */
+  private given = false;
   private quick: { worker: Worker; k: number; w: number; h: number; job: number; canvas: HTMLCanvasElement } | null = null;
   /** Último encargo grande ya enseñado (la vista rápida que llegue después no lo tapa). */
   private shownJob = 0;
@@ -1245,14 +1269,14 @@ export class FilterSession {
     const p = { ...params, seed: this.seed }, key = JSON.stringify(p);
     // en imágenes grandes se espera al hilo de fondo (la pantalla no se congela mientras tanto)
     if (this.last?.key !== key && this.worker && !this.ended) await this.compute(params);
+    if (this.last?.key !== key && this.given) { this.end(); setPreview(this.t, null); return; } // se canceló a medias
     const r = this.last?.key === key ? this.last.img : computeFilter(this.orig, this.sel?.data ?? null, this.def.apply, p, !!this.t.isMask, !!this.t.lockAlpha);
     this.end();
-    const out = cloneCanvas(this.t.canvas);
-    putPixels(out, r, this.region.x, this.region.y);
     setPreview(this.t, null);
-    // el filtro solo cambia su zona (la selección): el historial guarda solo esa zona
-    setTargetCanvas(this.t, out, this.region);
-    doc()!.commit(this.def.name.replace('…', ''), this.region);
+    // el resultado se escribe directamente en la capa, solo en su zona (sin copiar la capa entera); el historial guarda
+    // solo esa zona
+    const reg = this.region, z = editInPlace(this.t, reg, c => c.putImageData(r, reg.x, reg.y));
+    doc()!.commit(this.def.name.replace('…', ''), z ?? reg);
   }
 }
 

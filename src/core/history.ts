@@ -2,6 +2,7 @@
 // Para no gastar memoria de más, una capa cuyos píxeles no han cambiado
 // reutiliza la copia del paso anterior (solo se copian las capas tocadas).
 
+import type { SelInfo } from './selection';
 import { cloneCanvas, makeCanvas } from './canvas';
 import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, SmartLayer, SmartSource, AdjustmentLayer, LayerMask, BlendMode, isParametric } from './layers';
 import type { EditorDocument } from './document';
@@ -70,6 +71,13 @@ function freezeLayer(l: PixelOwner): FrozenRef {
   return ref;
 }
 
+/** Capa nueva y vacía en la que solo se va a dibujar una zona: el historial la guardará como «vacía + ese trozo», sin
+ *  copiar la capa entera. Llamar justo después de crearla, antes de dibujar, y luego avisar de la zona con touchRect. */
+export function startBlank(l: RasterLayer) {
+  frozenL.set(l, { version: l.version, ref: { kind: 'blank', w: l.canvas.width, h: l.canvas.height } });
+  l.dirty = null; l.pendingBefore = null;
+}
+
 /** Una copia exacta de una capa (duplicar) usa la misma copia guardada en el historial que el original: no hay que
  *  volver a copiar sus píxeles (los estados guardados no cambian nunca, se pueden compartir). Recorre grupos y máscaras. */
 export function shareFrozen(from: Layer, to: Layer) {
@@ -102,6 +110,8 @@ function snapLayer(l: Layer): LayerSnap {
   return s;
 }
 
+/** Caja y forma de cada selección guardada: al deshacer no hay que volver a buscarlas en la máscara. */
+const selInfos = new WeakMap<HTMLCanvasElement, SelInfo | null>();
 let selFrozen: { version: number; canvas: HTMLCanvasElement | null; owner: object } | null = null;
 
 export function snapshot(doc: EditorDocument): DocSnap {
@@ -109,7 +119,7 @@ export function snapshot(doc: EditorDocument): DocSnap {
   let selCanvas: HTMLCanvasElement | null = null;
   if (sel.mask) {
     if (selFrozen && selFrozen.owner === sel && selFrozen.version === sel.version) selCanvas = selFrozen.canvas;
-    else { selCanvas = cloneCanvas(sel.mask); selFrozen = { version: sel.version, canvas: selCanvas, owner: sel }; }
+    else { selCanvas = cloneCanvas(sel.mask); selFrozen = { version: sel.version, canvas: selCanvas, owner: sel }; selInfos.set(selCanvas, sel.info()); }
   }
   return {
     width: doc.width, height: doc.height, ppi: doc.ppi, mode: doc.mode, root: snapLayer(doc.root),
@@ -195,7 +205,7 @@ export function restore(doc: EditorDocument, snap: DocSnap) {
   const root = restoreLayer(snap.root, snap.width, snap.height, olds) as GroupLayer;
   doc.root = root;
   doc.selection.width = snap.width; doc.selection.height = snap.height;
-  doc.selection.setMask(snap.selection);
+  doc.selection.setMask(snap.selection, snap.selection ? selInfos.get(snap.selection) : null);
   doc.quickMask = !!snap.quickMask; doc.quickPreview = null;
   doc.channels = (snap.channels ?? []).slice();
   doc.paths = snap.paths ? JSON.parse(snap.paths) : []; doc.activePath = Math.min(snap.activePath ?? -1, doc.paths.length - 1);
@@ -203,7 +213,9 @@ export function restore(doc: EditorDocument, snap: DocSnap) {
   // Se mantiene la capa que el usuario tenía seleccionada si sigue existiendo.
   const keepId = doc.active?.id ?? -1;
   const editMask = doc.editMask;
-  doc.setActive(doc.findLayer(keepId) ?? doc.findLayer(snap.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);
+  // …salvo al rehacer algo que crea una capa (pegar, duplicar…): entonces queda activa esa capa, como al hacerlo
+  const appeared = snap.activeId != null && !olds.has(snap.activeId) ? doc.findLayer(snap.activeId) : null;
+  doc.setActive(appeared ?? doc.findLayer(keepId) ?? doc.findLayer(snap.activeId ?? -1) ?? doc.allLayers().pop() ?? null, false);
   doc.editMask = editMask && !!doc.active?.mask;
 }
 

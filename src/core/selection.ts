@@ -5,6 +5,8 @@ import { makeCanvas, ctx2d, cloneCanvas, contentBounds, contentBoundsQuick, Rect
 import { gaussianBlur } from '../filters/blur';
 
 export type SelMode = 'new' | 'add' | 'subtract' | 'intersect';
+/** Caja de la selección y, si es un rectángulo lleno, ese rectángulo. */
+export interface SelInfo { bounds: Rect | null; rect: Rect | null; }
 
 const OPS: Record<Exclude<SelMode, 'new'>, GlobalCompositeOperation> = {
   add: 'source-over', subtract: 'destination-out', intersect: 'destination-in',
@@ -143,7 +145,19 @@ export class Selection {
     this.changed();
     if (shrink) this.invert();
   }
-  setMask(c: HTMLCanvasElement | null) { this.mask = c ? cloneCanvas(c) : null; this.changed(); }
+  /** `known`: caja y forma ya conocidas de ese lienzo (p. ej. al deshacer): no hace falta volver a buscarlas. */
+  setMask(c: HTMLCanvasElement | null, known?: SelInfo | null) {
+    this.mask = c ? cloneCanvas(c) : null;
+    if (!known || !this.mask) { this.changed(); return; }
+    this.changed(known.rect ?? known.bounds ?? undefined);
+    if (!known.rect) this.rectShape = null;
+  }
+  /** Lo que se sabe de la selección actual (para guardarlo junto a su copia en el historial). */
+  info(): SelInfo | null {
+    if (!this.mask) return null;
+    const rect = this.rectShape && this.rectShape.version === this.version ? { ...this.rectShape.rect } : null;
+    return { bounds: this.bounds ? { ...this.bounds } : null, rect };
+  }
   /** Usa el lienzo tal cual, sin copiarlo (para herramientas que lo van construyendo mientras se arrastra). */
   setMaskShared(c: HTMLCanvasElement, bounds?: Rect | null) {
     if (bounds === undefined) { this.mask = c; this.changed(); return; }
