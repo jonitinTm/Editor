@@ -51,8 +51,15 @@ export function lensFlare(img: ImageData, p: any) {
       const gv = gd < s ? 0.12 * (0.6 + 0.4 * gd / s) : Math.exp(-Math.pow((gd - s) * 160, 2)) * 0.08;
       r += gv * col[0]; g += gv * col[1]; b += gv * col[2];
     }
-    // se suma en modo Trama
-    d[i] = 255 - (255 - d[i]) * (1 - Math.min(1, r * br / 255)); d[i + 1] = 255 - (255 - d[i + 1]) * (1 - Math.min(1, g * br / 255)); d[i + 2] = 255 - (255 - d[i + 2]) * (1 - Math.min(1, b * br / 255));
+    // se suma en modo Trama sobre lo que haya; donde la capa está vacía (o es transparente) el destello queda con su
+    // propia transparencia, así funciona también en una capa nueva (en Photoshop habría que rellenarla de negro)
+    const R = Math.min(1, r * br / 255), G = Math.min(1, g * br / 255), B = Math.min(1, b * br / 255), a0 = d[i + 3] / 255;
+    if (a0 >= 1) { d[i] = 255 - (255 - d[i]) * (1 - R); d[i + 1] = 255 - (255 - d[i + 1]) * (1 - G); d[i + 2] = 255 - (255 - d[i + 2]) * (1 - B); continue; }
+    // destello como color «sobre transparente» (alfa = su canal más fuerte) mezclado con lo que haya debajo en la capa
+    const fa = Math.max(R, G, B); if (fa <= 0) continue;
+    const oa = fa + a0 * (1 - fa);
+    for (const [k, v] of [[0, R], [1, G], [2, B]] as const) d[i + k] = ((v / fa * 255) * fa + d[i + k] * a0 * (1 - fa)) / oa;
+    d[i + 3] = oa * 255;
   }
 }
 
@@ -194,7 +201,9 @@ export function fragment(img: ImageData) {
 // ---- Interpretar ---------------------------------------------------------------------------------
 export function differenceClouds(img: ImageData, c1: string, c2: string, scale: number) {
   const n = new ImageData(img.width, img.height); clouds(n, c1, c2, scale, 5);
-  const d = img.data, s = n.data; for (let i = 0; i < d.length; i += 4) for (let c = 0; c < 3; c++) d[i + c] = Math.abs(d[i + c] - s[i + c]);
+  // lo transparente cuenta como negro (como en Photoshop: en una capa vacía salen las nubes) y el resultado es opaco
+  const d = img.data, s = n.data;
+  for (let i = 0; i < d.length; i += 4) { const a = d[i + 3] / 255; for (let c = 0; c < 3; c++) d[i + c] = Math.abs(d[i + c] * a - s[i + c]); d[i + 3] = 255; }
 }
 export function fibers(img: ImageData, c1: string, c2: string, variance: number, strength: number) {
   const { width: w, height: h, data: d } = img, A = hex(c1), B = hex(c2), rnd = rng(17);
