@@ -8,17 +8,17 @@ const P = 3; // radio del parche (7×7)
 interface Level { w: number; h: number; img: Float32Array; hole: Uint8Array }
 
 function downLevel(L: Level): Level {
-  const w = Math.max(1, L.w >> 1), h = Math.max(1, L.h >> 1), img = new Float32Array(w * h * 3), hole = new Uint8Array(w * h);
+  const w = Math.max(1, L.w >> 1), h = Math.max(1, L.h >> 1), img = new Float32Array(w * h * 4), hole = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    let s0 = 0, s1 = 0, s2 = 0, n = 0, hh = 0;
+    let s0 = 0, s1 = 0, s2 = 0, s3 = 0, n = 0, hh = 0;
     for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
       const xx = Math.min(L.w - 1, x * 2 + dx), yy = Math.min(L.h - 1, y * 2 + dy), i = yy * L.w + xx;
       if (L.hole[i]) { hh++; continue; }
-      s0 += L.img[i * 3]; s1 += L.img[i * 3 + 1]; s2 += L.img[i * 3 + 2]; n++;
+      s0 += L.img[i * 4]; s1 += L.img[i * 4 + 1]; s2 += L.img[i * 4 + 2]; s3 += L.img[i * 4 + 3]; n++;
     }
     const o = y * w + x;
     if (hh) hole[o] = 1;
-    if (n) { img[o * 3] = s0 / n; img[o * 3 + 1] = s1 / n; img[o * 3 + 2] = s2 / n; }
+    if (n) { img[o * 4] = s0 / n; img[o * 4 + 1] = s1 / n; img[o * 4 + 2] = s2 / n; img[o * 4 + 3] = s3 / n; }
   }
   return { w, h, img, hole };
 }
@@ -31,9 +31,9 @@ function diffuseFill(L: Level) {
     left = 0; const nk = known.slice();
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
       const i = y * w + x; if (known[i]) continue;
-      let s0 = 0, s1 = 0, s2 = 0, n = 0;
-      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) if (j >= 0 && known[j]) { s0 += img[j * 3]; s1 += img[j * 3 + 1]; s2 += img[j * 3 + 2]; n++; }
-      if (n) { img[i * 3] = s0 / n; img[i * 3 + 1] = s1 / n; img[i * 3 + 2] = s2 / n; nk[i] = 1; } else left++;
+      let s0 = 0, s1 = 0, s2 = 0, s3 = 0, n = 0;
+      for (const j of [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, y > 0 ? i - w : -1, y < h - 1 ? i + w : -1]) if (j >= 0 && known[j]) { s0 += img[j * 4]; s1 += img[j * 4 + 1]; s2 += img[j * 4 + 2]; s3 += img[j * 4 + 3]; n++; }
+      if (n) { img[i * 4] = s0 / n; img[i * 4 + 1] = s1 / n; img[i * 4 + 2] = s2 / n; img[i * 4 + 3] = s3 / n; nk[i] = 1; } else left++;
     }
     known.set(nk);
   }
@@ -57,12 +57,12 @@ function solveLevel(L: Level, nnf: Int32Array, iters: number, rnd: () => number)
   }
   const dist = (p: number, q: number, cut: number) => {
     const px = p % w, py = (p - px) / w, qx = q % w, qy = (q - qx) / w; let s = 0, n = 0;
-    for (let dy = -P; dy <= P; dy++) { const ay = py + dy; if (ay < 0 || ay >= h) continue; for (let dx = -P; dx <= P; dx++) { const ax = px + dx; if (ax < 0 || ax >= w) continue; const a = (ay * w + ax) * 3, b = ((qy + dy) * w + qx + dx) * 3; const e0 = img[a] - img[b], e1 = img[a + 1] - img[b + 1], e2 = img[a + 2] - img[b + 2]; s += e0 * e0 + e1 * e1 + e2 * e2; n++; if (s > cut * n) return Infinity; } }
+    for (let dy = -P; dy <= P; dy++) { const ay = py + dy; if (ay < 0 || ay >= h) continue; for (let dx = -P; dx <= P; dx++) { const ax = px + dx; if (ax < 0 || ax >= w) continue; const a = (ay * w + ax) * 4, b = ((qy + dy) * w + qx + dx) * 4; const e0 = img[a] - img[b], e1 = img[a + 1] - img[b + 1], e2 = img[a + 2] - img[b + 2], e3 = img[a + 3] - img[b + 3]; s += e0 * e0 + e1 * e1 + e2 * e2 + e3 * e3; n++; if (s > cut * n) return Infinity; } }
     return n ? s / n : Infinity;
   };
   const cost = new Float32Array(w * h).fill(Infinity);
   for (const p of targets) { let q = nnf[p]; if (q < 0 || !valid[q]) q = vlist[(rnd() * vlist.length) | 0]; nnf[p] = q; cost[p] = dist(p, q, Infinity); }
-  const acc = new Float32Array(w * h * 4);
+  const acc = new Float32Array(w * h * 5);
   for (let it = 0; it < iters; it++) {
     // búsqueda: propagación desde los vecinos y búsqueda aleatoria en radios decrecientes
     const order = it % 2 ? targets.slice().reverse() : targets, dir = it % 2 ? 1 : -1;
@@ -86,9 +86,9 @@ function solveLevel(L: Level, nnf: Int32Array, iters: number, rnd: () => number)
     acc.fill(0);
     for (const p of targets) {
       const q = nnf[p], px = p % w, py = (p - px) / w, qx = q % w, qy = (q - qx) / w, wt = Math.exp(-cost[p] / 800);
-      for (let dy = -P; dy <= P; dy++) { const ay = py + dy; if (ay < 0 || ay >= h) continue; for (let dx = -P; dx <= P; dx++) { const ax = px + dx; if (ax < 0 || ax >= w) continue; const a = ay * w + ax; if (!hole[a]) continue; const b = ((qy + dy) * w + qx + dx) * 3; acc[a * 4] += img[b] * wt; acc[a * 4 + 1] += img[b + 1] * wt; acc[a * 4 + 2] += img[b + 2] * wt; acc[a * 4 + 3] += wt; } }
+      for (let dy = -P; dy <= P; dy++) { const ay = py + dy; if (ay < 0 || ay >= h) continue; for (let dx = -P; dx <= P; dx++) { const ax = px + dx; if (ax < 0 || ax >= w) continue; const a = ay * w + ax; if (!hole[a]) continue; const b = ((qy + dy) * w + qx + dx) * 4; acc[a * 5] += img[b] * wt; acc[a * 5 + 1] += img[b + 1] * wt; acc[a * 5 + 2] += img[b + 2] * wt; acc[a * 5 + 3] += img[b + 3] * wt; acc[a * 5 + 4] += wt; } }
     }
-    for (let i = 0; i < w * h; i++) if (hole[i] && acc[i * 4 + 3] > 0) { img[i * 3] = acc[i * 4] / acc[i * 4 + 3]; img[i * 3 + 1] = acc[i * 4 + 1] / acc[i * 4 + 3]; img[i * 3 + 2] = acc[i * 4 + 2] / acc[i * 4 + 3]; }
+    for (let i = 0; i < w * h; i++) if (hole[i] && acc[i * 5 + 4] > 0) { const q = acc[i * 5 + 4]; img[i * 4] = acc[i * 5] / q; img[i * 4 + 1] = acc[i * 5 + 1] / q; img[i * 4 + 2] = acc[i * 5 + 2] / q; img[i * 4 + 3] = acc[i * 5 + 3] / q; }
     for (const p of targets) cost[p] = dist(p, nnf[p], Infinity);
   }
 }
@@ -102,14 +102,17 @@ export function inpaint(src: ImageData, hole: Uint8Array, maxSide = 420): ImageD
   let seed = 12345; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   // nivel de trabajo
   const w0 = Math.max(8, Math.round(W * k)), h0 = Math.max(8, Math.round(H * k));
-  const base: Level = { w: w0, h: h0, img: new Float32Array(w0 * h0 * 3), hole: new Uint8Array(w0 * h0) };
+  // cuatro canales: color multiplicado por la opacidad y la opacidad (así lo transparente cuenta como transparente,
+  // no como negro, y los bordes semitransparentes no se oscurecen)
+  const base: Level = { w: w0, h: h0, img: new Float32Array(w0 * h0 * 4), hole: new Uint8Array(w0 * h0) };
   for (let y = 0; y < h0; y++) for (let x = 0; x < w0; x++) {
     const sx = Math.min(W - 1, Math.floor((x + 0.5) / k)), sy = Math.min(H - 1, Math.floor((y + 0.5) / k)), i = sy * W + sx, o = y * w0 + x;
     // en la reducción, un píxel es hueco si lo es cualquiera de los suyos
     let hh = 0; const r = Math.ceil(0.5 / k);
     for (let dy = -r; dy <= r && !hh; dy++) for (let dx = -r; dx <= r; dx++) { const xx = sx + dx, yy = sy + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H && hole[yy * W + xx]) { hh = 1; break; } }
     base.hole[o] = hh;
-    base.img[o * 3] = src.data[i * 4]; base.img[o * 3 + 1] = src.data[i * 4 + 1]; base.img[o * 3 + 2] = src.data[i * 4 + 2];
+    const al = src.data[i * 4 + 3] / 255;
+    base.img[o * 4] = src.data[i * 4] * al; base.img[o * 4 + 1] = src.data[i * 4 + 1] * al; base.img[o * 4 + 2] = src.data[i * 4 + 2] * al; base.img[o * 4 + 3] = src.data[i * 4 + 3];
   }
   const pyr: Level[] = [base];
   while (Math.min(pyr[pyr.length - 1].w, pyr[pyr.length - 1].h) > 40) pyr.push(downLevel(pyr[pyr.length - 1]));
@@ -120,7 +123,7 @@ export function inpaint(src: ImageData, hole: Uint8Array, maxSide = 420): ImageD
     if (l < pyr.length - 1) {
       // el resultado del nivel anterior sirve de punto de partida (dentro del hueco) y su correspondencia se amplía
       const C = pyr[l + 1];
-      for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const i = y * L.w + x; if (!L.hole[i]) continue; const j = Math.min(C.h - 1, y >> 1) * C.w + Math.min(C.w - 1, x >> 1); L.img[i * 3] = C.img[j * 3]; L.img[i * 3 + 1] = C.img[j * 3 + 1]; L.img[i * 3 + 2] = C.img[j * 3 + 2]; }
+      for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const i = y * L.w + x; if (!L.hole[i]) continue; const j = Math.min(C.h - 1, y >> 1) * C.w + Math.min(C.w - 1, x >> 1); L.img[i * 4] = C.img[j * 4]; L.img[i * 4 + 1] = C.img[j * 4 + 1]; L.img[i * 4 + 2] = C.img[j * 4 + 2]; L.img[i * 4 + 3] = C.img[j * 4 + 3]; }
       const up = new Int32Array(L.w * L.h).fill(-1);
       if (nnf) for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) { const j = nnf[Math.min(C.h - 1, y >> 1) * C.w + Math.min(C.w - 1, x >> 1)]; if (j >= 0) { const jx = j % C.w, jy = (j - jx) / C.w; up[y * L.w + x] = Math.min(L.h - 1, jy * 2 + (y & 1)) * L.w + Math.min(L.w - 1, jx * 2 + (x & 1)); } }
       nnf = up;
@@ -134,11 +137,11 @@ export function inpaint(src: ImageData, hole: Uint8Array, maxSide = 420): ImageD
     const i = y * W + x; if (!hole[i]) continue;
     const fx = Math.min(L.w - 1, Math.max(0, (x + 0.5) * k - 0.5)), fy = Math.min(L.h - 1, Math.max(0, (y + 0.5) * k - 0.5));
     const x0 = Math.floor(fx), y0 = Math.floor(fy), x1 = Math.min(L.w - 1, x0 + 1), y1 = Math.min(L.h - 1, y0 + 1), tx = fx - x0, ty = fy - y0;
-    for (let c = 0; c < 3; c++) {
-      const v = (L.img[(y0 * L.w + x0) * 3 + c] * (1 - tx) + L.img[(y0 * L.w + x1) * 3 + c] * tx) * (1 - ty) + (L.img[(y1 * L.w + x0) * 3 + c] * (1 - tx) + L.img[(y1 * L.w + x1) * 3 + c] * tx) * ty;
-      out.data[i * 4 + c] = v;
-    }
-    out.data[i * 4 + 3] = 255;
+    const v = [0, 0, 0, 0];
+    for (let c = 0; c < 4; c++) v[c] = (L.img[(y0 * L.w + x0) * 4 + c] * (1 - tx) + L.img[(y0 * L.w + x1) * 4 + c] * tx) * (1 - ty) + (L.img[(y1 * L.w + x0) * 4 + c] * (1 - tx) + L.img[(y1 * L.w + x1) * 4 + c] * tx) * ty;
+    const al = v[3] / 255;
+    for (let c = 0; c < 3; c++) out.data[i * 4 + c] = al > 0.004 ? v[c] / al : 0;
+    out.data[i * 4 + 3] = v[3];
   }
   return out;
 }
