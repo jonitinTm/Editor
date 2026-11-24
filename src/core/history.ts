@@ -10,7 +10,8 @@ interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; full?: boolean
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
   blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; fillOpacity?: number; link?: number | null; clip: boolean; label?: string | null;
-  canvas?: HTMLCanvasElement; /** capa nueva vacía: no se guarda su lienzo */ blank?: boolean; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
+  canvas?: HTMLCanvasElement; /** capa nueva vacía: no se guarda su lienzo */ blank?: boolean;
+  /** Estado de los píxeles de la capa: copia entera o «estado anterior + parche» (ver FrozenRef). */ ref?: FrozenRef; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
   children?: LayerSnap[]; expanded?: boolean; artboard?: any; vmask?: string; frame?: boolean;
 }
@@ -33,6 +34,49 @@ function freeze(owner: object, version: number, canvas: HTMLCanvasElement): HTML
   return c;
 }
 
+// ---- Capas de píxeles: copia entera o parche sobre el estado anterior ----
+// Un trazo solo cambia una zona: en vez de copiar la capa entera en cada paso (48 MB con una foto de 12 MP),
+// se guarda el estado anterior más la zona cambiada. Al deshacer se reconstruye la capa (copia entera más
+// los parches, como mucho MAX_DEPTH seguidos; después se vuelve a guardar una copia entera). Deshacer o rehacer
+// un solo paso no reconstruye nada: pone el parche, o lo que había antes, sobre la capa actual.
+export type FrozenRef =
+  | { kind: 'full'; canvas: HTMLCanvasElement }
+  | { kind: 'blank'; w: number; h: number }
+  | { kind: 'patch'; base: FrozenRef; rect: { x: number; y: number; w: number; h: number }; patch: HTMLCanvasElement; w: number; h: number; depth: number; /** píxeles de antes en esa zona (para deshacer sin reconstruir) */ before?: HTMLCanvasElement };
+const MAX_DEPTH = 40;
+const refSize = (r: FrozenRef) => r.kind === 'full' ? { w: r.canvas.width, h: r.canvas.height } : { w: r.w, h: r.h };
+/** Lienzo nuevo con el estado guardado. */
+export function materialize(r: FrozenRef): HTMLCanvasElement {
+  if (r.kind === 'full') return cloneCanvas(r.canvas);
+  if (r.kind === 'blank') return makeCanvas(r.w, r.h);
+  const c = materialize(r.base), x = c.getContext('2d')!;
+  x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+  x.clearRect(r.rect.x, r.rect.y, r.rect.w, r.rect.h); x.drawImage(r.patch, r.rect.x, r.rect.y); x.restore();
+  return c;
+}
+function refCanvases(r: FrozenRef, out: Set<HTMLCanvasElement>) {
+  for (let q: FrozenRef | null = r; q; q = q.kind === 'patch' ? q.base : null) { if (q.kind === 'full') out.add(q.canvas); else if (q.kind === 'patch') { out.add(q.patch); if (q.before) out.add(q.before); } }
+}
+const frozenL = new WeakMap<RasterLayer, { version: number; ref: FrozenRef }>();
+function freezeLayer(l: RasterLayer): FrozenRef {
+  const f = frozenL.get(l), c = l.canvas;
+  if (f && f.version === l.version) { l.dirty = null; return f.ref; }
+  const dirty = l.dirty, before = l.pendingBefore; l.dirty = null; l.pendingBefore = null;
+  let ref: FrozenRef;
+  if (f && dirty && dirty !== 'all') {
+    const sz = refSize(f.ref), depth = f.ref.kind === 'patch' ? f.ref.depth : 0;
+    const x0 = Math.max(0, Math.floor(dirty.x)), y0 = Math.max(0, Math.floor(dirty.y)), x1 = Math.min(c.width, Math.ceil(dirty.x + dirty.w)), y1 = Math.min(c.height, Math.ceil(dirty.y + dirty.h));
+    if (sz.w === c.width && sz.h === c.height && depth < MAX_DEPTH && x1 > x0 && y1 > y0 && (x1 - x0) * (y1 - y0) < c.width * c.height * 0.5) {
+      const patch = makeCanvas(x1 - x0, y1 - y0); patch.getContext('2d')!.drawImage(c, -x0, -y0);
+      ref = { kind: 'patch', base: f.ref, rect: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, patch, w: c.width, h: c.height, depth: depth + 1 };
+      // los píxeles de antes valen si cubren exactamente la zona del parche (un solo trazo desde la última copia)
+      if (before && before.rect.x === x0 && before.rect.y === y0 && before.canvas.width === x1 - x0 && before.canvas.height === y1 - y0) ref.before = before.canvas;
+    } else ref = { kind: 'full', canvas: cloneCanvas(c) };
+  } else ref = { kind: 'full', canvas: cloneCanvas(c) };
+  frozenL.set(l, { version: l.version, ref });
+  return ref;
+}
+
 function snapLayer(l: Layer): LayerSnap {
   const s: LayerSnap = {
     id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,
@@ -44,7 +88,8 @@ function snapLayer(l: Layer): LayerSnap {
   if (l instanceof AdjustmentLayer) s.adjust = JSON.stringify({ filterId: l.filterId, params: l.params });
   if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; s.artboard = l.artboard ? { ...l.artboard } : undefined; s.frame = l.frame; }
   else if (l instanceof RasterLayer) {
-    if (l.isBlank()) s.blank = true; else s.canvas = freeze(l, l.version, l.canvas);
+    if (l.isBlank()) { s.blank = true; const ref: FrozenRef = { kind: 'blank', w: l.canvas.width, h: l.canvas.height }; frozenL.set(l, { version: l.version, ref }); l.dirty = null; }
+    else { s.ref = freezeLayer(l); if (s.ref.kind === 'full') s.canvas = s.ref.canvas; }
     if (isParametric(l)) s.props = JSON.parse(JSON.stringify(l.props)); // copia completa (los trazados tienen puntos anidados)
     if (l instanceof SmartLayer) s.smart = l.inner;
     const f = l.fullContent(); s.full = f.canvas !== l.canvas ? { canvas: f.canvas, x: f.x, y: f.y } : null;
@@ -86,18 +131,27 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
     if (old instanceof AdjustmentLayer) { old.filterId = a.filterId; old.params = a.params; l = old; }
     else l = new AdjustmentLayer(s.name, a.filterId, a.params);
   } else {
-    const f = old ? frozen.get(old) : undefined;
+    const f = old instanceof RasterLayer ? frozenL.get(old) : undefined;
     const same = s.blank ? old instanceof RasterLayer && old.isBlank() && old.canvas.width === w && old.canvas.height === h
-      : old instanceof RasterLayer && old.kind === s.kind && f && f.version === old.version && f.canvas === s.canvas
+      : old instanceof RasterLayer && old.kind === s.kind && f && f.version === old.version && f.ref === s.ref
       && old.canvas.width === w && old.canvas.height === h
       && (!isParametric(old) || JSON.stringify(old.props) === JSON.stringify(s.props))
       && (!(old instanceof SmartLayer) || old.inner === s.smart);
     let r: RasterLayer;
-    if (same) r = old as RasterLayer;
+    // deshacer o rehacer un solo paso de un trazo: basta con poner el parche (o lo de antes) sobre la capa actual
+    const step = !same && !s.blank && s.ref && old instanceof RasterLayer && old.kind === s.kind && s.kind === 'raster' && f && f.version === old.version && old.canvas.width === w && old.canvas.height === h
+      ? (s.ref.kind === 'patch' && s.ref.base === f.ref ? { rect: s.ref.rect, px: s.ref.patch } : f.ref.kind === 'patch' && f.ref.base === s.ref && f.ref.before ? { rect: f.ref.rect, px: f.ref.before } : null) : null;
+    if (step) {
+      r = old as RasterLayer;
+      const x = r.canvas.getContext('2d')!;
+      x.save(); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over';
+      x.clearRect(step.rect.x, step.rect.y, step.rect.w, step.rect.h); x.drawImage(step.px, step.rect.x, step.rect.y); x.restore();
+      r.touch(); frozenL.set(r, { version: r.version, ref: s.ref! }); r.dirty = null;
+    } else if (same) r = old as RasterLayer;
     else {
       r = s.kind === 'smart' ? new SmartLayer(s.name, w, h, s.smart!, s.props.m, s.props.filters ?? []) : s.kind === 'text' ? new TextLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : new RasterLayer(s.name, w, h);
-      if (s.blank) r.markBlank();
-      else if (s.kind !== 'smart') { r.canvas = cloneCanvas(s.canvas!); frozen.set(r, { version: r.version, canvas: s.canvas! }); } // el objeto inteligente se redibuja desde su contenido actual
+      if (s.blank) { r.markBlank(); frozenL.set(r, { version: r.version, ref: { kind: 'blank', w: r.canvas.width, h: r.canvas.height } }); r.dirty = null; }
+      else if (s.kind !== 'smart' && s.ref) { r.canvas = materialize(s.ref); frozenL.set(r, { version: r.version, ref: s.ref }); r.dirty = null; } // el objeto inteligente se redibuja desde su contenido actual
     }
     r.full = s.full ? { ...s.full, version: r.version } : null;
     l = r;
@@ -148,7 +202,7 @@ export function historyBudgetMB(): number {
 }
 /** Bytes de las copias distintas de una lista de pasos (las copias compartidas cuentan una vez). */
 function stepCanvases(snap: DocSnap, out: Set<HTMLCanvasElement>) {
-  const walk = (l: LayerSnap) => { if (l.canvas) out.add(l.canvas); if (l.mask) out.add(l.mask.canvas); if (l.full) out.add(l.full.canvas); l.children?.forEach(walk); };
+  const walk = (l: LayerSnap) => { if (l.ref) refCanvases(l.ref, out); else if (l.canvas) out.add(l.canvas); if (l.mask) out.add(l.mask.canvas); if (l.full) out.add(l.full.canvas); l.children?.forEach(walk); };
   walk(snap.root); if (snap.selection) out.add(snap.selection); snap.channels?.forEach(c => out.add(c.canvas));
 }
 const bytesOf = (set: Set<HTMLCanvasElement>) => { let b = 0; for (const c of set) b += c.width * c.height * 4; return b; };
@@ -179,10 +233,14 @@ export class History {
   }
   canUndo() { return this.index > 0; }
   canRedo() { return this.index < this.steps.length - 1; }
-  goto(doc: EditorDocument, i: number) {
-    if (i < 0 || i >= this.steps.length || i === this.index) return;
+  /** Va al paso i. Devuelve la zona que ha cambiado si solo cambió un trazo (si no, null = todo). */
+  goto(doc: EditorDocument, i: number): { x: number; y: number; w: number; h: number } | null {
+    if (i < 0 || i >= this.steps.length || i === this.index) return null;
+    const from = this.steps[this.index]?.snap;
     this.index = i;
-    restore(doc, this.steps[i].snap);
+    const to = this.steps[i].snap;
+    restore(doc, to);
+    return from ? onlyPatchBetween(from, to) : null;
   }
 }
 
@@ -192,5 +250,32 @@ export function layerCanvasIn(snap: DocSnap, id: number): HTMLCanvasElement | nu
   const f = find(snap.root);
   // capa vacía (no se guardó su lienzo): uno transparente del tamaño del documento
   if (f?.blank) return makeCanvas(snap.width, snap.height);
+  if (f?.ref && f.ref.kind !== 'full') return materialize(f.ref);
   return f?.canvas ?? null;
+}
+
+/** Si de un estado a otro solo cambian los píxeles de una capa por un parche (un trazo), la zona; si no, null. */
+function onlyPatchBetween(a: DocSnap, b: DocSnap): { x: number; y: number; w: number; h: number } | null {
+  if (a.width !== b.width || a.height !== b.height || a.selection !== b.selection || !!a.quickMask !== !!b.quickMask || a.paths !== b.paths || a.activePath !== b.activePath
+    || a.ppi !== b.ppi || a.mode !== b.mode || (a.channels?.length ?? 0) !== (b.channels?.length ?? 0) || (a.channels ?? []).some((c, i) => c !== b.channels![i])) return null;
+  let rect: { x: number; y: number; w: number; h: number } | null = null, diffs = 0;
+  const KEYS: (keyof LayerSnap)[] = ['id', 'kind', 'name', 'visible', 'opacity', 'blendMode', 'locked', 'lockAlpha', 'lockPos', 'lockPixels', 'fillOpacity', 'link', 'clip', 'label', 'styles', 'vmask', 'adjust', 'smart', 'expanded', 'frame', 'blank'];
+  const walk = (x: LayerSnap, y: LayerSnap): boolean => {
+    for (const k of KEYS) if (x[k] !== y[k]) return false;
+    if (JSON.stringify(x.props) !== JSON.stringify(y.props) || JSON.stringify(x.artboard) !== JSON.stringify(y.artboard)) return false;
+    if ((x.mask?.canvas ?? null) !== (y.mask?.canvas ?? null) || (x.mask?.enabled ?? null) !== (y.mask?.enabled ?? null)) return false;
+    if ((x.full?.canvas ?? null) !== (y.full?.canvas ?? null)) return false;
+    if (x.ref !== y.ref) {
+      const p = x.ref, q = y.ref;
+      if (!p || !q) return false;
+      const r = q.kind === 'patch' && q.base === p ? q.rect : p.kind === 'patch' && p.base === q ? p.rect : null;
+      if (!r || ++diffs > 1) return false;
+      rect = { ...r };
+    } else if (x.canvas !== y.canvas) return false;
+    const xc = x.children ?? [], yc = y.children ?? [];
+    if (xc.length !== yc.length) return false;
+    for (let i = 0; i < xc.length; i++) if (!walk(xc[i], yc[i])) return false;
+    return true;
+  };
+  return walk(a.root, b.root) && rect ? rect : null;
 }

@@ -243,7 +243,19 @@ export class RasterLayer extends Layer {
    * moverla). Solo es válido mientras los píxeles no se editen (misma versión).
    */
   full: { canvas: HTMLCanvasElement; x: number; y: number; version: number } | null = null;
-  touch() { resetDrawState(this.canvas); super.touch(); }
+  touch() { resetDrawState(this.canvas); super.touch(); this.dirty = 'all'; this.pendingBefore = null; }
+  /** Zona cambiada desde la última copia del historial ('all' = toda o desconocida; null = nada). */
+  dirty: { x: number; y: number; w: number; h: number } | 'all' | null = 'all';
+  /** Como touch(), pero indicando que solo cambió esa zona (el historial guardará solo ese parche). */
+  /** Píxeles de antes de la zona cambiada (si solo hubo un cambio desde la última copia): deshacer es instantáneo. */
+  pendingBefore: { rect: { x: number; y: number; w: number; h: number }; canvas: HTMLCanvasElement } | null = null;
+  touchRect(r: { x: number; y: number; w: number; h: number }, before?: HTMLCanvasElement) {
+    resetDrawState(this.canvas); this.version++;
+    const d = this.dirty;
+    this.pendingBefore = d === null && before ? { rect: { ...r }, canvas: before } : null;
+    if (d === 'all') return;
+    this.dirty = d ? { x: Math.min(d.x, r.x), y: Math.min(d.y, r.y), w: Math.max(d.x + d.w, r.x + r.w) - Math.min(d.x, r.x), h: Math.max(d.y + d.h, r.y + r.h) - Math.min(d.y, r.y) } : { ...r };
+  }
   constructor(name: string, w: number, h: number) {
     super(name);
     this.canvas = makeCanvas(w, h);

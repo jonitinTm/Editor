@@ -264,10 +264,11 @@ export class EditorDocument {
     this.invalidate(changedRect ?? null);
     this.changed();
   }
-  undo() { if (this.history.canUndo()) { this.history.goto(this, this.history.index - 1); this.afterRestore(); } }
-  redo() { if (this.history.canRedo()) { this.history.goto(this, this.history.index + 1); this.afterRestore(); } }
-  gotoHistory(i: number) { this.history.goto(this, i); this.afterRestore(); }
-  private afterRestore() { this.overrides.clear(); this.modified = true; this.invalidate(); this.changed(); }
+  undo() { if (this.history.canUndo()) this.afterRestore(this.history.goto(this, this.history.index - 1)); }
+  redo() { if (this.history.canRedo()) this.afterRestore(this.history.goto(this, this.history.index + 1)); }
+  gotoHistory(i: number) { this.afterRestore(this.history.goto(this, i)); }
+  /** Tras deshacer/rehacer: si solo cambió la zona de un trazo, solo se recompone esa zona. */
+  private afterRestore(rect: Rect | null = null) { const hadOv = this.overrides.size > 0; this.overrides.clear(); this.modified = true; this.invalidate(hadOv ? null : rect); this.changed(); }
 
   /** Cambia el tamaño del lienzo desplazando el contenido (dx, dy). */
   resizeCanvas(w: number, h: number, dx: number, dy: number) {

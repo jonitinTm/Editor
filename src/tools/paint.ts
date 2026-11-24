@@ -320,9 +320,13 @@ export class Stroke {
       if (!this.bounds) { app.doc!.invalidate(); returnBuffer(this.buffer, null); return false; }
       // pintura normal: se aplica directamente sobre la capa, solo en la zona del trazo (sin copiar la capa
       // entera; el historial ya guarda su propia copia del estado anterior)
+      // solo cambia la zona del trazo: el historial guardará solo ese parche (y lo que había antes, para deshacer)
+      const tl = !this.target.isMask && !this.target.quick && this.target.layer instanceof RasterLayer ? this.target.layer : null;
+      let before: HTMLCanvasElement | undefined;
+      if (tl) { const b = this.bounds; before = makeCanvas(b.w, b.h); ctx2d(before).drawImage(this.original, -b.x, -b.y); }
       this.applyInPlace(this.bounds);
       setPreview(this.target, null);
-      touchTarget(this.target);
+      if (tl) tl.touchRect(this.bounds, before); else touchTarget(this.target);
       app.doc!.invalidate(this.bounds);
       returnBuffer(this.buffer, this.bounds);
       return true;
