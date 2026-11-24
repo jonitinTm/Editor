@@ -13,7 +13,11 @@ import { WARP_STYLES } from '../tools/warpmesh';
 import { actionById } from './actions';
 import { promptDialog, row as formRow } from './dialog';
 import { createPicker, SWATCHES } from './colorpicker';
-import { layerStyleDialog, levelsBody, curvesBody, filterDialog, patternSelect, warpTextDialog, lutPicker, gradientButton, BUILTIN_PRESETS, userPresets, saveUserPresets } from './dialogs';
+import { levelsBody, curvesBody, patternSelect, lutPicker, gradientButton, BUILTIN_PRESETS, userPresets, saveUserPresets } from './widgets';
+// las ventanas se cargan al abrirlas
+const layerStyleDialog = () => { import('./dialogs').then(m => m.layerStyleDialog()); };
+const filterDialog = (...a: Parameters<typeof import('./dialogs').filterDialog>) => { import('./dialogs').then(m => m.filterDialog(...a)); };
+const warpTextDialog = (...a: Parameters<typeof import('./dialogs').warpTextDialog>) => { import('./dialogs').then(m => m.warpTextDialog(...a)); };
 import { defaultParams } from '../filters/registry';
 import { FILTERS } from '../filters/registry';
 import { getPixels } from '../core/canvas';

@@ -13,7 +13,8 @@ import { hasStyles, canvasBlend, tracePath } from '../core/layers';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer, clipMask } from '../tools/paint';
 import { FilterDef, defaultParams } from '../filters/registry';
 import * as io from '../io/files';
-import { readPsd, writePsd } from '../io/psd';
+// el lector y escritor de PSD se cargan al usarlos (no al abrir la app)
+const psdMod = () => import('../io/psd');
 import { heal, findSource } from '../filters/heal';
 import { computeFilter } from '../filters/compute';
 import FilterWorker from '../filters/worker?worker&inline';
@@ -59,7 +60,7 @@ export async function openFiles(files: File[], asLayers = false, remember = true
         if (r) { app.addDocument(r.doc); app.toast(`SVG abierto como ${r.count} capa${r.count > 1 ? 's' : ''} vectorial${r.count > 1 ? 'es' : ''}` + (r.skipped ? ` (${r.skipped} elemento${r.skipped > 1 ? 's' : ''} sin convertir: textos o imágenes)` : '')); continue; }
       }
       if (io.isPsdFile(f)) {
-        const { doc: pd, warnings } = await readPsd(await f.arrayBuffer(), io.baseName(f.name));
+        const { doc: pd, warnings } = await (await psdMod()).readPsd(await f.arrayBuffer(), io.baseName(f.name));
         const host = app.doc;
         if (asLayers && host) {
           // colocado en otro documento: como objeto inteligente que conserva sus capas (doble clic para editarlas)
@@ -237,7 +238,7 @@ export async function exportLayers(trim: boolean, onlyVisible: boolean) {
 export async function savePsd(name: string) {
   const d = doc(); if (!d) return;
   try {
-    const { blob, warnings } = writePsd(d);
+    const { blob, warnings } = (await psdMod()).writePsd(d);
     await io.saveBlob(blob, name + '.psd');
     if (warnings.length) alertDialog('PSD guardado con avisos', warnings.join('. ') + '.'); else app.toast('PSD guardado');
   } catch (e: any) { if (e?.name !== 'AbortError') alertDialog('Error al guardar', String(e?.message ?? e)); }
@@ -490,7 +491,7 @@ export function newFillLayer(id: 'solidfill' | 'gradfill' | 'patternfill') {
 export async function replaceSmartContents(file: File) {
   const d = doc(); const l = d?.active;
   if (!d || !(l instanceof SmartLayer)) { app.toast('Selecciona un objeto inteligente', 'warn'); return; }
-  const inner = io.isPsdFile(f(file)) ? (await readPsd(await file.arrayBuffer(), io.baseName(file.name))).doc : await io.documentFromImage(file, file.name);
+  const inner = io.isPsdFile(f(file)) ? (await (await psdMod()).readPsd(await file.arrayBuffer(), io.baseName(file.name))).doc : await io.documentFromImage(file, file.name);
   inner.embedded = true;
   const ow = l.inner.width, oh = l.inner.height, m = l.props.m;
   // se escala para que ocupe exactamente la misma caja que el contenido anterior

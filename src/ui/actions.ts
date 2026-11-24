@@ -6,14 +6,20 @@ import '../filters/matchsrc';
 
 import { app } from './app';
 import * as ops from './ops';
-import * as dlg from './dialogs';
+// Las ventanas (dialogs.ts) no se cargan al abrir la app: se cargan la primera vez que se abre una, o en segundo
+// plano cuando la app está libre (ver preloadDialogs). Mientras tanto, dlg.x(...) espera a que estén.
+import { lazyModule } from './lazy';
+type DlgMod = typeof import('./dialogs');
+let dlgMod: DlgMod | null = null;
+export const loadDialogs = () => import('./dialogs').then(m => (dlgMod = m));
+const dlg = new Proxy({} as DlgMod, { get: (_t, k: string) => (...a: any[]) => dlgMod ? (dlgMod as any)[k](...a) : loadDialogs().then(m => (m as any)[k](...a)) });
 import * as cmpv from './compare';
-import * as uniq from './unique';
-import * as s3d from './shadow3d';
+const uniq = lazyModule(() => import('./unique'));
+const s3d = lazyModule(() => import('./shadow3d'));
 import * as more from './more';
 import * as more2 from './more2';
 import * as more3 from './more3';
-import * as cr from './create';
+const cr = lazyModule(() => import('./create'));
 import * as ai from '../ai/aitools';
 
 import { FILTERS } from '../filters/registry';

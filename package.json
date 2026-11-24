@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build && node scripts/postbuild.js",
+    "build": "tsc --noEmit && vite build && vite build -c vite.web.config.ts && node scripts/postbuild.js",
     "preview": "vite preview"
   },
   "devDependencies": {

@@ -17,24 +17,26 @@ import { buildMenuBar } from './ui/menus';
 import { buildToolbar } from './ui/toolbar';
 import { buildOptionsBar } from './ui/optionsbar';
 import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel, buildColorPanel, buildSwatchesPanel } from './ui/panels';
-import { ACTIONS } from './ui/actions';
+import { ACTIONS, loadDialogs } from './ui/actions';
+import { lazyModule } from './ui/lazy';
 import * as ops from './ui/ops';
 import { buildAdjustmentsPanel } from './ui/adjpanel';
 import { dialogOpen } from './ui/dialog';
-import { newDocumentDialog, quickGuideDialog, recentGrid } from './ui/dialogs';
+import { recentGrid } from './ui/widgets';
+const newDocumentDialog = () => { import('./ui/dialogs').then(m => m.newDocumentDialog()); };
+const quickGuideDialog = () => { import('./ui/dialogs').then(m => m.quickGuideDialog()); };
 import { keyString } from './ui/keys';
 import * as io from './io/files';
-import * as uniq from './ui/unique';
+const uniq = lazyModule(() => import('./ui/unique'));
 import * as more from './ui/more';
-import * as cr from './ui/create';
+const cr = lazyModule(() => import('./ui/create'));
 import * as easy from './ui/easy';
 import { PerspectiveWarpTool } from './tools/perspwarp';
 import { VanishingTool } from './ui/more3';
 import { AISelectTool } from './ai/aitools';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
-import { readPsd, writePsd } from './io/psd';
-(app as any).debug = { filters: () => import('./filters/registry'), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), readPsd, writePsd, ops, io, uniq, more, cr, actions: ACTIONS };
+(app as any).debug = { filters: () => import('./filters/registry'), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS };
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
@@ -518,3 +520,7 @@ const reportError = (msg: string) => {
 };
 window.addEventListener('error', e => { if (e.error) reportError(String(e.error?.stack ?? e.message)); });
 window.addEventListener('unhandledrejection', e => { const r = e.reason; if (r?.name === 'AbortError') return; reportError(String(r?.stack ?? r)); });
+
+// Con la app ya abierta y libre, se cargan en segundo plano las ventanas: así abrir la primera es inmediato
+// sin retrasar el arranque.
+{ const idle = (window as any).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 1500)); setTimeout(() => idle(() => { loadDialogs(); }, { timeout: 4000 }), 1200); }
