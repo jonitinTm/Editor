@@ -15,29 +15,31 @@ function boxSizes(sigma: number, n: number): number[] {
 
 function boxBlurH(src: Float32Array, dst: Float32Array, w: number, h: number, r: number) {
   const iarr = 1 / (r + r + 1);
+  // mismas sumas que antes, pero sin comprobar los bordes en cada píxel: tramo inicial, central y final por separado
+  const a = Math.min(w, r + 1), b = Math.max(a, w - r);
   for (let y = 0; y < h; y++) {
-    const row = y * w;
-    let acc = 0;
-    const first = src[row], last = src[row + w - 1];
-    acc = (r + 1) * first;
+    const row = y * w, first = src[row], lastI = row + w - 1;
+    let acc = (r + 1) * first;
     for (let j = 0; j < r; j++) acc += src[row + Math.min(j, w - 1)];
-    for (let x = 0; x < w; x++) {
-      acc += src[row + Math.min(x + r, w - 1)] - (x - r - 1 >= 0 ? src[row + x - r - 1] : first);
-      dst[row + x] = acc * iarr;
-    }
-    void last;
+    let x = 0;
+    for (; x < a; x++) { acc += src[Math.min(row + x + r, lastI)] - first; dst[row + x] = acc * iarr; }
+    for (; x < b; x++) { acc += src[row + x + r] - src[row + x - r - 1]; dst[row + x] = acc * iarr; }
+    for (; x < w; x++) { acc += src[lastI] - src[row + x - r - 1]; dst[row + x] = acc * iarr; }
   }
 }
+// Pasada vertical fila a fila (todas las columnas a la vez): recorre la memoria en orden, mucho más rápido que ir
+// columna por columna en imágenes anchas. Cada columna hace exactamente las mismas sumas en el mismo orden.
+let accBuf = new Float64Array(0);
 function boxBlurV(src: Float32Array, dst: Float32Array, w: number, h: number, r: number) {
   const iarr = 1 / (r + r + 1);
-  for (let x = 0; x < w; x++) {
-    const first = src[x];
-    let acc = (r + 1) * first;
-    for (let j = 0; j < r; j++) acc += src[Math.min(j, h - 1) * w + x];
-    for (let y = 0; y < h; y++) {
-      acc += src[Math.min(y + r, h - 1) * w + x] - (y - r - 1 >= 0 ? src[(y - r - 1) * w + x] : first);
-      dst[y * w + x] = acc * iarr;
-    }
+  if (accBuf.length < w) accBuf = new Float64Array(w);
+  const acc = accBuf;
+  for (let x = 0; x < w; x++) acc[x] = (r + 1) * src[x];
+  for (let j = 0; j < r; j++) { const o = Math.min(j, h - 1) * w; for (let x = 0; x < w; x++) acc[x] += src[o + x]; }
+  for (let y = 0; y < h; y++) {
+    const add = Math.min(y + r, h - 1) * w, out = y * w;
+    if (y - r - 1 >= 0) { const sub = (y - r - 1) * w; for (let x = 0; x < w; x++) { acc[x] += src[add + x] - src[sub + x]; dst[out + x] = acc[x] * iarr; } }
+    else for (let x = 0; x < w; x++) { acc[x] += src[add + x] - src[x]; dst[out + x] = acc[x] * iarr; }
   }
 }
 
@@ -63,13 +65,20 @@ export function gaussianBlur(img: ImageData, radius: number, alphaOnly = false) 
     for (let i = 0; i < n; i++) d[i * 4 + 3] = a[i];
     return;
   }
+  let opaque = true;
+  for (let i = 0; i < n; i++) if (a[i] !== 255) { opaque = false; break; }
   const chans = [0, 1, 2].map(c => {
     const ch = new Float32Array(n);
-    for (let i = 0; i < n; i++) ch[i] = d[i * 4 + c] * a[i] / 255; // premultiplicar
+    if (opaque) for (let i = 0; i < n; i++) ch[i] = d[i * 4 + c]; // ×255/255: el mismo valor
+    else for (let i = 0; i < n; i++) ch[i] = d[i * 4 + c] * a[i] / 255; // premultiplicar
     return ch;
   });
   for (const ch of chans) blurChannel(ch, tmp, w, h, sigma);
-  blurChannel(a, tmp, w, h, sigma);
+  if (opaque) {
+    // imagen sin transparencia: el alfa desenfocado sale igual en todos los píxeles; se calcula en un trozo pequeño
+    // con las mismas operaciones (mismo valor exacto) en vez de desenfocar todo el canal
+    const k = new Float32Array(9).fill(255), kt = new Float32Array(9); blurChannel(k, kt, 3, 3, sigma); a.fill(k[4]);
+  } else blurChannel(a, tmp, w, h, sigma);
   for (let i = 0; i < n; i++) {
     const al = a[i];
     d[i * 4 + 3] = al;

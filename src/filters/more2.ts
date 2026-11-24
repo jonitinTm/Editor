@@ -76,15 +76,24 @@ export function lensBlur(img: ImageData, radius: number, highlights: number) {
 }
 export function boxBlur(img: ImageData, radius: number) {
   const { width: w, height: h, data: d } = img, r = Math.max(1, Math.round(radius));
-  const pass = (horiz: boolean) => {
-    const src = new Uint8ClampedArray(d), len = horiz ? w : h, lines = horiz ? h : w;
-    for (let L = 0; L < lines; L++) for (let c = 0; c < 4; c++) {
-      let acc = 0; const at = (q: number) => src[(horiz ? L * w + Math.min(len - 1, Math.max(0, q)) : Math.min(len - 1, Math.max(0, q)) * w + L) * 4 + c];
-      for (let q = -r; q <= r; q++) acc += at(q);
-      for (let q = 0; q < len; q++) { d[(horiz ? L * w + q : q * w + L) * 4 + c] = acc / (2 * r + 1); acc += at(q + r + 1) - at(q - r); }
+  const k = 2 * r + 1, cl = (q: number, n: number) => q < 0 ? 0 : q >= n ? n - 1 : q;
+  // horizontal: cada fila y canal (sumas enteras: el orden no cambia el resultado)
+  let src = new Uint8ClampedArray(d);
+  for (let y = 0; y < h; y++) {
+    const row = y * w * 4;
+    for (let c = 0; c < 4; c++) {
+      let acc = 0; for (let q = -r; q <= r; q++) acc += src[row + cl(q, w) * 4 + c];
+      for (let q = 0; q < w; q++) { d[row + q * 4 + c] = acc / k; acc += src[row + cl(q + r + 1, w) * 4 + c] - src[row + cl(q - r, w) * 4 + c]; }
     }
-  };
-  pass(true); pass(false);
+  }
+  // vertical: fila a fila con un acumulador por columna y canal (memoria en orden)
+  src = new Uint8ClampedArray(d);
+  const W4 = w * 4, acc = new Float64Array(W4);
+  for (let q = -r; q <= r; q++) { const o = cl(q, h) * W4; for (let i = 0; i < W4; i++) acc[i] += src[o + i]; }
+  for (let q = 0; q < h; q++) {
+    const out = q * W4, add = cl(q + r + 1, h) * W4, sub = cl(q - r, h) * W4;
+    for (let i = 0; i < W4; i++) { d[out + i] = acc[i] / k; acc[i] += src[add + i] - src[sub + i]; }
+  }
 }
 export function average(img: ImageData) {
   const d = img.data; let r = 0, g = 0, b = 0, n = 0;

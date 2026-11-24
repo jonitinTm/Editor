@@ -59,11 +59,14 @@ function boxH(s: F, o: F, w: number, h: number, r: number) {
     for (let x = 0; x < w; x++) { acc += s[row + Math.min(w - 1, x + r)] - s[row + Math.max(0, x - r - 1)]; o[row + x] = acc * iarr; }
   }
 }
+// fila a fila con un acumulador por columna (recorre la memoria en orden): mismas sumas, mismo orden, más rápido
 function boxV(s: F, o: F, w: number, h: number, r: number) {
-  const iarr = 1 / (r + r + 1);
-  for (let x = 0; x < w; x++) {
-    let acc = s[x] * (r + 1); for (let y = 0; y < r; y++) acc += s[Math.min(h - 1, y) * w + x];
-    for (let y = 0; y < h; y++) { acc += s[Math.min(h - 1, y + r) * w + x] - s[Math.max(0, y - r - 1) * w + x]; o[y * w + x] = acc * iarr; }
+  const iarr = 1 / (r + r + 1), acc = new Float64Array(w);
+  for (let x = 0; x < w; x++) acc[x] = s[x] * (r + 1);
+  for (let y = 0; y < r; y++) { const q = Math.min(h - 1, y) * w; for (let x = 0; x < w; x++) acc[x] += s[q + x]; }
+  for (let y = 0; y < h; y++) {
+    const add = Math.min(h - 1, y + r) * w, sub = Math.max(0, y - r - 1) * w, out = y * w;
+    for (let x = 0; x < w; x++) { acc[x] += s[add + x] - s[sub + x]; o[out + x] = acc[x] * iarr; }
   }
 }
 /** Suaviza los colores sin que lo transparente oscurezca los bordes. */
