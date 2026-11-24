@@ -130,6 +130,8 @@ export class EditorDocument {
   }
 
   /** Devuelve la imagen combinada actualizada. */
+  /** La imagen combinada se hizo con alguna vista previa (overrides) que quizá ya no está. */
+  private shownOverrides = false;
   getComposite(): HTMLCanvasElement {
     if (this.composite.width !== this.width || this.composite.height !== this.height) {
       this.composite = makeCanvas(this.width, this.height); this.compositeDirty = true;
@@ -140,6 +142,8 @@ export class EditorDocument {
         x: Math.floor(d.x) - 1, y: Math.floor(d.y) - 1, w: Math.ceil(d.w) + 3, h: Math.ceil(d.h) + 3,
       };
       const big = !rect || rect.w * rect.h > this.width * this.height / 4;
+      if (!rect) this.shownOverrides = false;
+      if (this.overrides.size) this.shownOverrides = true;
       if (!this.renderWithCache(rect, big)) renderComposite(this.root, this.composite, { overrides: this.overrides, rect });
       this.noteChange(rect);
       this.compositeDirty = null;
@@ -259,8 +263,10 @@ export class EditorDocument {
   /** Guarda un paso en el historial. Si se sabe qué zona cambió (un trazo), se indica para no recomponer la
    *  imagen entera (tras cada pincelada eso costaba un parón visible en imágenes grandes). */
   commit(name: string, changedRect?: Rect) {
-    this.history.push(this, name);
+    const none = this.history.push(this, name);
     this.modified = true;
+    // solo cambió la selección (o los trazados): la imagen no se recompone, salvo que se viera con una vista previa
+    if (!changedRect && none && !this.shownOverrides) { this.changed(); return; }
     this.invalidate(changedRect ?? null);
     this.changed();
   }

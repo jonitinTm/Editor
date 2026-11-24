@@ -23,14 +23,22 @@ export function loadImage(src: Blob | string): Promise<HTMLImageElement> {
   });
 }
 
+/** Descodifica la imagen fuera del hilo principal si el navegador sabe (la app no se congela al abrir fotos grandes). */
+async function decodeImage(file: Blob): Promise<HTMLImageElement | ImageBitmap> {
+  if (typeof createImageBitmap === 'function' && !/svg/i.test(file.type)) {
+    try { return await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions); } catch { /* formato que solo entiende <img> */ }
+  }
+  return loadImage(file);
+}
 export async function imageToCanvas(file: Blob): Promise<HTMLCanvasElement> {
-  const img = await loadImage(file);
-  let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+  const img = await decodeImage(file);
+  let w = (img as HTMLImageElement).naturalWidth || img.width, h = (img as HTMLImageElement).naturalHeight || img.height;
   // en iPhone/iPad un lienzo no puede pasar de unos 16,7 megapíxeles: la foto se reduce para que se pueda editar
   const max = maxCanvasPixels();
   if (w * h > max) { const k = Math.sqrt(max / (w * h)) * 0.98; const ow = w, oh = h; w = Math.floor(w * k); h = Math.floor(h * k); deviceLimitNotice?.(ow, oh, w, h); }
   const c = makeCanvas(w, h);
   ctx2d(c).drawImage(img, 0, 0, w, h);
+  if ('close' in img) img.close();
   return c;
 }
 /** Aviso cuando una imagen se reduce por el límite del dispositivo (lo pone la interfaz). */

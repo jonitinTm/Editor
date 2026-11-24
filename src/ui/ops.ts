@@ -10,7 +10,7 @@ import { GroupLayer, Layer, LayerMask, LayerStyles, AdjustmentLayer, SmartLayer,
 import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, canvasToBlob, Rect } from '../core/canvas';
 import { compositeGroup, composeStyled } from '../core/compositor';
 import { hasStyles, canvasBlend, tracePath } from '../core/layers';
-import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer, clipMask } from '../tools/paint';
+import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer, clipMask, editInPlace } from '../tools/paint';
 import { FilterDef, defaultParams , loadFilterImpls } from '../filters/registry';
 import * as io from '../io/files';
 // el lector y escritor de PSD se cargan al usarlos (no al abrir la app)
@@ -133,7 +133,9 @@ export async function openFiles(files: File[], asLayers = false, remember = true
     } finally {
       // se recuerda en «Recientes» (solo archivos abiertos como documento nuevo)
       if (remember && app.docs.length > before && app.doc) {
-        const d = app.doc!; import('../io/recent').then(r => r.addRecent(f, d.getComposite(), `${d.width} × ${d.height}`));
+        // la miniatura se hace cuando la app está libre, para no alargar la apertura
+        const d = app.doc!, idle = (window as any).requestIdleCallback ?? ((fn: () => void) => setTimeout(fn, 300));
+        idle(() => import('../io/recent').then(r => r.addRecent(f, d.getComposite(), `${d.width} × ${d.height}`)), { timeout: 3000 });
       }
     }
   }
@@ -663,9 +665,9 @@ export function strokeSelection(width: number, pos: 'center' | 'inside' | 'outsi
   lc.strokeStyle = app.fg; lc.lineWidth = pos === 'center' ? width : width * 2; lc.lineCap = 'square'; lc.lineJoin = 'round';
   lc.stroke(outline);
   if (pos !== 'center') { lc.globalCompositeOperation = pos === 'inside' ? 'destination-in' : 'destination-out'; lc.drawImage(sel, 0, 0); }
-  const out = cloneCanvas(t.canvas); ctx2d(out).drawImage(line, 0, 0);
-  const z = setTargetCanvas(t, out, 'auto');
-  d.commit('Contornear', z);
+  const b = d.selection.bounds, pad = Math.ceil(width) + 2;
+  const z = editInPlace(t, b ? { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 } : undefined, c => c.drawImage(line, 0, 0));
+  d.commit('Contornear', b ? z : undefined);
 }
 
 /** Selecciona los píxeles de la imagen parecidos al color frontal. */
@@ -953,15 +955,12 @@ export function clearSelection(name = 'Borrar') {
   const d = doc(); if (!d) return;
   if (!d.selection.active) { app.toast('Haz primero una selección', 'warn'); return; }
   const t = getPaintTarget(); if (!t) return;
-  const out = cloneCanvas(t.canvas); const c = ctx2d(out);
-  c.globalCompositeOperation = 'destination-out'; c.drawImage(d.selection.mask!, 0, 0);
-  if (t.isMask) {
+  const sel = d.selection.mask!;
+  const zone = editInPlace(t, d.selection.bounds, c => {
+    c.globalCompositeOperation = 'destination-out'; c.drawImage(sel, 0, 0);
     // En máscaras "borrar" = pintar con el color de fondo
-    const lum = luminanceOf(app.bg);
-    c.globalCompositeOperation = 'lighter'; c.globalAlpha = lum; c.drawImage(d.selection.mask!, 0, 0);
-  }
-  const zone = d.selection.bounds ?? undefined;
-  setTargetCanvas(t, out, zone);
+    if (t.isMask) { c.globalCompositeOperation = 'lighter'; c.globalAlpha = luminanceOf(app.bg); c.drawImage(sel, 0, 0); }
+  });
   d.commit(name, zone);
 }
 function luminanceOf(hex: string) { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; }
@@ -990,20 +989,21 @@ export function fillPattern(id: string, opacity = 1, scale = 1) {
 export function fill(color: string, opacity = 1, name = 'Rellenar') {
   const d = doc(); if (!d) return;
   const t = getPaintTarget(); if (!t) return;
-  const out = cloneCanvas(t.canvas); const c = ctx2d(out);
-  const area = makeCanvas(d.width, d.height); const ac = ctx2d(area);
-  ac.fillStyle = t.isMask ? '#fff' : color; ac.fillRect(0, 0, d.width, d.height);
   const sm = clipMask(t);
-  if (sm) { ac.globalCompositeOperation = 'destination-in'; ac.drawImage(sm, 0, 0); }
-  c.globalAlpha = opacity;
-  if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
-  if (t.isMask) {
-    c.globalCompositeOperation = 'destination-out'; c.drawImage(area, 0, 0);
-    c.globalAlpha = opacity * luminanceOf(color); c.globalCompositeOperation = 'lighter'; c.drawImage(area, 0, 0);
-  } else c.drawImage(area, 0, 0);
-  const zone = sm && d.selection.active ? d.selection.bounds ?? undefined : undefined;
-  setTargetCanvas(t, out, zone);
-  d.commit(name, zone);
+  const region = sm && d.selection.active ? d.selection.bounds ?? undefined : undefined;
+  // el relleno se prepara solo del tamaño de la zona
+  const zone = editInPlace(t, region, (c, r) => {
+    const area = makeCanvas(r.w, r.h), ac = ctx2d(area);
+    ac.fillStyle = t.isMask ? '#fff' : color; ac.fillRect(0, 0, r.w, r.h);
+    if (sm) { ac.globalCompositeOperation = 'destination-in'; ac.drawImage(sm, -r.x, -r.y); }
+    c.globalAlpha = opacity;
+    if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
+    if (t.isMask) {
+      c.globalCompositeOperation = 'destination-out'; c.drawImage(area, r.x, r.y);
+      c.globalAlpha = opacity * luminanceOf(color); c.globalCompositeOperation = 'lighter'; c.drawImage(area, r.x, r.y);
+    } else c.drawImage(area, r.x, r.y);
+  });
+  d.commit(name, region ? zone : undefined);
 }
 
 /** Capa vía copiar (Ctrl+J) o vía cortar (Mayús+Ctrl+J). */
@@ -1013,9 +1013,8 @@ export function layerVia(cutting: boolean) {
   const p = selectedPixels(false); if (!p) return;
   if (cutting) {
     const t = getPaintTarget(); if (!t || t.isMask) return;
-    const out = cloneCanvas(t.canvas); const c = ctx2d(out);
-    c.globalCompositeOperation = 'destination-out'; c.drawImage(d.selection.mask!, 0, 0);
-    setTargetCanvas(t, out, d.selection.bounds);
+    const sel = d.selection.mask!;
+    editInPlace(t, d.selection.bounds, c => { c.globalCompositeOperation = 'destination-out'; c.drawImage(sel, 0, 0); });
   }
   const l = new RasterLayer(d.nextLayerName(), d.width, d.height);
   ctx2d(l.canvas).drawImage(p.canvas, p.rect.x, p.rect.y);
@@ -1454,6 +1453,14 @@ export function growSimilar(contiguous: boolean, tolerance = 32) {
 
 import type { DocPath } from '../core/document';
 /** Dibuja todos los subtrazados de un trazado en un contexto (para rellenar, contornear o seleccionar). */
+/** Caja que contiene el trazado (los puntos y sus tiradores encierran la curva), con margen. */
+function pathBox(p: DocPath, pad: number): Rect | undefined {
+  const xs: number[] = [], ys: number[] = [];
+  for (const sp of p.subpaths) for (const q of sp.pts) { xs.push(q.x, q.ix, q.ox); ys.push(q.y, q.iy, q.oy); }
+  if (!xs.length || ![...xs, ...ys].every(Number.isFinite)) return undefined;
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  return { x: x0, y: y0, w: Math.max(...xs) + pad - x0, h: Math.max(...ys) + pad - y0 };
+}
 export function tracePathDoc(ctx: CanvasRenderingContext2D, p: DocPath) {
   ctx.beginPath();
   for (const sp of p.subpaths) tracePath(ctx, sp.pts, sp.closed);
@@ -1468,20 +1475,23 @@ export function newDocPath(subpaths: DocPath['subpaths'], name?: string) {
 export function fillDocPath(i: number) {
   const d = doc(); const p = d?.paths[i]; if (!d || !p) return;
   const t = getPaintTarget(); if (!t) { app.toast('Selecciona una capa de píxeles', 'warn'); return; }
-  const out = cloneCanvas(t.canvas), c = ctx2d(out);
-  if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
-  c.fillStyle = t.isMask ? '#fff' : app.fg; tracePathDoc(c, p); c.fill('evenodd');
-  const z = setTargetCanvas(t, out, 'auto'); d.commit('Rellenar trazado', z);
+  const z = editInPlace(t, pathBox(p, 2), c => {
+    if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
+    c.fillStyle = t.isMask ? '#fff' : app.fg; tracePathDoc(c, p); c.fill('evenodd');
+  });
+  d.commit('Rellenar trazado', z);
 }
 export function strokeDocPath(i: number) {
   const d = doc(); const p = d?.paths[i]; if (!d || !p) return;
   const t = getPaintTarget(); if (!t) { app.toast('Selecciona una capa de píxeles', 'warn'); return; }
-  const out = cloneCanvas(t.canvas), c = ctx2d(out);
-  if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
-  // contornea con el color frontal y el tamaño del pincel
-  c.strokeStyle = t.isMask ? '#fff' : app.fg; c.lineWidth = Math.max(1, app.opt<number>('size', 'brush') ?? 3); c.lineCap = 'round'; c.lineJoin = 'round';
-  tracePathDoc(c, p); c.stroke();
-  const z = setTargetCanvas(t, out, 'auto'); d.commit('Contornear trazado', z);
+  const lw = Math.max(1, app.opt<number>('size', 'brush') ?? 3);
+  const z = editInPlace(t, pathBox(p, lw + 2), c => {
+    if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
+    // contornea con el color frontal y el tamaño del pincel
+    c.strokeStyle = t.isMask ? '#fff' : app.fg; c.lineWidth = lw; c.lineCap = 'round'; c.lineJoin = 'round';
+    tracePathDoc(c, p); c.stroke();
+  });
+  d.commit('Contornear trazado', z);
 }
 export function docPathToSelection(i: number) {
   const d = doc(); const p = d?.paths[i]; if (!d || !p) return;

@@ -221,7 +221,17 @@ export class History {
   static onTrim: ((n: number) => void) | null = null;
   /** Memoria que ocupa ahora el historial (MB). */
   memoryMB() { const set = new Set<HTMLCanvasElement>(); for (const st of this.steps) stepCanvases(st.snap, set); return bytesOf(set) / 1048576; }
-  push(doc: EditorDocument, name: string) {
+  /** Guarda un paso. Devuelve una zona vacía si solo cambió la selección o los trazados (ningún píxel): no hace falta
+   *  recomponer la imagen; null si no se sabe. */
+  push(doc: EditorDocument, name: string): { x: number; y: number; w: number; h: number } | null {
+    const prev = this.steps[this.index]?.snap ?? null;
+    this.pushInner(doc, name);
+    const cur = this.steps[this.index]?.snap ?? null;
+    if (!prev || !cur || (prev.selection === cur.selection && prev.paths === cur.paths && prev.activePath === cur.activePath)) return null;
+    const r = onlyPatchBetween(prev, cur, true);
+    return r && r.w === 0 ? r : null;
+  }
+  private pushInner(doc: EditorDocument, name: string) {
     this.steps.length = this.index + 1;
     this.steps.push({ name, snap: snapshot(doc) });
     if (this.steps.length > this.limit) this.steps.splice(1, 1); // conserva el estado inicial
@@ -245,7 +255,7 @@ export class History {
     this.index = i;
     const to = this.steps[i].snap;
     restore(doc, to);
-    return from ? onlyPatchBetween(from, to) : null;
+    return from ? onlyPatchBetween(from, to, true) : null;
   }
 }
 
@@ -260,8 +270,10 @@ export function layerCanvasIn(snap: DocSnap, id: number): HTMLCanvasElement | nu
 }
 
 /** Si de un estado a otro solo cambian los píxeles de una capa por un parche (un trazo), la zona; si no, null. */
-function onlyPatchBetween(a: DocSnap, b: DocSnap): { x: number; y: number; w: number; h: number } | null {
-  if (a.width !== b.width || a.height !== b.height || a.selection !== b.selection || !!a.quickMask !== !!b.quickMask || a.paths !== b.paths || a.activePath !== b.activePath
+/** Con `noneOk`, si no cambió ningún píxel (solo la selección, los trazados…) devuelve una zona vacía. */
+function onlyPatchBetween(a: DocSnap, b: DocSnap, noneOk = false): { x: number; y: number; w: number; h: number } | null {
+  // la selección y los trazados no forman parte de la imagen combinada (se dibujan encima, en la vista)
+  if (a.width !== b.width || a.height !== b.height || (!noneOk && (a.selection !== b.selection || a.paths !== b.paths || a.activePath !== b.activePath)) || !!a.quickMask !== !!b.quickMask
     || a.ppi !== b.ppi || a.mode !== b.mode || (a.channels?.length ?? 0) !== (b.channels?.length ?? 0) || (a.channels ?? []).some((c, i) => c !== b.channels![i])) return null;
   let rect: { x: number; y: number; w: number; h: number } | null = null, diffs = 0;
   const KEYS: (keyof LayerSnap)[] = ['id', 'kind', 'name', 'visible', 'opacity', 'blendMode', 'locked', 'lockAlpha', 'lockPos', 'lockPixels', 'fillOpacity', 'link', 'clip', 'label', 'styles', 'vmask', 'adjust', 'smart', 'expanded', 'frame', 'blank'];
@@ -288,5 +300,6 @@ function onlyPatchBetween(a: DocSnap, b: DocSnap): { x: number; y: number; w: nu
     for (let i = 0; i < xc.length; i++) if (!walk(xc[i], yc[i])) return false;
     return true;
   };
-  return walk(a.root, b.root) && rect ? rect : null;
+  if (!walk(a.root, b.root)) return null;
+  return rect ?? (noneOk && !diffs ? { x: 0, y: 0, w: 0, h: 0 } : null);
 }

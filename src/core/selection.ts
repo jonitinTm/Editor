@@ -27,13 +27,16 @@ export class Selection {
 
   get active() { return this.mask !== null; }
 
-  private changed() {
+  /** La selección es exactamente este rectángulo (lleno, sin bordes suaves): el borde y la caja se saben sin leerla. */
+  private rectShape: { version: number; rect: Rect } | null = null;
+  private changed(known?: Rect) {
     this.version++;
     if (this.mask) {
       // la máscara no debe quedarse con un modo de fusión de la operación anterior
       { const x = ctx2d(this.mask); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; }
+      if (known) { this.bounds = known.w > 0 && known.h > 0 ? { ...known } : null; if (this.bounds) this.rectShape = { version: this.version, rect: { ...known } }; }
       // búsqueda rápida (sobre una copia reducida y luego exacta en los bordes): no hay que leer la máscara entera
-      this.bounds = contentBoundsQuick(this.mask, this.version);
+      else this.bounds = contentBoundsQuick(this.mask, this.version);
       if (!this.bounds) this.mask = null;
     } else this.bounds = null;
   }
@@ -65,7 +68,17 @@ export class Selection {
     this.changed();
   }
 
-  rect(r: Rect, mode: SelMode) { this.combine(mode, ctx => ctx.fillRect(Math.round(r.x), Math.round(r.y), Math.round(r.w), Math.round(r.h))); }
+  rect(r: Rect, mode: SelMode) {
+    const x = Math.round(r.x), y = Math.round(r.y), w = Math.round(r.w), h = Math.round(r.h);
+    if (mode === 'new' || (!this.mask && mode === 'add')) {
+      // rectángulo nuevo: su caja (recortada al documento) se conoce sin leer la máscara
+      const x0 = Math.max(0, Math.min(x, x + w)), y0 = Math.max(0, Math.min(y, y + h)), x1 = Math.min(this.width, Math.max(x, x + w)), y1 = Math.min(this.height, Math.max(y, y + h));
+      const shape = makeCanvas(this.width, this.height), c = ctx2d(shape); c.fillStyle = '#fff'; c.fillRect(x, y, w, h);
+      this.mask = shape; this.changed({ x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) });
+      return;
+    }
+    this.combine(mode, ctx => ctx.fillRect(x, y, w, h));
+  }
   ellipse(r: Rect, mode: SelMode) {
     this.combine(mode, ctx => { ctx.beginPath(); ctx.ellipse(r.x + r.w / 2, r.y + r.h / 2, Math.abs(r.w / 2), Math.abs(r.h / 2), 0, 0, Math.PI * 2); ctx.fill(); });
   }
@@ -78,7 +91,7 @@ export class Selection {
     this.mask = makeCanvas(this.width, this.height);
     const ctx = ctx2d(this.mask); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, this.width, this.height);
   }
-  selectAll() { this.selectAllInternal(); this.changed(); }
+  selectAll() { this.selectAllInternal(); this.changed({ x: 0, y: 0, w: this.width, h: this.height }); }
   /** La última selección que se quitó (para «Volver a seleccionar»). */
   last: HTMLCanvasElement | null = null;
   clear() { if (this.mask) this.last = this.mask; this.mask = null; this.changed(); }
@@ -142,6 +155,10 @@ export class Selection {
   getOutline(): Path2D | null {
     if (!this.mask) return null;
     if (this.outlineVersion === this.version && this.outline) return this.outline;
+    if (this.rectShape && this.rectShape.version === this.version) {
+      const r = this.rectShape.rect, p = new Path2D(); p.rect(r.x, r.y, r.w, r.h);
+      this.outline = p; this.outlineVersion = this.version; return p;
+    }
     // mientras una herramienta la va cambiando a cada fotograma, el borde se recalcula como mucho cada 120 ms
     // (al dejar de cambiar se pone al día enseguida)
     const now = performance.now();

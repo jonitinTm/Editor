@@ -98,6 +98,35 @@ export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement, region?: R
   return r && r.w === 0 ? r : undefined;
 }
 
+/**
+ * Cambia el objetivo directamente, sin copiar la capa entera: solo se guardan los píxeles de antes de la zona
+ * (para deshacer al instante) y solo se avisa de esa zona. `draw` recibe el contexto ya recortado a la zona y la
+ * zona. Sin zona conocida (o en máscara rápida) se hace como siempre: copia, dibujo y cambio de lienzo.
+ */
+export function editInPlace(t: PaintTarget, region: Rect | null | undefined, draw: (c: CanvasRenderingContext2D, r: Rect) => void): Rect | undefined {
+  const owner = t.quick ? null : t.isMask ? t.layer.mask! : t.layer instanceof RasterLayer ? t.layer : null;
+  const W = t.canvas.width, H = t.canvas.height;
+  const R = region ?? { x: 0, y: 0, w: W, h: H };
+  const x0 = Math.max(0, Math.floor(R.x)), y0 = Math.max(0, Math.floor(R.y)), x1 = Math.min(W, Math.ceil(R.x + R.w)), y1 = Math.min(H, Math.ceil(R.y + R.h));
+  const r = { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) };
+  if (!owner || owner.canvas !== t.canvas) {
+    const out = cloneCanvas(t.canvas), c = ctx2d(out);
+    c.save(); c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip(); draw(c, r); c.restore();
+    return setTargetCanvas(t, out, region ? r : undefined);
+  }
+  if (!r.w || !r.h) return r;
+  // los píxeles de antes solo sirven si el historial va a guardar un parche (zona menor que media capa)
+  let before: HTMLCanvasElement | undefined;
+  if (r.w * r.h < W * H * 0.5) { before = makeCanvas(r.w, r.h); ctx2d(before).drawImage(t.canvas, -r.x, -r.y); }
+  const c = ctx2d(t.canvas);
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none';
+  c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip();
+  draw(c, r);
+  c.restore();
+  owner.touchRect(r, before);
+  return r;
+}
+
 /** Aplica la previsualización temporal al compositor. */
 export function setPreview(t: PaintTarget, c: HTMLCanvasElement | null) {
   const doc = app.doc!;

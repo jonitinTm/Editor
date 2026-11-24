@@ -22,7 +22,15 @@ export async function addRecent(f: File, thumbSrc: HTMLCanvasElement | null, dim
   if (f.size > MAX_SIZE) return;
   try {
     let thumb = '';
-    if (thumbSrc) { const k = Math.min(1, 160 / Math.max(thumbSrc.width, thumbSrc.height)), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(thumbSrc.width * k)); c.height = Math.max(1, Math.round(thumbSrc.height * k)); const x = c.getContext('2d')!; x.imageSmoothingQuality = 'high'; x.drawImage(thumbSrc, 0, 0, c.width, c.height); thumb = c.toDataURL('image/jpeg', 0.7); }
+    if (thumbSrc) {
+      // reducción por mitades (cada paso es barato y se ve bien) y codificación asíncrona
+      const k = Math.min(1, 160 / Math.max(thumbSrc.width, thumbSrc.height)), tw = Math.max(1, Math.round(thumbSrc.width * k)), th = Math.max(1, Math.round(thumbSrc.height * k));
+      let cur: HTMLCanvasElement = thumbSrc;
+      while (cur.width / 2 >= tw * 1.5) { const n = document.createElement('canvas'); n.width = Math.ceil(cur.width / 2); n.height = Math.ceil(cur.height / 2); n.getContext('2d')!.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
+      const c = document.createElement('canvas'); c.width = tw; c.height = th; const x = c.getContext('2d')!; x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, tw, th);
+      const blob = await new Promise<Blob | null>(r => c.toBlob(r, 'image/jpeg', 0.7));
+      if (blob) thumb = await new Promise<string>(r => { const fr = new FileReader(); fr.onload = () => r(String(fr.result)); fr.onerror = () => r(''); fr.readAsDataURL(blob); });
+    }
     const key = f.name + '|' + f.size;
     await tx('readwrite', s => s.put({ name: f.name, date: Date.now(), bytes: f.size, dims, thumb, blob: f, type: f.type }, key));
     const all = await listRecent();
