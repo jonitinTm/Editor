@@ -640,6 +640,8 @@ export interface ShapeProps {
   sides?: number;
   /** Estrella: radio interior respecto al exterior (0-1). */
   inner?: number;
+  /** Polígono, estrella y flecha: radio para redondear las esquinas (px). */
+  corner?: number;
   /** Solo para shape = 'path' (dibujado con la pluma). */
   path?: { closed: boolean; pts: PathPoint[] };
   x0: number; y0: number; x1: number; y1: number;
@@ -688,20 +690,19 @@ export class ShapeLayer extends RasterLayer {
     else if (p.shape === 'ellipse') ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
     else if (p.shape === 'polygon' || p.shape === 'star') {
       const n = Math.max(3, Math.round(p.sides ?? (p.shape === 'star' ? 5 : 6))), star = p.shape === 'star', k = p.inner ?? 0.45;
-      const pts = star ? n * 2 : n;
+      const pts = star ? n * 2 : n, poly: [number, number][] = [];
       for (let i = 0; i < pts; i++) {
         const a = -Math.PI / 2 + i * Math.PI * 2 / pts, rr = star && i % 2 ? k : 1;
-        const px = x + w / 2 + Math.cos(a) * w / 2 * rr, py = y + h / 2 + Math.sin(a) * h / 2 * rr;
-        i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+        poly.push([x + w / 2 + Math.cos(a) * w / 2 * rr, y + h / 2 + Math.sin(a) * h / 2 * rr]);
       }
-      ctx.closePath();
+      tracePoly(ctx, poly, p.corner ?? 0);
     } else if (p.shape === 'arrow') {
       // flecha que apunta del primer punto al segundo
       const dx = p.x1 - p.x0, dy = p.y1 - p.y0, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
       const t = Math.max(2, Math.min(L * 0.12, p.strokeWidth * 2 + L * 0.06)), head = Math.min(L * 0.45, t * 3.2), hw = t * 2.4;
       const P = (a: number, b: number) => [p.x0 + ux * a + nx * b, p.y0 + uy * a + ny * b];
       const poly = [P(0, -t / 2), P(L - head, -t / 2), P(L - head, -hw / 2), P(L, 0), P(L - head, hw / 2), P(L - head, t / 2), P(0, t / 2)];
-      poly.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath();
+      tracePoly(ctx, poly as [number, number][], p.corner ?? 0);
     } else if (p.shape === 'heart') {
       const cx = x + w / 2;
       ctx.moveTo(cx, y + h * 0.3);
@@ -729,6 +730,24 @@ export class ShapeLayer extends RasterLayer {
     ctx.restore();
     this.touch();
   }
+}
+
+/** Polígono cerrado; con `r` > 0 las esquinas se redondean (sin pasarse de la mitad de cada lado). */
+export function tracePoly(ctx: CanvasRenderingContext2D, pts: [number, number][], r: number) {
+  const n = pts.length; if (n < 3) return;
+  if (!(r > 0)) { pts.forEach(([px, py], i) => i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)); ctx.closePath(); return; }
+  const mid = (a: [number, number], b: [number, number]): [number, number] => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  const start = mid(pts[n - 1], pts[0]); ctx.moveTo(start[0], start[1]);
+  for (let i = 0; i < n; i++) {
+    const P = pts[i], A = pts[(i - 1 + n) % n], B = pts[(i + 1) % n];
+    const ax = A[0] - P[0], ay = A[1] - P[1], bx = B[0] - P[0], by = B[1] - P[1], la = Math.hypot(ax, ay), lb = Math.hypot(bx, by);
+    const ang = la && lb ? Math.acos(Math.max(-1, Math.min(1, (ax * bx + ay * by) / (la * lb)))) : 0;
+    // el arco toca cada lado a r/tan(ángulo/2) de la esquina: se limita para que quepa en la mitad del lado
+    const rr = ang > 1e-3 && ang < Math.PI - 1e-3 ? Math.min(r, Math.min(la, lb) / 2 * Math.tan(ang / 2)) : 0;
+    const M = mid(P, B);
+    ctx.arcTo(P[0], P[1], M[0], M[1], rr);
+  }
+  ctx.closePath();
 }
 
 /** Matriz afín [a, b, c, d, e, f] como la de canvas: x' = a·x + c·y + e, y' = b·x + d·y + f. */

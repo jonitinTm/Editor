@@ -1,21 +1,24 @@
-// Herramienta Forma: rectángulo, rectángulo redondeado, elipse y línea.
-// Cada forma se crea en una capa vectorial nueva, editable desde Propiedades.
+// Herramienta Forma: rectángulo, elipse, polígono, estrella, línea, flecha…
+// Por defecto se dibuja en la capa actual (como el pincel); si se elige, va en una capa de forma nueva, editable desde
+// Propiedades.
 
 import { shapeD } from '../core/customshapes';
 import { CUSTOM_SHAPES } from '../core/customshapes';
 import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
-import { ShapeLayer, ShapeProps, GroupLayer, RasterLayer, type PathPoint } from '../core/layers';
+import { ShapeLayer, ShapeProps, GroupLayer, RasterLayer, isRaster, isParametric, type PathPoint } from '../core/layers';
 import { h } from '../ui/dom';
-import { ctx2d } from '../core/canvas';
+import { ctx2d, cloneCanvas, makeCanvas, rectUnion, type Rect } from '../core/canvas';
+import { getPaintTarget, setPreview, clipMask, editInPlace, type PaintTarget } from './paint';
 import type { Viewport } from '../ui/viewport';
 
 export class ShapeTool implements Tool {
   id = 'shape'; name = 'Forma'; icon = icon('shape'); key = 'U'; cursor = 'crosshair';
   options = [
+    { key: 'target', label: 'Dibujar', type: 'select', default: 'pixels', choices: [{ value: 'pixels', label: 'En la capa actual' }, { value: 'layer', label: 'En una capa de forma nueva' }] },
     { key: 'shape', label: 'Forma', type: 'select', default: 'rect', choices: [
-      { value: 'rect', label: 'Rectángulo' }, { value: 'round', label: 'Rect. redondeado' },
+      { value: 'rect', label: 'Rectángulo' },
       { value: 'ellipse', label: 'Elipse' }, { value: 'polygon', label: 'Polígono' }, { value: 'star', label: 'Estrella' },
       { value: 'line', label: 'Línea' }, { value: 'arrow', label: 'Flecha' }, { value: 'heart', label: 'Corazón' },
       ...CUSTOM_SHAPES.map(([id, n]) => ({ value: 'custom:' + id, label: n }))] },
@@ -25,30 +28,71 @@ export class ShapeTool implements Tool {
     { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
     { key: 'strokeColor', type: 'color', default: '#000000' },
     { key: 'strokeWidth', label: 'Grosor', type: 'range', min: 1, max: 200, default: 4, unit: 'px' },
-    { key: 'pathOp', label: 'Operación', type: 'select', default: 'new', choices: [{ value: 'new', label: 'Capa nueva' }, { value: 'unite', label: 'Combinar con la forma' }, { value: 'subtract', label: 'Restar de la forma' }, { value: 'intersect', label: 'Intersecar con la forma' }, { value: 'exclude', label: 'Excluir solapamiento' }] },
+    { key: 'pathOp', label: 'Operación', type: 'select', default: 'new', choices: [{ value: 'new', label: 'Forma nueva' }, { value: 'unite', label: 'Combinar con la forma' }, { value: 'subtract', label: 'Restar de la forma' }, { value: 'intersect', label: 'Intersecar con la forma' }, { value: 'exclude', label: 'Excluir solapamiento' }] },
     { key: 'dash', label: 'Línea', type: 'select', default: 'solid', choices: [{ value: 'solid', label: 'Continua' }, { value: 'dash', label: 'Discontinua' }, { value: 'dot', label: 'Punteada' }, { value: 'dashdot', label: 'Raya y punto' }] },
-    { key: 'radius', label: 'Radio', type: 'range', min: 0, max: 500, default: 20, unit: 'px' },
+    { key: 'corner', label: 'Redondear esquinas', type: 'range', min: 0, max: 500, default: 0, unit: 'px' },
   ] as any[];
   private a: { x: number; y: number } | null = null;
   private layer: ShapeLayer | null = null;
   private prev: any = null;
+  /** Dibujo en la capa actual: dónde, la última zona dibujada y (en máscaras) la copia de antes. */
+  private pix: { t: PaintTarget; box: Rect | null; tmp: HTMLCanvasElement | null; orig: HTMLCanvasElement | null; view: HTMLCanvasElement | null } | null = null;
+
+  private makeShape(x: number, y: number, w: number, h: number) {
+    const opt = app.opt<string>('shape', this.id), custom = opt.startsWith('custom:') ? opt.slice(7) : undefined;
+    let shape = (custom ? 'custom' : opt === 'round' ? 'rect' : opt) as ShapeProps['shape'];
+    const corner = Math.max(0, +(app.opt<number>('corner', this.id) ?? 0) || 0);
+    // rectángulo con esquinas redondeadas = «rectángulo redondeado» (así se exporta igual a PSD y SVG)
+    if (shape === 'rect' && corner > 0) shape = 'round';
+    return new ShapeLayer('Forma', w, h, {
+      shape, custom, customD: custom?.startsWith('u') ? shapeD(custom) : undefined, x0: x, y0: y, x1: x, y1: y,
+      fill: shape === 'line' ? null : app.opt('fill', this.id) ? app.fg : null,
+      stroke: shape === 'line' ? app.fg : app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : null,
+      strokeWidth: app.opt('strokeWidth', this.id), radius: corner, corner: corner || undefined, dash: app.opt('dash', this.id) || 'solid',
+      sides: app.opt('sides', this.id), inner: app.opt<number>('inner', this.id) / 100,
+    });
+  }
 
   down(e: ToolEvent) {
     const doc = app.doc!;
-    this.a = { x: e.x, y: e.y }; this.prev = doc.active;
-    const opt = app.opt<string>('shape', this.id), custom = opt.startsWith('custom:') ? opt.slice(7) : undefined;
-    const shape = (custom ? 'custom' : opt) as ShapeProps['shape'];
-    this.layer = new ShapeLayer('Forma', doc.width, doc.height, {
-      shape, custom, customD: custom?.startsWith('u') ? shapeD(custom) : undefined, x0: e.x, y0: e.y, x1: e.x, y1: e.y,
-      fill: shape === 'line' ? null : app.opt('fill', this.id) ? app.fg : null,
-      stroke: shape === 'line' ? app.fg : app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : null,
-      strokeWidth: app.opt('strokeWidth', this.id), radius: app.opt('radius', this.id), dash: app.opt('dash', this.id) || 'solid',
-      sides: app.opt('sides', this.id), inner: app.opt<number>('inner', this.id) / 100,
-    });
+    this.a = { x: e.x, y: e.y }; this.prev = doc.active; this.pix = null;
+    if (app.opt('target', this.id) !== 'layer') {
+      // en la capa actual: solo si es de píxeles (o su máscara); una capa de texto, forma u objeto inteligente no se
+      // rasteriza por sorpresa: la forma va entonces en su propia capa
+      const a = doc.active, t = pixelTargetForShapes(), pixelsOk = !!t || doc.quickMask || (a && ((doc.editMask && a.mask) || (isRaster(a) && !isParametric(a))));
+      if (t) {
+        this.layer = this.makeShape(e.x, e.y, doc.width, doc.height);
+        this.pix = { t, box: null, tmp: null, orig: null, view: null };
+        if (t.isMask || t.quick) { this.pix.orig = cloneCanvas(t.canvas); this.pix.view = cloneCanvas(t.canvas); setPreview(t, this.pix.view); }
+        else doc.overrides.set(t.layer, { extra: ctx => { const P = this.pix; if (P?.tmp && P.box) { ctx.save(); if (P.t.lockAlpha) ctx.globalCompositeOperation = 'source-atop'; ctx.drawImage(P.tmp, P.box.x, P.box.y); ctx.restore(); } } });
+        return;
+      }
+      if (pixelsOk) { this.a = null; return; } // capa bloqueada u oculta: ya se ha avisado
+      if (a) app.toast('La capa actual no es de píxeles: la forma va en una capa de forma nueva');
+    }
+    this.layer = this.makeShape(e.x, e.y, doc.width, doc.height);
     let n = 1; const names = new Set(doc.allLayers().map(l => l.name));
     while (names.has(`Forma ${n}`)) n++;
     this.layer.name = `Forma ${n}`;
     doc.insertAboveActive(this.layer);
+  }
+  /** Zona que ocupa la forma (con margen para el trazo y la punta de la flecha), recortada al documento. */
+  private shapeBox(): Rect | null {
+    const p = this.layer!.props, d = app.doc!;
+    const L = Math.hypot(p.x1 - p.x0, p.y1 - p.y0), pad = Math.ceil((p.stroke || p.shape === 'line' ? p.strokeWidth * 2 : 0) + (p.shape === 'arrow' ? L * 0.2 + p.strokeWidth * 3 : 0) + 4);
+    const x0 = Math.max(0, Math.floor(Math.min(p.x0, p.x1) - pad)), y0 = Math.max(0, Math.floor(Math.min(p.y0, p.y1) - pad));
+    const x1 = Math.min(d.width, Math.ceil(Math.max(p.x0, p.x1) + pad)), y1 = Math.min(d.height, Math.ceil(Math.max(p.y0, p.y1) + pad));
+    return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+  }
+  /** La forma tal como queda en la capa (recortada a la selección; en máscaras, en gris según el color frontal). */
+  private pixelsOf(r: Rect): HTMLCanvasElement {
+    const P = this.pix!, d = app.doc!, tmp = makeCanvas(r.w, r.h), x = ctx2d(tmp);
+    x.drawImage(this.layer!.canvas, -r.x, -r.y);
+    const sel = clipMask(P.t);
+    if (sel) { x.globalCompositeOperation = 'destination-in'; x.drawImage(sel, -r.x, -r.y); }
+    if (P.t.isMask) { const n = parseInt(app.fg.slice(1), 16), g = Math.round(0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)); x.globalCompositeOperation = 'source-in'; x.fillStyle = P.t.quick ? '#fff' : `rgb(${g},${g},${g})`; x.fillRect(0, 0, r.w, r.h); }
+    void d;
+    return tmp;
   }
   move(e: ToolEvent) {
     if (!this.a || !this.layer) return;
@@ -63,12 +107,35 @@ export class ShapeTool implements Tool {
     if (e.alt && p.shape !== 'line' && p.shape !== 'arrow') { x0 = 2 * this.a.x - x1; y0 = 2 * this.a.y - y1; }
     Object.assign(p, { x0, y0, x1, y1 });
     this.layer.render();
-    app.doc!.invalidate();
+    const P = this.pix;
+    if (!P) { app.doc!.invalidate(); return; }
+    // vista previa en la capa actual: solo se recompone la zona antigua y la nueva
+    const old = P.box, box = this.shapeBox();
+    if (P.view && P.orig) {
+      const v = ctx2d(P.view);
+      if (old) { v.save(); v.globalCompositeOperation = 'copy'; v.beginPath(); v.rect(old.x, old.y, old.w, old.h); v.clip(); v.drawImage(P.orig, 0, 0); v.restore(); }
+      if (box) v.drawImage(this.pixelsOf(box), box.x, box.y);
+      P.box = box;
+    } else { P.box = box; P.tmp = box ? this.pixelsOf(box) : null; }
+    const u = old && box ? rectUnion(old, box) : old ?? box;
+    if (u) app.doc!.invalidate(u);
   }
   up(e: ToolEvent) {
     if (!this.a || !this.layer) return;
     const doc = app.doc!;
     const tiny = Math.hypot(e.x - this.a.x, e.y - this.a.y) * app.viewport.zoom < 3;
+    const P = this.pix;
+    if (P) {
+      this.endPreview();
+      const box = this.shapeBox();
+      if (!tiny && box) {
+        const tmp = this.pixelsOf(box);
+        const z = editInPlace(P.t, box, c => { if (P.t.lockAlpha) c.globalCompositeOperation = 'source-atop'; c.drawImage(tmp, box.x, box.y); });
+        doc.commit('Forma', z);
+      } else if (P.box) doc.invalidate(P.box);
+      this.a = null; this.layer = null; this.prev = null; this.pix = null;
+      return;
+    }
     const op = app.opt<string>('pathOp', this.id) || 'new', prev = this.prev, nl = this.layer;
     const combinable = prev && prev !== nl && (prev instanceof ShapeLayer || (prev.kind === 'adjust' && prev.vmask)) && nl.props.shape !== 'line';
     if (tiny) { this.layer.parent?.remove(this.layer); doc.setActive(doc.allLayers().pop() ?? null); doc.invalidate(); }
@@ -79,7 +146,32 @@ export class ShapeTool implements Tool {
     } else doc.commit('Forma');
     this.a = null; this.layer = null; this.prev = null;
   }
-  cancel() { if (this.layer) { this.layer.parent?.remove(this.layer); app.doc?.invalidate(); } this.a = null; this.layer = null; }
+  private endPreview() {
+    const P = this.pix, d = app.doc; if (!P || !d) return;
+    if (P.view) setPreview(P.t, null); else d.overrides.delete(P.t.layer);
+  }
+  cancel() {
+    if (this.pix) { this.endPreview(); app.doc?.invalidate(this.pix.box ?? undefined); this.pix = null; }
+    else if (this.layer) { this.layer.parent?.remove(this.layer); app.doc?.invalidate(); }
+    this.a = null; this.layer = null;
+  }
+}
+
+/** ¿Se puede dibujar en la capa actual (píxeles o su máscara) sin rasterizar nada? Devuelve dónde, o null. */
+export function pixelTargetForShapes(): PaintTarget | null {
+  const doc = app.doc!, a = doc.active;
+  const ok = doc.quickMask || (a && ((doc.editMask && a.mask) || (isRaster(a) && !isParametric(a))));
+  return ok ? getPaintTarget() : null;
+}
+/** Pinta una forma (capa temporal, sin añadir) en la capa actual, en la zona `box`. */
+export function stampShape(t: PaintTarget, shape: ShapeLayer, box: Rect, name: string) {
+  const d = app.doc!, tmp = makeCanvas(box.w, box.h), x = ctx2d(tmp);
+  x.drawImage(shape.canvas, -box.x, -box.y);
+  const sel = clipMask(t);
+  if (sel) { x.globalCompositeOperation = 'destination-in'; x.drawImage(sel, -box.x, -box.y); }
+  if (t.isMask) { const n = parseInt(app.fg.slice(1), 16), g = Math.round(0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)); x.globalCompositeOperation = 'source-in'; x.fillStyle = t.quick ? '#fff' : `rgb(${g},${g},${g})`; x.fillRect(0, 0, box.w, box.h); }
+  const z = editInPlace(t, box, c => { if (t.lockAlpha) c.globalCompositeOperation = 'source-atop'; c.drawImage(tmp, box.x, box.y); });
+  d.commit(name, z);
 }
 
 /** Marco: dibuja un hueco (rectangular o elíptico) donde luego se colocan imágenes, que se recortan a su forma. */

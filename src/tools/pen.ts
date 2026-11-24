@@ -1,8 +1,9 @@
 // Pluma y selección directa: trazados vectoriales con curvas Bézier.
-// La pluma crea una capa de forma de tipo "trazado"; la selección directa
+// La pluma dibuja por defecto en la capa actual (o crea una capa de forma de tipo "trazado" si se elige); la selección directa
 // permite mover después sus puntos de ancla y sus tiradores.
 
 import { app } from '../ui/app';
+import { pixelTargetForShapes, stampShape } from './shape';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
@@ -32,7 +33,7 @@ function drawPathOverlay(ctx: CanvasRenderingContext2D, vp: Viewport, pts: PathP
 export class PenTool implements Tool {
   id = 'pen'; name = 'Pluma'; icon = icon('pen'); key = 'P'; group = 'pen'; cursor = 'crosshair';
   options = [
-    { key: 'mode', label: 'Crear', type: 'select', default: 'shape', choices: [{ value: 'shape', label: 'Forma' }, { value: 'path', label: 'Trazado' }] },
+    { key: 'mode', label: 'Crear', type: 'select', default: 'pixels', choices: [{ value: 'pixels', label: 'Píxeles en la capa actual' }, { value: 'shape', label: 'Capa de forma nueva' }, { value: 'path', label: 'Trazado' }] },
     { key: 'fill', label: 'Relleno (color frontal)', type: 'checkbox', default: true },
     { key: 'stroke', label: 'Trazo', type: 'checkbox', default: false },
     { key: 'strokeColor', type: 'color', default: '#000000' },
@@ -86,6 +87,17 @@ export class PenTool implements Tool {
       fill: fill ? app.fg : null, stroke: stroke ? (app.opt('stroke', this.id) ? app.opt('strokeColor', this.id) : app.fg) : null,
       strokeWidth: app.opt('strokeWidth', this.id), radius: 0,
     });
+    // por defecto se pinta en la capa actual; si no es de píxeles (texto, forma…) va en una capa de forma nueva
+    const t = app.opt('mode', this.id) === 'pixels' ? pixelTargetForShapes() : null;
+    if (t) {
+      const pad = Math.ceil((layer.props.stroke ? layer.props.strokeWidth : 0) + 3);
+      const hx = pts.flatMap(p => [p.x, p.ix, p.ox]), hy = pts.flatMap(p => [p.y, p.iy, p.oy]);
+      const x0 = Math.max(0, Math.floor(Math.min(...hx) - pad)), y0 = Math.max(0, Math.floor(Math.min(...hy) - pad));
+      const x1 = Math.min(doc.width, Math.ceil(Math.max(...hx) + pad)), y1 = Math.min(doc.height, Math.ceil(Math.max(...hy) + pad));
+      if (x1 > x0 && y1 > y0) stampShape(t, layer, { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, 'Pluma');
+      app.viewport.requestRender();
+      return;
+    }
     doc.insertAboveActive(layer);
     doc.commit('Pluma');
   }

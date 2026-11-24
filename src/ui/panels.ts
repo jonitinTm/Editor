@@ -580,7 +580,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
       const setBox = (nx: number, ny: number, nw: number, nh: number) => { p.x0 = nx; p.y0 = ny; p.x1 = nx + Math.max(1, nw); p.y1 = ny + Math.max(1, nh); };
       if (p.shape !== 'line') body.append(colorRow('Relleno', 'fill'));
       body.append(colorRow('Trazo', 'stroke'),
-        h('div', { class: 'prop-row' }, ...numF('Grosor', () => p.strokeWidth, v => p.strokeWidth = Math.max(1, v)), ...(p.shape === 'round' ? numF('Radio', () => p.radius, v => p.radius = Math.max(0, v)) : [])));
+        h('div', { class: 'prop-row' }, ...numF('Grosor', () => p.strokeWidth, v => p.strokeWidth = Math.max(1, v)), ...(p.shape === 'round' ? numF('Radio', () => p.radius, v => p.radius = Math.max(0, v)) : ['polygon', 'star', 'arrow'].includes(p.shape) ? numF('Redondear', () => p.corner ?? 0, v => p.corner = Math.max(0, v)) : [])));
       { const ds = h('select', {}, ...[['solid', 'Continua'], ['dash', 'Discontinua'], ['dot', 'Punteada'], ['dashdot', 'Raya y punto']].map(([v, t]) => h('option', { value: v }, t))) as HTMLSelectElement;
         ds.value = p.dash ?? 'solid'; ds.onchange = () => upd(() => p.dash = ds.value as any);
         body.append(h('div', { class: 'prop-row' }, h('span', {}, 'Línea'), ds)); }
