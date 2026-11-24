@@ -108,33 +108,37 @@ async function canvasToDataURL(c: HTMLCanvasElement) {
   return await new Promise<string>(res => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(blob); });
 }
 
-async function layerToProj(l: Layer): Promise<ProjLayer> {
+/** Cómo se guarda cada imagen: en el archivo de proyecto, como texto (data URL); en el guardado automático, como
+ *  archivo binario y reutilizando el de la vez anterior si esa capa no ha cambiado. */
+type ImgEnc = (c: HTMLCanvasElement, owner?: { version: number }) => Promise<any>;
+const toDataURL: ImgEnc = c => canvasToDataURL(c);
+async function layerToProj(l: Layer, enc: ImgEnc = toDataURL): Promise<ProjLayer> {
   const p: ProjLayer = {
     id: l.id, type: l.kind, name: l.name, visible: l.visible, opacity: l.opacity, blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, lockPos: l.lockPos, lockPixels: l.lockPixels, fillOpacity: l.fillOpacity, link: l.link, clip: l.clip, label: l.label,
-    mask: l.mask ? { image: await canvasToDataURL(l.mask.canvas), enabled: l.mask.enabled } : null,
+    mask: l.mask ? { image: await enc(l.mask.canvas, l.mask), enabled: l.mask.enabled } : null,
   };
   if (l.styles) p.styles = l.styles;
   if (l.vmask) (p as any).vmask = l.vmask;
   if (l instanceof AdjustmentLayer) p.adjust = { filterId: l.filterId, params: l.params };
-  if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(layerToProj)); p.expanded = l.expanded; if (l.artboard) p.artboard = l.artboard; if (l.frame) p.frame = true; }
-  else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument), filters: l.filters };
-  else if (isRaster(l)) { p.image = await canvasToDataURL(l.canvas); if (l instanceof TextLayer) p.text = { ...l.props }; if (l instanceof ShapeLayer) p.shape = { ...l.props }; }
+  if (l instanceof GroupLayer) { p.children = await Promise.all(l.children.map(c => layerToProj(c, enc))); p.expanded = l.expanded; if (l.artboard) p.artboard = l.artboard; if (l.frame) p.frame = true; }
+  else if (l instanceof SmartLayer) p.smart = { m: l.props.m, doc: await projectData(l.inner as EditorDocument, enc), filters: l.filters };
+  else if (isRaster(l)) { p.image = await enc(l.canvas, l); if (l instanceof TextLayer) p.text = { ...l.props }; if (l instanceof ShapeLayer) p.shape = { ...l.props }; }
   return p;
 }
 
 export async function serializeProject(doc: EditorDocument): Promise<Blob> {
   return new Blob([JSON.stringify(await projectData(doc))], { type: 'application/json' });
 }
-async function projectData(doc: EditorDocument): Promise<ProjFile> {
+async function projectData(doc: EditorDocument, enc: ImgEnc = toDataURL): Promise<ProjFile> {
   return {
     format: 'editor-proyecto', version: 1, name: doc.name, width: doc.width, height: doc.height, ppi: doc.ppi,
     guides: doc.guides, activeId: doc.active?.id ?? null, frames: doc.frames,
-    channels: await Promise.all(doc.channels.map(async c => ({ name: c.name, image: await canvasToDataURL(c.canvas) }))),
+    channels: await Promise.all(doc.channels.map(async c => ({ name: c.name, image: await enc(c.canvas) }))),
     paths: doc.paths,
     layerComps: doc.layerComps,
     ...({ notes: (doc as any).notes, counts: (doc as any).counts, samplers: (doc as any).samplers, meta: doc.meta } as any),
     slices: doc.slices,
-    layers: await Promise.all(doc.root.children.map(layerToProj)),
+    layers: await Promise.all(doc.root.children.map(l => layerToProj(l, enc))),
   };
 }
 
@@ -165,6 +169,20 @@ async function projToLayer(p: ProjLayer, w: number, h: number): Promise<Layer> {
   return l;
 }
 
+/** Guardado automático: los datos del proyecto con las imágenes como archivos binarios (sin pasarlas a texto) y
+ *  sin volver a codificar las capas que no han cambiado desde la vez anterior. */
+const encCache = new WeakMap<object, { version: number; canvas: HTMLCanvasElement; blob: Blob }>();
+export function autosaveData(doc: EditorDocument): Promise<ProjFile> {
+  return projectData(doc, async (c, owner) => {
+    const hit = owner ? encCache.get(owner) : undefined;
+    if (hit && hit.version === owner!.version && hit.canvas === c) return hit.blob;
+    const blob = await canvasToBlob(c, 'image/png');
+    if (owner) encCache.set(owner, { version: owner.version, canvas: c, blob });
+    return blob;
+  });
+}
+/** Abre unos datos de proyecto ya leídos (los del guardado automático: imágenes como archivos binarios). */
+export function openProjectData(data: ProjFile): Promise<EditorDocument> { return docFromData(data); }
 export async function openProject(file: Blob): Promise<EditorDocument> {
   const data = JSON.parse(await file.text()) as ProjFile;
   if (data.format !== 'editor-proyecto') throw new Error('El archivo no es un proyecto de Editor');

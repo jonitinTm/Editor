@@ -73,13 +73,15 @@ export class Viewport {
 
   constructor(parent: HTMLElement) {
     this.canvas = h('canvas', { class: 'view-canvas' });
+    // capa transparente encima solo para el borde animado de la selección: al animarse se redibuja solo ella
+    this.antsCanvas = h('canvas', { class: 'view-ants', 'aria-hidden': 'true' });
     this.rulerH = h('canvas', { class: 'ruler ruler-h' });
     this.rulerV = h('canvas', { class: 'ruler ruler-v' });
     // marcas de la posición del ratón en las reglas: elementos aparte que solo se mueven (no hay que redibujar las reglas)
     this.markH = h('div', { class: 'ruler-mark ruler-mark-h' }); this.markV = h('div', { class: 'ruler-mark ruler-mark-v' });
     this.el = h('div', { class: 'viewport' },
       h('div', { class: 'ruler-corner' }), this.rulerH, this.rulerV,
-      h('div', { class: 'view-wrap' }, this.canvas), this.markH, this.markV);
+      h('div', { class: 'view-wrap' }, this.canvas, this.antsCanvas), this.markH, this.markV);
     parent.append(this.el);
     // opaco (el fondo se pinta siempre): el navegador no tiene que mezclarlo con lo de detrás; «baja latencia»
     // (opcional) dibuja directamente en pantalla, sin esperar al resto de la página
@@ -88,7 +90,10 @@ export class Viewport {
     new ResizeObserver(() => this.resize()).observe(this.el.querySelector('.view-wrap')!);
     this.bindEvents();
     setInterval(() => {
-      if (app.doc?.selection.active || app.tool?.id === 'crop') { this.antsOffset = (this.antsOffset + 1) % 8; this.requestRender(); }
+      if (document.hidden) return;
+      if (app.tool?.id === 'crop') { this.antsOffset = (this.antsOffset + 1) % 8; this.requestRender(); }
+      // selección: solo se redibuja la capa del borde (antes, el lienzo entero unas 7 veces por segundo)
+      else if (this.antsShown) { this.antsOffset = (this.antsOffset + 1) % 8; this.drawSelectionAnts(); }
     }, 140);
   }
 
@@ -238,7 +243,7 @@ export class Viewport {
     // en móviles con poca memoria (≤ 3 GB), a 1,5× (casi la mitad de píxeles por fotograma); sin gráfica, a 1×
     this.dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
     this.width = wrap.clientWidth; this.height = wrap.clientHeight;
-    for (const [c, w, hh] of [[this.canvas, this.width, this.height], [this.rulerH, this.width, RULER], [this.rulerV, RULER, this.height]] as const) {
+    for (const [c, w, hh] of [[this.canvas, this.width, this.height], [this.antsCanvas, this.width, this.height], [this.rulerH, this.width, RULER], [this.rulerV, RULER, this.height]] as const) {
       c.width = Math.max(1, Math.round(w * this.dpr)); c.height = Math.max(1, Math.round(hh * this.dpr));
       c.style.width = w + 'px'; c.style.height = hh + 'px';
     }
@@ -396,9 +401,8 @@ export class Viewport {
       ctx.save(); ctx.imageSmoothingEnabled = zoom < 1; this.docImage(ctx, ov); ctx.restore();
     }
 
-    // Selección
-    const outline = d.quickMask || d.refinePreview || app.hideExtras ? null : d.selection.getOutline();
-    if (outline) this.drawAnts(outline, (d as any).selectionOffset);
+    // Selección (en su propia capa, encima)
+    this.drawSelectionAnts();
 
     // Guías
     if (app.showGuides && !app.hideExtras) {
@@ -441,9 +445,22 @@ export class Viewport {
     this.renderRulers();
   }
 
+  private antsCanvas: HTMLCanvasElement;
+  private antsShown = false;
+  /** Borde de la selección en su capa: se borra y se vuelve a dibujar solo él. */
+  private drawSelectionAnts() {
+    const d = this.doc, c = this.antsCanvas, x = c.getContext('2d')!;
+    const outline = !d || d.quickMask || d.refinePreview || app.hideExtras ? null : d.selection.getOutline();
+    if (!outline) { if (this.antsShown) { x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height); this.antsShown = false; } return; }
+    x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height);
+    x.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.strokeAnts(x, outline, (d as any).selectionOffset);
+    this.antsShown = true;
+  }
   /** Dibuja un trazado en coordenadas del documento como línea discontinua animada. */
-  drawAnts(path: Path2D, offset?: { x: number; y: number }) {
-    const ctx = this.ctx, v = this.doc!.view;
+  drawAnts(path: Path2D, offset?: { x: number; y: number }) { this.strokeAnts(this.ctx, path, offset); }
+  private strokeAnts(ctx: CanvasRenderingContext2D, path: Path2D, offset?: { x: number; y: number }) {
+    const v = this.doc!.view;
     ctx.save();
     this.docTransform(ctx);
     if (offset) ctx.translate(offset.x, offset.y);

@@ -2,7 +2,7 @@
 // trabajo si se cierra la pestaña por accidente. Nada sale del equipo.
 
 import type { EditorDocument } from '../core/document';
-import { serializeProject, openProject } from './files';
+import { autosaveData, openProject, openProjectData } from './files';
 
 const DB = 'editor', STORE = 'autosave';
 function db(): Promise<IDBDatabase> {
@@ -17,7 +17,7 @@ async function tx<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBReq
   return new Promise((res, rej) => { const rq = fn(d.transaction(STORE, mode).objectStore(STORE)); rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); });
 }
 
-export interface Saved { key: string; name: string; date: number; size: string; blob: Blob; }
+export interface Saved { key: string; name: string; date: number; size: string; /** versiones anteriores */ blob?: Blob; data?: any; }
 const uids = new WeakMap<EditorDocument, string>();
 const lastStep = new WeakMap<EditorDocument, unknown>();
 const uid = (d: EditorDocument) => { if (!uids.has(d)) uids.set(d, Date.now().toString(36) + Math.random().toString(36).slice(2, 8)); return uids.get(d)!; };
@@ -30,8 +30,9 @@ export async function autosave(docs: EditorDocument[]) {
     if (lastStep.get(d) === step) continue;
     if (d.width * d.height * d.allLayers().length > 120e6) continue; // demasiado grande para copiarlo cada poco
     try {
-      const blob = await serializeProject(d);
-      await tx('readwrite', s => s.put({ name: d.name, date: Date.now(), size: `${d.width} × ${d.height}`, blob }, uid(d)));
+      // imágenes como archivos binarios y solo se codifican las capas que han cambiado (antes: todo a texto, cada vez)
+      const data = await autosaveData(d);
+      await tx('readwrite', s => s.put({ name: d.name, date: Date.now(), size: `${d.width} × ${d.height}`, data }, uid(d)));
       lastStep.set(d, step);
     } catch { /* sin espacio o almacenamiento no disponible */ }
   }
@@ -45,7 +46,7 @@ export async function listSaved(): Promise<Saved[]> {
 }
 export async function removeSaved(key: string) { try { await tx('readwrite', s => s.delete(key)); } catch { /* */ } }
 export async function restoreSaved(s: Saved): Promise<EditorDocument> {
-  const d = await openProject(s.blob);
+  const d = s.data ? await openProjectData(s.data) : await openProject(s.blob!);
   uids.set(d, s.key);
   return d;
 }
