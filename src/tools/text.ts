@@ -2,6 +2,7 @@
 
 import { applyRunStyle, shiftRuns, normalizeRuns, type RunStyle } from '../core/textruns';
 import { app } from '../ui/app';
+import { ctx2d } from '../core/canvas';
 import { Tool, ToolEvent } from './tool';
 import { icon } from '../ui/icons';
 import type { Viewport } from '../ui/viewport';
@@ -109,11 +110,23 @@ export class TextTool implements Tool {
     app.touchDoc();
   }
 
+  /** ¿Hay letras de la capa a menos de `r` píxeles? */
+  private nearInk(l: TextLayer, x: number, y: number, r: number) {
+    const c = l.canvas, x0 = Math.max(0, Math.floor(x - r)), y0 = Math.max(0, Math.floor(y - r)), x1 = Math.min(c.width, Math.ceil(x + r)), y1 = Math.min(c.height, Math.ceil(y + r));
+    if (x1 <= x0 || y1 <= y0) return false;
+    const d = ctx2d(c).getImageData(x0, y0, x1 - x0, y1 - y0).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] > 20) return true;
+    return false;
+  }
   protected textLayerAt(x: number, y: number): TextLayer | null {
     const all = [...walkLayers(app.doc!.root)].filter(l => l instanceof TextLayer && l.isVisibleInTree()) as TextLayer[];
     for (let i = all.length - 1; i >= 0; i--) {
-      const b = all[i].bounds();
-      if (x >= b.x - 4 && x <= b.x + b.w + 4 && y >= b.y - 4 && y <= b.y + b.h + 4) return all[i];
+      const l = all[i], b = l.bounds();
+      if (!(x >= b.x - 4 && x <= b.x + b.w + 4 && y >= b.y - 4 && y <= b.y + b.h + 4)) continue;
+      // texto sobre un trazado: su caja abarca toda la curva (en un logotipo circular, todo el círculo); solo cuenta
+      // si se toca cerca de las letras, para poder escribir otro texto dentro
+      if (l.props.onPath && !this.nearInk(l, x, y, Math.max(6, l.props.size * 0.5))) continue;
+      return l;
     }
     return null;
   }
