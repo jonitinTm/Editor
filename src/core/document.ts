@@ -256,10 +256,12 @@ export class EditorDocument {
   changed() { this.listeners.forEach(f => f()); }
 
   /** Registra un paso en el historial tras una modificación. */
-  commit(name: string) {
+  /** Guarda un paso en el historial. Si se sabe qué zona cambió (un trazo), se indica para no recomponer la
+   *  imagen entera (tras cada pincelada eso costaba un parón visible en imágenes grandes). */
+  commit(name: string, changedRect?: Rect) {
     this.history.push(this, name);
     this.modified = true;
-    this.invalidate();
+    this.invalidate(changedRect ?? null);
     this.changed();
   }
   undo() { if (this.history.canUndo()) { this.history.goto(this, this.history.index - 1); this.afterRestore(); } }

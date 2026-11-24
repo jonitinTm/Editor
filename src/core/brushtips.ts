@@ -52,9 +52,9 @@ const cache = new Map<string, HTMLCanvasElement>();
 /** Punta coloreada, al tamaño (lado mayor) y ángulo pedidos. */
 export function sampledTip(id: string, size: number, color: string, angle = 0, roundness = 1): HTMLCanvasElement | null {
   const t = getTip(id); if (!t) return null;
-  const s = Math.max(1, Math.round(size)), key = `${id}|${s}|${color}|${Math.round(angle)}|${roundness.toFixed(2)}`;
+  const s = Math.max(1, size <= 16 ? Math.round(size) : Math.round(Math.exp(Math.round(Math.log(size) / Math.log(1.03)) * Math.log(1.03)))), key = `${id}|${s}|${color}|${Math.round(angle)}|${roundness.toFixed(2)}`;
   let c = cache.get(key); if (c) return c;
-  if (cache.size > 200) cache.clear();
+  if (cache.size > 300) { const k0 = cache.keys().next().value; if (k0 !== undefined) cache.delete(k0); }
   const k = s / Math.max(t.canvas.width, t.canvas.height), w = t.canvas.width * k, hh = t.canvas.height * k * roundness;
   const d = Math.ceil(Math.hypot(w, hh)) + 2;
   c = makeCanvas(d, d); const x = ctx2d(c);

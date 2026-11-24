@@ -11,6 +11,18 @@ import { GroupLayer, tracePath } from '../core/layers';
 
 /** Móvil con poca memoria: se ahorra resolución de pantalla al dibujar el lienzo. */
 const LOW_END = ((navigator as any).deviceMemory ?? 8) <= 3 || (navigator.hardwareConcurrency ?? 8) <= 2;
+/** ¿El navegador dibuja sin tarjeta gráfica (emulación por software)? Pasa en tabletas baratas con la gráfica
+ *  bloqueada: entonces cada píxel de pantalla cuesta mucho y conviene dibujar el lienzo con menos densidad. */
+const SOFTWARE_GFX = (() => {
+  try {
+    const k = 'editor.gfx', saved = sessionStorage.getItem(k); if (saved) return saved === 'sw';
+    const gl = document.createElement('canvas').getContext('webgl'); let sw = !gl;
+    if (gl) { const ext = gl.getExtension('WEBGL_debug_renderer_info'); const ren = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : ''; sw = /SwiftShader|llvmpipe|softpipe|Software|Basic Render/i.test(ren); gl.getExtension('WEBGL_lose_context')?.loseContext(); }
+    sessionStorage.setItem(k, sw ? 'sw' : 'hw'); return sw;
+  } catch { return false; }
+})();
+/** Densidad máxima del lienzo en pantalla (se puede forzar con localStorage «editor.dprCap» para pruebas). */
+const DPR_CAP = (() => { try { const v = +(localStorage.getItem('editor.dprCap') || 0); if (v > 0) return v; } catch { /* */ } return SOFTWARE_GFX ? 1 : LOW_END ? 1.5 : 2; })();
 
 const RULER = 20;
 
@@ -35,6 +47,8 @@ export class Viewport {
   private pointers = new Map<number, { x: number; y: number }>();
   private pinch: { dist: number; cx: number; cy: number; zoom: number; ang: number; rot: number; rotating: boolean } | null = null;
   /** ¿Se ha usado un lápiz? Entonces (en modo automático) el dedo solo mueve la vista y el lápiz dibuja. */
+  /** Puntos previstos por el navegador para el trazo en curso (coordenadas del documento), o null. */
+  predicted: { x: number; y: number }[] | null = null;
   penSeen = (() => { try { return localStorage.getItem('editor.penSeen') === '1'; } catch { return false; } })();
   /** El usuario ha pedido que el dedo también dibuje aunque haya lápiz (botón del lienzo). */
   fingerDraw = false;
@@ -67,7 +81,9 @@ export class Viewport {
       h('div', { class: 'ruler-corner' }), this.rulerH, this.rulerV,
       h('div', { class: 'view-wrap' }, this.canvas), this.markH, this.markV);
     parent.append(this.el);
-    this.ctx = this.canvas.getContext('2d')!;
+    // opaco (el fondo se pinta siempre): el navegador no tiene que mezclarlo con lo de detrás; «baja latencia»
+    // (opcional) dibuja directamente en pantalla, sin esperar al resto de la página
+    this.ctx = (this.canvas.getContext('2d', { alpha: false, desynchronized: !!prefs.lowLatency }) ?? this.canvas.getContext('2d'))!;
     setOnOutlineStale(() => this.requestRender());
     new ResizeObserver(() => this.resize()).observe(this.el.querySelector('.view-wrap')!);
     this.bindEvents();
@@ -203,10 +219,11 @@ export class Viewport {
   }
 
   resize() {
+    this.rectCache = null;
     const wrap = this.canvas.parentElement!;
     // en pantallas muy densas (3×) se dibuja a 2×: se ve igual de nítido y es mucho más ligero;
-    // en móviles con poca memoria (≤ 3 GB), a 1,5× (casi la mitad de píxeles por fotograma)
-    this.dpr = Math.min(LOW_END ? 1.5 : 2, window.devicePixelRatio || 1);
+    // en móviles con poca memoria (≤ 3 GB), a 1,5× (casi la mitad de píxeles por fotograma); sin gráfica, a 1×
+    this.dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
     this.width = wrap.clientWidth; this.height = wrap.clientHeight;
     for (const [c, w, hh] of [[this.canvas, this.width, this.height], [this.rulerH, this.width, RULER], [this.rulerV, RULER, this.height]] as const) {
       c.width = Math.max(1, Math.round(w * this.dpr)); c.height = Math.max(1, Math.round(hh * this.dpr));
@@ -255,6 +272,11 @@ export class Viewport {
     if (next) this.setZoom(next, at);
   }
 
+  private viewPending = false;
+  emitViewSoon() {
+    if (this.viewPending) return; this.viewPending = true;
+    requestAnimationFrame(() => { this.viewPending = false; app.emit('view'); });
+  }
   requestRender() {
     if (this.scheduled) return;
     this.scheduled = true;
@@ -465,8 +487,13 @@ export class Viewport {
   }
 
   // ---- Eventos --------------------------------------------------------
+  /** Rectángulo del lienzo en la página, guardado: pedirlo en cada evento obliga al navegador a recalcular la
+   *  maquetación si algo ha cambiado (y con el lápiz llegan cientos de eventos por segundo). Se renueva al tocar
+   *  la pantalla, al cambiar de tamaño y al desplazarse la página. */
+  private rectCache: DOMRect | null = null;
+  canvasRect(fresh = false) { if (fresh || !this.rectCache) this.rectCache = this.canvas.getBoundingClientRect(); return this.rectCache; }
   private makeEvent(e: PointerEvent): ToolEvent {
-    const r = this.canvas.getBoundingClientRect();
+    const r = this.canvasRect();
     const sx = e.clientX - r.left, sy = e.clientY - r.top;
     const p = this.toDoc(sx, sy);
     return {
@@ -521,9 +548,12 @@ export class Viewport {
   private bindEvents() {
     const cv = this.canvas;
     cv.addEventListener('contextmenu', e => e.preventDefault());
+    cv.addEventListener('pointerenter', () => { this.rectCache = null; });
+    for (const ev of ['resize', 'scroll']) window.addEventListener(ev, () => { this.rectCache = null; }, { passive: true, capture: true });
 
     cv.addEventListener('pointerdown', e => {
       if (!this.doc) return;
+      this.canvasRect(true);
       const touch = e.pointerType === 'touch';
       if (e.pointerType === 'pen') { this.notePen(); this.penDown = true; if (this.toolActive && this.strokeTouch && this.penMode()) this.cancelTouchStroke(); }
       // rechazo de la palma: mientras el lápiz está apoyado, los toques no cuentan
@@ -605,7 +635,7 @@ export class Viewport {
 
     cv.addEventListener('pointermove', e => {
       if (!this.doc) return;
-      const r = cv.getBoundingClientRect();
+      const r = this.canvasRect();
       if (e.pointerType === 'pen') this.notePen();
       if (e.pointerType === 'touch' && !this.pointers.has(e.pointerId)) return;
       if (this.pointers.has(e.pointerId)) {
@@ -618,7 +648,9 @@ export class Viewport {
       if (this.touchPick || this.penPick) { if (this.pointers.has(e.pointerId)) this.pickTouch(te.sx, te.sy); return; }
       if (this.panning && e.pointerType === 'touch' && Math.hypot(te.sx - this.panning.x, te.sy - this.panning.y) > 8) clearTimeout(this.holdTimer);
       this.mouse = { x: te.x, y: te.y }; this.mouseScreen = { x: te.sx, y: te.sy };
-      app.emit('view');
+      // la barra de estado, el panel Info y el navegador se actualizan como mucho una vez por fotograma,
+      // y mientras se pinta no (cada cambio en la página cuesta tiempo al navegador); al soltar se ponen al día
+      if (!this.toolActive) this.emitViewSoon();
       if (this.panning) {
         this.doc.view.panX = this.panning.px + te.sx - this.panning.x;
         this.doc.view.panY = this.panning.py + te.sy - this.panning.y;
@@ -636,6 +668,10 @@ export class Viewport {
         this.requestRender(); return;
       }
       if (this.toolActive) {
+        // predicción del navegador: hacia dónde va el lápiz en los próximos milisegundos; el pincel dibuja ahí un
+        // trazo provisional (solo en pantalla) y así la línea va pegada a la punta
+        const pr = e.pointerType !== 'mouse' ? (e as any).getPredictedEvents?.() as PointerEvent[] | undefined : undefined;
+        this.predicted = pr?.length ? pr.slice(-3).map(pe => { const q = this.makeEvent(pe); return { x: q.x, y: q.y }; }) : null;
         const evs = (e as any).getCoalescedEvents?.() as PointerEvent[] | undefined;
         if (evs && evs.length > 1) for (const ce of evs) app.tool?.move?.(this.makeEvent(ce));
         else app.tool?.move?.(te);
@@ -645,6 +681,7 @@ export class Viewport {
     });
 
     const end = (e: PointerEvent) => {
+      this.emitViewSoon(); this.predicted = null;
       if (e.pointerType === 'pen') this.penDown = false;
       const had = this.pointers.delete(e.pointerId);
       if (e.pointerType === 'touch') {

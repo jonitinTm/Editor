@@ -263,22 +263,30 @@ app.on('doc', () => {
   const t = tabs.querySelector('.tab.active span');
   if (t && app.doc) t.textContent = tabTitle(app.doc);
 });
-app.on('view', () => { const t = tabs.querySelector('.tab.active span'); if (t && app.doc) t.textContent = tabTitle(app.doc); });
+app.on('view', () => { const t = tabs.querySelector('.tab.active span'); if (t && app.doc) { const v = tabTitle(app.doc); if (t.textContent !== v) t.textContent = v; } });
 renderTabs();
 
 // ---- Barra de estado ------------------------------------------------------------------
+// la barra se construye una vez y luego solo se cambia el texto que cambia (rehacerla en cada movimiento del
+// ratón o del lápiz obligaba al navegador a recalcular la página y al traductor a revisar cada elemento)
+let stParts: { zoom: HTMLInputElement; size: HTMLElement; pos: HTMLElement; sel: HTMLElement } | null = null;
+const setText = (el: HTMLElement, t: string) => { if (el.textContent !== t) el.textContent = t; };
 function renderStatus() {
   const d = app.doc;
-  if (!d) { status.textContent = 'Arrastra una imagen aquí o usa Archivo › Abrir'; return; }
-  const m = app.viewport.mouse;
-  const zoomInput = h('input', { class: 'zoom-input', value: Math.round(d.view.zoom * 1000) / 10 + ' %' });
-  zoomInput.addEventListener('change', () => { const z = parseFloat(zoomInput.value); if (z > 0) app.viewport.setZoom(z / 100, null); });
-  status.innerHTML = '';
-  status.append(zoomInput,
-    h('span', {}, prefs.units === 'px' ? `${d.width} × ${d.height} px` : `${fmtUnit(d.width, d.ppi || 72, d.width)} × ${fmtUnit(d.height, d.ppi || 72, d.height)}`),
-    h('span', {}, m ? (prefs.units === 'px' ? `X: ${Math.floor(m.x)}  Y: ${Math.floor(m.y)}` : `X: ${fmtUnit(m.x, d.ppi || 72, d.width)}  Y: ${fmtUnit(m.y, d.ppi || 72, d.height)}`) : ''),
-    h('span', { class: 'grow' }),
-    h('span', { class: 'hint' }, d.selection.bounds ? `Selección: ${prefs.units === 'px' ? `${d.selection.bounds.w} × ${d.selection.bounds.h}` : `${fmtUnit(d.selection.bounds.w, d.ppi || 72, d.width)} × ${fmtUnit(d.selection.bounds.h, d.ppi || 72, d.height)}`}` : ''));
+  if (!d) { stParts = null; status.textContent = 'Arrastra una imagen aquí o usa Archivo › Abrir'; return; }
+  if (!stParts || !status.contains(stParts.zoom)) {
+    const zoom = h('input', { class: 'zoom-input' }) as HTMLInputElement;
+    zoom.addEventListener('change', () => { const z = parseFloat(zoom.value); if (z > 0) app.viewport.setZoom(z / 100, null); });
+    stParts = { zoom, size: h('span', {}), pos: h('span', { class: 'no-i18n' }), sel: h('span', { class: 'hint' }) };
+    status.innerHTML = '';
+    status.append(zoom, stParts.size, stParts.pos, h('span', { class: 'grow' }), stParts.sel);
+  }
+  const m = app.viewport.mouse, P = stParts, u = (v: number, ref: number) => fmtUnit(v, d.ppi || 72, ref);
+  const zv = Math.round(d.view.zoom * 1000) / 10 + ' %'; if (P.zoom.value !== zv && document.activeElement !== P.zoom) P.zoom.value = zv;
+  setText(P.size, prefs.units === 'px' ? `${d.width} × ${d.height} px` : `${u(d.width, d.width)} × ${u(d.height, d.height)}`);
+  setText(P.pos, m ? (prefs.units === 'px' ? `X: ${Math.floor(m.x)}  Y: ${Math.floor(m.y)}` : `X: ${u(m.x, d.width)}  Y: ${u(m.y, d.height)}`) : '');
+  const sb = d.selection.bounds;
+  setText(P.sel, sb ? `Selección: ${prefs.units === 'px' ? `${sb.w} × ${sb.h}` : `${u(sb.w, d.width)} × ${u(sb.h, d.height)}`}` : '');
 }
 app.on('view', () => { if (document.activeElement?.classList.contains('zoom-input')) return; renderStatus(); });
 app.on('doc', renderStatus); app.on('docs', renderStatus);

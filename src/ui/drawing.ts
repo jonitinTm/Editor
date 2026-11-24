@@ -145,6 +145,7 @@ export function penSettingsDialog() {
   const side = sel(prefs.sideSliders, [['auto', 'Automático (tablet o lápiz)'], ['on', 'Siempre'], ['off', 'Nunca']]);
   const rot = h('input', { type: 'checkbox', checked: prefs.pinchRotate }) as HTMLInputElement;
   const gest = h('input', { type: 'checkbox', checked: prefs.touchGestures }) as HTMLInputElement;
+  const lowLat = h('input', { type: 'checkbox', checked: !!prefs.lowLatency }) as HTMLInputElement;
   const presets = h('div', { class: 'pen-presets' }, ...([['Suave', 60, 0], ['Normal', 0, 0], ['Firme', -55, 0], ['Siempre se ve', 20, 15]] as [string, number, number][]).map(([n, c, m]) => {
     const b = h('button', { class: 'btn', type: 'button' }, n); b.onclick = () => { curve.value = String(c); min.value = String(m); apply(); }; return b;
   }));
@@ -160,10 +161,11 @@ export function penSettingsDialog() {
       row('El dedo solo mueve la vista', penOnly),
       row('', h('label', { class: 'check' }, rot, ' Girar la vista con dos dedos')),
       row('', h('label', { class: 'check' }, gest, ' Tocar con 2 dedos = deshacer, con 3 = rehacer')),
+      row('', h('label', { class: 'check' }, lowLat, ' Baja latencia: el trazo sale antes en pantalla (experimental; se aplica al recargar)')),
       row('Barras de tamaño y opacidad', side),
       h('div', { class: 'hint' }, 'Botón lateral del lápiz: coge un color. Goma del lápiz (si la tiene): borra. Mantén el dedo quieto sobre la imagen para coger un color.'),
     ],
-    onOk: () => { Object.assign(prefs, { penCurve: +curve.value, penMin: +min.value, penOnly: penOnly.value, sideSliders: side.value, pinchRotate: rot.checked, touchGestures: gest.checked }); savePrefs(); (window as any).__sideSliders?.(); app.toast('Ajustes del lápiz guardados'); },
+    onOk: () => { Object.assign(prefs, { penCurve: +curve.value, penMin: +min.value, penOnly: penOnly.value, sideSliders: side.value, pinchRotate: rot.checked, touchGestures: gest.checked, lowLatency: lowLat.checked }); savePrefs(); (window as any).__sideSliders?.(); app.toast('Ajustes del lápiz guardados'); },
     onCancel: () => { Object.assign(prefs, before); },
   });
   drawGraph();

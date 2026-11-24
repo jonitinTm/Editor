@@ -369,14 +369,23 @@ abstract class StrokeTool implements Tool {
     const roped = !!this.ropePt; this.ropePt = null; this.ropeCursor = null;
     if (e && !roped && this.sm && this.dab && (app.opt<number>('smoothing', this.id) ?? 0) > 0) { this.stroke.lineTo(e.x, e.y, e.pressure, this.spacing(e.pressure), this.dab); this.lastPoint = { x: e.x, y: e.y }; }
     this.sm = null;
-    const changed = this.stroke.finish();
+    const st = this.stroke, changed = st.finish();
     this.stroke = null;
-    if (changed) { app.doc!.commit(this.historyName); if (!this.erase) import('../ui/artist').then(m => m.addRecentColor(app.fg)); }
+    if (changed) { app.doc!.commit(this.historyName, st.bounds ?? undefined); if (!this.erase) import('../ui/artist').then(m => m.addRecentColor(app.fg)); }
   }
   cancel() { clearTimeout(this.qsTimer); this.qsDone = false; assistEnd(); this.vpDrag = -1; this.stroke?.cancel(); this.stroke = null; }
   hover() { /* el cursor se dibuja en drawOverlay */ }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     drawAssist(ctx, vp);
+    // trazo provisional hasta donde el navegador prevé que irá el lápiz (se sustituye por el real en el siguiente fotograma)
+    const pr = vp.predicted;
+    if (pr && this.stroke && this.lastPoint && !this.erase && !this.qsDone && !this.ropePt && !assistOn() && (app.opt<number>('smoothing', this.id) ?? 0) <= 25) {
+      const a = vp.toScreen(this.lastPoint.x, this.lastPoint.y);
+      ctx.save(); ctx.lineCap = ctx.lineJoin = 'round'; ctx.strokeStyle = app.fg;
+      ctx.globalAlpha = Math.min(1, (app.opt<number>('opacity', this.id) ?? 100) / 100) * 0.9;
+      ctx.lineWidth = Math.max(1, this.size(this.lastP) * vp.zoom * 0.9);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); for (const q of pr) { const s = vp.toScreen(q.x, q.y); ctx.lineTo(s.x, s.y); } ctx.stroke(); ctx.restore();
+    }
     const R = this.ropeLen();
     if (R > 0 && !this.stroke && vp.mouseScreen) {
       // círculo de la cuerda alrededor del puntero

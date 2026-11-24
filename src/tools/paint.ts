@@ -84,35 +84,51 @@ export function setPreview(t: PaintTarget, c: HTMLCanvasElement | null) {
 
 // ---- Puntas de pincel ---------------------------------------------------
 
+/** Puntas ya dibujadas, de la menos a la más usada recientemente; se limita por memoria (píxeles), no por número. */
 const tipCache = new Map<string, HTMLCanvasElement>();
+let tipPixels = 0;
+const TIP_BUDGET = 12_000_000; // ~48 MB
+function tipGet(key: string) { const c = tipCache.get(key); if (c) { tipCache.delete(key); tipCache.set(key, c); } return c; }
+function tipPut(key: string, c: HTMLCanvasElement) {
+  tipCache.set(key, c); tipPixels += c.width * c.height;
+  for (const [k, v] of tipCache) { if (tipPixels <= TIP_BUDGET || tipCache.size <= 8) break; tipCache.delete(k); tipPixels -= v.width * v.height; }
+}
+/** Tamaño de punta redondeado a escalones del 2 % (invisibles): con la presión del lápiz el tamaño cambia en cada
+ *  pincelada y, sin esto, había que dibujar una punta nueva (lienzo y degradado) cada vez. */
+export function quantSize(s: number) {
+  if (s <= 4) return Math.max(0.25, Math.round(s * 4) / 4);
+  if (s <= 16) return Math.round(s * 2) / 2;
+  const L = Math.log(1.02); return Math.round(Math.exp(Math.round(Math.log(s) / L) * L) * 4) / 4;
+}
 export function brushTip(size: number, hardness: number, color: string, aliased = false, roundness = 1, angle = 0): HTMLCanvasElement {
+  size = aliased ? Math.max(1, Math.round(size)) : quantSize(size);
   if (!aliased && (roundness < 0.999 || (angle % 180) !== 0) && roundness < 0.999) {
     // Punta elíptica: la redonda, aplastada y girada
     const key = `e|${size}|${hardness}|${color}|${roundness}|${angle}`;
-    let e = tipCache.get(key);
+    let e = tipGet(key);
     if (e) return e;
     const base = brushTip(size, hardness, color), d = base.width;
     e = makeCanvas(d, d); const c = ctx2d(e);
     c.translate(d / 2, d / 2); c.rotate(-angle * Math.PI / 180); c.scale(1, Math.max(0.01, roundness)); c.drawImage(base, -d / 2, -d / 2);
-    tipCache.set(key, e);
+    tipPut(key, e);
     return e;
   }
   const d = Math.max(1, Math.ceil(size));
   const key = `${d}|${hardness}|${color}|${aliased}|${size}`;
-  let c = tipCache.get(key);
+  let c = tipGet(key);
   if (c) return c;
-  if (tipCache.size > 64) tipCache.clear();
   c = makeCanvas(d + 2, d + 2);
   const ctx = ctx2d(c);
   const r = size / 2, cx = (d + 2) / 2;
   if (aliased) {
-    ctx.fillStyle = color;
-    const rr = Math.max(0.5, r);
-    for (let y = 0; y < d + 2; y++) for (let x = 0; x < d + 2; x++) {
+    // píxeles duros: se escribe la imagen de una vez (antes era un fillRect por píxel)
+    const rr = Math.max(0.5, r), W = d + 2, img = ctx.createImageData(W, W), D = img.data;
+    const [cr, cg, cb] = /^#[0-9a-f]{6}$/i.test(color) ? [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)) : [0, 0, 0];
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
       const dx = x + .5 - cx, dy = y + .5 - cx;
-      if (dx * dx + dy * dy <= rr * rr || d <= 1) ctx.fillRect(x, y, 1, 1);
+      if (d <= 1 ? (x === 1 && y === 1) : dx * dx + dy * dy <= rr * rr) { const i = (y * W + x) * 4; D[i] = cr; D[i + 1] = cg; D[i + 2] = cb; D[i + 3] = 255; }
     }
-    if (d <= 1) { ctx.clearRect(0, 0, d + 2, d + 2); ctx.fillRect(1, 1, 1, 1); }
+    ctx.putImageData(img, 0, 0);
   } else if (hardness >= 0.99) {
     ctx.fillStyle = color; ctx.beginPath(); ctx.arc(cx, cx, Math.max(0.5, r), 0, Math.PI * 2); ctx.fill();
   } else {
@@ -126,7 +142,7 @@ export function brushTip(size: number, hardness: number, color: string, aliased 
     }
     ctx.fillStyle = g; ctx.fillRect(0, 0, d + 2, d + 2);
   }
-  tipCache.set(key, c);
+  tipPut(key, c);
   return c;
 }
 const smooth = (x: number) => x * x * (3 - 2 * x);
@@ -140,6 +156,20 @@ export type StrokeMode = 'paint' | 'erase' | 'mask';
  * original con el búfer usando la opacidad del trazo, que así no se acumula
  * al pasar varias veces por el mismo sitio (como en los editores profesionales).
  */
+// Lienzo de trabajo del trazo: se reutiliza de un trazo al siguiente (crear uno del tamaño de la imagen en cada
+// trazo cuesta mucho con imágenes grandes). Al devolverlo se recuerda qué zona se ensució para limpiar solo esa.
+let spareBuf: { c: HTMLCanvasElement; dirty: Rect | null } | null = null;
+function borrowBuffer(w: number, h: number): HTMLCanvasElement {
+  const sp = spareBuf; spareBuf = null;
+  if (sp && sp.c.width === w && sp.c.height === h) {
+    const x = ctx2d(sp.c); x.setTransform(1, 0, 0, 1, 0, 0); x.globalAlpha = 1; x.globalCompositeOperation = 'source-over'; x.filter = 'none';
+    if (sp.dirty) x.clearRect(sp.dirty.x - 2, sp.dirty.y - 2, sp.dirty.w + 4, sp.dirty.h + 4); else x.clearRect(0, 0, w, h);
+    return sp.c;
+  }
+  return makeCanvas(w, h);
+}
+function returnBuffer(c: HTMLCanvasElement, dirty: Rect | null) { spareBuf = { c, dirty }; }
+
 export class Stroke {
   buffer: HTMLCanvasElement;
   original: HTMLCanvasElement;
@@ -165,7 +195,7 @@ export class Stroke {
     public blend: GlobalCompositeOperation = 'source-over',
   ) {
     const w = target.canvas.width, h = target.canvas.height;
-    this.buffer = makeCanvas(w, h);
+    this.buffer = borrowBuffer(w, h);
     // El lienzo de la capa no se modifica durante el trazo (se pinta sobre la vista previa), así que no hace falta copiarlo
     this.original = target.canvas;
     this.sel = clipMask(target);
@@ -287,20 +317,38 @@ export class Stroke {
       this.composeInto(this.preview, this.bounds);
     } else if (this.fast) {
       this.clearExtra(); this.fast = false;
-      if (!this.bounds) { app.doc!.invalidate(); return false; }
-      this.preview = cloneCanvas(this.original);
-      this.composeInto(this.preview, this.bounds);
+      if (!this.bounds) { app.doc!.invalidate(); returnBuffer(this.buffer, null); return false; }
+      // pintura normal: se aplica directamente sobre la capa, solo en la zona del trazo (sin copiar la capa
+      // entera; el historial ya guarda su propia copia del estado anterior)
+      this.applyInPlace(this.bounds);
+      setPreview(this.target, null);
+      touchTarget(this.target);
+      app.doc!.invalidate(this.bounds);
+      returnBuffer(this.buffer, this.bounds);
+      return true;
     }
     setPreview(this.target, null);
+    returnBuffer(this.buffer, this.bounds);
     if (!this.bounds) return false;
     setTargetCanvas(this.target, this.preview);
     app.doc!.invalidate(this.bounds);
     return true;
   }
+  private applyInPlace(r: Rect) {
+    let src = this.buffer;
+    if (this.sel) { this.clipToSelection(r); src = this.tmp!; }
+    const ctx = ctx2d(this.original);
+    ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath(); ctx.rect(r.x, r.y, r.w, r.h); ctx.clip();
+    ctx.globalAlpha = this.opacity; ctx.globalCompositeOperation = this.mode === 'erase' ? 'destination-out' : 'source-over';
+    ctx.drawImage(src, 0, 0);
+    ctx.restore();
+  }
   cancel() {
     if (this.fast) this.clearExtra();
     setPreview(this.target, null);
     app.doc!.invalidate();
+    returnBuffer(this.buffer, null);
   }
 }
 
