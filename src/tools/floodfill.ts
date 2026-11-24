@@ -3,7 +3,7 @@
 
 import { makeCanvas, ctx2d } from '../core/canvas';
 
-export function floodMask(src: ImageData, sx: number, sy: number, tolerance: number, contiguous: boolean): { canvas: HTMLCanvasElement; count: number } | null {
+export function floodMask(src: ImageData, sx: number, sy: number, tolerance: number, contiguous: boolean): { canvas: HTMLCanvasElement; count: number; bounds: { x: number; y: number; w: number; h: number } | null } | null {
   const { width: w, height: h, data: d } = src;
   sx = Math.floor(sx); sy = Math.floor(sy);
   if (sx < 0 || sy < 0 || sx >= w || sy >= h) return null;
@@ -45,9 +45,10 @@ export function floodMask(src: ImageData, sx: number, sy: number, tolerance: num
   const c = makeCanvas(w, h);
   const img = ctx2d(c).createImageData(w, h);
   const o = img.data;
-  for (let p = 0; p < w * h; p++) if (out[p]) { const j = p * 4; o[j] = o[j + 1] = o[j + 2] = o[j + 3] = 255; }
+  let bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+  for (let p = 0; p < w * h; p++) if (out[p]) { const j = p * 4; o[j] = o[j + 1] = o[j + 2] = o[j + 3] = 255; const x = p % w, y = (p - x) / w; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
   ctx2d(c).putImageData(img, 0, 0);
-  return { canvas: c, count };
+  return { canvas: c, count, bounds: bx1 >= 0 ? { x: bx0, y: by0, w: bx1 - bx0 + 1, h: by1 - by0 + 1 } : null };
 }
 
 /** Distancia ≤ r a algún píxel marcado (cuadrado), en O(n): pasada por filas y luego por columnas. */
@@ -71,7 +72,7 @@ function dilate(m: Uint8Array, w: number, h: number, r: number): Uint8Array {
 
 /** Relleno que «cierra huecos»: las líneas se engordan `gap` píxeles para que el color no se escape por
  *  pequeñas aberturas del dibujo; luego el relleno se vuelve a ensanchar hasta tocar las líneas reales. */
-export function floodMaskGaps(src: ImageData, sx: number, sy: number, tolerance: number, gap: number): { canvas: HTMLCanvasElement; count: number } | null {
+export function floodMaskGaps(src: ImageData, sx: number, sy: number, tolerance: number, gap: number): { canvas: HTMLCanvasElement; count: number; bounds: { x: number; y: number; w: number; h: number } | null } | null {
   if (gap <= 0) return floodMask(src, sx, sy, tolerance, true);
   const { width: w, height: h, data: d } = src;
   sx = Math.floor(sx); sy = Math.floor(sy);
@@ -98,7 +99,8 @@ export function floodMaskGaps(src: ImageData, sx: number, sy: number, tolerance:
   const grown = dilate(reg, w, h, gap);
   const c = makeCanvas(w, h), img = ctx2d(c).createImageData(w, h), o = img.data;
   let count = 0;
-  for (let p = 0; p < n; p++) if (grown[p] && !wall[p]) { const j = p * 4; o[j] = o[j + 1] = o[j + 2] = o[j + 3] = 255; count++; }
+  let bx0 = w, by0 = h, bx1 = -1, by1 = -1;
+  for (let p = 0; p < n; p++) if (grown[p] && !wall[p]) { const j = p * 4; o[j] = o[j + 1] = o[j + 2] = o[j + 3] = 255; count++; const x = p % w, y = (p - x) / w; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; }
   ctx2d(c).putImageData(img, 0, 0);
-  return { canvas: c, count };
+  return { canvas: c, count, bounds: bx1 >= 0 ? { x: bx0, y: by0, w: bx1 - bx0 + 1, h: by1 - by0 + 1 } : null };
 }

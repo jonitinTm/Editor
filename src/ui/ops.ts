@@ -960,8 +960,9 @@ export function clearSelection(name = 'Borrar') {
     const lum = luminanceOf(app.bg);
     c.globalCompositeOperation = 'lighter'; c.globalAlpha = lum; c.drawImage(d.selection.mask!, 0, 0);
   }
-  setTargetCanvas(t, out);
-  d.commit(name);
+  const zone = d.selection.bounds ?? undefined;
+  setTargetCanvas(t, out, zone);
+  d.commit(name, zone);
 }
 function luminanceOf(hex: string) { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16 & 255) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; }
 
@@ -981,8 +982,9 @@ export function fillPattern(id: string, opacity = 1, scale = 1) {
   const t = getPaintTarget(); if (!t) return;
   const area = patternFill(p, d.width, d.height, scale);
   const out = applyOnTarget(t, t.canvas, area, opacity, 1);
-  setTargetCanvas(t, out);
-  d.commit('Rellenar con motivo');
+  const zone = d.selection.active ? d.selection.bounds ?? undefined : undefined;
+  setTargetCanvas(t, out, zone);
+  d.commit('Rellenar con motivo', zone);
 }
 
 export function fill(color: string, opacity = 1, name = 'Rellenar') {
@@ -999,8 +1001,9 @@ export function fill(color: string, opacity = 1, name = 'Rellenar') {
     c.globalCompositeOperation = 'destination-out'; c.drawImage(area, 0, 0);
     c.globalAlpha = opacity * luminanceOf(color); c.globalCompositeOperation = 'lighter'; c.drawImage(area, 0, 0);
   } else c.drawImage(area, 0, 0);
-  setTargetCanvas(t, out);
-  d.commit(name);
+  const zone = sm && d.selection.active ? d.selection.bounds ?? undefined : undefined;
+  setTargetCanvas(t, out, zone);
+  d.commit(name, zone);
 }
 
 /** Capa vía copiar (Ctrl+J) o vía cortar (Mayús+Ctrl+J). */
@@ -1198,8 +1201,9 @@ export class FilterSession {
     const out = cloneCanvas(this.t.canvas);
     putPixels(out, r, this.region.x, this.region.y);
     setPreview(this.t, null);
-    setTargetCanvas(this.t, out);
-    doc()!.commit(this.def.name.replace('…', ''));
+    // el filtro solo cambia su zona (la selección): el historial guarda solo esa zona
+    setTargetCanvas(this.t, out, this.region);
+    doc()!.commit(this.def.name.replace('…', ''), this.region);
   }
 }
 

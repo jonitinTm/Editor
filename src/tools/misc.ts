@@ -61,8 +61,10 @@ export class BucketTool implements Tool {
     fc.globalCompositeOperation = 'source-in';
     if (pat) { fc.fillStyle = fc.createPattern(pat.canvas, 'repeat')!; } else fc.fillStyle = st.color;
     fc.fillRect(0, 0, fill.width, fill.height);
-    setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, app.opt<number>('opacity', this.id) / 100, st.maskValue));
-    doc.commit('Bote de pintura');
+    // solo cambia la zona rellenada: el historial guarda esa zona y solo se recompone ella
+    const zone = res.bounds ?? undefined;
+    setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, app.opt<number>('opacity', this.id) / 100, st.maskValue), zone);
+    doc.commit('Bote de pintura', zone);
   }
 }
 
@@ -378,8 +380,9 @@ export function colorDrop(x: number, y: number): boolean {
   for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) gc.drawImage(fill, dx, dy);
   fc.clearRect(0, 0, fill.width, fill.height); fc.drawImage(grown, 0, 0);
   fc.globalCompositeOperation = 'source-in'; fc.fillStyle = st.color; fc.fillRect(0, 0, fill.width, fill.height);
-  setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, 1, st.maskValue));
-  doc.commit('Soltar color');
+  const zone = res.bounds ? { x: res.bounds.x - 2, y: res.bounds.y - 2, w: res.bounds.w + 4, h: res.bounds.h + 4 } : undefined;
+  setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, 1, st.maskValue), zone);
+  doc.commit('Soltar color', zone);
   return true;
 }
 
@@ -410,8 +413,10 @@ export class LassoFillTool implements Tool {
     fc.beginPath(); pts.forEach((q, i) => i ? fc.lineTo(q.x, q.y) : fc.moveTo(q.x, q.y)); fc.closePath(); fc.fill();
     if (!app.opt('aa', this.id)) { const im = fc.getImageData(0, 0, fill.width, fill.height), D = im.data; for (let i = 3; i < D.length; i += 4) D[i] = D[i] >= 128 ? 255 : 0; fc.putImageData(im, 0, 0); }
     const blend: GlobalCompositeOperation = erase && !t.isMask ? 'destination-out' : 'source-over';
-    setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, app.opt<number>('opacity', this.id) / 100, st.maskValue, blend));
-    doc.commit(erase ? 'Borrar con lazo' : 'Relleno con lazo');
+    let zx0 = Infinity, zy0 = Infinity, zx1 = -Infinity, zy1 = -Infinity; for (const q of pts) { zx0 = Math.min(zx0, q.x); zy0 = Math.min(zy0, q.y); zx1 = Math.max(zx1, q.x); zy1 = Math.max(zy1, q.y); }
+    const zone = blend === 'source-over' || !t.lockAlpha ? { x: zx0 - 2, y: zy0 - 2, w: zx1 - zx0 + 4, h: zy1 - zy0 + 4 } : undefined;
+    setTargetCanvas(t, applyOnTarget(t, t.canvas, fill, app.opt<number>('opacity', this.id) / 100, st.maskValue, blend), zone);
+    doc.commit(erase ? 'Borrar con lazo' : 'Relleno con lazo', zone);
   }
   cancel() { this.pts = []; }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {

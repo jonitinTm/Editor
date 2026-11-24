@@ -62,14 +62,22 @@ export function touchTarget(t: PaintTarget) {
   if (t.isMask) t.layer.mask!.touch(); else t.layer.touch();
 }
 
-/** Sustituye el contenido del objetivo por un lienzo nuevo. */
-export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement) {
+/** Sustituye el contenido del objetivo por un lienzo nuevo. Si se sabe que el lienzo nuevo solo difiere del
+ *  anterior dentro de `region` (un relleno, un filtro con selección…), el historial guarda solo esa zona. */
+export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement, region?: Rect | null) {
   // el lienzo pasa a ser el de la capa: se deja su estado de dibujo como nuevo (modo normal, opacidad 1)
   { const x = ctx2d(c); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; x.setTransform(1, 0, 0, 1, 0, 0); }
   if (t.quick) { app.doc!.selection.setMask(c); t.canvas = app.doc!.selection.mask ?? c; return; }
+  const owner = t.isMask ? t.layer.mask! : t.layer instanceof RasterLayer ? t.layer : null, old = owner?.canvas;
+  let r: Rect | null = null, before: HTMLCanvasElement | undefined;
+  if (region && owner && old && old.width === c.width && old.height === c.height) {
+    const x0 = Math.max(0, Math.floor(region.x)), y0 = Math.max(0, Math.floor(region.y)), x1 = Math.min(c.width, Math.ceil(region.x + region.w)), y1 = Math.min(c.height, Math.ceil(region.y + region.h));
+    if (x1 > x0 && y1 > y0) { r = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }; before = makeCanvas(r.w, r.h); ctx2d(before).drawImage(old, -r.x, -r.y); }
+    else r = { x: 0, y: 0, w: 0, h: 0 };
+  }
   if (t.isMask) t.layer.mask!.canvas = c; else (t.layer as RasterLayer).canvas = c;
   t.canvas = c;
-  touchTarget(t);
+  if (r && owner && r.w > 0) owner.touchRect(r, before); else touchTarget(t);
 }
 
 /** Aplica la previsualización temporal al compositor. */
