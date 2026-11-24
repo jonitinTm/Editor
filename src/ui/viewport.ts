@@ -523,13 +523,24 @@ export class Viewport {
    *  la pantalla, al cambiar de tamaño y al desplazarse la página. */
   private rectCache: DOMRect | null = null;
   canvasRect(fresh = false) { if (fresh || !this.rectCache) this.rectCache = this.canvas.getBoundingClientRect(); return this.rectCache; }
+  /** Última presión real del lápiz mientras toca la pantalla. Al levantarlo, el navegador manda presión 0 (así lo
+   *  dice el estándar): no es «sin dato» sino el final del trazo, y se usa la última presión que hubo; si no, el
+   *  trazo terminaba con un punto gordo (a media presión) justo donde debía afinarse. */
+  private lastPenPressure = 0.5;
+  private penPressureOf(e: PointerEvent): number {
+    if (e.type === 'pointerup' || e.type === 'pointercancel' || e.type === 'lostpointercapture') return penPressure(this.lastPenPressure);
+    // sin presión (algunos lápices o navegadores) se toma 0.5, como antes
+    const raw = e.pressure > 0 ? e.pressure : (e.buttons ? 0.5 : this.lastPenPressure);
+    if (e.buttons) this.lastPenPressure = raw;
+    return penPressure(raw);
+  }
   private makeEvent(e: PointerEvent): ToolEvent {
     const r = this.canvasRect();
     const sx = e.clientX - r.left, sy = e.clientY - r.top;
     const p = this.toDoc(sx, sy);
     return {
       x: p.x, y: p.y, sx, sy, shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey,
-      pressure: e.pointerType === 'pen' ? penPressure(e.pressure || 0.5) : 1, pointerType: e.pointerType, button: e.button, detail: e.detail,
+      pressure: e.pointerType === 'pen' ? this.penPressureOf(e) : 1, pointerType: e.pointerType, button: e.button, detail: e.detail,
       ...(e.pointerType === 'pen' ? penTilt(e, this.rot) : {}),
     };
   }
