@@ -18,7 +18,7 @@ const psdMod = () => import('../io/psd');
 import { heal, findSource } from '../filters/heal';
 import { computeFilter } from '../filters/compute';
 import { record } from './macros';
-import { snapshot, restore } from '../core/history';
+import { snapshot, restore, shareFrozen } from '../core/history';
 import { FILTERS } from '../filters/registry';
 const FILTERS_BY_ID = new Map(FILTERS.map(x => [x.id, x]));
 import { addPattern, getPattern, patternFill } from '../core/patterns';
@@ -291,6 +291,7 @@ export function duplicateLayer() {
   for (const l of layers) {
     const c = cloneLayer(l, d);
     c.name = l.name + ' copia';
+    shareFrozen(l, c);
     l.parent!.add(c, l.parent!.children.indexOf(l) + 1);
     last = c;
   }
@@ -1113,13 +1114,23 @@ function getFilterWorker(): Worker | null {
   return filterWorker;
 }
 let sessionSeq = 0;
+/** Segundo hilo solo para las vistas previas rápidas (a tamaño reducido): no esperan a que acabe el cálculo grande. */
+let quickWorker: Worker | null | undefined;
+function getQuickWorker(): Worker | null {
+  if (quickWorker !== undefined) return quickWorker;
+  if (!FilterWorkerCtor) return null;
+  try { quickWorker = new FilterWorkerCtor(); } catch { quickWorker = null; }
+  return quickWorker;
+}
 
 export class FilterSession {
   t: PaintTarget;
   region: Rect;
   private orig: ImageData;
   private sel: ImageData | null;
-  private preview: HTMLCanvasElement;
+  // copia de la capa para enseñar la vista previa: solo se hace si hay vista previa (aplicar sin ventana no la necesita)
+  private _preview: HTMLCanvasElement | null = null;
+  private get preview(): HTMLCanvasElement { return this._preview ??= cloneCanvas(this.t.canvas); }
   private seed = (Math.random() * 1e9) | 0;
   /** En imágenes grandes el cálculo va a un hilo de fondo. */
   private worker: Worker | null = null;
@@ -1128,7 +1139,7 @@ export class FilterSession {
   private waiting = new Map<number, (img: ImageData) => void>();
   private last: { key: string; img: ImageData } | null = null;
   private pending: { key: string; promise: Promise<ImageData> } | null = null;
-  constructor(t: PaintTarget, public def: FilterDef, useWorker = true) {
+  constructor(t: PaintTarget, public def: FilterDef, useWorker = true, quickPreview = true) {
     const d = doc()!;
     this.t = t;
     this.region = (!t.quick && d.selection.bounds) || { x: 0, y: 0, w: d.width, h: d.height };
@@ -1138,23 +1149,46 @@ export class FilterSession {
       for (let i = 0; i < a.length; i += 4) { a[i] = a[i + 1] = a[i + 2] = a[i + 3]; a[i + 3] = 255; }
     }
     this.sel = d.selection.mask && !t.quick ? getPixels(d.selection.mask, this.region) : null;
-    this.preview = cloneCanvas(t.canvas);
     if (useWorker && this.region.w * this.region.h > 400_000) {
       this.worker = getFilterWorker();
       if (this.worker) {
         this.worker.postMessage({ type: 'init', session: this.id, w: this.orig.width, h: this.orig.height, data: this.orig.data.buffer.slice(0), sel: this.sel ? this.sel.data.buffer.slice(0) : null, filterId: def.id, isMask: !!t.isMask, lockAlpha: !!t.lockAlpha });
         this.worker.addEventListener('message', this.onMsg);
+        // imagen grande: además, una copia reducida para enseñar algo al momento mientras se calcula la de verdad
+        const area = this.region.w * this.region.h, qw = quickPreview && area > 2_500_000 ? getQuickWorker() : null;
+        if (qw) {
+          const k = Math.sqrt(1_000_000 / area), w = Math.max(1, Math.round(this.region.w * k)), hh = Math.max(1, Math.round(this.region.h * k));
+          const shrink = (src: HTMLCanvasElement) => { const c = makeCanvas(w, hh), x = ctx2d(c); x.imageSmoothingQuality = 'medium'; x.drawImage(src, this.region.x, this.region.y, this.region.w, this.region.h, 0, 0, w, hh); return x.getImageData(0, 0, w, hh); };
+          const small = shrink(t.canvas);
+          if (t.isMask) { const a = small.data; for (let i = 0; i < a.length; i += 4) { a[i] = a[i + 1] = a[i + 2] = a[i + 3]; a[i + 3] = 255; } }
+          const ssel = this.sel ? shrink(d.selection.mask!) : null;
+          this.quick = { worker: qw, k, w, h: hh, job: 0, canvas: makeCanvas(w, hh) };
+          qw.postMessage({ type: 'init', session: this.id, w, h: hh, data: small.data.buffer, sel: ssel ? ssel.data.buffer : null, filterId: def.id, isMask: !!t.isMask, lockAlpha: !!t.lockAlpha }, [small.data.buffer, ...(ssel ? [ssel.data.buffer] : [])]);
+          qw.addEventListener('message', this.onQuick);
+        }
       }
     }
   }
+  private quick: { worker: Worker; k: number; w: number; h: number; job: number; canvas: HTMLCanvasElement } | null = null;
+  /** Último encargo grande ya enseñado (la vista rápida que llegue después no lo tapa). */
+  private shownJob = 0;
+  private onQuick = (e: MessageEvent) => {
+    const m = e.data, q = this.quick; if (!q || m.session !== this.id || this.ended) return;
+    // solo si sigue siendo lo último que se ha pedido y la versión exacta aún no ha llegado
+    if (m.job !== this.job || this.shownJob === this.job) return;
+    ctx2d(q.canvas).putImageData(new ImageData(new Uint8ClampedArray(m.data), q.w, q.h), 0, 0);
+    const c = ctx2d(this.preview), r = this.region;
+    c.save(); c.globalCompositeOperation = 'copy'; c.beginPath(); c.rect(r.x, r.y, r.w, r.h); c.clip(); c.imageSmoothingQuality = 'medium'; c.drawImage(q.canvas, r.x, r.y, r.w, r.h); c.restore();
+    setPreview(this.t, this.preview); doc()!.invalidate(this.region); app.viewport.requestRender();
+  };
   private onMsg = (e: MessageEvent) => {
     const m = e.data; if (m.session !== this.id) return;
     const done = this.waiting.get(m.job); this.waiting.delete(m.job);
     done?.(new ImageData(new Uint8ClampedArray(m.data), this.orig.width, this.orig.height));
   };
-  static start(def: FilterDef, useWorker = true): FilterSession | null {
+  static start(def: FilterDef, useWorker = true, quickPreview = true): FilterSession | null {
     const t = getPaintTarget(); if (!t) return null;
-    return new FilterSession(t, def, useWorker);
+    return new FilterSession(t, def, useWorker, quickPreview);
   }
   /** Imagen original de la zona (para histogramas). */
   source() { return this.orig; }
@@ -1182,13 +1216,23 @@ export class FilterSession {
       app.viewport.requestRender();
     };
     const r = this.compute(params);
-    if (r instanceof ImageData) show(r);
-    else { const job = this.job; r.then(img => { if (job === this.job && !this.ended) show(img); }); }
+    if (r instanceof ImageData) { this.shownJob = this.job; show(r); }
+    else {
+      const job = this.job;
+      // mientras llega la versión exacta, una rápida a tamaño reducido (los valores en píxeles se escalan)
+      if (this.quick && this.shownJob !== job) {
+        const q = this.quick, qp: any = { ...params, seed: this.seed };
+        for (const pd of this.def.params ?? []) if (pd.type === 'range' && pd.unit === 'px' && typeof qp[pd.key] === 'number') qp[pd.key] = qp[pd.key] * q.k;
+        q.worker.postMessage({ type: 'run', session: this.id, job, params: qp });
+      }
+      r.then(img => { if (job === this.job && !this.ended) { this.shownJob = job; show(img); } });
+    }
   }
   private ended = false;
   private end() {
     this.ended = true;
     if (this.worker) { this.worker.removeEventListener('message', this.onMsg); this.worker.postMessage({ type: 'end', session: this.id }); }
+    if (this.quick) { this.quick.worker.removeEventListener('message', this.onQuick); this.quick.worker.postMessage({ type: 'end', session: this.id }); this.quick = null; }
   }
   clearPreview() {
     this.end();
@@ -1247,8 +1291,9 @@ export async function applyFilterDirect(def: FilterDef, params: any = {}) {
   record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') });
   const a = doc()?.active;
   if (a instanceof SmartLayer && !doc()!.editMask) { new SmartFilterSession(a, def).commit(params); setLastFilter(def, params); return; }
-  // Sin ventana: se aplica al momento (así un Ctrl+Z inmediato deshace justo esto)
-  const s = FilterSession.start(def, false); if (!s) return;
+  // Sin ventana: en imágenes pequeñas se aplica al momento; en las grandes se calcula en el hilo de fondo para que la
+  // app no se congele (sin vista previa rápida, que aquí no se ve)
+  const s = FilterSession.start(def, true, false); if (!s) return;
   await s.commit(params);
   setLastFilter(def, params);
 }

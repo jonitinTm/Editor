@@ -70,6 +70,18 @@ function freezeLayer(l: PixelOwner): FrozenRef {
   return ref;
 }
 
+/** Una copia exacta de una capa (duplicar) usa la misma copia guardada en el historial que el original: no hay que
+ *  volver a copiar sus píxeles (los estados guardados no cambian nunca, se pueden compartir). Recorre grupos y máscaras. */
+export function shareFrozen(from: Layer, to: Layer) {
+  const pair = (a: PixelOwner, b: PixelOwner) => {
+    const f = frozenL.get(a);
+    if (f && f.version === a.version && a.canvas.width === b.canvas.width && a.canvas.height === b.canvas.height) { frozenL.set(b, { version: b.version, ref: f.ref }); b.dirty = null; b.pendingBefore = null; }
+  };
+  if (from instanceof RasterLayer && to instanceof RasterLayer && from.kind === to.kind && !from.isBlank()) pair(from, to);
+  if (from.mask && to.mask) pair(from.mask, to.mask);
+  if (from instanceof GroupLayer && to instanceof GroupLayer && from.children.length === to.children.length) from.children.forEach((c, i) => shareFrozen(c, to.children[i]));
+}
+
 function snapLayer(l: Layer): LayerSnap {
   const s: LayerSnap = {
     id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,

@@ -204,11 +204,12 @@ export class Viewport {
         n.width = W; n.height = H; const c = n.getContext('2d')!; c.imageSmoothingQuality = 'low'; c.drawImage(comp, 0, 0, W, H);
         m = this.mip = { doc: d, canvas: n, s, comp, rough: true };
       } else {
-      // se reconstruye entera, reduciendo a la mitad en cada paso para que quede nítida
+      // se reconstruye entera, reduciendo a la mitad en cada paso para que quede nítida (a mitad exacta, el suavizado
+      // «bajo» ya promedia 2×2 píxeles: el mismo resultado que «alto» y bastante más rápido)
       let cur: HTMLCanvasElement = comp, k = 1;
       // se parte del nivel guardado más pequeño que aún sea mayor que el pedido (menos trabajo que desde la imagen entera)
       if (!changes) for (const [ls, lv] of this.mipLevels) if (ls > s && ls < k && lv.doc === d && lv.comp === comp) { cur = lv.canvas; k = ls; }
-      while (k / 2 >= s) { k /= 2; const n = document.createElement('canvas'); n.width = Math.max(1, Math.ceil(comp.width * k)); n.height = Math.max(1, Math.ceil(comp.height * k)); const c = n.getContext('2d')!; c.imageSmoothingQuality = 'high'; c.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
+      while (k / 2 >= s) { k /= 2; const n = document.createElement('canvas'); n.width = Math.max(1, Math.ceil(comp.width * k)); n.height = Math.max(1, Math.ceil(comp.height * k)); const c = n.getContext('2d')!; c.imageSmoothingQuality = 'low'; c.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
       m = this.mip = { doc: d, canvas: cur, s, comp };
       }
     } else if (changes) {
