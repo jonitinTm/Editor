@@ -245,7 +245,11 @@ export async function savePsd(name: string) {
 
 // ---- Capas ------------------------------------------------------------------
 
-export function newLayer() { const d = doc(); if (!d) return; d.newRasterLayer(); d.commit('Nueva capa'); }
+export function newLayer() {
+  const d = doc(); if (!d) return;
+  // capa vacía: la imagen no cambia, así que no se recompone nada ni se copia en el historial
+  d.newRasterLayer().markBlank(); d.commit('Nueva capa', { x: 0, y: 0, w: 0, h: 0 });
+}
 
 export function newGroup() {
   const d = doc(); if (!d) return;

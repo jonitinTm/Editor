@@ -2,7 +2,7 @@
 
 import { isCustomBlend, drawCustomBlend } from './blend';
 import { borrowCanvas, returnCanvas, ctx2d, Rect } from './canvas';
-import { canvasBlend, GroupLayer, Layer, AdjustmentLayer, LayerStyles, hasStyles, isRaster, blendIfActive, effectiveMask } from './layers';
+import { canvasBlend, GroupLayer, Layer, RasterLayer, AdjustmentLayer, LayerStyles, hasStyles, isRaster, blendIfActive, effectiveMask } from './layers';
 import { FILTERS } from '../filters/registry';
 import { hexToRgb, makeCanvas } from './canvas';
 import { bevelLayers } from './bevel';
@@ -37,6 +37,8 @@ export function compositeGroup(group: GroupLayer, ctx: CanvasRenderingContext2D,
     while (i + 1 < ch.length && ch[i + 1].clip) clipped.push(ch[++i]);
     if (layer.clip) continue; // recortada sin base válida
     if (!layer.visible || layer.opacity <= 0) continue;
+    // capa nueva aún vacía: no aporta nada (salvo que se esté pintando en ella ahora mismo)
+    if (!clipped.length && layer instanceof RasterLayer && layer.isBlank() && !opts.overrides?.get(layer) && !hasStyles(layer.styles)) continue;
     if (layer instanceof AdjustmentLayer) {
       // varias capas de ajuste seguidas se aplican juntas (una sola tabla de color)
       const run = [layer];

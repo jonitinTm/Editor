@@ -172,12 +172,23 @@ export class Viewport {
   private mipTmp: HTMLCanvasElement | null = null;
   private bgCache: { key: string; canvas: HTMLCanvasElement } | null = null;
   private mip: { doc: object; canvas: HTMLCanvasElement; s: number; comp: HTMLCanvasElement; rough?: boolean } | null = null;
+  /** Otros niveles de reducción ya calculados (al ampliar y reducir con los dedos se pasa por ellos una y otra vez). */
+  private mipLevels = new Map<number, { doc: object; canvas: HTMLCanvasElement; comp: HTMLCanvasElement }>();
   private drawComposite(ctx: CanvasRenderingContext2D, comp: HTMLCanvasElement) {
     const d = this.doc!, eff = d.view.zoom * this.dpr;
     const changes = d.takeCompositeChanges();
     let s = 1; while (s / 2 >= eff && s > 1 / 32) s /= 2;
     if (s === 1 || comp.width * comp.height < 1.5e6) { this.mip = null; this.docImage(ctx, comp); return; }
     const W = Math.max(1, Math.ceil(comp.width * s)), H = Math.max(1, Math.ceil(comp.height * s));
+    // si la imagen ha cambiado, los niveles guardados ya no valen (el actual se pone al día más abajo)
+    if (changes) this.mipLevels.clear();
+    if (this.mip && !this.mip.rough && this.mip.s !== s) {
+      const old = this.mip; this.mipLevels.set(old.s, { doc: old.doc, canvas: old.canvas, comp: old.comp });
+      const lv = this.mipLevels.get(s);
+      if (lv && lv.doc === d && lv.comp === comp && lv.canvas.width === W && lv.canvas.height === H && !changes) { this.mip = { doc: d, canvas: lv.canvas, s, comp }; this.mipLevels.delete(s); }
+      // no se guardan más de 4 niveles
+      while (this.mipLevels.size > 4) this.mipLevels.delete(this.mipLevels.keys().next().value!);
+    }
     let m = this.mip;
     const huge = changes && (changes === true || changes.w * changes.h > comp.width * comp.height / 3);
     if (!m || huge || m.rough && !this.toolActive || m.doc !== d || m.s !== s || m.comp !== comp || m.canvas.width !== W || m.canvas.height !== H) {
@@ -190,6 +201,8 @@ export class Viewport {
       } else {
       // se reconstruye entera, reduciendo a la mitad en cada paso para que quede nítida
       let cur: HTMLCanvasElement = comp, k = 1;
+      // se parte del nivel guardado más pequeño que aún sea mayor que el pedido (menos trabajo que desde la imagen entera)
+      if (!changes) for (const [ls, lv] of this.mipLevels) if (ls > s && ls < k && lv.doc === d && lv.comp === comp) { cur = lv.canvas; k = ls; }
       while (k / 2 >= s) { k /= 2; const n = document.createElement('canvas'); n.width = Math.max(1, Math.ceil(comp.width * k)); n.height = Math.max(1, Math.ceil(comp.height * k)); const c = n.getContext('2d')!; c.imageSmoothingQuality = 'high'; c.drawImage(cur, 0, 0, n.width, n.height); cur = n; }
       m = this.mip = { doc: d, canvas: cur, s, comp };
       }

@@ -75,18 +75,24 @@ function printSim(r: number, g: number, b: number): [number, number, number] {
   lay(INK.c, C * 0.95); lay(INK.m, M * 0.95); lay(INK.y, Y); lay(INK.k, k);
   return [out[0] * 255, out[1] * 255, out[2] * 255];
 }
-const PROOF_LUT = new Uint8Array(32 * 32 * 32 * 3), GAMUT_LUT = new Uint8Array(32 * 32 * 32);
-for (let r = 0; r < 32; r++) for (let g = 0; g < 32; g++) for (let b = 0; b < 32; b++) {
-  const i = (r * 32 + g) * 32 + b, [pr, pg, pb] = printSim(r * 8.23, g * 8.23, b * 8.23);
-  PROOF_LUT[i * 3] = pr; PROOF_LUT[i * 3 + 1] = pg; PROOF_LUT[i * 3 + 2] = pb;
-  // fuera de gama: lo impreso se aleja mucho del original (en color, no en luz)
-  const dr = pr - r * 8.23, dg = pg - g * 8.23, db = pb - b * 8.23, mean = (dr + dg + db) / 3;
-  GAMUT_LUT[i] = Math.hypot(dr - mean, dg - mean, db - mean) > 28 ? 1 : 0;
+// tablas de la prueba de impresión: se calculan la primera vez que se usan (antes, al arrancar la app)
+let PROOF_LUT: Uint8Array, GAMUT_LUT: Uint8Array, lutsReady = false;
+function buildProofLuts() {
+  if (lutsReady) return; lutsReady = true;
+  PROOF_LUT = new Uint8Array(32 * 32 * 32 * 3); GAMUT_LUT = new Uint8Array(32 * 32 * 32);
+  for (let r = 0; r < 32; r++) for (let g = 0; g < 32; g++) for (let b = 0; b < 32; b++) {
+    const i = (r * 32 + g) * 32 + b, [pr, pg, pb] = printSim(r * 8.23, g * 8.23, b * 8.23);
+    PROOF_LUT[i * 3] = pr; PROOF_LUT[i * 3 + 1] = pg; PROOF_LUT[i * 3 + 2] = pb;
+    // fuera de gama: lo impreso se aleja mucho del original (en color, no en luz)
+    const dr = pr - r * 8.23, dg = pg - g * 8.23, db = pb - b * 8.23, mean = (dr + dg + db) / 3;
+    GAMUT_LUT[i] = Math.hypot(dr - mean, dg - mean, db - mean) > 28 ? 1 : 0;
+  }
 }
 function drawViewExtras(ctx: CanvasRenderingContext2D, vp: Viewport) {
   const d = app.doc; if (!d) return;
   const dpr = (vp as any).dpr ?? 1;
   if (viewOpts.proof || viewOpts.gamut) {
+    buildProofLuts();
     const pts = [vp.toScreen(0, 0), vp.toScreen(d.width, 0), vp.toScreen(0, d.height), vp.toScreen(d.width, d.height)];
     const x0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p.x)) * dpr)), y0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p.y)) * dpr));
     const x1 = Math.min(ctx.canvas.width, Math.ceil(Math.max(...pts.map(p => p.x)) * dpr)), y1 = Math.min(ctx.canvas.height, Math.ceil(Math.max(...pts.map(p => p.y)) * dpr));

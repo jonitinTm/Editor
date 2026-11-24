@@ -7,8 +7,9 @@ export interface BrushTip { id: string; name: string; canvas: HTMLCanvasElement;
 
 function seeded(seed: number) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
 function gen(name: string, size: number, draw: (c: CanvasRenderingContext2D, s: number, rnd: () => number) => void, seed = 7): BrushTip {
-  const c = makeCanvas(size, size), x = ctx2d(c); x.fillStyle = '#fff'; x.strokeStyle = '#fff';
-  draw(x, size, seeded(seed)); return { id: 'base:' + name, name, canvas: c };
+  // la imagen se genera la primera vez que se usa (antes, todas al arrancar la app)
+  let c: HTMLCanvasElement | null = null;
+  return { id: 'base:' + name, name, get canvas() { if (!c) { c = makeCanvas(size, size); const x = ctx2d(c); x.fillStyle = '#fff'; x.strokeStyle = '#fff'; draw(x, size, seeded(seed)); } return c; }, set canvas(v) { c = v; } };
 }
 const BUILTIN: BrushTip[] = [
   gen('Tiza', 128, (c, s, r) => { for (let i = 0; i < 2600; i++) { const a = r() * Math.PI * 2, d = Math.sqrt(r()) * s * 0.46; c.globalAlpha = 0.25 + r() * 0.6; c.fillRect(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, 1 + r() * 2.5, 1 + r() * 2.5); } }),

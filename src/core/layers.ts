@@ -248,6 +248,11 @@ export class RasterLayer extends Layer {
     super(name);
     this.canvas = makeCanvas(w, h);
   }
+  // Capa creada vacía a propósito («Nueva capa») y aún sin tocar: no hace falta dibujarla al combinar ni copiarla
+  // en el historial. Deja de estar vacía en cuanto se edita (touch) o se le cambia el lienzo.
+  private blankOf: HTMLCanvasElement | null = null; private blankVer = -1;
+  markBlank() { this.blankOf = this.canvas; this.blankVer = this.version; }
+  isBlank() { return this.kind === 'raster' && this.blankOf === this.canvas && this.blankVer === this.version; }
   /** Contenido con lo que haya fuera del lienzo, y su posición. */
   fullContent(): { canvas: HTMLCanvasElement; x: number; y: number } {
     if (this.full && this.full.version === this.version) return this.full;

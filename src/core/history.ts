@@ -2,7 +2,7 @@
 // Para no gastar memoria de más, una capa cuyos píxeles no han cambiado
 // reutiliza la copia del paso anterior (solo se copian las capas tocadas).
 
-import { cloneCanvas } from './canvas';
+import { cloneCanvas, makeCanvas } from './canvas';
 import { Layer, GroupLayer, RasterLayer, TextLayer, ShapeLayer, SmartLayer, SmartSource, AdjustmentLayer, LayerMask, BlendMode, isParametric } from './layers';
 import type { EditorDocument } from './document';
 
@@ -10,7 +10,7 @@ interface MaskSnap { canvas: HTMLCanvasElement; enabled: boolean; full?: boolean
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
   blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; fillOpacity?: number; link?: number | null; clip: boolean; label?: string | null;
-  canvas?: HTMLCanvasElement; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
+  canvas?: HTMLCanvasElement; /** capa nueva vacía: no se guarda su lienzo */ blank?: boolean; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
   children?: LayerSnap[]; expanded?: boolean; artboard?: any; vmask?: string; frame?: boolean;
 }
@@ -44,7 +44,7 @@ function snapLayer(l: Layer): LayerSnap {
   if (l instanceof AdjustmentLayer) s.adjust = JSON.stringify({ filterId: l.filterId, params: l.params });
   if (l instanceof GroupLayer) { s.children = l.children.map(snapLayer); s.expanded = l.expanded; s.artboard = l.artboard ? { ...l.artboard } : undefined; s.frame = l.frame; }
   else if (l instanceof RasterLayer) {
-    s.canvas = freeze(l, l.version, l.canvas);
+    if (l.isBlank()) s.blank = true; else s.canvas = freeze(l, l.version, l.canvas);
     if (isParametric(l)) s.props = JSON.parse(JSON.stringify(l.props)); // copia completa (los trazados tienen puntos anidados)
     if (l instanceof SmartLayer) s.smart = l.inner;
     const f = l.fullContent(); s.full = f.canvas !== l.canvas ? { canvas: f.canvas, x: f.x, y: f.y } : null;
@@ -87,7 +87,8 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
     else l = new AdjustmentLayer(s.name, a.filterId, a.params);
   } else {
     const f = old ? frozen.get(old) : undefined;
-    const same = old instanceof RasterLayer && old.kind === s.kind && f && f.version === old.version && f.canvas === s.canvas
+    const same = s.blank ? old instanceof RasterLayer && old.isBlank() && old.canvas.width === w && old.canvas.height === h
+      : old instanceof RasterLayer && old.kind === s.kind && f && f.version === old.version && f.canvas === s.canvas
       && old.canvas.width === w && old.canvas.height === h
       && (!isParametric(old) || JSON.stringify(old.props) === JSON.stringify(s.props))
       && (!(old instanceof SmartLayer) || old.inner === s.smart);
@@ -95,8 +96,8 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
     if (same) r = old as RasterLayer;
     else {
       r = s.kind === 'smart' ? new SmartLayer(s.name, w, h, s.smart!, s.props.m, s.props.filters ?? []) : s.kind === 'text' ? new TextLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : s.kind === 'shape' ? new ShapeLayer(s.name, w, h, JSON.parse(JSON.stringify(s.props))) : new RasterLayer(s.name, w, h);
-      if (s.kind !== 'smart') r.canvas = cloneCanvas(s.canvas!); // el objeto inteligente se redibuja desde su contenido actual
-      if (s.kind !== 'smart') frozen.set(r, { version: r.version, canvas: s.canvas! });
+      if (s.blank) r.markBlank();
+      else if (s.kind !== 'smart') { r.canvas = cloneCanvas(s.canvas!); frozen.set(r, { version: r.version, canvas: s.canvas! }); } // el objeto inteligente se redibuja desde su contenido actual
     }
     r.full = s.full ? { ...s.full, version: r.version } : null;
     l = r;
@@ -188,5 +189,8 @@ export class History {
 /** Lienzo de una capa (por id) dentro de un estado guardado, o null si no existía o no era de píxeles. */
 export function layerCanvasIn(snap: DocSnap, id: number): HTMLCanvasElement | null {
   const find = (s: LayerSnap): LayerSnap | null => { if (s.id === id) return s; for (const c of s.children ?? []) { const r = find(c); if (r) return r; } return null; };
-  return find(snap.root)?.canvas ?? null;
+  const f = find(snap.root);
+  // capa vacía (no se guardó su lienzo): uno transparente del tamaño del documento
+  if (f?.blank) return makeCanvas(snap.width, snap.height);
+  return f?.canvas ?? null;
 }

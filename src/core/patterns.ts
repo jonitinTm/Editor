@@ -7,7 +7,9 @@ import { setPatternSource } from '../filters/registry';
 export interface Pattern { id: string; name: string; canvas: HTMLCanvasElement; }
 
 function make(name: string, w: number, h: number, draw: (c: CanvasRenderingContext2D) => void): Pattern {
-  const c = makeCanvas(w, h); draw(ctx2d(c)); return { id: 'base:' + name, name, canvas: c };
+  // la imagen se genera la primera vez que se usa (antes, todas al arrancar la app)
+  let c: HTMLCanvasElement | null = null;
+  return { id: 'base:' + name, name, get canvas() { if (!c) { c = makeCanvas(w, h); draw(ctx2d(c)); } return c; }, set canvas(v) { c = v; } };
 }
 /** Ruido suave en mosaico (se repite sin costuras): base de las texturas de papel. */
 function tileNoise(n: number, cells: number, seed: number) {

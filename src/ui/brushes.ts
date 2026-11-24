@@ -68,7 +68,12 @@ function preview(b: BrushPreset, color: string, w = 150, hh = 34) {
 
 export function buildBrushesPanel(parent: HTMLElement) {
   const list = h('div', { class: 'brush-list' });
-  const render = () => {
+  // las vistas previas solo se dibujan cuando el panel está a la vista (antes, al arrancar aunque estuviera oculto)
+  let dirty = true, shown = false;
+  const render = () => { dirty = true; if (shown) paint(); };
+  new IntersectionObserver(en => { shown = en.some(e => e.isIntersecting); if (dirty && shown) paint(); }).observe(list);
+  const paint = () => {
+    dirty = false;
     list.innerHTML = '';
     const color = getComputedStyle(document.body).getPropertyValue('--text').trim() || '#ddd';
     for (const b of allBrushes()) {
