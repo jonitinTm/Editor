@@ -11,7 +11,7 @@ import * as ops from './ops';
 import { lazyModule } from './lazy';
 type DlgMod = typeof import('./dialogs');
 let dlgMod: DlgMod | null = null;
-export const loadDialogs = () => import('./dialogs').then(m => (dlgMod = m));
+export const loadDialogs = () => Promise.all([import('./dialogs'), import('../filters/registry').then(r => r.loadFilterImpls()), ops.preloadFilterWorker()]).then(([m]) => (dlgMod = m));
 const dlg = new Proxy({} as DlgMod, { get: (_t, k: string) => (...a: any[]) => dlgMod ? (dlgMod as any)[k](...a) : loadDialogs().then(m => (m as any)[k](...a)) });
 import * as cmpv from './compare';
 const uniq = lazyModule(() => import('./unique'));

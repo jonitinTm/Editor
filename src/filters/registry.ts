@@ -7,12 +7,14 @@ import * as F from './advanced';
 import { develop, DEVELOP_DEFAULTS } from './develop';
 import * as M from './more';
 import * as L from './lut';
-import * as N from './more2';
-import * as R from './artistic';
 import * as MD from './modes';
-import * as R2 from './render2';
-import * as G from './gallery';
-import * as RT from './retouch';
+// Filtros de efectos (artísticos, galería, interpretar, más…): no hacen falta para arrancar ni para las capas de
+// ajuste; se cargan al abrir o aplicar un filtro, o en segundo plano cuando la app está libre.
+let N!: typeof import('./more2'), R!: typeof import('./artistic'), R2!: typeof import('./render2'), G!: typeof import('./gallery'), RT!: typeof import('./retouch');
+export const filterImplsReady = () => !!G;
+/** Los pone loadimpls.ts (en la app, al usarlos) o el hilo de fondo de los filtros (directamente). */
+export function setFilterImpls(m: { N: typeof N; R: typeof R; R2: typeof R2; G: typeof G; RT: typeof RT }) { N = m.N; R = m.R; R2 = m.R2; G = m.G; RT = m.RT; }
+export { loadFilterImpls } from './loadimpls';
 import { indexColors } from './indexed';
 import { matchColor } from './matchcolor';
 import { colorGrade } from './colorgrade';

@@ -11,13 +11,12 @@ import { cloneCanvas, ctx2d, makeCanvas, contentBounds, getPixels, putPixels, ca
 import { compositeGroup, composeStyled } from '../core/compositor';
 import { hasStyles, canvasBlend, tracePath } from '../core/layers';
 import { getPaintTarget, setTargetCanvas, setPreview, PaintTarget, rasterizeLayer, clipMask } from '../tools/paint';
-import { FilterDef, defaultParams } from '../filters/registry';
+import { FilterDef, defaultParams , loadFilterImpls } from '../filters/registry';
 import * as io from '../io/files';
 // el lector y escritor de PSD se cargan al usarlos (no al abrir la app)
 const psdMod = () => import('../io/psd');
 import { heal, findSource } from '../filters/heal';
 import { computeFilter } from '../filters/compute';
-import FilterWorker from '../filters/worker?worker&inline';
 import { record } from './macros';
 import { snapshot, restore } from '../core/history';
 import { FILTERS } from '../filters/registry';
@@ -1103,9 +1102,15 @@ export function transformImage(kind: 'rot90' | 'rot-90' | 'rot180' | 'flipH' | '
 
 /** Aplica un filtro con vista previa; respeta la selección y funciona también sobre máscaras. */
 let filterWorker: Worker | null | undefined;
+// el código del hilo de fondo (todos los filtros) se carga al usarlo, no al abrir la app
+let FilterWorkerCtor: (new () => Worker) | null = null, fwP: Promise<void> | null = null;
+export const filterWorkerReady = () => !!FilterWorkerCtor || fwDone;
+let fwDone = false;
+export function preloadFilterWorker(): Promise<void> { return fwP ??= import('../filters/worker?worker&inline').then(m => { FilterWorkerCtor = m.default; }).catch(() => {}).finally(() => { fwDone = true; }); }
 function getFilterWorker(): Worker | null {
   if (filterWorker !== undefined) return filterWorker;
-  try { filterWorker = new FilterWorker(); } catch { filterWorker = null; }
+  if (!FilterWorkerCtor) { preloadFilterWorker(); return null; } // aún no está: esta vez se calcula aquí
+  try { filterWorker = new FilterWorkerCtor(); } catch { filterWorker = null; }
   return filterWorker;
 }
 let sessionSeq = 0;
@@ -1239,6 +1244,7 @@ export let lastFilter: { def: FilterDef; params: any } | null = null;
 export function setLastFilter(def: FilterDef, params: any) { if (def.group === 'filtro') lastFilter = { def, params }; }
 
 export async function applyFilterDirect(def: FilterDef, params: any = {}) {
+  await loadFilterImpls();
   record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') });
   const a = doc()?.active;
   if (a instanceof SmartLayer && !doc()!.editMask) { new SmartFilterSession(a, def).commit(params); setLastFilter(def, params); return; }

@@ -6,7 +6,7 @@ import { h, numberSlider } from './dom';
 import { showDialog, row, promptDialog } from './dialog';
 import * as ops from './ops';
 import * as io from '../io/files';
-import { FilterDef, defaultParams } from '../filters/registry';
+import { FilterDef, defaultParams, filterImplsReady, loadFilterImpls } from '../filters/registry';
 import { histogram, curveLut, levelsLut, CurvePoint } from '../filters/adjustments';
 import { SmartLayer, TextLayer, blendIfActive, type LayerStyles } from '../core/layers';
 import { WARP_STYLES } from '../tools/warpmesh';
@@ -356,7 +356,9 @@ export function modifySelectionDialog(kind: 'feather' | 'expand' | 'contract' | 
 
 // ---- Filtros genéricos ----------------------------------------------------------------
 
-export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: number }, initial?: any) {
+export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: number }, initial?: any): void {
+  // los filtros de efectos se cargan al usarlos (casi siempre ya están: se cargan en segundo plano al arrancar)
+  if (!filterImplsReady() || !ops.filterWorkerReady()) { Promise.all([loadFilterImpls(), ops.preloadFilterWorker()]).then(() => filterDialog(def, edit, initial)); return; }
   if (!def.params && !def.custom) { ops.applyFilterDirect(def); return; }
   const active = app.doc?.active;
   // En objetos inteligentes el filtro queda como filtro inteligente (editable)
@@ -1061,6 +1063,7 @@ export function duplicateToDialog() {
 // ---- Galería de filtros ------------------------------------------------------------------------
 /** Miniaturas de la imagen con cada filtro artístico: clic para abrirlo con sus opciones. */
 export async function filterGalleryDialog() {
+  if (!filterImplsReady()) { loadFilterImpls().then(() => filterGalleryDialog()); return; }
   const d = app.doc; if (!d) return;
   const { FILTERS } = await import('../filters/registry');
   const groups = ['Artístico', 'Trazos de pincel', 'Bosquejar', 'Textura', 'Distorsionar', 'Estilizar'];

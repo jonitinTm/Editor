@@ -5,7 +5,10 @@ import { t, tName } from '../i18n/i18n';
 
 import { isCustomBlend } from './blend';
 import { makeCanvas, ctx2d, clearCanvas, Rect } from './canvas';
-import { FILTERS } from '../filters/registry';
+import { FILTERS, filterImplsReady, loadFilterImpls } from '../filters/registry';
+/** Lo pone la app: redibuja tras cargar filtros que faltaban. */
+export let smartFilterRedraw: (() => void) | null = null;
+export const setSmartFilterRedraw = (f: () => void) => { smartFilterRedraw = f; };
 import { drawMeshExact, styledMesh } from '../tools/warpmesh';
 import { ensureFont, needsDownload } from './fonts';
 import { customShapePath } from './customshapes';
@@ -754,8 +757,10 @@ export class SmartLayer extends RasterLayer {
     const r: Rect = { x: Math.max(0, Math.floor(Math.min(...xs)) - pad), y: Math.max(0, Math.floor(Math.min(...ys)) - pad), w: 0, h: 0 };
     r.w = Math.min(W, Math.ceil(Math.max(...xs)) + pad) - r.x; r.h = Math.min(H, Math.ceil(Math.max(...ys)) + pad) - r.y;
     if (r.w < 1 || r.h < 1) return;
+    // los filtros de efectos se cargan al usarlos: si aún no están, se piden y se vuelve a dibujar al llegar
+    if (!filterImplsReady()) { loadFilterImpls().then(() => { this.render(); smartFilterRedraw?.(); }); }
     const ctx = ctx2d(this.canvas), img = ctx.getImageData(r.x, r.y, r.w, r.h);
-    for (const f of list) FILTERS.find(d => d.id === f.id)?.apply(img, f.params);
+    for (const f of list) { try { FILTERS.find(d => d.id === f.id)?.apply(img, f.params); } catch (e) { if (filterImplsReady()) throw e; } }
     ctx.putImageData(img, r.x, r.y);
   }
 }

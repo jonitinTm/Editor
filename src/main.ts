@@ -19,6 +19,7 @@ import { buildOptionsBar } from './ui/optionsbar';
 import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel, buildColorPanel, buildSwatchesPanel } from './ui/panels';
 import { ACTIONS, loadDialogs } from './ui/actions';
 import { lazyModule } from './ui/lazy';
+import { setSmartFilterRedraw } from './core/layers';
 import * as ops from './ui/ops';
 import { buildAdjustmentsPanel } from './ui/adjpanel';
 import { dialogOpen } from './ui/dialog';
@@ -36,7 +37,7 @@ import { VanishingTool } from './ui/more3';
 import { AISelectTool } from './ai/aitools';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
-(app as any).debug = { filters: () => import('./filters/registry'), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS };
+(app as any).debug = { filters: () => import('./filters/registry').then(async r => { await r.loadFilterImpls(); return r; }), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS };
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';
@@ -524,3 +525,5 @@ window.addEventListener('unhandledrejection', e => { const r = e.reason; if (r?.
 // Con la app ya abierta y libre, se cargan en segundo plano las ventanas: así abrir la primera es inmediato
 // sin retrasar el arranque.
 { const idle = (window as any).requestIdleCallback ?? ((f: () => void) => setTimeout(f, 1500)); setTimeout(() => idle(() => { loadDialogs(); }, { timeout: 4000 }), 1200); }
+// los filtros inteligentes que se dibujaron antes de cargar los filtros de efectos se vuelven a dibujar
+setSmartFilterRedraw(() => { app.doc?.invalidate(); app.viewport?.requestRender(); });

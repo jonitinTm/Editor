@@ -1,6 +1,13 @@
 // Hilo de fondo para los filtros: así la ventana sigue respondiendo mientras calcula.
 
-import { FILTERS } from './registry';
+import { FILTERS, setFilterImpls } from './registry';
+import * as N from './more2';
+import * as R from './artistic';
+import * as R2 from './render2';
+import * as G from './gallery';
+import * as RT from './retouch';
+// en el hilo de fondo los filtros de efectos van incluidos (no retrasan el arranque de la app)
+setFilterImpls({ N, R, R2, G, RT });
 import { computeFilter } from './compute';
 
 interface Session { orig: ImageData; sel: Uint8ClampedArray | null; filterId: string; isMask: boolean; lockAlpha: boolean; }
