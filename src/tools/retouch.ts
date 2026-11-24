@@ -114,7 +114,7 @@ class RetouchTool implements Tool {
   up() {
     const t = this.t; if (!t || !this.work) return;
     setPreview(t, null);
-    if (this.changed) { setTargetCanvas(t, this.work); app.doc!.commit(this.name); }
+    if (this.changed) { const z = setTargetCanvas(t, this.work, 'auto'); app.doc!.commit(this.name, z); }
     this.t = null; this.work = null; this.last = null;
   }
   cancel() { if (this.t) setPreview(this.t, null); this.t = null; this.work = null; app.doc?.invalidate(); }

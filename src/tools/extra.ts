@@ -28,7 +28,7 @@ export class MagicEraserTool implements Tool {
     const sel = app.doc!.selection.mask;
     if (sel) { const m = ctx2d(res.canvas); m.globalCompositeOperation = 'destination-in'; m.drawImage(sel, 0, 0); }
     c.globalAlpha = app.opt<number>('opacity', this.id) / 100; c.globalCompositeOperation = 'destination-out'; c.drawImage(res.canvas, 0, 0);
-    setTargetCanvas(t, out); app.doc!.commit(this.name);
+    const z = setTargetCanvas(t, out, res.bounds ?? 'auto'); app.doc!.commit(this.name, z);
   }
 }
 
@@ -83,7 +83,7 @@ export class BackgroundEraserTool implements Tool {
   up() {
     const t = this.t; if (!t || !this.work) return;
     setPreview(t, null);
-    if (this.changed) { setTargetCanvas(t, this.work); app.doc!.commit(this.name); }
+    if (this.changed) { const z = setTargetCanvas(t, this.work, 'auto'); app.doc!.commit(this.name, z); }
     this.t = null; this.work = null; this.last = null;
   }
   cancel() { if (this.t) setPreview(this.t, null); this.t = null; this.work = null; app.doc?.invalidate(); }
@@ -127,7 +127,7 @@ export class RedEyeTool implements Tool {
     }
     if (!n2) { app.toast('No se ha encontrado rojo en esa zona', 'warn'); return; }
     c.putImageData(img, x0, y0);
-    setTargetCanvas(t, out); d.commit(this.name);
+    const z = setTargetCanvas(t, out, 'auto'); d.commit(this.name, z);
   }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
     if (!this.start || !this.now) return;

@@ -120,7 +120,7 @@ export class PatchTool extends LassoDragTool {
     const d = app.doc!, sel = d.selection, b = sel.bounds!, out = cloneCanvas(t.canvas), adapt = !!app.opt('adapt', this.id);
     if (app.opt('mode', this.id) === 'source') patchInto(out, t.canvas, softMask(sel.mask!), { x: b.x - 2, y: b.y - 2, w: b.w + 4, h: b.h + 4 }, dx, dy, adapt);
     else patchInto(out, t.canvas, softMask(sel.mask!, dx, dy), { x: b.x + dx - 2, y: b.y + dy - 2, w: b.w + 4, h: b.h + 4 }, -dx, -dy, adapt);
-    setTargetCanvas(t, out); d.commit('Parche');
+    const z = setTargetCanvas(t, out, 'auto'); d.commit('Parche', z);
   }
 }
 
@@ -159,7 +159,7 @@ export class ContentMoveTool extends LassoDragTool {
     const sd = sx.getImageData(0, 0, src.width, src.height); for (let i = 3; i < sd.data.length; i += 4) sd.data[i] = Math.max(0, Math.min(255, (sd.data[i] - 200) * 255 / 55)); sx.putImageData(sd, 0, 0);
     cx.drawImage(shrink, 0, 0);
     ctx2d(blended).drawImage(core, 0, 0);
-    setTargetCanvas(t, blended);
+    setTargetCanvas(t, blended, 'auto');
     sel.setMask(dest);
     d.commit(this.name);
   }

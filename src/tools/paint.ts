@@ -64,11 +64,27 @@ export function touchTarget(t: PaintTarget) {
 
 /** Sustituye el contenido del objetivo por un lienzo nuevo. Si se sabe que el lienzo nuevo solo difiere del
  *  anterior dentro de `region` (un relleno, un filtro con selección…), el historial guarda solo esa zona. */
-export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement, region?: Rect | null) {
+/** Rectángulo donde dos lienzos del mismo tamaño se diferencian (null si son iguales). Para herramientas de retoque
+ *  cuyo resultado puede salirse un poco de lo pintado (quitar con IA, parche…): así el historial guarda solo eso. */
+export function diffBounds(a: HTMLCanvasElement, b: HTMLCanvasElement): Rect | null {
+  const W = a.width, H = a.height;
+  const A = new Uint32Array(ctx2d(a).getImageData(0, 0, W, H).data.buffer), B = new Uint32Array(ctx2d(b).getImageData(0, 0, W, H).data.buffer);
+  let y0 = -1, y1 = -1;
+  for (let y = 0; y < H && y0 < 0; y++) for (let i = y * W, e = i + W; i < e; i++) if (A[i] !== B[i]) { y0 = y; break; }
+  if (y0 < 0) return null;
+  for (let y = H - 1; y >= y0 && y1 < 0; y--) for (let i = y * W, e = i + W; i < e; i++) if (A[i] !== B[i]) { y1 = y; break; }
+  let x0 = W, x1 = -1;
+  for (let y = y0; y <= y1; y++) { const r = y * W; for (let x = 0; x < x0; x++) if (A[r + x] !== B[r + x]) { x0 = x; break; } for (let x = W - 1; x > x1; x--) if (A[r + x] !== B[r + x]) { x1 = x; break; } }
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+
+/** Devuelve la zona cambiada si se conoce (para pasársela a commit y recomponer solo eso). */
+export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement, region?: Rect | null | 'auto'): Rect | undefined {
   // el lienzo pasa a ser el de la capa: se deja su estado de dibujo como nuevo (modo normal, opacidad 1)
   { const x = ctx2d(c); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none'; x.setTransform(1, 0, 0, 1, 0, 0); }
-  if (t.quick) { app.doc!.selection.setMask(c); t.canvas = app.doc!.selection.mask ?? c; return; }
+  if (t.quick) { app.doc!.selection.setMask(c); t.canvas = app.doc!.selection.mask ?? c; return undefined; }
   const owner = t.isMask ? t.layer.mask! : t.layer instanceof RasterLayer ? t.layer : null, old = owner?.canvas;
+  if (region === 'auto') region = old && old !== c && old.width === c.width && old.height === c.height ? diffBounds(old, c) ?? { x: 0, y: 0, w: 0, h: 0 } : null;
   let r: Rect | null = null, before: HTMLCanvasElement | undefined;
   if (region && owner && old && old.width === c.width && old.height === c.height) {
     const x0 = Math.max(0, Math.floor(region.x)), y0 = Math.max(0, Math.floor(region.y)), x1 = Math.min(c.width, Math.ceil(region.x + region.w)), y1 = Math.min(c.height, Math.ceil(region.y + region.h));
@@ -77,7 +93,9 @@ export function setTargetCanvas(t: PaintTarget, c: HTMLCanvasElement, region?: R
   }
   if (t.isMask) t.layer.mask!.canvas = c; else (t.layer as RasterLayer).canvas = c;
   t.canvas = c;
-  if (r && owner && r.w > 0) owner.touchRect(r, before); else touchTarget(t);
+  if (r && owner && r.w > 0) { owner.touchRect(r, before); return r; }
+  touchTarget(t);
+  return r && r.w === 0 ? r : undefined;
 }
 
 /** Aplica la previsualización temporal al compositor. */

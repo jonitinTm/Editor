@@ -664,8 +664,8 @@ export function strokeSelection(width: number, pos: 'center' | 'inside' | 'outsi
   lc.stroke(outline);
   if (pos !== 'center') { lc.globalCompositeOperation = pos === 'inside' ? 'destination-in' : 'destination-out'; lc.drawImage(sel, 0, 0); }
   const out = cloneCanvas(t.canvas); ctx2d(out).drawImage(line, 0, 0);
-  setTargetCanvas(t, out);
-  d.commit('Contornear');
+  const z = setTargetCanvas(t, out, 'auto');
+  d.commit('Contornear', z);
 }
 
 /** Selecciona los píxeles de la imagen parecidos al color frontal. */
@@ -769,8 +769,8 @@ export function distributeLayers(mode: 'left' | 'hcenter' | 'right' | 'top' | 'v
  */
 export function healHole(t: PaintTarget, holeCanvas: HTMLCanvasElement, box: Rect, name: string) {
   const out = healCanvas(t.canvas, holeCanvas, box); if (!out) return;
-  setTargetCanvas(t, out);
-  doc()!.commit(name);
+  const z = setTargetCanvas(t, out, 'auto');
+  doc()!.commit(name, z);
 }
 
 /** Rellena el hueco (alfa de `holeCanvas`, dentro de `box`) con textura del entorno; devuelve el lienzo nuevo. */
@@ -802,7 +802,7 @@ export async function aiContentFill() {
   const { aiInpaint } = await import('../ai/ai');
   const out = await aiInpaint(t.canvas, hole, { x: b.x - 3, y: b.y - 3, w: b.w + 6, h: b.h + 6 });
   if (!out) { contentAwareFill(); return; }
-  setTargetCanvas(t, out); d.commit('Borrar con IA');
+  const z = setTargetCanvas(t, out, 'auto'); d.commit('Borrar con IA', z);
 }
 export function contentAwareFill() {
   const d = doc(); if (!d || !d.selection.mask || !d.selection.bounds) { app.toast('Haz primero una selección', 'warn'); return; }
@@ -815,7 +815,7 @@ export function contentAwareFill() {
   const box = { x: Math.max(0, b.x - 3), y: Math.max(0, b.y - 3), w: b.w + 6, h: b.h + 6 };
   if (b.w * b.h > 2500 * 2500) { healHole(t, hole, box, 'Rellenar según contenido'); return; }
   app.toast('Rellenando…');
-  inpaintCanvas(t.canvas, hole, box).then(out => { if (!out) return; setTargetCanvas(t, out); d.commit('Rellenar según contenido'); });
+  inpaintCanvas(t.canvas, hole, box).then(out => { if (!out) return; const z = setTargetCanvas(t, out, 'auto'); d.commit('Rellenar según contenido', z); });
 }
 
 // ---- Canales alfa -----------------------------------------------------------------------
@@ -1015,7 +1015,7 @@ export function layerVia(cutting: boolean) {
     const t = getPaintTarget(); if (!t || t.isMask) return;
     const out = cloneCanvas(t.canvas); const c = ctx2d(out);
     c.globalCompositeOperation = 'destination-out'; c.drawImage(d.selection.mask!, 0, 0);
-    setTargetCanvas(t, out);
+    setTargetCanvas(t, out, d.selection.bounds);
   }
   const l = new RasterLayer(d.nextLayerName(), d.width, d.height);
   ctx2d(l.canvas).drawImage(p.canvas, p.rect.x, p.rect.y);
@@ -1464,7 +1464,7 @@ export function fillDocPath(i: number) {
   const out = cloneCanvas(t.canvas), c = ctx2d(out);
   if (t.lockAlpha) c.globalCompositeOperation = 'source-atop';
   c.fillStyle = t.isMask ? '#fff' : app.fg; tracePathDoc(c, p); c.fill('evenodd');
-  setTargetCanvas(t, out); d.commit('Rellenar trazado');
+  const z = setTargetCanvas(t, out, 'auto'); d.commit('Rellenar trazado', z);
 }
 export function strokeDocPath(i: number) {
   const d = doc(); const p = d?.paths[i]; if (!d || !p) return;
@@ -1474,7 +1474,7 @@ export function strokeDocPath(i: number) {
   // contornea con el color frontal y el tamaño del pincel
   c.strokeStyle = t.isMask ? '#fff' : app.fg; c.lineWidth = Math.max(1, app.opt<number>('size', 'brush') ?? 3); c.lineCap = 'round'; c.lineJoin = 'round';
   tracePathDoc(c, p); c.stroke();
-  setTargetCanvas(t, out); d.commit('Contornear trazado');
+  const z = setTargetCanvas(t, out, 'auto'); d.commit('Contornear trazado', z);
 }
 export function docPathToSelection(i: number) {
   const d = doc(); const p = d?.paths[i]; if (!d || !p) return;

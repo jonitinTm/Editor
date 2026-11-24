@@ -666,7 +666,7 @@ export class SpotHealTool implements Tool {
     const { inpaintCanvas } = await import('../ui/ops');
     const out = await inpaintCanvas(t.canvas, g, { x: box.x - 2, y: box.y - 2, w: box.w + 4, h: box.h + 4 });
     if (!out) { healHole(t, hole, box, 'Pincel corrector puntual'); return; }
-    const { setTargetCanvas } = await import('./paint'); setTargetCanvas(t, out); app.doc!.commit('Pincel corrector puntual');
+    const { setTargetCanvas } = await import('./paint'); const z = setTargetCanvas(t, out, 'auto'); app.doc!.commit('Pincel corrector puntual', z);
   }
   cancel() { this.t = null; this.hole = null; this.box = null; }
   drawOverlay(ctx: CanvasRenderingContext2D, vp: Viewport) {
@@ -793,7 +793,7 @@ export class RemoveTool extends SpotHealTool {
       out = await inpaintCanvas(t.canvas, g, bx);
     }
     if (!out) return;
-    const { setTargetCanvas } = await import('./paint'); setTargetCanvas(t, out); d.commit('Quitar');
+    const { setTargetCanvas } = await import('./paint'); const z = setTargetCanvas(t, out, 'auto'); d.commit('Quitar', z);
   }
 }
 
