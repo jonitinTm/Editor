@@ -72,9 +72,9 @@ export const TEMPLATES: Template[] = [
   { id: 'sale', name: 'Oferta (Instagram)', desc: '1080 × 1080', w: 1080, h: 1080, build: d => {
     d.root.add(fillBg(d, (x, W, H) => lin(x, W, H, ['#ff5f6d', '#ffc371'])));
     d.root.add(frame(d, 'Foto del producto', { x: 540, y: 140, w: 470, h: 620 }, 'rect', 36));
-    d.root.add(text(d, 'OFERTA', 70, 150, { size: 140, bold: true, color: '#ffffff', font: 'Anton', tracking: 20 }, { shadow: { enabled: true, color: '#7a1020', opacity: 0.35, angle: 120, distance: 8, blur: 12 } }));
+    d.root.add(text(d, 'OFERTA', 70, 150, { size: 140, bold: true, color: '#ffffff', font: 'Anton', tracking: 20 }, { shadow: { enabled: true, color: '#7a1020', opacity: 35, angle: 120, distance: 8, blur: 12 } }));
     d.root.add(text(d, 'en toda la\ncolección', 75, 360, { size: 58, color: '#ffffff', bold: true, lineHeight: 1.1 }));
-    d.root.add(shape(d, 'Insignia', { shape: 'star', sides: 16, inner: 0.85, x0: 70, y0: 560, x1: 380, y1: 870, fill: '#ffffff' }, { shadow: { enabled: true, color: '#000000', opacity: 0.2, angle: 120, distance: 10, blur: 18 } }));
+    d.root.add(shape(d, 'Insignia', { shape: 'star', sides: 16, inner: 0.85, x0: 70, y0: 560, x1: 380, y1: 870, fill: '#ffffff' }, { shadow: { enabled: true, color: '#000000', opacity: 20, angle: 120, distance: 10, blur: 18 } }));
     d.root.add(text(d, '-30%', 75, 664, { size: 92, bold: true, color: '#ff5f6d', font: 'Anton', boxWidth: 300, align: 'center' }));
     d.root.add(text(d, 'Solo esta semana · tutienda.com', 70, 960, { size: 40, color: '#ffffff' }));
   } },
@@ -88,7 +88,7 @@ export const TEMPLATES: Template[] = [
   { id: 'youtube', name: 'Miniatura de YouTube', desc: '1280 × 720', w: 1280, h: 720, build: d => {
     d.root.add(fillBg(d, (x, W, H) => lin(x, W, H, ['#1e1e2f', '#3a1c71'])));
     d.root.add(frame(d, 'Foto (persona o tema)', { x: 690, y: 0, w: 590, h: 720 }));
-    d.root.add(text(d, 'CÓMO LO\nHICE EN\n7 DÍAS', 60, 80, { size: 140, bold: true, font: 'Anton', color: '#ffffff', lineHeight: 0.98 }, { stroke: { enabled: true, color: '#000000', size: 10, position: 'outside' }, shadow: { enabled: true, color: '#000000', opacity: 0.6, angle: 120, distance: 12, blur: 6 } }));
+    d.root.add(text(d, 'CÓMO LO\nHICE EN\n7 DÍAS', 60, 80, { size: 140, bold: true, font: 'Anton', color: '#ffffff', lineHeight: 0.98 }, { stroke: { enabled: true, color: '#000000', size: 10, position: 'outside' }, shadow: { enabled: true, color: '#000000', opacity: 60, angle: 120, distance: 12, blur: 6 } }));
     d.root.add(shape(d, 'Flecha', { shape: 'arrow', x0: 520, y0: 560, x1: 700, y1: 470, fill: '#ffd400', strokeWidth: 30 }, { stroke: { enabled: true, color: '#000000', size: 6, position: 'outside' } }));
   } },
   { id: 'invite', name: 'Invitación', desc: '1080 × 1350', w: 1080, h: 1350, build: d => {
@@ -215,15 +215,15 @@ export async function makeCollage(files: File[], size: string, dist: string, gap
 // ---- Efectos de texto ------------------------------------------------------------------------------------------
 type TextFx = { name: string; color?: string; styles: (size: number) => LayerStyles; fill?: number };
 export const TEXT_FX: TextFx[] = [
-  { name: 'Neón', color: '#ffffff', styles: s => ({ glow: { enabled: true, color: '#ff2bd6', opacity: 0.9, size: Math.max(8, s * 0.35), spread: 10 }, stroke: { enabled: true, color: '#ff7be8', size: Math.max(2, s * 0.03), position: 'outside' } }) },
-  { name: '3D', color: '#ffcc00', styles: s => ({ shadow: { enabled: true, color: '#b35900', opacity: 1, angle: 135, distance: Math.max(4, s * 0.12), blur: 0 }, stroke: { enabled: true, color: '#7a3d00', size: Math.max(1, s * 0.02), position: 'outside' } }) },
+  { name: 'Neón', color: '#ffffff', styles: s => ({ glow: { enabled: true, color: '#ff2bd6', opacity: 90, size: Math.max(8, s * 0.35), spread: 10 }, stroke: { enabled: true, color: '#ff7be8', size: Math.max(2, s * 0.03), position: 'outside' } }) },
+  { name: '3D', color: '#ffcc00', styles: s => ({ shadow: { enabled: true, color: '#b35900', opacity: 100, angle: 135, distance: Math.max(4, s * 0.12), blur: 0 }, stroke: { enabled: true, color: '#7a3d00', size: Math.max(1, s * 0.02), position: 'outside' } }) },
   { name: 'Contorno', color: '#ffffff', fill: 0, styles: s => ({ stroke: { enabled: true, color: '#111111', size: Math.max(2, s * 0.04), position: 'outside' } }) },
-  { name: 'Retro', color: '#ff5470', styles: s => ({ stroke: { enabled: true, color: '#1b1b3a', size: Math.max(2, s * 0.05), position: 'outside' }, shadow: { enabled: true, color: '#00c2d1', opacity: 1, angle: 135, distance: Math.max(4, s * 0.1), blur: 0 } }) },
-  { name: 'Dorado', color: '#d4a017', styles: s => ({ gradientOverlay: { enabled: true, opacity: 1, angle: 90, stops: [[0, '#fff2a8'], [0.45, '#d4a017'], [0.55, '#9c6b00'], [1, '#ffe27a']] }, bevel: { ...BEVEL_DEFAULT, enabled: true, size: Math.max(2, s * 0.06), depth: 120 }, shadow: { enabled: true, color: '#000000', opacity: 0.45, angle: 120, distance: Math.max(2, s * 0.05), blur: Math.max(2, s * 0.08) } }) },
-  { name: 'Pegatina', color: '#111111', styles: s => ({ stroke: { enabled: true, color: '#ffffff', size: Math.max(4, s * 0.12), position: 'outside' }, shadow: { enabled: true, color: '#000000', opacity: 0.35, angle: 120, distance: Math.max(2, s * 0.05), blur: Math.max(3, s * 0.1) } }) },
-  { name: 'Cromado', color: '#cccccc', styles: s => ({ gradientOverlay: { enabled: true, opacity: 1, angle: 90, stops: [[0, '#ffffff'], [0.48, '#9aa4ad'], [0.52, '#3b4249'], [1, '#e8eef2']] }, bevel: { ...BEVEL_DEFAULT, enabled: true, size: Math.max(2, s * 0.05) }, stroke: { enabled: true, color: '#2b2f33', size: Math.max(1, s * 0.02), position: 'outside' } }) },
-  { name: 'Fuego', color: '#ffb000', styles: s => ({ gradientOverlay: { enabled: true, opacity: 1, angle: 90, stops: [[0, '#fff3a0'], [0.5, '#ff8a00'], [1, '#d60000']] }, glow: { enabled: true, color: '#ff4500', opacity: 0.8, size: Math.max(6, s * 0.3) } }) },
-  { name: 'Sombra suave', styles: s => ({ shadow: { enabled: true, color: '#000000', opacity: 0.35, angle: 120, distance: Math.max(2, s * 0.06), blur: Math.max(4, s * 0.18) } }) },
+  { name: 'Retro', color: '#ff5470', styles: s => ({ stroke: { enabled: true, color: '#1b1b3a', size: Math.max(2, s * 0.05), position: 'outside' }, shadow: { enabled: true, color: '#00c2d1', opacity: 100, angle: 135, distance: Math.max(4, s * 0.1), blur: 0 } }) },
+  { name: 'Dorado', color: '#d4a017', styles: s => ({ gradientOverlay: { enabled: true, opacity: 100, angle: 90, stops: [[0, '#fff2a8'], [0.45, '#d4a017'], [0.55, '#9c6b00'], [1, '#ffe27a']] }, bevel: { ...BEVEL_DEFAULT, enabled: true, size: Math.max(2, s * 0.06), depth: 120 }, shadow: { enabled: true, color: '#000000', opacity: 45, angle: 120, distance: Math.max(2, s * 0.05), blur: Math.max(2, s * 0.08) } }) },
+  { name: 'Pegatina', color: '#111111', styles: s => ({ stroke: { enabled: true, color: '#ffffff', size: Math.max(4, s * 0.12), position: 'outside' }, shadow: { enabled: true, color: '#000000', opacity: 35, angle: 120, distance: Math.max(2, s * 0.05), blur: Math.max(3, s * 0.1) } }) },
+  { name: 'Cromado', color: '#cccccc', styles: s => ({ gradientOverlay: { enabled: true, opacity: 100, angle: 90, stops: [[0, '#ffffff'], [0.48, '#9aa4ad'], [0.52, '#3b4249'], [1, '#e8eef2']] }, bevel: { ...BEVEL_DEFAULT, enabled: true, size: Math.max(2, s * 0.05) }, stroke: { enabled: true, color: '#2b2f33', size: Math.max(1, s * 0.02), position: 'outside' } }) },
+  { name: 'Fuego', color: '#ffb000', styles: s => ({ gradientOverlay: { enabled: true, opacity: 100, angle: 90, stops: [[0, '#fff3a0'], [0.5, '#ff8a00'], [1, '#d60000']] }, glow: { enabled: true, color: '#ff4500', opacity: 80, size: Math.max(6, s * 0.3) } }) },
+  { name: 'Sombra suave', styles: s => ({ shadow: { enabled: true, color: '#000000', opacity: 35, angle: 120, distance: Math.max(2, s * 0.06), blur: Math.max(4, s * 0.18) } }) },
   { name: 'Sin efecto', styles: () => ({}) },
 ];
 export function textEffectsDialog() {

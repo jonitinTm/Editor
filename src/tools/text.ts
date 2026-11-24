@@ -90,6 +90,9 @@ export class TextTool implements Tool {
       setTimeout(() => { area.focus(); area.setSelectionRange(a, b); }, 0);
       return;
     }
+    // Texto de punto (sin caja): al cambiar el tamaño, la línea base (donde se hizo clic)
+    // se queda en su sitio, como en Photoshop; si no, el texto crecería hacia abajo y se movería
+    if ('size' in changed && !p.boxWidth && !p.vertical && !p.onPath && !p.area?.length && prev.size > 0) p.y = Math.round(p.y + (prev.size - now.size) * 0.6);
     // Sin selección: se aplica a todo el texto (y deja de ser excepción en los trozos que lo tuvieran)
     if (p.runs?.length) { const keys = Object.keys(changed) as (keyof RunStyle)[]; p.runs = normalizeRuns(p.runs.map(r => { const c = { ...r }; for (const k of keys) delete (c as any)[k]; return c; }), p.text.length); }
     // solo lo que ha cambiado (el color, por ejemplo, avisa dos veces y no debe pisar nada la segunda)
