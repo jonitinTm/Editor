@@ -197,8 +197,12 @@ function dilated(src: HTMLCanvasElement, ox: number, oy: number, r: number, w: n
 }
 
 /** Dibuja los efectos de estilo de `src` (sin la propia capa). Sirve también para exportar. */
-export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null, knock = false) {
+export function renderStyles(out: CanvasRenderingContext2D, src: HTMLCanvasElement, st: LayerStyles, ox: number, oy: number, w: number, h: number, bl?: { hi: HTMLCanvasElement; sh: HTMLCanvasElement } | null, knock = false) {
   const FAR = w + 4096; // la imagen se dibuja fuera y solo su "sombra" cae dentro del lienzo
+  // con el relleno bajado, la sombra y el resplandor exterior no deben verse a través de la forma (en Photoshop, «la
+  // capa cubre la sombra paralela»): se dibujan aparte y se les quita la silueta de la capa
+  const sep = knock && !!(st.shadow?.enabled || st.glow?.enabled), tmp = sep ? borrowCanvas(w, h) : null;
+  let ctx = tmp ? ctx2d(tmp) : out;
   const cast = (color: string, blur: number, dx: number, dy: number, times = 1) => {
     ctx.save();
     ctx.shadowColor = color; ctx.shadowBlur = blur; ctx.shadowOffsetX = FAR + dx; ctx.shadowOffsetY = dy;
@@ -219,6 +223,10 @@ export function renderStyles(ctx: CanvasRenderingContext2D, src: HTMLCanvasEleme
     castSpread(rgba(s.color, s.opacity / 100), s.blur, s.spread ?? 0, -Math.cos(a) * s.distance, Math.sin(a) * s.distance);
   }
   if (st.glow?.enabled) castSpread(rgba(st.glow.color, st.glow.opacity / 100), st.glow.size, st.glow.spread ?? 0, 0, 0, 2);
+  if (tmp) {
+    ctx.globalCompositeOperation = 'destination-out'; ctx.drawImage(src, ox, oy); ctx.globalCompositeOperation = 'source-over';
+    out.drawImage(tmp, 0, 0); returnCanvas(tmp); ctx = out;
+  }
   const sk = st.stroke;
   if (sk?.enabled && sk.size > 0 && (sk.position ?? 'outside') !== 'inside') {
     // exterior: todo el grosor por fuera; centro: la mitad (la otra mitad va por dentro)

@@ -24,7 +24,10 @@ export function brightnessContrast(img: ImageData, brightness: number, contrast:
 }
 
 export interface LevelsParams { inBlack: number; inWhite: number; gamma: number; outBlack: number; outWhite: number; }
-export function levelsLut(p: LevelsParams) {
+export function levelsLut(p0: Partial<LevelsParams> | null | undefined) {
+  // valores que falten (p. ej. «repetir filtro» o una acción grabada sin ellos) = neutros: la imagen no cambia
+  const n = (v: unknown, d: number) => typeof v === 'number' && Number.isFinite(v) ? v : d;
+  const p = { inBlack: n(p0?.inBlack, 0), inWhite: n(p0?.inWhite, 255), gamma: Math.max(0.01, n(p0?.gamma, 1)), outBlack: n(p0?.outBlack, 0), outWhite: n(p0?.outWhite, 255) };
   const lut = new Uint8ClampedArray(256);
   const range = Math.max(1, p.inWhite - p.inBlack);
   for (let i = 0; i < 256; i++) {
@@ -34,7 +37,7 @@ export function levelsLut(p: LevelsParams) {
   }
   return lut;
 }
-export function levels(img: ImageData, p: LevelsParams) { applyLut(img, levelsLut(p)); }
+export function levels(img: ImageData, p: Partial<LevelsParams> | null | undefined) { applyLut(img, levelsLut(p)); }
 
 export type CurvePoint = [number, number];
 /** Interpolación cúbica monótona (no produce "rebotes" entre puntos). */
@@ -68,9 +71,11 @@ export function curveLut(points: CurvePoint[]): Uint8ClampedArray {
   return lut;
 }
 export interface CurvesParams { rgb: CurvePoint[]; r: CurvePoint[]; g: CurvePoint[]; b: CurvePoint[]; }
-export function curves(img: ImageData, p: CurvesParams) {
-  const master = curveLut(p.rgb);
-  const r = curveLut(p.r), g = curveLut(p.g), b = curveLut(p.b);
+export function curves(img: ImageData, p0: Partial<CurvesParams> | null | undefined) {
+  // curvas que falten o no sean válidas = recta (sin cambio)
+  const ok = (c: unknown): CurvePoint[] => Array.isArray(c) && c.length >= 2 && c.every(q => Array.isArray(q) && q.length >= 2 && q.every(Number.isFinite)) ? c as CurvePoint[] : [[0, 0], [255, 255]];
+  const master = curveLut(ok(p0?.rgb));
+  const r = curveLut(ok(p0?.r)), g = curveLut(ok(p0?.g)), b = curveLut(ok(p0?.b));
   const rr = new Uint8ClampedArray(256), gg = new Uint8ClampedArray(256), bb = new Uint8ClampedArray(256);
   for (let i = 0; i < 256; i++) { rr[i] = master[r[i]]; gg[i] = master[g[i]]; bb[i] = master[b[i]]; }
   applyLut(img, rr, gg, bb);
