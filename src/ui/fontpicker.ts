@@ -2,7 +2,7 @@
 
 import { h } from './dom';
 import { app } from './app';
-import { SYSTEM_FONTS, WEB_FONTS, CATEGORY_NAMES, ensureFont, isWebFont, localFonts, loadLocalFonts } from '../core/fonts';
+import { SYSTEM_FONTS, WEB_FONTS, CATEGORY_NAMES, ensureFont, isWebFont, localFonts, loadLocalFonts, systemFontAvailable } from '../core/fonts';
 
 const previewed = new Set<string>();
 /** Carga una versión mínima de la fuente (solo las letras de su nombre) para la vista previa. */
@@ -30,7 +30,8 @@ export function fontPicker(value: string, onChange: (family: string) => void): H
     const cats = h('div', { class: 'font-cats' });
     const list = h('div', { class: 'font-list' });
     const io = new IntersectionObserver(ents => { for (const en of ents) if (en.isIntersecting) { previewFont((en.target as HTMLElement).dataset.f!); io.unobserve(en.target); } }, { root: list });
-    const all = (): [string, string][] => [...SYSTEM_FONTS.map(f => [f, 'system'] as [string, string]), ...WEB_FONTS, ...localFonts.map(f => [f, 'local'] as [string, string])];
+    // del sistema solo las que están instaladas en este equipo (en un móvil faltan muchas)
+    const all = (): [string, string][] => [...SYSTEM_FONTS.filter(systemFontAvailable).map(f => [f, 'system'] as [string, string]), ...WEB_FONTS, ...localFonts.map(f => [f, 'local'] as [string, string])];
     const render = () => {
       list.innerHTML = '';
       const q = search.value.trim().toLowerCase();

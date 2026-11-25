@@ -19,6 +19,7 @@ import { heal, findSource } from '../filters/heal';
 import { computeFilter } from '../filters/compute';
 import { record } from './macros';
 import { snapshot, restore, shareFrozen, startBlank } from '../core/history';
+import { fontUsable } from '../core/fonts';
 import { FILTERS } from '../filters/registry';
 const FILTERS_BY_ID = new Map(FILTERS.map(x => [x.id, x]));
 import { addPattern, getPattern, patternFill } from '../core/patterns';
@@ -47,11 +48,19 @@ export function newDocument(name: string, w: number, h: number, bg: string | nul
   app.addDocument(d, 'Nuevo');
 }
 
+/** Fuentes de los textos del documento que no hay en este equipo (ni en la biblioteca): se verían con otra. */
+export function missingFonts(d: EditorDocument): string[] {
+  const used = new Set<string>();
+  for (const l of d.allLayers()) if (l instanceof TextLayer) { used.add(l.props.font); for (const r of l.props.runs ?? []) if (r.font) used.add(r.font); }
+  return [...used].filter(f => f && !fontUsable(f));
+}
+const fontsWarning = (mf: string[]) => `Este documento usa fuentes que no están en este equipo (${mf.join(', ')}): esos textos se ven con otra fuente parecida hasta que elijas una de la lista`;
+function warnMissingFonts(d: EditorDocument) { const mf = missingFonts(d); if (mf.length) app.toast(fontsWarning(mf), 'warn'); }
 export async function openFiles(files: File[], asLayers = false, remember = true) {
   for (const f of files) {
     const before = app.docs.length;
     try {
-      if (io.isProjectFile(f)) { app.addDocument(await io.openProject(f)); continue; }
+      if (io.isProjectFile(f)) { const pd = await io.openProject(f); app.addDocument(pd); warnMissingFonts(pd); continue; }
       // SVG: como capas vectoriales editables (si no tiene formas que convertir, se abre como imagen)
       if (!asLayers && (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name))) {
         const { openSvgAsVectors } = await import('../io/svgimport');
@@ -71,6 +80,7 @@ export async function openFiles(files: File[], asLayers = false, remember = true
           continue;
         }
         app.addDocument(pd);
+        const mf = missingFonts(pd); if (mf.length) warnings.push(fontsWarning(mf));
         if (warnings.length) alertDialog('PSD abierto con avisos', warnings.join('. ') + '.');
         continue;
       }

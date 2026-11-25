@@ -25,6 +25,25 @@ export const WEB_FONTS: [string, string][] = [
 export const CATEGORY_NAMES: Record<string, string> = { sans: 'Sin serifa', serif: 'Con serifa', display: 'Decorativas', handwriting: 'Manuscritas', mono: 'Monoespaciadas', system: 'Del sistema', local: 'Del equipo' };
 
 const webSet = new Set(WEB_FONTS.map(f => f[0]));
+
+/** ¿Está instalada esta fuente del sistema en el equipo? Se mide un texto con ella y con una fuente de reserva: si
+ *  mide igual con las tres reservas, el navegador está usando la reserva (la fuente no existe). En Android, por
+ *  ejemplo, no hay Arial, Georgia ni Times: así no se ofrece una fuente que luego se vería con otra. */
+const GENERIC = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui']);
+const availCache = new Map<string, boolean>();
+export function systemFontAvailable(family: string): boolean {
+  if (GENERIC.has(family)) return true;
+  const hit = availCache.get(family); if (hit !== undefined) return hit;
+  let ok = true;
+  try {
+    const c = document.createElement('canvas').getContext('2d')!, sample = 'mmmmmmmmmmlliWQ@#ÁÑ 0123';
+    ok = ['monospace', 'serif', 'sans-serif'].some(fb => { c.font = `72px ${fb}`; const w0 = c.measureText(sample).width; c.font = `72px ${JSON.stringify(family)}, ${fb}`; return Math.abs(c.measureText(sample).width - w0) > 0.5; });
+  } catch { ok = true; }
+  availCache.set(family, ok);
+  return ok;
+}
+/** ¿Se verá esta fuente tal cual en este equipo? (de la biblioteca, del equipo o del sistema instalada) */
+export function fontUsable(family: string): boolean { return webSet.has(family) || localFonts.includes(family) || systemFontAvailable(family); }
 const state = new Map<string, Promise<boolean>>();
 export let localFonts: string[] = [];
 
