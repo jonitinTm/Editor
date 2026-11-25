@@ -248,6 +248,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const fx = hasStyles(l.styles) ? h('span', { class: 'ltag fx', title: 'Tiene estilos de capa (doble clic para editarlos)' }, 'fx') : null;
     fx?.addEventListener('dblclick', e => { e.stopPropagation(); app.doc!.setActive(l); layerStyleDialog(); });
     const lock = l.locked ? h('span', { class: 'llock', html: icon('lock') }) : l.lockPos || l.lockPixels ? h('span', { class: 'llock', title: [l.lockPixels && 'Píxeles bloqueados', l.lockPos && 'Posición bloqueada'].filter(Boolean).join(' · '), html: icon('lock') }) : l.lockAlpha ? h('span', { class: 'llock', title: 'Transparencia bloqueada', html: icon('lockAlpha') }) : null;
+    const refEl = l.reference ? h('span', { class: 'llock lref', title: 'Capa de referencia (el bote de pintura y la varita miran sus líneas)', html: icon('reference') }) : null;
     const linkEl = l.link != null ? h('span', { class: 'llock llink', title: 'Vinculada (se mueve con las otras capas vinculadas). Clic: seleccionarlas', html: icon('link') }) : null;
     linkEl?.addEventListener('click', e => { e.stopPropagation(); d.setActive(l); ops.selectLinkedLayers(); });
     if (l.label) eye.style.background = LABEL_COLORS[l.label] ?? '';
@@ -262,7 +263,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     const el = h('div', {
       class: 'layer-row' + (isActive ? ' active' : selected ? ' selected' : '') + (l.isVisibleInTree() ? '' : ' hidden-layer'),
       draggable: 'true', style: { paddingLeft: 4 + depth * 14 + 'px' },
-    }, eye, arrow, clipMark, thumbWrap, maskEl, vmEl, name, kindTag, fx, linkEl, lock);
+    }, eye, arrow, clipMark, thumbWrap, maskEl, vmEl, name, kindTag, fx, refEl, linkEl, lock);
     el.addEventListener('click', e => {
       if (e.ctrlKey || e.metaKey) {
         if (d.selectedIds.has(l.id) && d.selectedIds.size > 1) d.selectedIds.delete(l.id); else d.selectedIds.add(l.id);
@@ -283,7 +284,7 @@ export function buildLayersPanel(parent: HTMLElement) {
     el.addEventListener('contextmenu', e => {
       e.preventDefault();
       if (!d.selectedIds.has(l.id)) d.setActive(l);
-      contextMenu(e.clientX, e.clientY, ['dupLayer', 'delLayer', 'renameLayer', '-', 'label:rojo', 'label:naranja', 'label:amarillo', 'label:verde', 'label:azul', 'label:violeta', 'label:gris', 'label:none', '-', 'layerStyle', 'clearStyle', 'clip', '-', 'toSmart', 'editSmart', 'rasterize', '-', 'group', 'ungroup', '-', 'mergeDown', 'mergeVisible', 'flatten']);
+      contextMenu(e.clientX, e.clientY, ['dupLayer', 'delLayer', 'renameLayer', '-', 'label:rojo', 'label:naranja', 'label:amarillo', 'label:verde', 'label:azul', 'label:violeta', 'label:gris', 'label:none', '-', 'layerStyle', 'clearStyle', 'clip', 'refLayer', '-', 'toSmart', 'editSmart', 'rasterize', '-', 'group', 'ungroup', '-', 'mergeDown', 'mergeVisible', 'flatten']);
     });
     el.addEventListener('dblclick', e => { if ((e.target as HTMLElement).closest('.lname, .thumb-wrap, .eye, .arrow')) return; d.setActive(l); layerStyleDialog(); });
     // Arrastrar para reordenar

@@ -259,6 +259,17 @@ export class EditorDocument {
   }
 
   /** Imagen combinada sin previsualizaciones, en un lienzo nuevo. */
+  /** Lo que se ve de las capas marcadas como referencia, para rellenar y seleccionar por sus líneas (null si no hay). */
+  referenceCanvas(): HTMLCanvasElement | null {
+    const refs = [...walkLayers(this.root)].filter(l => l.reference && l.visible);
+    if (!refs.length) return null;
+    const c = makeCanvas(this.width, this.height), x = ctx2d(c);
+    for (const l of refs) {
+      if (l instanceof GroupLayer) { const t = makeCanvas(this.width, this.height); compositeGroup(l, ctx2d(t), this.width, this.height, {}); x.drawImage(t, 0, 0); }
+      else if ((l as RasterLayer).canvas) x.drawImage((l as RasterLayer).canvas, 0, 0);
+    }
+    return c;
+  }
   flatten(): HTMLCanvasElement {
     const c = makeCanvas(this.width, this.height);
     renderComposite(this.root, c, {});

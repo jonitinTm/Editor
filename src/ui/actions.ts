@@ -391,6 +391,7 @@ export const ACTIONS: Action[] = [
   { id: 'layerBelow', label: 'Seleccionar la capa de abajo', keys: ['Alt+['], enabled: hasLayer, run: () => stepLayer(-1) },
   { id: 'layerTop', label: 'Seleccionar la capa superior', keys: ['Alt+.'], enabled: hasLayer, run: () => stepLayer(1e6) },
   { id: 'layerBottom', label: 'Seleccionar la capa inferior', keys: ['Alt+,'], enabled: hasLayer, run: () => stepLayer(-1e6) },
+  { id: 'refLayer', label: 'Usar como capa de referencia (el bote y la varita miran sus líneas)', enabled: hasLayer, checked: () => !!app.doc?.active?.reference, run: () => { const l = app.doc!.active!; ops.setLayerProp(l, 'reference', !l.reference); app.toast(l.reference ? 'Capa de referencia: el bote de pintura y la varita rellenan según sus líneas aunque pintes en otra capa' : 'Ya no es capa de referencia'); } },
   { id: 'lockAlphaToggle', label: 'Bloquear o desbloquear la transparencia de la capa', keys: ['/'], enabled: hasLayer, checked: () => !!app.doc?.active?.lockAlpha, run: () => { const l = app.doc!.active!; ops.setLayerProp(l, 'lockAlpha', !l.lockAlpha); app.toast(l.lockAlpha ? 'Transparencia bloqueada: solo se pinta sobre lo que ya hay' : 'Transparencia desbloqueada'); } },
   { id: 'blendNext', label: 'Siguiente modo de fusión', keys: ['Shift++', 'Shift+NumpadAdd', 'Shift+='], enabled: hasLayer, run: () => cycleBlend(1) },
   { id: 'blendPrev', label: 'Modo de fusión anterior', keys: ['Shift+-', 'Shift+NumpadSubtract'], enabled: hasLayer, run: () => cycleBlend(-1) },
@@ -401,6 +402,7 @@ export const ACTIONS: Action[] = [
   { id: 'circleCrop', label: 'Recorte circular (foto de perfil)', enabled: hasDoc, run: () => import('./watermark').then(m => m.circleCrop()) },
   { id: 'drawMode', label: 'Modo dibujo (pantalla completa)', keys: ['F'], enabled: () => !!app.doc, run: () => import('./drawing').then(m => m.toggleDrawMode()) },
   { id: 'reference', label: 'Imagen de referencia', run: () => import('./artist').then(m => m.toggleReference()) },
+  { id: 'quickBtnSettings', label: 'Botón rápido (tecla en pantalla)…', run: () => import('./quickbtn').then(m => m.quickBtnDialog()) },
   { id: 'penSettings', label: 'Ajustes del lápiz…', run: () => import('./drawing').then(m => m.penSettingsDialog()) },
   { id: 'win:all', label: 'Ocultar / mostrar todos los paneles', keys: ['Tab'], run: () => { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); } },
 

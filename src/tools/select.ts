@@ -243,6 +243,7 @@ export class WandTool implements Tool {
     { key: 'tolerance', label: 'Tolerancia', type: 'range', min: 0, max: 255, default: 32 },
     { key: 'contiguous', label: 'Contiguo', type: 'checkbox', default: true },
     { key: 'all', label: 'Todas las capas', type: 'checkbox', default: false },
+    { key: 'useRef', label: 'Mirar las capas de referencia', type: 'checkbox', default: true },
     { key: 'sample', label: 'Muestra', type: 'select', default: '1', choices: [{ value: '1', label: 'Punto' }, { value: '3', label: 'Media 3×3' }, { value: '5', label: 'Media 5×5' }, { value: '11', label: 'Media 11×11' }] },
     { key: 'antialias', label: 'Suavizar', type: 'checkbox', default: true },
   ] as any[];
@@ -251,7 +252,7 @@ export class WandTool implements Tool {
     const doc = app.doc!;
     const mode = selMode(this.id, e);
     const layer = doc.active;
-    const src = app.opt('all', this.id) || !isRaster(layer) ? doc.flatten() : layer.canvas;
+    const src = (app.opt('useRef', this.id) !== false ? doc.referenceCanvas() : null) ?? (app.opt('all', this.id) || !isRaster(layer) ? doc.flatten() : layer.canvas);
     const px = getPixels(src), n = parseInt(app.opt('sample', this.id)) || 1;
     const sx = Math.floor(e.x), sy = Math.floor(e.y);
     if (n > 1 && sx >= 0 && sy >= 0 && sx < px.width && sy < px.height) {

@@ -387,11 +387,11 @@ export function moveLayerTo(layer: Layer, parent: GroupLayer, index: number) {
   d.commit('Mover capa');
 }
 
-export function setLayerProp(l: Layer, prop: 'opacity' | 'fillOpacity' | 'blendMode' | 'visible' | 'locked' | 'lockAlpha' | 'lockPos' | 'lockPixels', value: any, record = true) {
+export function setLayerProp(l: Layer, prop: 'opacity' | 'fillOpacity' | 'blendMode' | 'visible' | 'locked' | 'lockAlpha' | 'lockPos' | 'lockPixels' | 'reference', value: any, record = true) {
   const d = doc(); if (!d) return;
   (l as any)[prop] = value;
   d.invalidate();
-  if (record) d.commit({ fillOpacity: 'Relleno de capa', opacity: 'Opacidad de capa', blendMode: 'Modo de fusión', visible: value ? 'Mostrar capa' : 'Ocultar capa', locked: value ? 'Bloquear capa' : 'Desbloquear capa', lockAlpha: value ? 'Bloquear transparencia' : 'Desbloquear transparencia', lockPos: value ? 'Bloquear posición' : 'Desbloquear posición', lockPixels: value ? 'Bloquear píxeles' : 'Desbloquear píxeles' }[prop]);
+  if (record) d.commit({ fillOpacity: 'Relleno de capa', opacity: 'Opacidad de capa', blendMode: 'Modo de fusión', visible: value ? 'Mostrar capa' : 'Ocultar capa', locked: value ? 'Bloquear capa' : 'Desbloquear capa', lockAlpha: value ? 'Bloquear transparencia' : 'Desbloquear transparencia', lockPos: value ? 'Bloquear posición' : 'Desbloquear posición', lockPixels: value ? 'Bloquear píxeles' : 'Desbloquear píxeles', reference: value ? 'Capa de referencia' : 'Quitar capa de referencia' }[prop]);
   else d.changed();
 }
 

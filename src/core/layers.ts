@@ -216,6 +216,8 @@ export abstract class Layer {
   /** Bloquear posición (no se mueve ni se transforma) y bloquear píxeles (no se pinta). */
   lockPos = false;
   lockPixels = false;
+  /** Capa de referencia: el bote de pintura y la varita miran sus líneas aunque se pinte en otra capa. */
+  reference = false;
   /** Relleno (0-1): opacidad del contenido sin afectar a la sombra, el contorno ni el resplandor exteriores. */
   fillOpacity = 1;
   /** Capas vinculadas: las que comparten este número se mueven juntas. */

@@ -40,6 +40,7 @@ export class BucketTool implements Tool {
     { key: 'contiguous', label: 'Contiguo', type: 'checkbox', default: true },
     { key: 'gap', label: 'Cerrar huecos', type: 'range', min: 0, max: 20, default: 0, unit: 'px' },
     { key: 'all', label: 'Todas las capas', type: 'checkbox', default: false },
+    { key: 'useRef', label: 'Mirar las capas de referencia', type: 'checkbox', default: true },
     { key: 'source', label: 'Relleno', type: 'select', default: 'fg', choices: [{ value: 'fg', label: 'Color frontal' }, { value: 'pattern', label: 'Motivo' }] },
     { key: 'pattern', label: 'Motivo', type: 'select', default: 'base:Damero', choices: [] },
   ] as any[];
@@ -51,7 +52,8 @@ export class BucketTool implements Tool {
     const t = getPaintTarget();
     if (!t) return;
     const doc = app.doc!;
-    const src = app.opt('all', this.id) && !t.isMask ? doc.flatten() : t.canvas;
+    const ref = !t.isMask && app.opt('useRef', this.id) !== false ? doc.referenceCanvas() : null;
+    const src = ref ?? (app.opt('all', this.id) && !t.isMask ? doc.flatten() : t.canvas);
     const gap = app.opt<number>('gap', this.id) ?? 0;
     const res = gap > 0 && app.opt('contiguous', this.id) ? floodMaskGaps(getPixels(src), e.x, e.y, app.opt('tolerance', this.id), gap) : floodMask(getPixels(src), e.x, e.y, app.opt('tolerance', this.id), app.opt('contiguous', this.id));
     if (!res) return;
@@ -372,7 +374,7 @@ export function colorDrop(x: number, y: number): boolean {
   if (!t || !doc || x < 0 || y < 0 || x >= doc.width || y >= doc.height) return false;
   // usa «Cerrar huecos» del bote de pintura (3 px si no se ha tocado: los dibujos a mano suelen tener aberturas)
   const gap = app.opt<number>('gap', 'bucket') || 3;
-  const res = floodMaskGaps(getPixels(t.isMask ? t.canvas : doc.flatten()), x, y, 48, gap);
+  const res = floodMaskGaps(getPixels(t.isMask ? t.canvas : doc.referenceCanvas() ?? doc.flatten()), x, y, 48, gap);
   if (!res) return false;
   const st = strokeSetup(t, false);
   const fill = res.canvas, fc = ctx2d(fill);

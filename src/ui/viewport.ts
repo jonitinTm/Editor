@@ -3,6 +3,7 @@
 
 import { setOnOutlineStale } from '../core/selection';
 import { app } from './app';
+import { softMods } from './softmods';
 import { prefs, savePrefs, pxPerUnit, UNIT_NAMES, penPressure } from './prefs';
 import type { ToolEvent } from '../tools/tool';
 import { h } from './dom';
@@ -55,8 +56,38 @@ export class Viewport {
   private penDown = false;
   /** El trazo en curso lo empezó un dedo (si luego apoya el lápiz, era la palma: se anula). */
   private strokeTouch = false;
+  /** Con el dedo, la herramienta empieza un instante después (o en cuanto el dedo se mueve): si en ese tiempo llega
+   *  otro dedo es un gesto (deshacer, ampliar…) y no se pinta, selecciona ni rellena nada. */
+  private pendingDown: { te: ToolEvent; moves: ToolEvent[]; timer: number; ctrl: boolean } | null = null;
+  private startPending() {
+    const p = this.pendingDown; if (!p) return;
+    this.pendingDown = null; clearTimeout(p.timer);
+    if (p.ctrl && !['move', 'transform', 'pen', 'node', 'text', 'hand', 'zoom', 'rotateView', 'crop'].includes(app.tool?.id)) { this.springMove = true; app.setTool('move', true); }
+    this.toolActive = true; this.strokeTouch = true;
+    app.tool?.down?.(p.te);
+    for (const m of p.moves) app.tool?.move?.(m);
+    this.requestRender();
+  }
+  private dropPending() { if (this.pendingDown) { clearTimeout(this.pendingDown.timer); this.pendingDown = null; } }
   /** Toque con varios dedos: si se sueltan enseguida sin moverse, 2 dedos = deshacer, 3 = rehacer. */
-  private tap: { t: number; n: number; moved: boolean; pts: Map<number, { x: number; y: number }> } | null = null;
+  private tap: { t: number; n: number; moved: boolean; held?: boolean; pts: Map<number, { x: number; y: number }> } | null = null;
+  /** Mantener 2 dedos quietos deshace seguido (3 dedos rehace), cada vez más deprisa. */
+  private holdRepeat = 0;
+  private holdRepeatStart(n: number) {
+    clearTimeout(this.holdRepeat);
+    if (!prefs.touchGestures || (n !== 2 && n !== 3)) return;
+    let count = 0;
+    const tick = (delay: number) => {
+      const t = this.tap;
+      if (!t || t.moved || this.pointers.size !== n) return;
+      const h = app.doc?.history; if (!h) return;
+      if (n === 2 ? !h.canUndo() : !h.canRedo()) return;
+      t.held = true; count++;
+      import('./ops').then(o => { if (n === 2) o.undo(); else o.redo(); app.toast(n === 2 ? `Deshacer ×${count} (mantén 2 dedos)` : `Rehacer ×${count} (mantén 3 dedos)`); });
+      this.holdRepeat = window.setTimeout(() => tick(Math.max(60, delay * 0.82)), delay);
+    };
+    this.holdRepeat = window.setTimeout(() => tick(320), 650);
+  }
   /** Mantener pulsado con el dedo (en modo lápiz): cuentagotas. */
   private holdTimer = 0;
   private touchPick: { x: number; y: number; color: string } | null = null;
@@ -539,7 +570,7 @@ export class Viewport {
     const sx = e.clientX - r.left, sy = e.clientY - r.top;
     const p = this.toDoc(sx, sy);
     return {
-      x: p.x, y: p.y, sx, sy, shift: e.shiftKey, alt: e.altKey, ctrl: e.ctrlKey || e.metaKey,
+      x: p.x, y: p.y, sx, sy, shift: e.shiftKey || softMods.shift, alt: e.altKey || softMods.alt, ctrl: e.ctrlKey || e.metaKey || softMods.ctrl,
       pressure: e.pointerType === 'pen' ? this.penPressureOf(e) : 1, pointerType: e.pointerType, button: e.button, detail: e.detail,
       ...(e.pointerType === 'pen' ? penTilt(e, this.rot) : {}),
     };
@@ -597,7 +628,7 @@ export class Viewport {
       if (!this.doc) return;
       this.canvasRect(true);
       const touch = e.pointerType === 'touch';
-      if (e.pointerType === 'pen') { this.notePen(); this.penDown = true; if (this.toolActive && this.strokeTouch && this.penMode()) this.cancelTouchStroke(); }
+      if (e.pointerType === 'pen') { this.notePen(); this.penDown = true; this.dropPending(); if (this.toolActive && this.strokeTouch && this.penMode()) this.cancelTouchStroke(); }
       // rechazo de la palma: mientras el lápiz está apoyado, los toques no cuentan
       if (touch && this.penDown) return;
       // un contacto muy grande es la palma o el canto de la mano, no un dedo
@@ -611,10 +642,11 @@ export class Viewport {
         const n = [...this.pointers.keys()].length;
         if (n === 1) this.tap = { t: performance.now(), n: 1, moved: false, pts: new Map([[e.pointerId, sp]]) };
         else if (this.tap) { this.tap.n = Math.max(this.tap.n, n); this.tap.pts.set(e.pointerId, sp); if (performance.now() - this.tap.t > 400) this.tap.moved = true; }
+        if (this.tap && !this.tap.moved) this.holdRepeatStart(n); else clearTimeout(this.holdRepeat);
       }
       if (this.pointers.size >= 2 && touch) {
         // Gesto de pellizco: cancela el trazo en curso.
-        clearTimeout(this.holdTimer); this.touchPick = null; this.panning = null;
+        this.dropPending(); clearTimeout(this.holdTimer); this.touchPick = null; this.panning = null;
         if (this.toolActive) { this.toolActive = false; app.tool?.cancel?.(); if (this.springMove) { this.springMove = false; app.restoreTool(); } }
         if (this.pointers.size === 2) this.startPinch();
         return;
@@ -669,6 +701,11 @@ export class Viewport {
         return;
       }
       // Ctrl + arrastrar con casi cualquier herramienta: mover (y elegir la capa bajo el ratón)
+      if (touch) {
+        this.dropPending();
+        this.pendingDown = { te, moves: [], ctrl: te.ctrl, timer: window.setTimeout(() => { if (this.pointers.size === 1) this.startPending(); else this.dropPending(); }, 90) };
+        return;
+      }
       if (te.ctrl && !['move', 'transform', 'pen', 'node', 'text', 'hand', 'zoom', 'rotateView', 'crop'].includes(app.tool?.id)) { this.springMove = true; app.setTool('move', true); }
       this.toolActive = true; this.strokeTouch = touch;
       app.tool?.down?.(te);
@@ -709,6 +746,11 @@ export class Viewport {
         this.guideDrag.pos = Math.round(this.guideDrag.axis === 'v' ? te.x : te.y);
         this.requestRender(); return;
       }
+      if (this.pendingDown && e.pointerType === 'touch') {
+        const p = this.pendingDown; p.moves.push(te);
+        if (Math.hypot(te.sx - p.te.sx, te.sy - p.te.sy) > 10) this.startPending();
+        this.updateCursor(te); this.requestRender(); return;
+      }
       if (this.toolActive) {
         // predicción del navegador: hacia dónde va el lápiz en los próximos milisegundos; el pincel dibuja ahí un
         // trazo provisional (solo en pantalla) y así la línea va pegada a la punta
@@ -728,15 +770,20 @@ export class Viewport {
       const had = this.pointers.delete(e.pointerId);
       if (e.pointerType === 'touch') {
         if (!had) return;
-        clearTimeout(this.holdTimer);
-        if (!this.pointers.size && this.tap) {
+        clearTimeout(this.holdTimer); clearTimeout(this.holdRepeat);
+        if (this.tap?.held) { if (!this.pointers.size) this.tap = null; }
+        else if (!this.pointers.size && this.tap) {
           // toque rápido con 2 o 3 dedos: deshacer / rehacer
           const t = this.tap; this.tap = null;
           if (prefs.touchGestures && !t.moved && t.n >= 2 && performance.now() - t.t < 400) {
-            import('./ops').then(o => { if (t.n === 2) { if (app.doc?.history.canUndo()) { o.undo(); app.toast('Deshacer (toque con 2 dedos)'); } } else if (app.doc?.history.canRedo()) { o.redo(); app.toast('Rehacer (toque con 3 dedos)'); } });
+            if (t.n >= 4) { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => this.resize()); app.toast('Interfaz oculta o visible (toque con 4 dedos)'); }
+            else import('./ops').then(o => { if (t.n === 2) { if (app.doc?.history.canUndo()) { o.undo(); app.toast('Deshacer (toque con 2 dedos)'); } } else if (app.doc?.history.canRedo()) { o.redo(); app.toast('Rehacer (toque con 3 dedos)'); } });
           }
         }
       }
+      // toque corto con un dedo: la herramienta empieza y acaba ahora
+      if (this.pendingDown && e.pointerType === 'touch' && had && !this.pointers.size) this.startPending();
+      else if (e.pointerType === 'touch' && this.pointers.size) this.dropPending();
       if (this.touchPick || this.penPick) { if (!this.pointers.size) { this.touchPick = null; this.penPick = false; this.requestRender(); } return; }
       if (this.pinch) { if (this.pointers.size < 2) { this.pinch = null; this.panning = null; } return; }
       if (!this.doc) return;

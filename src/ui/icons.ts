@@ -97,6 +97,8 @@ export const ICONS: Record<string, string> = {
   contentMove: S('<rect x="3" y="3" width="9" height="9" rx="1.5" stroke-dasharray="2.5 2"/><path d="M12 12l8 8M20 14v6h-6"/><path d="M5 8l2-2 3 3"/>'),
   spotHeal: S('<rect x="3" y="8.5" width="18" height="7" rx="3.5" transform="rotate(-40 12 12)"/><circle cx="18.5" cy="18.5" r="2.5" stroke-dasharray="1.5 1.5"/>'),
   quickMask: S('<rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="12" cy="12" r="4" stroke-dasharray="2 1.6"/>'),
+  modKey: S('<rect x="3" y="6" width="18" height="12" rx="3"/><path d="M7 14h10M8 10h.01M12 10h.01M16 10h.01"/>'),
+  reference: S('<path d="M4 18c3-1 4-6 7-6s3 4 6 3 3-4 3-4"/><circle cx="12" cy="12" r="9" stroke-dasharray="3 2.5"/>'),
   lockAlpha: S('<rect x="4" y="4" width="16" height="16"/><path d="M4 12h16M12 4v16" stroke-opacity=".5"/><rect x="4" y="4" width="8" height="8" fill="currentColor" fill-opacity=".45"/><rect x="12" y="12" width="8" height="8" fill="currentColor" fill-opacity=".45"/>'),
   quickSel: S('<path d="M14 4c3 0 6 3 5 6-1 2-4 2-6 4l-3 3-2.5-2.5 3-3c2-2 2-5 4-6z"/><circle cx="6" cy="18" r="2.6" stroke-dasharray="1.6 1.4"/>'),
   rotateView: S('<path d="M8 13V6.5a1.5 1.5 0 013 0V12M11 11.5V4.5a1.5 1.5 0 013 0V12M14 11.5V6a1.5 1.5 0 013 0v7.5c0 4-2.5 6.5-6 6.5-2.5 0-3.8-1-5.2-3L4 14.3"/><path d="M19 3a5 5 0 012 4"/><path d="M21 7l.4-2.2M21 7l-2.2-.3"/>'),

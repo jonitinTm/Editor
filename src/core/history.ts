@@ -10,7 +10,7 @@ import type { EditorDocument } from './document';
 interface MaskSnap { /** copia entera (si la hay) */ canvas?: HTMLCanvasElement; ref: FrozenRef; enabled: boolean; full?: boolean; }
 export interface LayerSnap {
   id: number; kind: Layer['kind']; name: string; visible: boolean; opacity: number;
-  blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; fillOpacity?: number; link?: number | null; clip: boolean; label?: string | null;
+  blendMode: BlendMode; locked: boolean; lockAlpha?: boolean; lockPos?: boolean; lockPixels?: boolean; fillOpacity?: number; link?: number | null; clip: boolean; label?: string | null; reference?: boolean;
   canvas?: HTMLCanvasElement; /** capa nueva vacía: no se guarda su lienzo */ blank?: boolean;
   /** Estado de los píxeles de la capa: copia entera o «estado anterior + parche» (ver FrozenRef). */ ref?: FrozenRef; mask?: MaskSnap | null; props?: any; smart?: SmartSource; styles?: string | null; adjust?: string;
   full?: { canvas: HTMLCanvasElement; x: number; y: number } | null;
@@ -93,7 +93,7 @@ export function shareFrozen(from: Layer, to: Layer) {
 function snapLayer(l: Layer): LayerSnap {
   const s: LayerSnap = {
     id: l.id, kind: l.kind, name: l.name, visible: l.visible, opacity: l.opacity,
-    blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, lockPos: l.lockPos, lockPixels: l.lockPixels, fillOpacity: l.fillOpacity, link: l.link, clip: l.clip, label: l.label,
+    blendMode: l.blendMode, locked: l.locked, lockAlpha: l.lockAlpha, lockPos: l.lockPos, lockPixels: l.lockPixels, fillOpacity: l.fillOpacity, link: l.link, clip: l.clip, label: l.label, reference: l.reference || undefined,
     mask: l.mask ? (() => { const ref = freezeLayer(l.mask!); return { ref, canvas: ref.kind === 'full' ? ref.canvas : undefined, enabled: l.mask!.enabled, full: l.mask!.isFull() }; })() : null,
   };
   s.styles = l.styles ? JSON.stringify(l.styles) : null;
@@ -171,7 +171,7 @@ function restoreLayer(s: LayerSnap, w: number, h: number, olds: Map<number, Laye
     r.full = s.full ? { ...s.full, version: r.version } : null;
     l = r;
   }
-  l.name = s.name; l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.lockPos = !!s.lockPos; l.lockPixels = !!s.lockPixels; l.fillOpacity = s.fillOpacity ?? 1; l.link = s.link ?? null; l.clip = s.clip; l.label = s.label ?? null;
+  l.name = s.name; l.id = s.id; l.visible = s.visible; l.opacity = s.opacity; l.blendMode = s.blendMode; l.locked = s.locked; l.lockAlpha = !!s.lockAlpha; l.lockPos = !!s.lockPos; l.lockPixels = !!s.lockPixels; l.fillOpacity = s.fillOpacity ?? 1; l.link = s.link ?? null; l.clip = s.clip; l.label = s.label ?? null; l.reference = !!s.reference;
   l.styles = s.styles ? JSON.parse(s.styles) : null;
   l.vmask = s.vmask ? JSON.parse(s.vmask) : undefined;
   if (s.mask) {
@@ -300,7 +300,7 @@ function onlyPatchBetween(a: DocSnap, b: DocSnap, noneOk = false): { x: number; 
   if (a.width !== b.width || a.height !== b.height || (!noneOk && (a.selection !== b.selection || a.paths !== b.paths || a.activePath !== b.activePath)) || !!a.quickMask !== !!b.quickMask
     || a.ppi !== b.ppi || a.mode !== b.mode || (a.channels?.length ?? 0) !== (b.channels?.length ?? 0) || (a.channels ?? []).some((c, i) => c !== b.channels![i])) return null;
   let rect: { x: number; y: number; w: number; h: number } | null = null, diffs = 0;
-  const KEYS: (keyof LayerSnap)[] = ['id', 'kind', 'name', 'visible', 'opacity', 'blendMode', 'locked', 'lockAlpha', 'lockPos', 'lockPixels', 'fillOpacity', 'link', 'clip', 'label', 'styles', 'vmask', 'adjust', 'smart', 'expanded', 'frame', 'blank'];
+  const KEYS: (keyof LayerSnap)[] = ['id', 'kind', 'name', 'visible', 'opacity', 'blendMode', 'locked', 'lockAlpha', 'lockPos', 'lockPixels', 'fillOpacity', 'link', 'clip', 'label', 'reference', 'styles', 'vmask', 'adjust', 'smart', 'expanded', 'frame', 'blank'];
   const walk = (x: LayerSnap, y: LayerSnap): boolean => {
     for (const k of KEYS) if (x[k] !== y[k]) return false;
     if (JSON.stringify(x.props) !== JSON.stringify(y.props) || JSON.stringify(x.artboard) !== JSON.stringify(y.artboard)) return false;
