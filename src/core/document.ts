@@ -6,6 +6,10 @@ import { GroupLayer, Layer, RasterLayer, walkLayers, isRaster, isParametric , bl
 import { Selection } from './selection';
 import { History } from './history';
 import { renderComposite, compositeGroup, LayerOverride } from './compositor';
+import { POINTWISE } from './adjlut';
+
+/** Ajustes que dan lo mismo calculados por trozos (cada píxel solo depende de sí mismo, o el relleno sabe dónde está). */
+const REGION_SAFE = new Set([...POINTWISE, 'solidfill', 'gradfill', 'patternfill', 'posterize', 'threshold']);
 
 export interface ViewState { zoom: number; panX: number; panY: number; /** Giro de la vista en radianes (no afecta a la imagen). */ rot?: number; /** Vista volteada en horizontal (espejo; no afecta a la imagen). */ flip?: boolean; }
 
@@ -138,7 +142,8 @@ export class EditorDocument {
     }
     if (this.compositeDirty) {
       const d = this.compositeDirty;
-      const rect = d === true ? null : {
+      // un ajuste que mira a sus vecinos o a toda la imagen (tramado, ecualizar, automáticos…) no se puede rehacer por trozos
+      const rect = d === true || this.hasRegionalAdjust() ? null : {
         x: Math.floor(d.x) - 1, y: Math.floor(d.y) - 1, w: Math.ceil(d.w) + 3, h: Math.ceil(d.h) + 3,
       };
       const big = !rect || rect.w * rect.h > this.width * this.height / 4;
@@ -149,6 +154,11 @@ export class EditorDocument {
       this.compositeDirty = null;
     }
     return this.composite;
+  }
+
+  private hasRegionalAdjust(): boolean {
+    for (const l of walkLayers(this.root)) if (l.kind === 'adjust' && l.visible && l.opacity > 0 && !REGION_SAFE.has((l as any).filterId)) return true;
+    return false;
   }
 
   // ---- Caché de interacción ----------------------------------------------------------

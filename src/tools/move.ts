@@ -112,7 +112,7 @@ export class MoveTool implements Tool {
     if (links.size) sel = [...new Set([...sel, ...doc.allLayers().filter(l => l.link != null && links.has(l.link))])];
     if (sel.some(l => l.posLocked())) { app.toast(sel.some(l => l.isLocked()) ? 'La capa está bloqueada' : 'La posición de la capa está bloqueada', 'warn'); return false; }
     this.offset = { x: 0, y: 0 };
-    if (doc.selection.active && sel.length === 1 && !(a instanceof GroupLayer) && !doc.editMask) {
+    if (doc.selection.active && sel.length === 1 && !(a instanceof GroupLayer) && (isRaster(a) || isParametric(a)) && !doc.editMask) {
       if (isParametric(a)) a = rasterizeLayer(a);
       const layer = a as RasterLayer;
       const sel = doc.selection.mask!;

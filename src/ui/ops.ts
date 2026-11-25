@@ -649,7 +649,7 @@ export function addMask(mode: 'reveal' | 'hide' | 'selection') {
 export function deleteMask(apply: boolean) {
   const d = doc(); const l = d?.active; if (!d || !l || !l.mask) return;
   if (apply) {
-    if (l instanceof GroupLayer) { app.toast('No se puede aplicar la máscara de un grupo', 'warn'); return; }
+    if (l instanceof GroupLayer || l instanceof AdjustmentLayer) { app.toast(l instanceof GroupLayer ? 'No se puede aplicar la máscara de un grupo' : 'No se puede aplicar la máscara de una capa de ajuste', 'warn'); return; }
     let r = l as RasterLayer;
     if (isParametric(r)) r = rasterizeLayer(r);
     const c = ctx2d(r.canvas); c.globalCompositeOperation = 'destination-in'; c.drawImage(l.mask.canvas, 0, 0); c.globalCompositeOperation = 'source-over';
@@ -1897,7 +1897,9 @@ export async function exportSlices(type: 'image/png' | 'image/jpeg' | 'image/web
 
 /** Contornos (en coordenadas del documento) de lo opaco de una capa, calculados a 3× para más precisión. */
 export async function layerOutlines(l: Layer): Promise<{ closed: boolean; pts: import('../core/layers').PathPoint[] }[]> {
-  const d = doc()!, S = 3, src = (l as RasterLayer).canvas;
+  // un grupo usa lo que se ve de él (sus capas combinadas); una capa de ajuste no tiene dibujo
+  const d = doc()!, S = 3, src = isRaster(l) ? (l as RasterLayer).canvas : l instanceof GroupLayer ? bakeLayer(l, d) : null;
+  if (!src) return [];
   const big = makeCanvas(d.width * S, d.height * S), bx = ctx2d(big);
   bx.imageSmoothingEnabled = true; bx.imageSmoothingQuality = 'high'; bx.drawImage(src, 0, 0, big.width, big.height);
   const { maskContours } = await import('../core/contour');
