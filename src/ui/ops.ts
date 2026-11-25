@@ -2101,6 +2101,9 @@ export async function frequencySeparation(radius: number) {
   const { gaussianBlur } = await import('../filters/blur');
   const W = d.width, H = d.height, src = ctx2d(bakeLayer(l, d)).getImageData(0, 0, W, H);
   const low = new ImageData(new Uint8ClampedArray(src.data), W, H); gaussianBlur(low, radius);
+  // la baja frecuencia solo suaviza el color: conserva el borde (la opacidad) original, si no, en capas con
+  // transparencia el contorno desenfocado asomaba como un halo y la suma ya no daba la imagen original
+  for (let i = 3; i < low.data.length; i += 4) low.data[i] = src.data[i];
   const high = new ImageData(W, H);
   for (let i = 0; i < src.data.length; i += 4) {
     for (let c = 0; c < 3; c++) high.data[i + c] = (src.data[i + c] - low.data[i + c]) / 2 + 128;

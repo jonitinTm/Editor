@@ -324,7 +324,10 @@ export function detectTilt(src: HTMLCanvasElement): number | null {
   const coarse = best;
   for (let a = coarse - 0.3; a <= coarse + 0.3; a += 0.02) { const s2 = score(a); if (s2 > bs) { bs = s2; best = a; } }
   // si casi no hay diferencia con no girar, no hay líneas claras
-  if (bs < score(0) * 1.02 && Math.abs(best) > 0.2) return null;
+  // (con líneas rectas de verdad, girar al ángulo bueno las junta en una fila y la mejora es grande; con curvas, como
+  // un círculo, siempre hay algún ángulo «un poco mejor» y se giraba sin motivo)
+  // (medido: un horizonte o edificio torcido mejora entre 6 y 17 veces; un círculo, 1,13)
+  if (bs < score(0) * 1.5 && Math.abs(best) > 0.2) return null;
   return best;
 }
 /** Endereza la imagen y recorta (o rellena) las esquinas que quedan vacías. */

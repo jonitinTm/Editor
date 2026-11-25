@@ -278,10 +278,20 @@ export function autoAdjust(img: ImageData, mode: 'tone' | 'contrast' | 'color') 
   for (let i = 0; i < d.length; i += 4) if (d[i + 3] > 0) { for (let c = 0; c < 3; c++) { hist[c][d[i + c]]++; sum[c] += d[i + c]; } n++; }
   if (!n) return;
   const range = (h: Uint32Array) => { const clip = n * 0.001; let lo = 0, hi = 255, a = 0; while (lo < 255 && (a += h[lo]) <= clip) lo++; a = 0; while (hi > 0 && (a += h[hi]) <= clip) hi--; return [lo, Math.max(lo + 1, hi)]; };
-  let rs = hist.map(range);
+  // canal casi liso (una zona de un solo color, una selección pequeña): no se estira; si no, cada canal acababa en el
+  // gris medio (un césped o un cielo liso se volvían grises) o se quemaba
+  let rs = hist.map(range).map(([lo, hi]) => hi - lo < 48 ? [0, 255] : [lo, hi]);
   if (mode === 'contrast') { const lo = Math.min(...rs.map(r => r[0])), hi = Math.max(...rs.map(r => r[1])); rs = [[lo, hi], [lo, hi], [lo, hi]]; }
-  const avg = (sum[0] + sum[1] + sum[2]) / 3;
-  const luts = rs.map(([lo, hi], c) => { const g = mode === 'color' && sum[c] > 0 ? Math.max(0.6, Math.min(1.6, avg / sum[c])) : 1; const l = new Uint8ClampedArray(256); for (let i = 0; i < 256; i++) l[i] = clamp((i - lo) / (hi - lo) * 255 * g); return l; });
+  const stretch = rs.map(([lo, hi]) => { const l = new Uint8ClampedArray(256); for (let i = 0; i < 256; i++) l[i] = clamp((i - lo) / (hi - lo) * 255); return l; });
+  // color: tras estirar, la dominante que quede se mide en los píxeles casi grises (blancos, grises, nubes…) y no en
+  // toda la imagen; si casi no hay, no se toca (una foto con mucha hierba o un vestido verde no se vuelve gris)
+  let gains = [1, 1, 1];
+  if (mode === 'color') {
+    const ns = [0, 0, 0]; let nn = 0;
+    for (let i = 0; i < d.length; i += 4) { if (!d[i + 3]) continue; const r = stretch[0][d[i]], g = stretch[1][d[i + 1]], b = stretch[2][d[i + 2]], mx = Math.max(r, g, b), mn = Math.min(r, g, b); if (mx > 40 && mx - mn <= mx * 0.3) { ns[0] += r; ns[1] += g; ns[2] += b; nn++; } }
+    if (nn >= n * 0.02) { const avg = (ns[0] + ns[1] + ns[2]) / 3; gains = ns.map(v => v > 0 ? Math.max(0.6, Math.min(1.6, avg / v)) : 1); }
+  }
+  const luts = stretch.map((l, c) => { const o = new Uint8ClampedArray(256); for (let i = 0; i < 256; i++) o[i] = clamp(l[i] * gains[c]); return o; });
   applyLut(img, luts[0], luts[1], luts[2]);
 }
 
