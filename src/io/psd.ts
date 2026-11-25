@@ -12,6 +12,7 @@ import { normalizeRuns, type TextRun } from '../core/textruns';
 import type { VectorMask, PathPoint } from '../core/layers';
 import { ShapeLayer, GroupLayer, Layer, LayerMask, LayerStyles, RasterLayer, TextLayer, TextProps, SmartLayer, Matrix, AdjustmentLayer, BlendMode, isRaster, hasStyles } from '../core/layers';
 import { cloneCanvas, contentBounds, ctx2d, makeCanvas, getPixels } from '../core/canvas';
+import { srgbIcc } from './icc';
 
 const BLEND_KEYS: [string, BlendMode][] = [
   ['pass', 'pass-through'], ['norm', 'source-over'], ['dark', 'darken'], ['mul ', 'multiply'], ['idiv', 'color-burn'], ['lite', 'lighten'],
@@ -756,7 +757,7 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
   if (W * H > 268e6) throw new Error('La imagen es demasiado grande para el navegador');
   r.skipBlock();              // datos de modo de color
   // recursos de imagen: resolución (1005), guías (1032), nombres de canales alfa (1006) y trazados (2000…)
-  let ppi = 72;
+  let ppi = 72, icc: Uint8Array | null = null;
   const guides = { h: [] as number[], v: [] as number[] }, alphaNames: string[] = [], paths: { id: number; name: string; data: Uint8Array }[] = [];
   { const rl = r.u32(), rEnd = r.pos + rl;
     try {
@@ -766,6 +767,7 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
         if (id === 1005 && sz >= 16) { const v = r.u32() / 65536, unit = r.u16(); ppi = unit === 2 ? v * 2.54 : v; }
         else if (id === 1032 && sz >= 16) { r.u32(); r.u32(); r.u32(); const n = r.u32(); for (let k = 0; k < n && r.pos + 5 <= dataStart + sz; k++) { const loc = r.i32() / 32, dir = r.u8(); (dir ? guides.h : guides.v).push(loc); } }
         else if (id === 1006) { while (r.pos < dataStart + sz) { const n = r.u8(); if (!n && r.pos >= dataStart + sz) break; alphaNames.push(String.fromCharCode(...r.bytes(n))); } }
+        else if (id === 1039 && sz > 132) icc = new Uint8Array(r.bytes(sz));
         else if (id >= 2000 && id <= 2997) paths.push({ id, name: rname || `Trazado ${paths.length + 1}`, data: new Uint8Array(r.bytes(sz)) });
         r.pos = dataStart + sz + (sz & 1);
       }
@@ -883,6 +885,20 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
   }
   if (smartOk) warnings.push(`${smartOk} objeto(s) inteligente(s) importados con su contenido editable (sin filtros inteligentes ni deformaciones)`);
   if (smartPx) warnings.push(`${smartPx} objeto(s) inteligente(s) con contenido no compatible (vectorial o enlazado a un archivo externo) se quedan como píxeles`);
+  // perfil de color: si no es sRGB (Adobe RGB, Display P3…), los píxeles se convierten a sRGB
+  if (icc && !gray && !cmyk) {
+    const { parseIcc, isSrgb, convertToSrgb } = await import('./icc');
+    const prof = parseIcc(icc);
+    if (!prof) warnings.push('El archivo trae un perfil de color que no se puede convertir: los colores pueden verse algo distintos');
+    else if (!isSrgb(prof)) {
+      for (const l of doc.allLayers()) {
+        if (l.kind !== 'raster' || !(l as RasterLayer).canvas) continue;
+        const c = (l as RasterLayer).canvas, x = ctx2d(c), id = x.getImageData(0, 0, c.width, c.height);
+        convertToSrgb(id.data, prof); x.putImageData(id, 0, 0); l.touch();
+      }
+      warnings.push(`Colores convertidos de «${prof.name}» a sRGB`);
+    }
+  }
   doc.setActive(doc.allLayers().pop() ?? null, false);
   return { doc, warnings };
 }
@@ -1238,6 +1254,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
     if (gv.length + gh.length) { const g = new Writer(); g.u32(1); g.u32(576); g.u32(576); g.u32(gv.length + gh.length); for (const x of gv) { g.i32(Math.round(x * 32)); g.u8(0); } for (const y of gh) { g.i32(Math.round(y * 32)); g.u8(1); } add(1032, '', g); }
     if (doc.channels.length) { const nm = new Writer(); for (const c of doc.channels) pascal(nm, c.name, 1); add(1006, '', nm); }
     doc.paths.forEach((pth, i) => { if (i < 997) add(2000 + i, pth.name, pathRecords(pth.subpaths, W, H)); });
+    { const p = new Writer(); p.bytes(srgbIcc()); add(1039, '', p); } // perfil de color sRGB
     out.u32(res.size); out.writer(res); }
   // motivos usados por capas de relleno y superposiciones de motivo
   const usedPat = new Set<string>();

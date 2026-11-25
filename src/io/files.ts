@@ -260,7 +260,10 @@ export async function exportImage(doc: EditorDocument, type: ExportType, quality
     const r = await import('./raster'), id = ctx2d(c).getImageData(0, 0, c.width, c.height);
     return type === 'image/tiff' ? r.encodeTiff(id, doc.ppi || 72) : type === 'image/x-tga' ? r.encodeTga(id) : r.encodeBmp(id);
   }
-  return canvasToBlob(c, type, quality);
+  const blob = await canvasToBlob(c, type, quality);
+  // perfil de color: el editor trabaja en sRGB y así lo dice el archivo (Photoshop y otros lo muestran igual)
+  if (type === 'image/png' || type === 'image/jpeg') { const icc = await import('./icc'); return type === 'image/png' ? icc.pngWithSrgb(blob) : icc.jpegWithSrgb(blob); }
+  return blob;
 }
 
 export function pickFiles(accept: string, multiple = true): Promise<File[]> {
