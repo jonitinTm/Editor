@@ -409,7 +409,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
         h('button', { class: 'btn', onclick: () => actionById.get('canvasSize')!.run() }, 'Tamaño de lienzo')));
     if (!l) return;
     const kind = l instanceof GroupLayer && l.artboard ? 'Mesa de trabajo' : l instanceof AdjustmentLayer ? (FILTER_BY_ID.get(l.filterId)?.fill ? 'Capa de relleno' : 'Capa de ajuste') : l instanceof GroupLayer ? 'Grupo' : l instanceof TextLayer ? 'Capa de texto' : l instanceof ShapeLayer ? 'Forma vectorial' : l instanceof SmartLayer ? 'Objeto inteligente' : 'Capa de píxeles';
-    body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · editando máscara' : '')));
+    body.append(h('div', { class: 'prop-title' }, kind + (d.editMask ? ' · Editando máscara' : '')));
     if (l instanceof GroupLayer && l.artboard) {
       const a = l.artboard;
       const num = (v: number, set: (v: number) => void) => { const i = h('input', { type: 'number', class: 'num', value: String(Math.round(v)) }); i.onchange = () => { set(Math.round(+i.value || 0)); fitBoards(); d.commit('Mesa de trabajo'); }; return i; };
