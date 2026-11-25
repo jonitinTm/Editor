@@ -300,6 +300,37 @@ function vectorPaths(b: Uint8Array, W: number, H: number): VectorMask | null {
   if (!ok || !real.length || startFilled) return null;
   return { subpaths: real.map(sp => ({ ...sp, closed: true })), enabled: !(flags & 2), invert: !!(flags & 1) };
 }
+/** Cadena Pascal (longitud + texto en latin1), rellenada hasta múltiplo de `pad` bytes en total. */
+function pascal(w: Writer, text: string, pad: number) {
+  const b = Array.from(text.slice(0, 255)).map(ch => { const c = ch.charCodeAt(0); return c < 256 ? c : 63; });
+  w.u8(b.length); for (const c of b) w.u8(c);
+  for (let n = 1 + b.length; n % pad; n++) w.u8(0);
+}
+/** Trazado del documento → registros de trazado de Photoshop (recurso 2000+): abiertos y cerrados. */
+function pathRecords(subs: { closed: boolean; pts: PathPoint[] }[], W: number, H: number): Writer {
+  const v = new Writer(), pad = (n: number) => { for (let i = 0; i < n; i++) v.u8(0); };
+  v.u16(6); pad(24);           // regla de relleno del trazado
+  v.u16(8); v.u16(0); pad(22); // relleno inicial
+  const fx = (val: number, size: number) => v.i32(Math.round(val / size * 16777216));
+  for (const sp of subs) {
+    if (sp.pts.length < 1) continue;
+    v.u16(sp.closed ? 0 : 3); v.u16(sp.pts.length); pad(22);
+    for (const q of sp.pts) { const smooth = !(q.ix === q.x && q.iy === q.y && q.ox === q.x && q.oy === q.y); v.u16(sp.closed ? (smooth ? 1 : 2) : (smooth ? 4 : 5)); fx(q.iy, H); fx(q.ix, W); fx(q.y, H); fx(q.x, W); fx(q.oy, H); fx(q.ox, W); }
+  }
+  return v;
+}
+/** Registros de trazado de Photoshop → subtrazados (conserva abiertos/cerrados). */
+function readPathRecords(b: Uint8Array, W: number, H: number): { closed: boolean; pts: PathPoint[] }[] {
+  const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+  const pt = (o: number) => ({ y: v.getInt32(o) / 16777216 * H, x: v.getInt32(o + 4) / 16777216 * W });
+  const subs: { closed: boolean; pts: PathPoint[] }[] = []; let cur: PathPoint[] | null = null;
+  for (let o = 0; o + 26 <= b.length; o += 26) {
+    const sel = v.getUint16(o);
+    if (sel === 0 || sel === 3) { cur = []; subs.push({ closed: sel === 0, pts: cur }); }
+    else if ((sel === 1 || sel === 2 || sel === 4 || sel === 5) && cur) { const a = pt(o + 2), n = pt(o + 10), z = pt(o + 18); cur.push({ ix: a.x, iy: a.y, x: n.x, y: n.y, ox: z.x, oy: z.y }); }
+  }
+  return subs.filter(sp => sp.pts.length >= 1);
+}
 /** Trazados → bloque vmsk de Photoshop. */
 function vectorMaskBlock(vm: VectorMask, W: number, H: number): Uint8Array {
   const v = new Writer(); v.u32(3); v.u32((vm.invert ? 1 : 0) | (vm.enabled ? 0 : 2));
@@ -724,14 +755,18 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
   if (mode === 4) warnings.push('Documento CMYK convertido a RGB sin perfil de color: los colores pueden variar ligeramente');
   if (W * H > 268e6) throw new Error('La imagen es demasiado grande para el navegador');
   r.skipBlock();              // datos de modo de color
-  // recursos de imagen: de aquí solo interesa la resolución (1005)
+  // recursos de imagen: resolución (1005), guías (1032), nombres de canales alfa (1006) y trazados (2000…)
   let ppi = 72;
+  const guides = { h: [] as number[], v: [] as number[] }, alphaNames: string[] = [], paths: { id: number; name: string; data: Uint8Array }[] = [];
   { const rl = r.u32(), rEnd = r.pos + rl;
     try {
       while (r.pos + 12 <= rEnd && r.str(4) === '8BIM') {
-        const id = r.u16(), nl = r.u8(); r.pos += nl + ((nl + 1) & 1 ? 1 : 0);
+        const id = r.u16(), nl = r.u8(); const rname = r.str(nl); if ((nl + 1) & 1) r.pos++;
         const sz = r.u32(), dataStart = r.pos;
         if (id === 1005 && sz >= 16) { const v = r.u32() / 65536, unit = r.u16(); ppi = unit === 2 ? v * 2.54 : v; }
+        else if (id === 1032 && sz >= 16) { r.u32(); r.u32(); r.u32(); const n = r.u32(); for (let k = 0; k < n && r.pos + 5 <= dataStart + sz; k++) { const loc = r.i32() / 32, dir = r.u8(); (dir ? guides.h : guides.v).push(loc); } }
+        else if (id === 1006) { while (r.pos < dataStart + sz) { const n = r.u8(); if (!n && r.pos >= dataStart + sz) break; alphaNames.push(String.fromCharCode(...r.bytes(n))); } }
+        else if (id >= 2000 && id <= 2997) paths.push({ id, name: rname || `Trazado ${paths.length + 1}`, data: new Uint8Array(r.bytes(sz)) });
         r.pos = dataStart + sz + (sz & 1);
       }
     } catch { /* recursos inesperados */ }
@@ -740,6 +775,8 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
   const lmEnd = r.pos + lmLen;
   const doc = new EditorDocument(name, W, H);
   if (ppi > 1 && ppi < 100000) doc.ppi = Math.round(ppi * 100) / 100;
+  if (guides.h.length + guides.v.length) doc.guides = guides;
+  for (const pth of paths.sort((a, b) => a.id - b.id)) { try { const subpaths = readPathRecords(pth.data, W, H); if (subpaths.length) doc.paths.push({ name: pth.name, subpaths }); } catch { warnings.push(`El trazado «${pth.name}» no se pudo leer`); } }
   const gray = mode === 1, cmyk = mode === 4;
   const pending: PendingSmart[] = [];
   const linked = new Map<string, { name: string; data: Uint8Array }>();
@@ -798,6 +835,26 @@ export async function readPsd(buf: ArrayBuffer, name: string): Promise<PsdResult
     }
     const l = new RasterLayer('Fondo', W, H); ctx2d(l.canvas).putImageData(img, 0, 0); l.touch();
     doc.root.add(l);
+  }
+  // canales alfa (selecciones guardadas): son los últimos canales de la imagen combinada, nombrados en el recurso 1006
+  if (alphaNames.length && depth === 8) {
+    try {
+      r.pos = lmEnd;
+      const comp = r.u16(), n = W * H;
+      if (comp <= 1) {
+        const counts: number[] = []; if (comp === 1) for (let i = 0; i < nch * H; i++) counts.push(r.big ? r.u32() : r.u16());
+        const colorCh = gray ? 1 : cmyk ? 4 : 3, first = Math.max(colorCh, nch - alphaNames.length);
+        for (let c = 0; c < nch; c++) {
+          if (c < first) { r.pos += comp === 1 ? counts.slice(c * H, (c + 1) * H).reduce((a, b) => a + b, 0) : W * H; continue; }
+          const raw = new Uint8Array(n);
+          for (let y = 0; y < H; y++) { if (comp === 1) unpackBits(r.bytes(counts[c * H + y]), raw, y * W, W); else raw.set(r.bytes(W), y * W); }
+          const cv = makeCanvas(W, H), x = ctx2d(cv), img = x.createImageData(W, H);
+          for (let i = 0; i < n; i++) { img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = 255; img.data[i * 4 + 3] = raw[i]; }
+          x.putImageData(img, 0, 0);
+          doc.channels.push({ id: doc.channels.length + 1, name: alphaNames[c - first] ?? `Alfa ${doc.channels.length + 1}`, canvas: cv });
+        }
+      }
+    } catch { warnings.push('Los canales alfa no se pudieron leer'); }
   }
   // Objetos inteligentes de Photoshop: se reconstruyen desde su archivo incrustado
   let smartOk = 0, smartPx = 0;
@@ -1168,11 +1225,20 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
 
   const out = new Writer();
   out.str('8BPS'); out.u16(1); for (let i = 0; i < 6; i++) out.u8(0);
-  out.u16(3); out.u32(H); out.u32(W); out.u16(8); out.u16(3);
+  out.u16(3 + doc.channels.length); out.u32(H); out.u32(W); out.u16(8); out.u16(3);
   out.u32(0);
-  // recursos de imagen: resolución (1005)
-  { const fx16 = Math.round(doc.ppi * 65536); out.u32(28); out.str('8BIM'); out.u16(1005); out.u8(0); out.u8(0); out.u32(16);
-    out.u32(fx16); out.u16(1); out.u16(2); out.u32(fx16); out.u16(1); out.u16(2); }
+  // recursos de imagen: resolución (1005), guías (1032), nombres de canales alfa (1006) y trazados (2000…)
+  { const res = new Writer();
+    const add = (id: number, name: string, data: Writer) => {
+      res.str('8BIM'); res.u16(id); pascal(res, name, 2);
+      const n = data.size; res.u32(n); res.writer(data); if (n & 1) res.u8(0);
+    };
+    const fx16 = Math.round(doc.ppi * 65536), r1 = new Writer(); r1.u32(fx16); r1.u16(1); r1.u16(2); r1.u32(fx16); r1.u16(1); r1.u16(2); add(1005, '', r1);
+    const gv = doc.guides?.v ?? [], gh = doc.guides?.h ?? [];
+    if (gv.length + gh.length) { const g = new Writer(); g.u32(1); g.u32(576); g.u32(576); g.u32(gv.length + gh.length); for (const x of gv) { g.i32(Math.round(x * 32)); g.u8(0); } for (const y of gh) { g.i32(Math.round(y * 32)); g.u8(1); } add(1032, '', g); }
+    if (doc.channels.length) { const nm = new Writer(); for (const c of doc.channels) pascal(nm, c.name, 1); add(1006, '', nm); }
+    doc.paths.forEach((pth, i) => { if (i < 997) add(2000 + i, pth.name, pathRecords(pth.subpaths, W, H)); });
+    out.u32(res.size); out.writer(res); }
   // motivos usados por capas de relleno y superposiciones de motivo
   const usedPat = new Set<string>();
   for (const l of doc.allLayers()) { if (l instanceof AdjustmentLayer && l.filterId === 'patternfill' && l.params.pattern) usedPat.add(l.params.pattern); if (l.styles?.patternOverlay?.enabled) usedPat.add(l.styles.patternOverlay.pattern); }
@@ -1186,6 +1252,8 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
   const fd = getPixels(flat).data;
   out.u16(1);
   const enc = [0, 1, 2].map(c => { const plane = new Uint8Array(W * H); for (let i = 0; i < W * H; i++) plane[i] = fd[i * 4 + c]; return encodeChannel(plane, W, H, false); });
+  // canales alfa (selecciones guardadas) a continuación del color
+  for (const ch of doc.channels) { const a = getPixels(ch.canvas).data, plane = new Uint8Array(W * H); for (let i = 0; i < W * H; i++) plane[i] = a[i * 4 + 3]; enc.push(encodeChannel(plane, W, H, false)); }
   for (const e of enc) for (const c of e.counts) out.u16(c);
   for (const e of enc) out.bytes(e.data);
   return { blob: new Blob(out.parts() as BlobPart[], { type: 'image/vnd.adobe.photoshop' }), warnings };
