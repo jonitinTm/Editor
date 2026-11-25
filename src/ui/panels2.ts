@@ -18,12 +18,15 @@ export function buildNavigatorPanel(parent: HTMLElement) {
   const cv = h('canvas', { class: 'nav-canvas' }), ctx = cv.getContext('2d')!;
   const zoom = h('input', { type: 'range', min: '-460', max: '415', step: '1', class: 'nav-zoom', title: 'Zoom' });
   const pct = h('span', { class: 'nav-pct' });
-  const body = h('div', { class: 'panel-body nav' }, cv, h('div', { class: 'nav-bar' }, h('button', { class: 'btn icon-btn', title: 'Alejar', onclick: () => app.viewport.zoomStep(-1) }, '−'), zoom, h('button', { class: 'btn icon-btn', title: 'Acercar', onclick: () => app.viewport.zoomStep(1) }, '+'), pct));
+  const bar = h('div', { class: 'nav-bar' }, h('button', { class: 'btn icon-btn', title: 'Alejar', onclick: () => app.viewport.zoomStep(-1) }, '−'), zoom, h('button', { class: 'btn icon-btn', title: 'Acercar', onclick: () => app.viewport.zoomStep(1) }, '+'), pct);
+  const body = h('div', { class: 'panel-body nav' }, cv, bar);
   parent.append(body);
   let thumb: HTMLCanvasElement | null = null, k = 1, ox = 0, oy = 0;
   const layout = () => {
     const d = app.doc; if (!d) return;
-    const W = Math.max(60, body.clientWidth - 16), H = 150;
+    // la miniatura cabe en el hueco del panel (si no, la parte de abajo quedaba tapada por el panel siguiente)
+    const room = (parent.clientHeight || 190) - bar.offsetHeight - 22;
+    const W = Math.max(60, body.clientWidth - 16), H = Math.max(60, Math.min(220, room));
     k = Math.min(W / d.width, H / d.height); const tw = Math.round(d.width * k), th = Math.round(d.height * k);
     cv.width = W; cv.height = H; ox = Math.round((W - tw) / 2); oy = Math.round((H - th) / 2);
   };
@@ -56,6 +59,9 @@ export function buildNavigatorPanel(parent: HTMLElement) {
     vp.placeDocPoint(x, y, { x: vp.width / 2, y: vp.height / 2 });
     vp.requestRender(); app.emit('view');
   };
+  // al cambiar el alto del panel (arrastrar el separador, girar la tableta) se rehace
+  let lastRoom = 0;
+  new ResizeObserver(() => { const r = parent.clientHeight + 'x' + body.clientWidth; if (r !== String(lastRoom)) { lastRoom = r as any; renderThumb(); } }).observe(parent);
   cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); go(e); });
   cv.addEventListener('pointermove', e => { if (e.buttons) go(e); });
   zoom.addEventListener('input', () => app.viewport.setZoom(Math.pow(2, +zoom.value / 100), null));

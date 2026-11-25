@@ -441,7 +441,7 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
     title: def.name.replace('…', '') + (session instanceof ops.SmartFilterSession ? ' (filtro inteligente)' : ''), width: def.custom ? 420 : 400, side: true,
     body: [...body, row('Predefinido', presetSel), h('label', { class: 'check preview-check' }, prev, ' Vista previa')],
     extraButtons: [reset],
-    onOk: async () => { clearTimeout(timer); await session.commit(params); ops.setLastFilter(def, params); if (!edit) record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') }); },
+    onOk: async () => { clearTimeout(timer); await ops.trackOp(Promise.resolve(session.commit(params))); ops.setLastFilter(def, params); if (!edit) record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') }); },
     onCancel: () => { clearTimeout(timer); session.clearPreview(); },
   });
   showDialogClose = () => { clearTimeout(timer); session.clearPreview(); dlg.close(); };

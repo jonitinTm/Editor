@@ -41,28 +41,31 @@ function closeRing() { ring?.remove(); ring = null; btn?.classList.remove('ringe
 
 function openRing() {
   closeRing();
+  if (!sticky) setMod(false);
   const r = btn!.getBoundingClientRect(), R = 100, cx0 = r.left + r.width / 2, cy0 = r.top + r.height / 2;
   // el anillo cabe entero en la pantalla aunque el botón esté en una esquina
   const cx = Math.max(R + 34, Math.min(innerWidth - R - 34, cx0)), cy = Math.max(R + 34, Math.min(innerHeight - R - 34, cy0));
   const items = prefs.quickSlots.map(item).filter((x): x is Item => !!x).slice(0, 8);
-  const el = h('div', { class: 'qring-overlay' });
+  const el = h('div', { class: 'qring-overlay' }), opened = performance.now();
+  // un doble toque rápido sobre el botón no debe pulsar lo que hay debajo del dedo en el menú recién abierto
+  const fresh = () => performance.now() - opened < 350;
   el.addEventListener('pointerdown', e => { if (e.target === el) { e.preventDefault(); closeRing(); } });
   items.forEach((it, i) => {
     const a = -Math.PI / 2 + i / items.length * Math.PI * 2;
     const b = h('button', { class: 'qring-item' + (it.on ? ' on' : ''), type: 'button', title: it.label, 'aria-label': it.label, disabled: it.off || undefined },
       h('span', { class: 'qi-ic', html: it.svg }), h('span', { class: 'qi-lb' }, it.short ?? it.label));
     b.style.left = cx + Math.cos(a) * R + 'px'; b.style.top = cy + Math.sin(a) * R + 'px';
-    b.onclick = () => { closeRing(); it.run(); };
+    b.onclick = () => { if (fresh()) return; closeRing(); it.run(); };
     el.append(b);
   });
   // en el centro: fijar la tecla (para usarla con una sola mano) y los ajustes del botón
   const name = MOD_NAMES[prefs.quickMod];
   const lock = h('button', { class: 'qring-center' + (sticky ? ' on' : ''), type: 'button', title: sticky ? `Soltar ${name}` : `Fijar ${name}`, 'aria-label': sticky ? `Soltar ${name}` : `Fijar ${name}` }, h('span', { html: icon('modKey') }), h('span', { class: 'qi-lb' }, sticky ? `Soltar ${name}` : `Fijar ${name}`));
   lock.style.left = cx + 'px'; lock.style.top = cy - 16 + 'px';
-  lock.onclick = () => { closeRing(); sticky = !sticky; setMod(sticky); app.toast(sticky ? `${name} fijada: toca el botón rápido para soltarla` : `${name} suelta`); };
+  lock.onclick = () => { if (fresh()) return; closeRing(); sticky = !sticky; setMod(sticky); app.toast(sticky ? `${name} fijada: toca el botón rápido para soltarla` : `${name} suelta`); };
   const cfg = h('button', { class: 'qring-cfg', type: 'button', title: 'Personalizar el botón rápido', 'aria-label': 'Personalizar el botón rápido' }, 'Personalizar');
   cfg.style.left = cx + 'px'; cfg.style.top = cy + 24 + 'px';
-  cfg.onclick = () => { closeRing(); quickBtnDialog(); };
+  cfg.onclick = () => { if (fresh()) return; closeRing(); quickBtnDialog(); };
   el.append(lock, cfg);
   document.body.append(el); ring = el; btn!.classList.add('ringed');
 }
@@ -101,10 +104,10 @@ export function buildQuickButton(host: HTMLElement) {
     b.style.left = Math.max(4, Math.min(W - 60, x)) + 'px'; b.style.top = Math.max(4, Math.min(H - 60, y)) + 'px';
   };
   const restore = () => { let p: { x: number; y: number } | null = null; try { p = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch { /* sin almacenamiento */ } const W = host.clientWidth, H = host.clientHeight; place(p ? p.x * W : 44, p ? p.y * H : H - 140); };
-  let st: { x: number; y: number; bx: number; by: number; t: number; drag: boolean; held: boolean; timer: number } | null = null;
+  let st: { x: number; y: number; bx: number; by: number; t: number; drag: boolean; held: boolean; timer: number; id: number } | null = null;
   b.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation(); b.setPointerCapture(e.pointerId); closeRing();
-    st = { x: e.clientX, y: e.clientY, bx: b.offsetLeft, by: b.offsetTop, t: performance.now(), drag: false, held: false, timer: 0 };
+    st = { x: e.clientX, y: e.clientY, bx: b.offsetLeft, by: b.offsetTop, t: performance.now(), drag: false, held: false, timer: 0, id: e.pointerId };
     const s = st;
     s.timer = window.setTimeout(() => { if (st === s && !s.drag) { s.held = true; if (!sticky) setMod(true); } }, 220);
   });
@@ -129,7 +132,10 @@ export function buildQuickButton(host: HTMLElement) {
     // teclado (Intro o espacio con el foco en el botón): abre el menú
     if (e.detail === 0 && !ring) openRing();
   });
-  b.addEventListener('pointerup', up); b.addEventListener('pointercancel', () => { if (st) { clearTimeout(st.timer); st = null; } if (!sticky) setMod(false); });
+  b.addEventListener('pointerup', up);
+  // si el dedo se suelta fuera del botón (o el navegador pierde la captura), la tecla se suelta igual
+  addEventListener('pointerup', e => { if (st && e.pointerId === st.id && e.target !== b) up(); }, true);
+  b.addEventListener('lostpointercapture', e => { if (st && e.pointerId === st.id) { const s2 = st; setTimeout(() => { if (st === s2) up(); }, 0); } }); b.addEventListener('pointercancel', () => { if (st) { clearTimeout(st.timer); st = null; } if (!sticky) setMod(false); });
   // la tecla no se queda «pegada» si se pierde el foco o se cambia de app
   addEventListener('blur', () => { if (!sticky) setMod(false); });
   update = () => {

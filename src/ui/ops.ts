@@ -34,9 +34,17 @@ const doc = () => app.doc;
 /** Llamar tras deshacer/rehacer o cambiar de documento. */
 export function notifyToolDocChanged() { app.tool?.docChanged?.(); }
 
-export function undo() { const d = doc(); if (!d) return; app.tool?.cancel?.(); d.undo(); notifyToolDocChanged(); }
-export function redo() { const d = doc(); if (!d) return; app.tool?.cancel?.(); d.redo(); notifyToolDocChanged(); }
-export function gotoHistory(i: number) { const d = doc(); if (!d) return; app.tool?.cancel?.(); d.gotoHistory(i); notifyToolDocChanged(); }
+/** Operación que aún se está calculando (un filtro en el hilo de fondo): deshacer, rehacer y otro filtro esperan a que
+ *  acabe. Si no, Ctrl+Z justo después de un filtro deshacía el paso anterior y luego el filtro se aplicaba igual. */
+let busy: Promise<unknown> | null = null;
+function track<T>(p: Promise<T>): Promise<T> { const q: Promise<unknown> = p.catch(() => {}).finally(() => { if (busy === q) busy = null; }); busy = q; return p; }
+/** Cuenta `p` como operación en curso (deshacer espera a que acabe). */
+export function trackOp<T>(p: Promise<T>): Promise<T> { return track(p); }
+/** Se resuelve cuando no queda ninguna operación calculándose. */
+export function whenIdle(): Promise<void> { return busy ? busy.then(() => whenIdle()) : Promise.resolve(); }
+export function undo() { if (busy) { busy.then(undo); return; } const d = doc(); if (!d) return; app.tool?.cancel?.(); d.undo(); notifyToolDocChanged(); }
+export function redo() { if (busy) { busy.then(redo); return; } const d = doc(); if (!d) return; app.tool?.cancel?.(); d.redo(); notifyToolDocChanged(); }
+export function gotoHistory(i: number) { if (busy) { busy.then(() => gotoHistory(i)); return; } const d = doc(); if (!d) return; app.tool?.cancel?.(); d.gotoHistory(i); notifyToolDocChanged(); }
 
 // ---- Documentos -------------------------------------------------------------
 
@@ -1320,7 +1328,11 @@ export function removeSmartFilter(l: SmartLayer, i: number) {
 export let lastFilter: { def: FilterDef; params: any } | null = null;
 export function setLastFilter(def: FilterDef, params: any) { if (def.group === 'filtro') lastFilter = { def, params }; }
 
-export async function applyFilterDirect(def: FilterDef, params: any = {}) {
+export function applyFilterDirect(def: FilterDef, params: any = {}): Promise<void> {
+  const prev = busy;
+  return track((async () => { if (prev) await prev; await applyFilterNow(def, params); })());
+}
+async function applyFilterNow(def: FilterDef, params: any) {
   await loadFilterImpls();
   record({ kind: 'filter', id: def.id, params: JSON.parse(JSON.stringify(params)), label: def.name.replace('…', '') });
   const a = doc()?.active;
