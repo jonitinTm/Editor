@@ -571,15 +571,23 @@ export class TextLayer extends RasterLayer {
       R.lines.forEach((line, i) => {
         let x = p.align === 'center' ? left + (L.width - line.w) / 2 : p.align === 'right' ? left + L.width - line.w : left;
         const base = p.y + i * lh + (lh - R.maxSize) / 2 + R.maxSize * 0.8;
+        // justificado (en caja, salvo la última línea de cada párrafo): lo que sobra se reparte entre los espacios
+        const lineText = txt.slice(line.start, line.end), lastOfPara = line.end >= txt.length || txt[line.end] === '\n';
+        const spaces = (lineText.match(/ /g) ?? []).length;
+        const gap = p.align === 'justify' && p.boxWidth && !lastOfPara && spaces > 0 ? Math.max(0, (L.width - line.w) / spaces) : 0;
         for (const sg of segments(p.runs!, line.start, line.end)) {
           const size = sg.st.size ?? p.size, t = txt.slice(sg.a, sg.b);
           ctx.font = this.runFont(sg.st); if ('letterSpacing' in ctx) (ctx as any).letterSpacing = `${(p.tracking ?? 0) / 1000 * size}px`;
           ctx.fillStyle = sg.st.color ?? p.color;
-          ctx.fillText(t, x, base);
-          const w = ctx.measureText(t).width, thick = Math.max(1, size / 16);
-          if (sg.st.underline ?? p.underline) ctx.fillRect(x, base + size * 0.12, w, thick);
-          if (sg.st.strike ?? p.strike) ctx.fillRect(x, base - size * 0.28, w, thick);
-          x += w;
+          const thick = Math.max(1, size / 16), under = sg.st.underline ?? p.underline, strike = sg.st.strike ?? p.strike;
+          // por palabras si hay que repartir espacio; si no, el trozo entero
+          for (const tok of gap ? t.split(/( )/).filter(Boolean) : [t]) {
+            const w = ctx.measureText(tok).width + (gap && tok === ' ' ? gap : 0);
+            if (tok !== ' ' || !gap) ctx.fillText(tok, x, base);
+            if (under) ctx.fillRect(x, base + size * 0.12, w, thick);
+            if (strike) ctx.fillRect(x, base - size * 0.28, w, thick);
+            x += w;
+          }
         }
       });
     } else
