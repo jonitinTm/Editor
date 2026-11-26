@@ -138,8 +138,12 @@ class App {
   toast(msg: string, kind: 'info' | 'warn' = 'info') {
     const box = document.getElementById('toasts');
     if (!box) return;
+    // el mismo aviso repetido no se apila: se renueva el que ya hay; y como mucho se ven 4 a la vez
+    for (const o of [...box.children] as HTMLElement[]) if (o.dataset.msg === msg) o.remove();
+    while (box.children.length >= 4) box.firstElementChild!.remove();
     const t = document.createElement('div');
     t.className = 'toast ' + kind;
+    t.dataset.msg = msg;
     t.textContent = msg;
     box.append(t);
     setTimeout(() => t.classList.add('out'), 2600);

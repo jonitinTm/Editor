@@ -213,6 +213,14 @@ const handles = new WeakMap<EditorDocument, any>();
 export async function saveProject(saveAs = false) {
   const d = doc(); if (!d) return;
   if (d.embedded) { app.toast('Es el contenido de un objeto inteligente: los cambios ya se aplican solos al documento principal'); return; }
+  // Guardar: en Mis proyectos (como en las apps de tableta: sin buscar carpetas ni descargar archivos), salvo que el
+  // documento ya esté unido a un archivo del equipo; «Guardar como» guarda un archivo .edp
+  if (!saveAs && !handles.get(d)) {
+    const { saveToLibrary } = await import('./projects');
+    const first = !d.projectId;
+    if (await saveToLibrary(d)) app.toast(first ? 'Guardado en Mis proyectos (Archivo › Mis proyectos). Para guardarlo como archivo: Guardar como' : 'Guardado');
+    return;
+  }
   try {
     const blob = await io.serializeProject(d);
     const h = await io.saveBlob(blob, d.name + io.PROJECT_EXT, saveAs ? undefined : handles.get(d));

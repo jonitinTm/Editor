@@ -165,7 +165,7 @@ function doText(n: Text) {
 }
 const SKIP_ATTR = '.lname, .no-i18n, [contenteditable]';
 function doAttrs(el: Element) {
-  if (el.closest(SKIP_ATTR)) return;
+  if (el.closest(SKIP_ATTR) || el.classList.contains('no-i18n-title')) return;
   for (const a of ATTRS) {
     const v = el.getAttribute(a); if (!v || v.length < 2) continue;
     const w = wroteAttr.get(el); if (w && w[a] === v) continue;

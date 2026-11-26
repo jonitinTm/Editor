@@ -999,3 +999,48 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .qring-center .qi-lb { max-width: 64px; white-space: nowrap; }
 .qring-cfg { border-radius: 8px; font-size: 11px; padding: 3px 8px; }
 .llock.lref svg { color: var(--accent); }
+
+/* ---- Mis proyectos ---- */
+.modal.pj-dialog { max-width: calc(100vw - 24px); }
+.pj-wrap { display: flex; gap: 14px; min-height: 360px; max-height: min(70vh, 640px); }
+.pj-side { width: 190px; flex: none; display: flex; flex-direction: column; gap: 2px; overflow: auto; }
+.pj-folder { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text); text-align: left; min-height: 36px; }
+.pj-folder svg { width: 16px; height: 16px; opacity: .8; }
+.pj-folder.on { background: var(--accent-soft); }
+.pj-folder:hover { background: var(--btn-hover); }
+.pj-fname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-count { color: var(--muted); font-size: 11px; }
+.pj-newfolder { margin-top: 8px; display: flex; align-items: center; gap: 6px; justify-content: center; }
+.pj-newfolder svg { width: 14px; height: 14px; }
+.pj-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.pj-top { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pj-search { flex: 1 1 160px; min-width: 120px; }
+.pj-grid { flex: 1; overflow: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; align-content: start; padding: 2px; }
+.pj-card { position: relative; display: flex; flex-direction: column; gap: 3px; padding: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--panel-2, var(--panel)); cursor: pointer; min-width: 0; }
+.pj-card:hover, .pj-card:focus-visible { border-color: var(--accent); outline: none; }
+.pj-card img, .pj-noimg { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: repeating-conic-gradient(#5a5a5a 0 25%, #4a4a4a 0 50%) 0 0/10px 10px; border-radius: 4px; }
+.pj-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 26px; }
+.pj-sub { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pj-more { position: absolute; right: 4px; bottom: 22px; width: 30px; height: 30px; border: 0; border-radius: 6px; background: transparent; color: var(--text); display: grid; place-items: center; padding: 0; }
+.pj-more:hover { background: var(--btn-hover); }
+.pj-more svg { width: 16px; height: 16px; }
+.pj-empty { grid-column: 1 / -1; color: var(--muted); padding: 30px 10px; text-align: center; line-height: 1.5; }
+.pj-info { margin-top: 2px; }
+.pj-menu { position: fixed; z-index: 400; width: 220px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.45); padding: 4px; display: flex; flex-direction: column; }
+.pj-mi { text-align: left; padding: 9px 10px; border: 0; border-radius: 5px; background: transparent; color: var(--text); min-height: 36px; }
+.pj-mi:hover { background: var(--accent); color: #fff; }
+.pj-mi.danger { color: #ff6b6b; }
+.pj-mi.danger:hover { background: #c0392b; color: #fff; }
+.pj-versions { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow: auto; margin-top: 8px; }
+.pj-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.pj-strip-box { margin: 4px 0 10px; }
+.pj-strip-head { display: flex; align-items: center; justify-content: space-between; }
+.pj-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; margin-top: 6px; }
+.pj-strip .pj-name { padding-right: 0; }
+@media (max-width: 700px) {
+  .pj-wrap { flex-direction: column; max-height: none; }
+  .pj-side { width: auto; flex-direction: row; overflow-x: auto; overflow-y: hidden; padding-bottom: 4px; }
+  .pj-folder { flex: none; }
+  .pj-newfolder { margin-top: 0; flex: none; }
+  .pj-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); max-height: 55vh; }
+}

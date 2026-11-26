@@ -18,7 +18,7 @@ const filterItems = (group: 'ajuste' | 'filtro'): Item[] => {
 };
 
 export const MENUS: { label: string; items: Item[] }[] = [
-  { label: 'Archivo', items: ['new', 'templates', 'collage', 'open', 'openGallery', 'galleryLayer', 'openLayers', 'recent', 'place', '-', 'save', 'saveAs', 'quickPng', 'export', 'exportLayers', 'exportSlices', 'social', 'watermark', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'fileInfo', 'print', 'revert', 'close'] },
+  { label: 'Archivo', items: ['new', 'templates', 'collage', 'open', 'openGallery', 'galleryLayer', 'openLayers', 'projects', 'recent', 'place', '-', 'save', 'saveAs', 'quickPng', 'export', 'exportLayers', 'exportSlices', 'social', 'watermark', 'timelapse', '-', 'videoFrames', 'contactSheet', '-', 'batch', 'cropScans', 'panorama', '-', 'fileInfo', 'print', 'revert', 'close'] },
   { label: 'Edición', items: ['undo', 'redo', '-', 'cut', 'copy', 'copyMerged', 'paste', 'pasteInPlace', 'pasteInto', 'clear', '-', 'fade', '-', 'fill', 'contentFill', '-', 'caScale', 'puppet', 'perspWarp', 'autoAlign', 'stroke', '-', 'findReplace', 'skyReplace', '-', 'defineBrush', 'definePattern', 'defineShape', 'importPresets', '-', 'freeTransform',
     { label: 'Transformar', items: ['skew', 'distort', 'perspective', 'warp', '-', 'flipH', 'flipV', '-', 'rot90', 'rot-90', 'rot180'] }, '-', 'keysEdit', 'penSettings', 'quickBtnSettings', 'prefs'] },
   { label: 'Imagen', items: ['autoEnhance', 'blurBg', '-', { label: 'Ajustes', items: [...filterItems('ajuste'), '-', 'variations'] }, '-', 'dupDoc', '-', 'palette', 'applyImage', 'calculations', 'freqSep', '-', 'imageSize', 'canvasSize',

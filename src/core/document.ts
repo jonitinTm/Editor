@@ -61,6 +61,8 @@ export class EditorDocument {
   frameIndex = 0;
   /** true = es el contenido de un objeto inteligente (vive dentro de otro documento). */
   embedded = false;
+  /** Proyecto de «Mis proyectos» al que corresponde (Guardar lo actualiza ahí). */
+  projectId: string | null = null;
   /** ¿Hay cambios sin guardar? */
   modified = false;
   /** Estado en el último guardado (para Archivo › Revertir). */
