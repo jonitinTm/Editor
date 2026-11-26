@@ -645,7 +645,9 @@ export class Viewport {
       // rechazo de la palma: mientras el lápiz está apoyado, los toques no cuentan
       if (touch && this.penDown) return;
       // un contacto muy grande es la palma o el canto de la mano, no un dedo
-      if (touch && (e.width > 48 || e.height > 48)) return;
+      // (el iPhone da contactos más grandes que Android para un dedo normal: con un umbral bajo se ignoraban todos los
+      // dedos; la palma solo molesta mientras se usa el lápiz)
+      if (touch && this.penMode() && Math.max(e.width || 0, e.height || 0) > 100) return;
       (document.activeElement as HTMLElement | null)?.blur?.();
       try { cv.setPointerCapture(e.pointerId); } catch { /* puntero sintético */ }
       const r = cv.getBoundingClientRect();
