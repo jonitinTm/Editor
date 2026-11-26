@@ -2,6 +2,7 @@
 //  - app/Editor.html      → para abrir con doble clic
 //  - index.html (raíz)    → lo que sirve GitHub Pages
 //  - manifest, icono y service worker en la raíz → instalación y uso sin conexión
+import { execSync } from 'node:child_process';
 import { renameSync, copyFileSync, existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 if (existsSync('app/index.html')) renameSync('app/index.html', 'app/Editor.html');
 // la web (raíz) usa la compilación en partes (web-build/): index.html + assets/ (si no existe, la de un archivo)
@@ -12,7 +13,13 @@ if (existsSync('web-build/index.html')) {
   // guarda en memoria) puede seguir cargando sus ventanas en vez de fallar. Solo la anterior, para no acumular.
   const LIST = 'assets/.versiones.json', fresh = readdirSync('web-build/assets');
   mkdirSync('assets', { recursive: true });
-  let prev = []; try { prev = JSON.parse(readFileSync(LIST, 'utf8')).actual ?? []; } catch { prev = readdirSync('assets').filter(f => !f.startsWith('.')); }
+  // «anterior» = la versión publicada (la del último commit), no la de la última compilación local: así se puede
+  // compilar varias veces seguidas sin borrar lo que usa una pestaña abierta con la versión publicada
+  let prev = [];
+  try { prev = JSON.parse(execSync('git show HEAD:' + LIST, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })).actual ?? []; }
+  catch { try { prev = JSON.parse(readFileSync(LIST, 'utf8')).actual ?? []; } catch { prev = readdirSync('assets').filter(f => !f.startsWith('.')); } }
+  // si alguna parte publicada falta en la carpeta (se borró en una compilación anterior), se recupera del commit
+  for (const f of prev) if (!existsSync('assets/' + f)) try { writeFileSync('assets/' + f, execSync('git show HEAD:assets/' + f, { stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 28 })); } catch { /* no estaba publicada */ }
   for (const f of readdirSync('assets')) if (!f.startsWith('.') && !fresh.includes(f) && !prev.includes(f)) rmSync('assets/' + f, { force: true });
   for (const f of fresh) { copyFileSync('web-build/assets/' + f, 'assets/' + f); assets.push('./assets/' + f); }
   writeFileSync(LIST, JSON.stringify({ actual: fresh, anterior: prev.filter(f => !fresh.includes(f)) }));

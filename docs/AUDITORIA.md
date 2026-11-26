@@ -78,6 +78,14 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 
 ## 3. Pruebas ejecutadas
 
+- **Resultado de la última pasada completa (26-11-2026):** de 221 pruebas, 15 fallaron en la primera vuelta. Revisadas una a una:
+  - 10 eran pruebas antiguas que esperaban comportamientos que cambiamos a propósito (Ctrl+S ahora guarda en «Mis proyectos»; el rectángulo redondeado pasó a ser una opción de esquinas; el umbral de palma de 48 px que rompía el iPhone; 33 looks en lugar de 8). Se actualizaron las pruebas, no la app.
+  - 1 era una prueba que no esperaba a que terminase un filtro en segundo plano.
+  - 1 era un guion de depuración que no debía estar en la lista.
+  - 1 prueba con un error de programación propio (corregido).
+  - **1 fallo real de la app:** en el panel Ajustes el deslizador de intensidad de los looks (con el botón ↺ nuevo) se salía del panel y provocaba desplazamiento lateral. Corregido: los deslizadores se encogen si no caben.
+  - Tras las correcciones, todas las pruebas afectadas pasan.
+- **Fallo del proceso de publicación corregido:** compilar dos veces seguidas borraba las partes de la versión publicada (lo que provocaba el «Algo ha fallado» en pestañas abiertas). Ahora siempre se conservan las de la versión del último commit.
 - Batería automática: 228 pruebas (`t1`–`t228`) con navegador real (Chromium), incluidas emulaciones de iPhone, Pixel, iPad, Galaxy Tab y plegables.
 - «Prueba del mono»: miles de acciones al azar (escritorio y táctil) comprobando que la vista coincide con la imagen, que no hay errores y que guardar/abrir (proyecto y PSD) conserva la imagen.
 - Rastreo de traducciones de toda la interfaz.
