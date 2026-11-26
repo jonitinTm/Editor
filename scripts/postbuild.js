@@ -8,8 +8,14 @@ if (existsSync('app/index.html')) renameSync('app/index.html', 'app/Editor.html'
 let assets = [];
 if (existsSync('web-build/index.html')) {
   copyFileSync('web-build/index.html', 'index.html');
-  rmSync('assets', { recursive: true, force: true }); mkdirSync('assets', { recursive: true });
-  for (const f of readdirSync('web-build/assets')) { copyFileSync('web-build/assets/' + f, 'assets/' + f); assets.push('./assets/' + f); }
+  // se conservan también las partes de la versión anterior: una pestaña que siga abierta con ella (el móvil las
+  // guarda en memoria) puede seguir cargando sus ventanas en vez de fallar. Solo la anterior, para no acumular.
+  const LIST = 'assets/.versiones.json', fresh = readdirSync('web-build/assets');
+  mkdirSync('assets', { recursive: true });
+  let prev = []; try { prev = JSON.parse(readFileSync(LIST, 'utf8')).actual ?? []; } catch { prev = readdirSync('assets').filter(f => !f.startsWith('.')); }
+  for (const f of readdirSync('assets')) if (!f.startsWith('.') && !fresh.includes(f) && !prev.includes(f)) rmSync('assets/' + f, { force: true });
+  for (const f of fresh) { copyFileSync('web-build/assets/' + f, 'assets/' + f); assets.push('./assets/' + f); }
+  writeFileSync(LIST, JSON.stringify({ actual: fresh, anterior: prev.filter(f => !fresh.includes(f)) }));
 } else copyFileSync('app/Editor.html', 'index.html');
 for (const f of ['manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'privacidad.html']) copyFileSync('public/' + f, f);
 // El service worker lleva la fecha de construcción para renovar la caché en cada versión

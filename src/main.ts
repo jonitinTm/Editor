@@ -539,7 +539,10 @@ window.addEventListener('unhandledrejection', e => {
   const r = e.reason; if (r?.name === 'AbortError') return;
   // tras publicar una versión nueva con el editor abierto, las piezas antiguas ya no existen: se recarga una vez
   if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(r?.message ?? r))) {
-    try { const k = 'editor.chunkReload', last = +(sessionStorage.getItem(k) || 0); if (Date.now() - last > 60000) { sessionStorage.setItem(k, String(Date.now())); location.reload(); return; } } catch { /* */ }
+    // sin cambios sin guardar, se recarga solo (una vez); si hay trabajo sin guardar, se avisa para no perderlo
+    if (!app.docs.some(d => d.modified)) {
+      try { const k = 'editor.chunkReload', last = +(sessionStorage.getItem(k) || 0); if (Date.now() - last > 60000) { sessionStorage.setItem(k, String(Date.now())); location.reload(); return; } } catch { /* */ }
+    } else { app.toast('Hay una versión nueva del editor: guarda tu trabajo (Ctrl+S) y recarga la página', 'warn'); (window as any).__editorLogError?.(String(r?.message ?? r)); return; }
   }
   reportError(String(r?.stack ?? r));
 });
