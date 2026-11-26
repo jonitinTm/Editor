@@ -28,7 +28,6 @@ import { buildAdjustmentsPanel } from './ui/adjpanel';
 import { dialogOpen } from './ui/dialog';
 import { recentGrid } from './ui/widgets';
 const newDocumentDialog = () => { import('./ui/dialogs').then(m => m.newDocumentDialog()); };
-const quickGuideDialog = () => { import('./ui/dialogs').then(m => m.quickGuideDialog()); };
 import { keyString } from './ui/keys';
 import * as io from './io/files';
 const uniq = lazyModule(() => import('./ui/unique'));
@@ -364,7 +363,7 @@ function buildWelcome() {
       recentBox,
       langPicker(),
       h('div', { class: 'drop-hint' }, 'También puedes arrastrar aquí imágenes (PNG, JPG, WebP, GIF, TIFF…), PSD, RAW o proyectos .edp, o pegar con Ctrl+V.'),
-      h('button', { class: 'link-btn', onclick: () => quickGuideDialog() }, '¿Primera vez aquí? Lee la guía rápida (F1)')));
+      h('button', { class: 'link-btn', onclick: () => { import('./ui/tutorial').then(m => m.tutorialDialog()); } }, '¿Primera vez aquí? Mira el tutorial: cómo se hace cada cosa (F1)')));
 }
 
 // ---- Teclado -----------------------------------------------------------------------------

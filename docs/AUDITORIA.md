@@ -66,6 +66,10 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 - ✅ Gestos (pellizcar, girar, 2/3 dedos deshacer/rehacer y mantenerlos, 4 dedos interfaz), rechazo de palma, lápiz con presión e inclinación, botón rápido (tecla en pantalla y menú circular), atajos configurables, reglas, guías, cuadrícula, ajuste magnético.
 - ✅ Corregido este ciclo: en iPhone el lienzo no respondía al dedo (umbral de palma).
 
+### Ayuda al usuario
+- ✅ **Tutorial «cómo se hace cada cosa»** (Ayuda › Tutorial, o F1): 46 guías paso a paso en 8 temas, con buscador y botón «Probar ahora» que lleva a la herramienta, el menú o el panel. Los nombres de menús y herramientas se rellenan con las etiquetas reales de cada idioma, así siempre coinciden con la pantalla. Traducido a los 9 idiomas y comprobado guía por guía.
+- ✅ Guía de bienvenida, guía de gestos para móvil y tableta, guía rápida, buscador de funciones y nombre visible de cada botón al mantenerlo pulsado.
+
 ### Seguridad y privacidad
 - ✅ Todo se procesa en el dispositivo; ninguna foto se sube. Sin claves ni credenciales en el código.
 - ✅ Archivos dañados o maliciosos: se rechazan con un mensaje claro (pruebas con JPG corrupto, vacío, PSD cortado, proyecto dañado, PNG con proyecto roto).

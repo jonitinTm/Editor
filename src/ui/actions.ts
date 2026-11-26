@@ -414,7 +414,8 @@ export const ACTIONS: Action[] = [
   { id: 'win:all', label: 'Ocultar / mostrar todos los paneles', keys: ['Tab'], run: () => { document.body.classList.toggle('hide-panels'); requestAnimationFrame(() => app.viewport.resize()); } },
 
   // Ayuda
-  { id: 'guide', label: 'Guía rápida', keys: ['F1'], run: dlg.quickGuideDialog },
+  { id: 'tutorial', label: 'Tutorial: cómo se hace cada cosa…', keys: ['F1'], run: () => { import('./tutorial').then(m => m.tutorialDialog()); } },
+  { id: 'guide', label: 'Guía rápida', run: dlg.quickGuideDialog },
   { id: 'shortcuts', label: 'Lista de atajos de teclado', run: () => dlg.shortcutsDialog(shortcutList()) },
   { id: 'about', label: 'Acerca de Editor', run: dlg.aboutDialog },
   { id: 'privacy', label: 'Privacidad', run: dlg.privacyDialog },

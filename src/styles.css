@@ -1071,3 +1071,34 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .look-amount { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
 .look-amount .num-slider { flex: 1; min-width: 0; }
 .look-amount .num-slider input[type=range] { flex: 1; width: auto; }
+
+/* Tutorial: lista de temas a la izquierda y la guía a la derecha; en pantallas estrechas, una cosa cada vez */
+.tut-modal { max-width: calc(100vw - 16px); }
+.tut { display: flex; gap: 14px; height: min(64vh, 560px); min-height: 0; }
+.tut-side { width: 250px; flex: none; display: flex; flex-direction: column; min-height: 0; }
+.tut-search { width: 100%; margin-bottom: 6px; min-height: 32px; }
+.tut-list { flex: 1; overflow: auto; min-height: 0; padding-right: 4px; }
+.tut-topic { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 10px 0 3px; }
+.tut-topic:first-child { margin-top: 2px; }
+.tut-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: var(--text); padding: 6px 8px; border-radius: 6px; font: inherit; font-size: 13px; cursor: pointer; min-height: 32px; }
+.tut-item:hover { background: var(--btn-hover); }
+.tut-item.on { background: var(--accent-soft); }
+.tut-view { flex: 1; min-width: 0; overflow: auto; padding: 0 4px 8px 0; line-height: 1.5; }
+.tut-view h3 { margin: 2px 0 8px; font-size: 17px; color: var(--title); }
+.tut-crumb { font-size: 11px; }
+.tut-steps { padding-left: 22px; margin: 0 0 10px; }
+.tut-steps li { margin-bottom: 7px; }
+.tut-tip { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 7px 10px; border-radius: 4px; margin: 6px 0 12px; }
+.tut-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.tut-next { max-width: 100%; text-align: left; }
+.tut-back { display: none; margin-bottom: 6px; }
+.tut-empty { padding: 8px; }
+@media (max-width: 700px) {
+  .tut { height: min(70vh, 620px); }
+  .tut-side { width: auto; flex: 1; }
+  .tut-view { display: none; }
+  .tut.reading .tut-side { display: none; }
+  .tut.reading .tut-view { display: block; }
+  .tut-back { display: inline-flex; }
+  .tut-item { min-height: 40px; font-size: 14px; }
+}
