@@ -144,9 +144,24 @@ function applyCpu(ctx: CanvasRenderingContext2D, lut: Uint8Array, x: number, y: 
 }
 
 /** Aplica una tanda de ajustes «de color» seguidos a la zona indicada. */
+const identity = new WeakMap<Uint8Array, boolean>();
+/** ¿La tabla deja todos los colores como estaban? (se calcula una vez por tabla) */
+function isIdentity(lut: Uint8Array): boolean {
+  let v = identity.get(lut);
+  if (v === undefined) {
+    v = true;
+    for (let b = 0, i = 0; b < N && v; b++) for (let g = 0; g < N && v; g++) for (let r = 0; r < N; r++, i += 4) {
+      if (Math.abs(lut[i] - r * 255 / (N - 1)) > 0.5 || Math.abs(lut[i + 1] - g * 255 / (N - 1)) > 0.5 || Math.abs(lut[i + 2] - b * 255 / (N - 1)) > 0.5) { v = false; break; }
+    }
+    identity.set(lut, v);
+  }
+  return v;
+}
 export function applyLutSteps(ctx: CanvasRenderingContext2D, steps: LutStep[], x: number, y: number, w: number, h: number, mask: HTMLCanvasElement | null = null) {
   // con máscara, la opacidad se mezcla aparte (junto con la máscara); sin ella, va dentro de la tabla
   const opacity = mask ? steps[0].opacity : 1;
   const lut = buildLut(mask ? steps.map(s => ({ ...s, opacity: 1 })) : steps);
+  // un ajuste neutro (recién creado, o con los valores a cero) no cambia nada: no se recorre la imagen
+  if (isIdentity(lut)) return;
   if (!applyGpu(ctx, lut, x, y, w, h, mask, opacity)) applyCpu(ctx, lut, x, y, w, h, mask, opacity);
 }

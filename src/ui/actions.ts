@@ -136,6 +136,7 @@ export const ACTIONS: Action[] = [
   // Imagen
   { id: 'dupDoc', label: 'Duplicar…', enabled: hasDoc, run: () => ops.duplicateDocument() },
   { id: 'imageSize', label: 'Tamaño de imagen…', keys: ['Alt+Ctrl+I'], enabled: hasDoc, run: dlg.imageSizeDialog },
+  { id: 'expandImage', label: 'Expandir imagen (rellenar según contenido)…', enabled: hasDoc, run: () => import('./expand').then(m => m.expandDialog()) },
   { id: 'canvasSize', label: 'Tamaño de lienzo…', keys: ['Alt+Ctrl+C'], enabled: hasDoc, run: dlg.canvasSizeDialog },
   { id: 'modeRgb', label: 'Color RGB', enabled: hasDoc, checked: () => app.doc?.mode !== 'gray', run: () => ops.setColorMode('rgb') },
   { id: 'modeGray', label: 'Escala de grises', enabled: hasDoc, checked: () => app.doc?.mode === 'gray', run: () => ops.setColorMode('gray') },
