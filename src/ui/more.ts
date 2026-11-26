@@ -58,9 +58,11 @@ export function defringeDialog() {
 }
 
 // ---- Cuadrícula de píxeles y prueba de impresión -------------------------------------------------------
-export const viewOpts = { pixelGrid: true, proof: false, gamut: false };
+export const viewOpts = { pixelGrid: true, proof: false, gamut: false, clip: false };
 export function togglePixelGrid() { viewOpts.pixelGrid = !viewOpts.pixelGrid; app.viewport.requestRender(); app.emit('view'); }
 export function toggleProof() { viewOpts.proof = !viewOpts.proof; app.viewport.requestRender(); app.emit('view'); if (viewOpts.proof) app.toast('Prueba de impresión CMYK: así se verá aproximadamente en papel (la imagen no cambia)'); }
+/** Avisos de recorte: en rojo lo que se ha quemado (blanco sin detalle) y en azul lo empastado (negro sin detalle). */
+export function toggleClip() { viewOpts.clip = !viewOpts.clip; app.viewport.requestRender(); app.emit('view'); if (viewOpts.clip) app.toast('En rojo: luces quemadas (sin detalle). En azul: sombras empastadas'); }
 export function toggleGamut() { viewOpts.gamut = !viewOpts.gamut; app.viewport.requestRender(); app.emit('view'); if (viewOpts.gamut) app.toast('En gris: colores que una imprenta no puede reproducir'); }
 
 // tintas de cuatricromía y papel (aproximación de un papel estucado)
@@ -91,7 +93,7 @@ function buildProofLuts() {
 function drawViewExtras(ctx: CanvasRenderingContext2D, vp: Viewport) {
   const d = app.doc; if (!d) return;
   const dpr = (vp as any).dpr ?? 1;
-  if (viewOpts.proof || viewOpts.gamut) {
+  if (viewOpts.proof || viewOpts.gamut || viewOpts.clip) {
     buildProofLuts();
     const pts = [vp.toScreen(0, 0), vp.toScreen(d.width, 0), vp.toScreen(0, d.height), vp.toScreen(d.width, d.height)];
     const x0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p.x)) * dpr)), y0 = Math.max(0, Math.floor(Math.min(...pts.map(p => p.y)) * dpr));
@@ -100,6 +102,11 @@ function drawViewExtras(ctx: CanvasRenderingContext2D, vp: Viewport) {
       ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
       const img = ctx.getImageData(x0, y0, x1 - x0, y1 - y0), a = img.data;
       for (let i = 0; i < a.length; i += 4) {
+        if (viewOpts.clip) {
+          const r = a[i], g = a[i + 1], b = a[i + 2];
+          if (r >= 254 && g >= 254 && b >= 254) { a[i] = 255; a[i + 1] = 0; a[i + 2] = 64; continue; }
+          if (r <= 2 && g <= 2 && b <= 2) { a[i] = 0; a[i + 1] = 110; a[i + 2] = 255; continue; }
+        }
         const q = ((a[i] >> 3) * 32 + (a[i + 1] >> 3)) * 32 + (a[i + 2] >> 3);
         if (viewOpts.gamut && GAMUT_LUT[q]) { a[i] = a[i + 1] = a[i + 2] = 128; continue; }
         if (viewOpts.proof) { a[i] = PROOF_LUT[q * 3]; a[i + 1] = PROOF_LUT[q * 3 + 1]; a[i + 2] = PROOF_LUT[q * 3 + 2]; }

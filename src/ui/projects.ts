@@ -9,6 +9,7 @@ import type { EditorDocument } from '../core/document';
 import * as io from '../io/files';
 import * as P from '../io/projects';
 import { forget } from '../io/autosave';
+import { embedInPng, shareOrSave, extractFromPng } from '../io/transfer';
 
 /** Miniatura del documento (JPEG pequeño en una data URL). */
 async function thumbOf(d: EditorDocument): Promise<string> {
@@ -95,6 +96,7 @@ export function projectsDialog() {
       item('Duplicar', async () => { await P.duplicateProject(p.id, p.name + ' copia'); app.toast('Proyecto duplicado'); }),
       item('Mover a carpeta…', () => moveDialog(p)),
       item('Versiones anteriores…', () => versionsDialog(p)),
+      item('Enviar a otro dispositivo…', () => sendFromLibrary(p)),
       item('Exportar como archivo (.edp)', async () => { const b = await P.getData(p.id); if (b) await io.saveBlob(b, p.name + io.PROJECT_EXT).catch(() => {}); }),
       item('Eliminar…', async () => { if (await confirmDialog('Eliminar proyecto', `¿Eliminar «${p.name}» y sus versiones anteriores? No se puede deshacer.`, 'Eliminar')) { await P.deleteProject(p.id); for (const d of app.docs) if (d.projectId === p.id) d.projectId = null; } }, true));
     document.body.append(m);
@@ -143,13 +145,16 @@ export function projectsDialog() {
   // copia de seguridad e importación
   const backup = h('button', { class: 'btn', type: 'button', title: 'Guarda todos los proyectos en un solo archivo ZIP (para pasarlos a otro dispositivo o guardarlos aparte)' }, 'Copia de seguridad');
   backup.onclick = async () => { app.toast('Preparando la copia de seguridad…'); const z = await P.backupAll(); await io.saveBlob(z, `Mis proyectos ${new Date().toISOString().slice(0, 10)}.zip`).catch(() => {}); };
-  const imp = h('button', { class: 'btn', type: 'button', title: 'Añade proyectos desde un archivo .edp o desde una copia de seguridad (.zip)' }, 'Importar…');
+  const sendAllBtn = h('button', { class: 'btn', type: 'button', title: 'Pasa todos los proyectos a otro dispositivo (Quick Share, Drive, correo…)' }, 'Enviar todos…');
+  sendAllBtn.onclick = () => sendAll();
+  const imp = h('button', { class: 'btn', type: 'button', title: 'Añade proyectos desde un archivo .edp, un proyecto enviado (.png) o una copia de seguridad (.zip)' }, 'Importar…');
   imp.onclick = async () => {
-    const files = await io.pickFiles('.edp,.zip,application/zip');
+    const files = await io.pickFiles('.edp,.zip,.png,application/zip,image/png');
     let n = 0;
     for (const f of files) {
       try {
         if (/\.zip$/i.test(f.name)) n += await P.restoreBackup(f);
+        else if (/\.png$/i.test(f.name) || f.type === 'image/png') { const got = await extractFromPng(f); if (!got) throw new Error('Esta imagen no lleva un proyecto dentro'); if (got.kind === 'backup') n += await P.restoreBackup(got.data); else { const d = await io.openProject(got.data); d.name = got.name || io.baseName(f.name); if (await saveToLibrary(d, true, folder ?? '')) n++; } }
         else { const d = await io.openProject(f); d.name = io.baseName(f.name); if (await saveToLibrary(d, true, folder ?? '')) n++; }
       } catch (e: any) { alertDialog('No se ha podido importar', `${f.name}: ${e?.message ?? e}`); }
     }
@@ -158,10 +163,64 @@ export function projectsDialog() {
   };
   const saveCur = h('button', { class: 'btn', type: 'button', disabled: !app.doc || undefined }, 'Guardar el actual aquí');
   saveCur.onclick = async () => { const d = app.doc; if (!d) return; if (await saveToLibrary(d, false, folder ?? undefined)) app.toast('Guardado en Mis proyectos'); };
-  const body = h('div', { class: 'pj-wrap' }, side, h('div', { class: 'pj-main' }, h('div', { class: 'pj-top' }, search, saveCur, imp, backup), grid, info));
+  const body = h('div', { class: 'pj-wrap' }, side, h('div', { class: 'pj-main' }, h('div', { class: 'pj-top' }, search, saveCur, imp, sendAllBtn, backup), grid, info));
   const dlg = showDialog({ title: 'Mis proyectos', body, width: 900, cancelLabel: null, okLabel: 'Cerrar' });
   dlg.form.classList.add('pj-dialog');
   const re = () => { if (document.body.contains(body)) render(); else window.removeEventListener('editor-projects', re); };
   window.addEventListener('editor-projects', re);
   render();
+}
+
+// ---- Pasar proyectos a otro dispositivo -------------------------------------------------------------------
+/** Vista previa (PNG de hasta 2048 px) de un documento. */
+async function previewPng(d: EditorDocument): Promise<Blob> {
+  const src = d.flatten(), k = Math.min(1, 2048 / Math.max(src.width, src.height));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(src.width * k)); c.height = Math.max(1, Math.round(src.height * k));
+  const x = c.getContext('2d')!; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
+  return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('No se ha podido crear la imagen')), 'image/png'));
+}
+const sentNote = 'Ábrelo con Editor en el otro dispositivo: se abre con todas sus capas y se guarda en Mis proyectos. Envíalo con Quick Share, Drive, el correo o un cable (WhatsApp comprime las fotos y se perderían las capas).';
+async function send(png: Blob, fileName: string) {
+  const r = await shareOrSave(new File([png], fileName, { type: 'image/png' }), (b, n) => io.saveBlob(b, n));
+  if (r === 'saved') alertDialog('Listo para pasar a otro dispositivo', `Se ha guardado «${fileName}». ${sentNote}`);
+  else if (r === 'shared') app.toast('Enviado. En el otro dispositivo, ábrelo con Editor');
+}
+/** Envía el documento actual (proyecto completo dentro de un PNG). */
+export async function sendCurrent() {
+  const d = app.doc; if (!d) return;
+  app.toast('Preparando el proyecto para enviar…');
+  const blob = await io.serializeProject(d);
+  await send(await embedInPng(await previewPng(d), 'edPj', new Uint8Array(await blob.arrayBuffer()), d.name), `${d.name}.png`);
+}
+async function sendFromLibrary(p: P.ProjectMeta) {
+  const blob = await P.getData(p.id); if (!blob) return;
+  app.toast('Preparando el proyecto para enviar…');
+  const d = await io.openProject(blob);
+  await send(await embedInPng(await previewPng(d), 'edPj', new Uint8Array(await blob.arrayBuffer()), p.name), `${p.name}.png`);
+}
+/** Todos los proyectos de una vez (la copia de seguridad dentro de un PNG con un mosaico de miniaturas). */
+async function sendAll() {
+  const list = await P.listProjects(); if (!list.length) { app.toast('Aún no hay proyectos que enviar', 'warn'); return; }
+  app.toast('Preparando todos los proyectos…');
+  const zip = await P.backupAll();
+  const n = Math.min(list.length, 9), cols = Math.ceil(Math.sqrt(n)), rows = Math.ceil(n / cols), S = 300;
+  const c = document.createElement('canvas'); c.width = cols * S; c.height = rows * S + 60; const x = c.getContext('2d')!;
+  x.fillStyle = '#1d1e21'; x.fillRect(0, 0, c.width, c.height);
+  await Promise.all(list.slice(0, n).map((p, i) => new Promise<void>(res => { if (!p.thumb) return res(); const im = new Image(); im.onload = () => { const k = Math.min((S - 12) / im.width, (S - 12) / im.height); x.drawImage(im, (i % cols) * S + (S - im.width * k) / 2, Math.floor(i / cols) * S + (S - im.height * k) / 2, im.width * k, im.height * k); res(); }; im.onerror = () => res(); im.src = p.thumb; })));
+  x.fillStyle = '#d7d9dd'; x.font = '600 26px sans-serif'; x.fillText(`Editor · ${list.length} proyecto(s)`, 16, c.height - 20);
+  const png = await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/png'));
+  await send(await embedInPng(png, 'edBk', new Uint8Array(await zip.arrayBuffer()), 'Mis proyectos'), `Mis proyectos ${new Date().toISOString().slice(0, 10)}.png`);
+}
+/** Al abrir un PNG: si lleva un proyecto o una copia dentro, se abre o se restaura (y se guarda en Mis proyectos). */
+export async function openTransferred(f: Blob): Promise<boolean> {
+  const got = await extractFromPng(f).catch(() => null); if (!got) return false;
+  if (got.kind === 'backup') {
+    const n = await P.restoreBackup(got.data);
+    app.toast(`${n} proyecto(s) importados`); projectsDialog(); return true;
+  }
+  const d = await io.openProject(got.data);
+  if (got.name) d.name = got.name;
+  app.addDocument(d);
+  if (await saveToLibrary(d, true)) app.toast('Proyecto recibido con todas sus capas: guardado en Mis proyectos');
+  return true;
 }

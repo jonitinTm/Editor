@@ -69,6 +69,8 @@ export async function openFiles(files: File[], asLayers = false, remember = true
     const before = app.docs.length;
     try {
       if (io.isProjectFile(f)) { const pd = await io.openProject(f); app.addDocument(pd); warnMissingFonts(pd); continue; }
+      // PNG enviado desde otro dispositivo con el proyecto completo dentro
+      if (!asLayers && (f.type === 'image/png' || /\.png$/i.test(f.name)) && await (await import('./projects')).openTransferred(f)) continue;
       // SVG: como capas vectoriales editables (si no tiene formas que convertir, se abre como imagen)
       if (!asLayers && (f.type === 'image/svg+xml' || /\.svg$/i.test(f.name))) {
         const { openSvgAsVectors } = await import('../io/svgimport');

@@ -224,6 +224,15 @@ tabGroup(sideBottom, 'layers', [['Capas', buildLayersPanel], ['Canales', buildCh
 }
 root.append(h('div', { id: 'toasts' }));
 // app instalada: «Abrir con → Editor» desde el explorador de archivos del sistema
+// archivos recibidos con «Compartir» de Android (los dejó el service worker): se abren al arrancar
+if (new URLSearchParams(location.search).has('shared') && 'caches' in window) (async () => {
+  try {
+    const c = await caches.open('editor-shared'), files: File[] = [];
+    for (const k of await c.keys()) { const r = await c.match(k); if (!r) continue; files.push(new File([await r.blob()], decodeURIComponent(r.headers.get('x-name') || 'archivo'), { type: r.headers.get('content-type') || '' })); await c.delete(k); }
+    history.replaceState(null, '', location.pathname);
+    if (files.length) ops.openFiles(files);
+  } catch { /* sin caché */ }
+})();
 if ('launchQueue' in window) (window as any).launchQueue.setConsumer(async (p: any) => { if (p.files?.length) ops.openFiles(await Promise.all(p.files.map((f: any) => f.getFile()))); });
 
 // Separador ajustable entre paneles
