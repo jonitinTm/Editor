@@ -149,7 +149,11 @@ export async function openFiles(files: File[], asLayers = false, remember = true
       if (asLayers && app.doc) await placeImage(f, io.baseName(f.name), undefined, true);
       else app.addDocument(await io.documentFromImage(f, f.name));
     } catch (e: any) {
-      alertDialog('No se pudo abrir', `${f.name}: ${e?.message ?? e}`);
+      // el detalle técnico va al informe de errores; al usuario, algo que se entienda
+      const raw = String(e?.message ?? e);
+      (window as any).__editorLogError?.(`Abrir ${f.name}: ${raw}`);
+      const broken = /DataView|bounds|JSON|Unexpected (token|end)|Unterminated|Invalid (array|typed)|out of range|Offset|RangeError|undefined|null/i.test(raw);
+      alertDialog('No se pudo abrir', `${f.name}: ${broken ? 'el archivo está dañado o incompleto (quizá no se terminó de copiar o de descargar).' : raw}`);
     } finally {
       // se recuerda en «Recientes» (solo archivos abiertos como documento nuevo)
       if (remember && app.docs.length > before && app.doc) {

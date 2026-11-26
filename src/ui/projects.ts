@@ -214,11 +214,13 @@ async function sendAll() {
 /** Al abrir un PNG: si lleva un proyecto o una copia dentro, se abre o se restaura (y se guarda en Mis proyectos). */
 export async function openTransferred(f: Blob): Promise<boolean> {
   const got = await extractFromPng(f).catch(() => null); if (!got) return false;
+  // si lo que lleva dentro está roto, se abre la imagen como una foto normal (y se avisa)
+  const broken = (e: unknown) => { (window as any).__editorLogError?.('Proyecto dentro de PNG: ' + String((e as any)?.message ?? e)); app.toast('El proyecto que lleva esta imagen está dañado: se abre solo la imagen', 'warn'); return false; };
   if (got.kind === 'backup') {
-    const n = await P.restoreBackup(got.data);
+    let n = 0; try { n = await P.restoreBackup(got.data); } catch (e) { return broken(e); }
     app.toast(`${n} proyecto(s) importados`); projectsDialog(); return true;
   }
-  const d = await io.openProject(got.data);
+  let d: EditorDocument; try { d = await io.openProject(got.data); } catch (e) { return broken(e); }
   if (got.name) d.name = got.name;
   app.addDocument(d);
   if (await saveToLibrary(d, true)) app.toast('Proyecto recibido con todas sus capas: guardado en Mis proyectos');

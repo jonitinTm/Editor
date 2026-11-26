@@ -532,7 +532,7 @@ export function buildPropertiesPanel(parent: HTMLElement) {
           sel.onchange = () => { l.params[pd.key] = sel.value; syncShow(); changed(); };
           body.append(formRow(pd.label, sel));
         } else if (pd.type === 'range') {
-          const r = formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, onInput: v => { l.params[pd.key] = v; changed(); } }).el);
+          const r = formRow(pd.label, numberSlider({ min: pd.min, max: pd.max, step: pd.step, value: l.params[pd.key], unit: pd.unit, def: pd.default, onInput: v => { l.params[pd.key] = v; changed(); } }).el);
           if (pd.showIf) conds.push([r, pd.showIf]);
           body.append(r);
         }

@@ -3,7 +3,7 @@
 // crean como un grupo de capas de ajuste editables.
 
 import { app } from './app';
-import { h } from './dom';
+import { h, numberSlider } from './dom';
 import { FILTERS, FilterDef, defaultParams } from '../filters/registry';
 import { AdjustmentLayer, GroupLayer, LayerMask } from '../core/layers';
 import { cloneCanvas, ctx2d, makeCanvas } from '../core/canvas';
@@ -18,17 +18,58 @@ function demoParams(f: FilterDef) {
   return p;
 }
 
-type Look = { name: string; desc: string; layers: [string, any][] };
+type Look = { name: string; desc: string; layers: [string, any][]; cat?: string };
+const CG = (shadows: number[], highs: number[], mids: number[] = [40, 0]) => ['colorgrade', { shadows, mids, highs }] as [string, any];
+/** Looks de serie por categorías. Todos son capas de ajuste reales (se pueden editar una a una después). */
 const LOOKS: Look[] = [
-  { name: 'Cálido', desc: 'Tonos de atardecer', layers: [['photofilter', { color: '#ec8a00', density: 30, preserve: true }], ['vibrance', { vibrance: 15, sat: 0 }]] },
-  { name: 'Frío', desc: 'Azulado y limpio', layers: [['photofilter', { color: '#1f6bd6', density: 25, preserve: true }]] },
-  { name: 'Más contraste', desc: 'Más fuerza', layers: [['brightness', { brightness: 0, contrast: 30 }], ['vibrance', { vibrance: 20, sat: 0 }]] },
-  { name: 'Viveza', desc: 'Colores más vivos', layers: [['vibrance', { vibrance: 55, sat: 8 }]] },
-  { name: 'Blanco y negro', desc: 'Con contraste', layers: [['bw', null], ['brightness', { brightness: 0, contrast: 20 }]] },
-  { name: 'Vintage', desc: 'Foto antigua', layers: [['vibrance', { vibrance: -35, sat: -10 }], ['photofilter', { color: '#c08a3e', density: 35, preserve: true }], ['brightness', { brightness: 8, contrast: -12 }]] },
-  { name: 'Cine', desc: 'Sombras verdosas, luces cálidas', layers: [['colorbalance', { s0: -18, s1: 2, s2: 14, h0: 14, h1: 0, h2: -14 }], ['brightness', { brightness: -4, contrast: 18 }], ['vibrance', { vibrance: -10, sat: 0 }]] },
-  { name: 'Luminoso', desc: 'Más luz y suavidad', layers: [['brightness', { brightness: 22, contrast: -8 }], ['vibrance', { vibrance: 12, sat: 0 }]] },
+  // Retrato
+  { cat: 'Retrato', name: 'Luminoso', desc: 'Más luz y suavidad', layers: [['brightness', { brightness: 22, contrast: -8 }], ['vibrance', { vibrance: 12, sat: 0 }]] },
+  { cat: 'Retrato', name: 'Piel cálida', desc: 'Tono de piel cálido y natural', layers: [['photofilter', { color: '#e8a060', density: 14, preserve: true }], ['vibrance', { vibrance: -8, sat: 0 }], ['brightness', { brightness: 5, contrast: -4 }]] },
+  { cat: 'Retrato', name: 'Retrato suave', desc: 'Contraste bajo y colores delicados', layers: [['brightness', { brightness: 8, contrast: -16 }], ['vibrance', { vibrance: -12, sat: 0 }], CG([210, 10], [35, 12])] },
+  // Paisaje
+  { cat: 'Paisaje', name: 'Cálido', desc: 'Tonos de atardecer', layers: [['photofilter', { color: '#ec8a00', density: 30, preserve: true }], ['vibrance', { vibrance: 15, sat: 0 }]] },
+  { cat: 'Paisaje', name: 'Paisaje vivo', desc: 'Color y profundidad', layers: [['vibrance', { vibrance: 45, sat: 5 }], ['brightness', { brightness: 0, contrast: 16 }]] },
+  { cat: 'Paisaje', name: 'Hora dorada', desc: 'Luz dorada de última hora', layers: [['photofilter', { color: '#f0a030', density: 24, preserve: true }], CG([25, 10], [40, 30]), ['vibrance', { vibrance: 12, sat: 0 }]] },
+  // Cine
+  { cat: 'Cine', name: 'Cine', desc: 'Sombras verdosas, luces cálidas', layers: [['colorbalance', { s0: -18, s1: 2, s2: 14, h0: 14, h1: 0, h2: -14 }], ['brightness', { brightness: -4, contrast: 18 }], ['vibrance', { vibrance: -10, sat: 0 }]] },
+  { cat: 'Cine', name: 'Cian y naranja', desc: 'El look de las superproducciones', layers: [['colorlookup', { preset: 'tealorange', amount: 85 }]] },
+  { cat: 'Cine', name: 'Sin blanqueo', desc: 'Desaturado y con mucho contraste', layers: [['colorlookup', { preset: 'bleach', amount: 80 }]] },
+  // Blanco y negro
+  { cat: 'Blanco y negro', name: 'Blanco y negro', desc: 'Con contraste', layers: [['bw', null], ['brightness', { brightness: 0, contrast: 20 }]] },
+  { cat: 'Blanco y negro', name: 'Noir', desc: 'Negro profundo, mucho contraste', layers: [['colorlookup', { preset: 'noir', amount: 100 }]] },
+  { cat: 'Blanco y negro', name: 'B/N suave', desc: 'Gris delicado', layers: [['bw', null], ['brightness', { brightness: 6, contrast: -14 }]] },
+  { cat: 'Blanco y negro', name: 'Selenio', desc: 'Blanco y negro con un toque frío', layers: [['huesat', { hue: 225, sat: -78, light: 0, colorize: true }]] },
+  // Vintage
+  { cat: 'Vintage', name: 'Vintage', desc: 'Foto antigua', layers: [['vibrance', { vibrance: -35, sat: -10 }], ['photofilter', { color: '#c08a3e', density: 35, preserve: true }], ['brightness', { brightness: 8, contrast: -10 }]] },
+  { cat: 'Vintage', name: 'Sepia', desc: 'Tono marrón clásico', layers: [['bw', null], ['photofilter', { color: '#a86e2e', density: 55, preserve: true }]] },
+  { cat: 'Vintage', name: 'Película desvaída', desc: 'Colores apagados y negros lavados', layers: [['colorlookup', { preset: 'film', amount: 90 }]] },
+  // Analógico
+  { cat: 'Analógico', name: 'Mate', desc: 'Negros grisáceos de película', layers: [['colorlookup', { preset: 'matte', amount: 90 }]] },
+  { cat: 'Analógico', name: 'Proceso cruzado', desc: 'Colores cambiados de laboratorio', layers: [['colorlookup', { preset: 'crossprocess', amount: 75 }]] },
+  { cat: 'Analógico', name: 'Película cálida', desc: 'Carrete de colores cálidos', layers: [['photofilter', { color: '#e0a050', density: 18, preserve: true }], ['brightness', { brightness: 0, contrast: 10 }], ['vibrance', { vibrance: 10, sat: 0 }], CG([200, 12], [45, 15])] },
+  // Nocturna
+  { cat: 'Nocturna', name: 'Noche azul', desc: 'Frío nocturno', layers: [['photofilter', { color: '#1f4fd6', density: 32, preserve: true }], ['exposure', { stops: -0.3, offset: 0, gamma: 1 }], ['vibrance', { vibrance: 10, sat: 0 }]] },
+  { cat: 'Nocturna', name: 'Neón urbano', desc: 'Sombras cian, luces magenta', layers: [CG([190, 40], [320, 30]), ['vibrance', { vibrance: 30, sat: 0 }], ['brightness', { brightness: 0, contrast: 14 }]] },
+  { cat: 'Nocturna', name: 'Luces de ciudad', desc: 'Farolas cálidas sobre sombras frías', layers: [CG([220, 28], [35, 32]), ['brightness', { brightness: -5, contrast: 22 }]] },
+  // Moda
+  { cat: 'Moda', name: 'Más contraste', desc: 'Más fuerza', layers: [['brightness', { brightness: 0, contrast: 30 }], ['vibrance', { vibrance: 20, sat: 0 }]] },
+  { cat: 'Moda', name: 'Editorial', desc: 'Contraste y color contenido', layers: [['brightness', { brightness: 0, contrast: 24 }], ['vibrance', { vibrance: -22, sat: 0 }], CG([215, 10], [30, 8])] },
+  { cat: 'Moda', name: 'Pastel', desc: 'Suave y luminoso', layers: [['brightness', { brightness: 14, contrast: -20 }], ['vibrance', { vibrance: -25, sat: 0 }], CG([300, 8], [60, 10])] },
+  // Arquitectura
+  { cat: 'Arquitectura', name: 'Limpio', desc: 'Líneas nítidas y tonos neutros', layers: [['brightness', { brightness: 0, contrast: 20 }], ['vibrance', { vibrance: -15, sat: 0 }], ['colorlookup', { preset: 'cold', amount: 40 }]] },
+  { cat: 'Arquitectura', name: 'Hormigón', desc: 'Casi sin color, mucho volumen', layers: [['vibrance', { vibrance: -55, sat: 0 }], ['brightness', { brightness: 0, contrast: 22 }]] },
+  // Naturaleza
+  { cat: 'Naturaleza', name: 'Frío', desc: 'Azulado y limpio', layers: [['photofilter', { color: '#1f6bd6', density: 25, preserve: true }]] },
+  { cat: 'Naturaleza', name: 'Verde intenso', desc: 'Hojas y hierba con más vida', layers: [['vibrance', { vibrance: 38, sat: 6 }], ['brightness', { brightness: 0, contrast: 8 }]] },
+  { cat: 'Naturaleza', name: 'Bosque', desc: 'Sombras verdes y profundas', layers: [CG([150, 25], [55, 12]), ['brightness', { brightness: -4, contrast: 12 }]] },
+  // Comercial
+  { cat: 'Comercial', name: 'Viveza', desc: 'Colores más vivos', layers: [['vibrance', { vibrance: 55, sat: 8 }]] },
+  { cat: 'Comercial', name: 'Producto limpio', desc: 'Luz clara y colores fieles', layers: [['brightness', { brightness: 10, contrast: 12 }], ['vibrance', { vibrance: 15, sat: 0 }]] },
+  { cat: 'Comercial', name: 'Blanco puro', desc: 'Fondos blancos más limpios', layers: [['exposure', { stops: 0.15, offset: 0.015, gamma: 1 }], ['brightness', { brightness: 4, contrast: 10 }]] },
 ];
+const LOOK_CATS = ['Retrato', 'Paisaje', 'Cine', 'Blanco y negro', 'Vintage', 'Analógico', 'Nocturna', 'Moda', 'Arquitectura', 'Naturaleza', 'Comercial'];
+/** Intensidad de los looks (0-1): en capas, la opacidad del grupo; aplicados directamente, mezcla con el original. */
+let lookAmount = 1;
 
 // looks propios (se guardan en este navegador)
 const LOOK_KEY = 'editor.looks';
@@ -57,7 +98,10 @@ async function applyLook(look: Look) {
     // directamente sobre la capa elegida, en un solo paso del historial
     if (!d.activeRaster()) { app.toast('Elige una capa de imagen', 'warn'); return; }
     const n0 = d.history.index;
+    const tgt = d.activeRaster()!, before = lookAmount < 1 ? cloneCanvas(tgt.canvas) : null;
     for (const [id, params] of look.layers) { const f = FILTERS.find(x => x.id === id); if (f) await ops.applyFilterDirect(f, { ...defaultParams(f), ...(params ?? {}) }); }
+    // intensidad: se mezcla el original con el resultado (en el mismo paso del historial)
+    if (before) { const x = ctx2d(tgt.canvas); x.save(); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1 - lookAmount; x.drawImage(before, 0, 0); x.restore(); tgt.touch(); d.invalidate(); d.commit('Intensidad del look'); }
     const hs = d.history; if (hs.index > n0 + 1) { const last = hs.steps[hs.index]; hs.steps.splice(n0 + 1, hs.index - n0); hs.steps.splice(n0 + 1, 0, { ...last, name: 'Look: ' + look.name }); hs.index = n0 + 1; } else if (hs.index === n0 + 1) hs.steps[hs.index].name = 'Look: ' + look.name;
     app.emit('doc'); app.toast(`Look «${look.name}» aplicado`); return;
   }
@@ -67,6 +111,7 @@ async function applyLook(look: Look) {
     const l = new AdjustmentLayer(f.name.replace('…', ''), id, { ...defaultParams(f), ...(params ?? {}) });
     g.add(l);
   }
+  g.opacity = lookAmount;
   if (d.selection.mask) { g.mask = new LayerMask(d.width, d.height, 'white'); g.mask.canvas = cloneCanvas(d.selection.mask); g.mask.touch(); }
   d.insertAboveActive(g); d.setActive(g); d.invalidate(); d.commit('Look: ' + look.name);
   app.toast(`Look «${look.name}» añadido como grupo de ajustes: baja su opacidad para suavizarlo`);
@@ -101,6 +146,13 @@ export function buildAdjustmentsPanel(parent: HTMLElement) {
     } });
   };
   for (const L of LOOKS) addLook(L, looks);
+  // categorías (Todos, Retrato, Paisaje…) e intensidad
+  let cat = '';
+  const chips = h('div', { class: 'look-cats' });
+  const showCat = () => { [...looks.children].forEach((b, i) => { (b as HTMLElement).style.display = !cat || LOOKS[i]?.cat === cat ? '' : 'none'; }); [...chips.children].forEach(c => c.classList.toggle('on', (c as HTMLElement).dataset.cat === cat)); };
+  for (const c of ['', ...LOOK_CATS]) { const b = h('button', { class: 'look-cat', type: 'button', 'data-cat': c }, c || 'Todos'); b.onclick = () => { cat = c; showCat(); }; chips.append(b); }
+  const amount = numberSlider({ min: 5, max: 100, value: Math.round(lookAmount * 100), unit: '%', def: 100, onInput: v => { lookAmount = v / 100; } });
+  showCat();
   const builtinThumbs = lookThumbs.length;
   const fillMine = () => {
     mine.innerHTML = ''; lookThumbs.length = builtinThumbs;
@@ -118,7 +170,7 @@ export function buildAdjustmentsPanel(parent: HTMLElement) {
   saveBtn.onclick = () => saveLook(fillMine);
   parent.append(h('div', { class: 'panel-body adj-panel' },
     hint, h('label', { class: 'check adj-mode' }, modeCb, ' Como capa de ajuste (se puede cambiar después)'),
-    grid, h('div', { class: 'adj-head' }, 'Looks de un toque'), looks, mineHead, mine, saveBtn));
+    grid, h('div', { class: 'adj-head' }, 'Looks de un toque'), chips, h('div', { class: 'look-amount' }, h('span', { class: 'hint' }, 'Intensidad'), amount.el), looks, mineHead, mine, saveBtn));
   // miniaturas con la imagen actual (solo cuando el panel se ve, y sin prisa)
   let t = 0, last = '';
   const refresh = () => {

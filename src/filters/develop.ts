@@ -8,6 +8,8 @@ export interface DevelopParams {
   highlights: number; shadows: number; whites: number; blacks: number;
   clarity: number; dehaze: number; vibrance: number; saturation: number;
   vignette: number; sharpen: number; noise: number;
+  /** textura (detalle fino), desvanecimiento (negros lavados) y grano de película */
+  texture?: number; fade?: number; grain?: number; seed?: number;
 }
 export const DEVELOP_DEFAULTS: DevelopParams = { temp: 0, tint: 0, exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, clarity: 0, dehaze: 0, vibrance: 0, saturation: 0, vignette: 0, sharpen: 0, noise: 0 };
 
@@ -47,6 +49,8 @@ export function develop(img: ImageData, p: DevelopParams) {
   const needLocal = p.highlights || p.shadows || p.dehaze;
   const Lb = needLocal ? blurredLum(L, w, h, Math.max(4, Math.min(w, h) / 40)) : null;
   const Lc = p.clarity ? blurredLum(L, w, h, Math.max(3, Math.min(w, h) / 120)) : null;
+  const Lt = p.texture ? blurredLum(L, w, h, Math.max(1.2, Math.min(w, h) / 500)) : null;
+  const fade = (p.fade ?? 0) / 100, grain = (p.grain ?? 0) / 100, gseed = ((p.seed ?? 1) * 2654435761) >>> 0;
   const wr = 1 + p.temp / 100 * 0.45, wb = 1 - p.temp / 100 * 0.45, wg = 1 - p.tint / 100 * 0.3;
   const ev = 2 ** p.exposure, ct = p.contrast / 100, hz = p.dehaze / 100;
   const cx = w / 2, cy = h / 2, vg = p.vignette / 100, sat = p.saturation / 100, vib = p.vibrance / 100;
@@ -62,8 +66,11 @@ export function develop(img: ImageData, p: DevelopParams) {
     if (p.blacks) t += p.blacks / 100 * 0.25 * (1 - t) ** 3;
     if (ct) { const s = t - 0.5; t = 0.5 + s * (1 + ct) - (ct > 0 ? ct * 0.6 * s * Math.abs(s) * 2 : 0); }
     if (Lc) { const lc = toSrgb(Math.min(1, Lc[i] * ev)); t += p.clarity / 100 * 1.2 * (t - lc) * (1 - Math.abs(2 * t - 1)); }
+    if (Lt) { const lt = toSrgb(Math.min(1, Lt[i] * ev)); t += (p.texture ?? 0) / 100 * 1.6 * (t - lt) * (1 - Math.abs(2 * t - 1) * 0.6); }
     if (hz) { if (hz > 0) { const a = tb * 0.6 * hz; t = (t - a) / (1 - a); } else t = t * (1 + hz * 0.5) - hz * 0.5 * 0.85; }
     if (vg) { const dx = (i % w - cx) / cx, dy = ((i / w | 0) - cy) / cy, rr = Math.sqrt(dx * dx + dy * dy) / Math.SQRT2; t *= 1 + vg * smooth(0.35, 1.1, rr) * (vg < 0 ? 1 : 0.8); }
+    // grano: ruido de luminancia, más visible en los medios tonos (como el de verdad)
+    if (grain) { let x = (i ^ gseed) >>> 0; x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x = Math.imul(x ^ (x >>> 16), 0x45d9f3b); x ^= x >>> 16; t += ((x & 0xffff) / 65535 - 0.5) * grain * 0.22 * (1 - Math.abs(2 * t - 1) * 0.55); }
     t = clamp01(t);
     // la luminancia nueva se reparte en los tres canales manteniendo el color
     const tl = t <= 0.04045 ? t / 12.92 : ((t + 0.055) / 1.055) ** 2.4, k = tl / l0;
@@ -76,6 +83,9 @@ export function develop(img: ImageData, p: DevelopParams) {
       const f = 1 + sAdj + vib * (1 - cur) * (vib > 0 ? 1.2 : 1);
       sr = m + (sr - m) * f; sg = m + (sg - m) * f; sb = m + (sb - m) * f;
     }
+    // desvanecimiento: los negros se levantan (y los blancos bajan un poco), como en la película revelada; por canal,
+    // así también el negro puro sube
+    if (fade) { const k = 1 - fade * 0.24, o = fade * 0.17; sr = sr * k + o; sg = sg * k + o; sb = sb * k + o; }
     d[j] = clamp01(sr) * 255 + 0.5; d[j + 1] = clamp01(sg) * 255 + 0.5; d[j + 2] = clamp01(sb) * 255 + 0.5;
   }
 }

@@ -1057,3 +1057,15 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .perf-bar.hot > div { background: #e67e22; }
 .perf-list { margin: 10px 0 0; padding-left: 18px; line-height: 1.5; }
 .err-log { max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 11px/1.4 ui-monospace, monospace; background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-top: 8px; user-select: text; -webkit-user-select: text; }
+/* restablecer un control: solo se ve cuando no está en su valor por defecto */
+.ns-reset { visibility: hidden; flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-size: 14px; line-height: 1; cursor: pointer; }
+.ns-reset.on { visibility: visible; }
+.ns-reset:hover { background: var(--btn-hover); color: var(--text); }
+@media (pointer: coarse) { .ns-reset { width: 30px; height: 30px; font-size: 17px; } }
+/* looks: categorías e intensidad */
+.look-cats { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; }
+.look-cats::-webkit-scrollbar { display: none; }
+.look-cat { flex: none; border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 12px; padding: 3px 10px; font-size: 11px; min-height: 26px; }
+.look-cat.on { background: var(--accent-soft); border-color: var(--accent); }
+.look-amount { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.look-amount .num-slider { flex: 1; min-width: 0; }

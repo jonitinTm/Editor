@@ -31,6 +31,8 @@ document.addEventListener('pointerdown', e => {
 export function numberSlider(opts: {
   label?: string; min: number; max: number; step?: number; value: number; unit?: string;
   onInput: (v: number) => void; compact?: boolean;
+  /** valor por defecto: si se indica, aparece «↺» para volver a él (también con doble toque en el deslizador) */
+  def?: number;
 }) {
   const step = opts.step ?? 1;
   const num = h('input', { type: 'number', min: opts.min, max: opts.max, step, value: String(opts.value), class: 'num' });
@@ -43,13 +45,23 @@ export function numberSlider(opts: {
     if (from !== num) num.value = String(+v.toFixed(2));
     if (from !== range) range.value = String(v);
     if (!silent) opts.onInput(v);
+    if (reset) reset.classList.toggle('on', opts.def !== undefined && Math.abs(v - opts.def) > 1e-9);
   };
+  let reset: HTMLElement | null = null;
   num.addEventListener('input', () => set(parseFloat(num.value), num));
   num.addEventListener('change', () => set(parseFloat(num.value)));
   range.addEventListener('input', () => set(parseFloat(range.value), range));
   const el = h('label', { class: 'num-slider' + (opts.compact ? ' compact' : '') },
     opts.label ? h('span', { class: 'lbl' }, opts.label) : null,
     opts.compact ? null : range, num, opts.unit ? h('span', { class: 'unit' }, opts.unit) : null);
+  if (opts.def !== undefined) {
+    const d = opts.def;
+    reset = h('button', { class: 'ns-reset', type: 'button', title: 'Restablecer', 'aria-label': 'Restablecer', html: '↺' });
+    reset.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); set(d); });
+    range.addEventListener('dblclick', () => set(d));
+    el.append(reset);
+    reset.classList.toggle('on', Math.abs(opts.value - d) > 1e-9);
+  }
   if (opts.compact) {
     // En la barra de opciones el deslizador aparece en una ventanita al pulsar.
     const pop = h('div', { class: 'slider-pop' }, range);

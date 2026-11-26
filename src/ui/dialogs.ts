@@ -410,8 +410,8 @@ export function filterDialog(def: FilterDef, edit?: { layer: SmartLayer; index: 
       sel.addEventListener('change', () => { params[p.key] = sel.value; syncShow(); update(); });
       return row(p.label, sel);
     }
-    if (p.showIf) { const r = row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el); conds.push([r, p.showIf]); return r; }
-    return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, onInput: v => { params[p.key] = v; update(); } }).el);
+    if (p.showIf) { const r = row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, def: p.default, onInput: v => { params[p.key] = v; update(); } }).el); conds.push([r, p.showIf]); return r; }
+    return row(p.label, numberSlider({ min: p.min, max: p.max, step: p.step, value: params[p.key], unit: p.unit, def: p.default, onInput: v => { params[p.key] = v; update(); } }).el);
   }
   const prev = h('input', { type: 'checkbox', checked: true });
   prev.addEventListener('change', () => { previewOn = prev.checked; update(); });
