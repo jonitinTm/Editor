@@ -7,7 +7,7 @@
 
 type Dict = { s: Record<string, string>; t: [string, string][] };
 /** Idiomas disponibles, cada uno con su nombre en su propio idioma. */
-export const LANGS: [string, string][] = [['es', 'Español'], ['en', 'English'], ['fr', 'Français'], ['pt', 'Português'], ['it', 'Italiano'], ['de', 'Deutsch'], ['ru', 'Русский'], ['zh', '中文（简体）'], ['ja', '日本語']];
+export const LANGS: [string, string][] = [['es', 'Español'], ['en', 'English'], ['fr', 'Français'], ['pt', 'Português (Brasil)'], ['it', 'Italiano'], ['de', 'Deutsch'], ['ru', 'Русский'], ['zh', '中文（简体）'], ['ja', '日本語']];
 const AVAILABLE = new Set(LANGS.map(l => l[0]));
 declare const __I18N_HASH__: string;
 const STORE = 'editor.i18n';
