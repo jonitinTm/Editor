@@ -170,9 +170,13 @@ export function colorHalftone(img: ImageData, radius: number) {
       // coordenadas en la retícula girada de este canal
       const u = x * ca + y * sa, v = -x * sa + y * ca, cu = (Math.floor(u / cell) + 0.5) * cell, cv = (Math.floor(v / cell) + 0.5) * cell;
       const sx = Math.min(w - 1, Math.max(0, Math.round(cu * ca - cv * sa))), sy = Math.min(h - 1, Math.max(0, Math.round(cu * sa + cv * ca)));
-      const ink = 1 - src[(sy * w + sx) * 4 + c] / 255, rr = Math.sqrt(ink) * cell * 0.7;
+      // el área del punto es la cantidad de tinta (π·r² = tinta·celda²); antes eran un 54 % mayores y en los medios
+      // tonos se solapaban hasta dejar la imagen casi negra con manchas de colores puros
+      const ink = 1 - src[(sy * w + sx) * 4 + c] / 255, rr = Math.sqrt(ink / Math.PI) * cell;
       const dist = Math.hypot(u - cu, v - cv), i = (y * w + x) * 4;
-      if (dist < rr) d[i + c] = 0;
+      // borde suave de un píxel (sin dientes de sierra)
+      const cover = Math.max(0, Math.min(1, rr - dist + 0.5));
+      if (cover > 0) d[i + c] = Math.min(d[i + c], Math.round(255 * (1 - cover)));
     }
   }
 }
