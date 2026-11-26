@@ -142,10 +142,27 @@ export function craquelure(img: ImageData, p: any) {
 // ---- Resplandor de neón ---------------------------------------------------------------------
 export function neonGlow(img: ImageData, p: any) {
   const { width: w, height: h, data: d } = img, size = p.size ?? 5, bright = (p.brightness ?? 60) / 100, col = hex(p.color ?? '#33ccff');
-  const L = lum(img), E = sobel(blurArr(L, w, h, 1), w, h), G = blurArr(E.map(v => Math.min(255, v * 3)), w, h, size);
-  for (let i = 0; i < w * h; i++) {
-    const g = Math.min(1, (G[i] / 255) * (1 + bright * 2)), base = L[i] / 255 * 0.35;
-    for (let c = 0; c < 3; c++) d[i * 4 + c] = clamp(base * d[i * 4 + c] + g * col[c] + Math.min(1, E[i] / 80) * 255 * bright * 0.5);
+  // el neón luce sobre oscuro: lo que no es borde se oscurece (antes el blanco quedaba en un gris apagado)
+  const keep = 1 - (p.dark ?? 75) / 100, n = w * h;
+  // con transparencia, los bordes también son los de la forma (letras negras sobre transparente) y el resplandor sale
+  // fuera de ella (antes se quedaba recortado dentro)
+  let transp = false; for (let i = 3; i < d.length; i += 4) if (d[i] < 255) { transp = true; break; }
+  const L = lum(img);
+  if (transp) for (let i = 0; i < n; i++) L[i] = L[i] * d[i * 4 + 3] / 255;
+  // solo los contornos principales: antes de buscar los bordes se suaviza según «Detalle», así la textura menuda (pelo,
+  // hierba, tela…) no se convierte en una maraña de neón; las líneas y los contornos claros se mantienen
+  const detail = Math.max(0, Math.min(1, (p.detail ?? 30) / 100)), soft = Math.max(1, Math.round(1 + (1 - detail) * Math.min(w, h) * 0.006));
+  let E = sobel(blurArr(L, w, h, soft), w, h);
+  const floor = (1 - detail) * 14; for (let i = 0; i < n; i++) E[i] = Math.max(0, E[i] - floor) * (1 + (1 - detail) * 0.8);
+  if (transp) { const A = new Float32Array(n); for (let i = 0; i < n; i++) A[i] = d[i * 4 + 3]; const EA = sobel(blurArr(A, w, h, 1), w, h); for (let i = 0; i < n; i++) E[i] = Math.max(E[i], EA[i]); }
+  const G = blurArr(E.map(v => Math.min(255, v * 3)), w, h, size);
+  for (let i = 0; i < n; i++) {
+    const a0 = d[i * 4 + 3] / 255, g = Math.min(1, (G[i] / 255) * (1 + bright * 2)), core = Math.min(1, E[i] / 80) * bright * 0.5;
+    // luz añadida (color del neón y núcleo casi blanco) sobre lo que haya, oscurecido
+    const A = Math.min(1, a0 + (1 - a0) * Math.min(1, g + core));
+    if (A <= 0) continue;
+    for (let c = 0; c < 3; c++) { const base = d[i * 4 + c] * keep * (0.55 + 0.45 * L[i] / 255) * a0; d[i * 4 + c] = clamp((base + g * col[c] + core * 255) / A); }
+    d[i * 4 + 3] = Math.round(A * 255);
   }
 }
 
