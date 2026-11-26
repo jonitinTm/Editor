@@ -274,7 +274,15 @@ export class Viewport {
     // en pantallas muy densas (3×) se dibuja a 2×: se ve igual de nítido y es mucho más ligero;
     // en móviles con poca memoria (≤ 3 GB), a 1,5× (casi la mitad de píxeles por fotograma); sin gráfica, a 1×
     this.dpr = Math.min(DPR_CAP, window.devicePixelRatio || 1);
-    this.width = wrap.clientWidth; this.height = wrap.clientHeight;
+    // al girar la tableta, plegar o desplegar el móvil o cambiar la pantalla dividida: si la imagen se veía entera, se
+    // vuelve a encuadrar; si no (estabas ampliando), el punto que mirabas sigue en el centro
+    const ow = this.width, oh = this.height, nw = wrap.clientWidth, nh = wrap.clientHeight;
+    let keep: { whole: boolean; c: { x: number; y: number } } | null = null;
+    if (this.doc?.viewInitialized && ow > 10 && oh > 10 && (ow !== nw || oh !== nh)) {
+      const d = this.doc, a = this.toScreen(0, 0), z = this.toScreen(d.width, d.height);
+      keep = { whole: Math.min(a.x, z.x) >= -2 && Math.min(a.y, z.y) >= -2 && Math.max(a.x, z.x) <= ow + 2 && Math.max(a.y, z.y) <= oh + 2, c: this.toDoc(ow / 2, oh / 2) };
+    }
+    this.width = nw; this.height = nh;
     for (const [c, w, hh] of [[this.canvas, this.width, this.height], [this.antsCanvas, this.width, this.height], [this.rulerH, this.width, RULER], [this.rulerV, RULER, this.height]] as const) {
       c.width = Math.max(1, Math.round(w * this.dpr)); c.height = Math.max(1, Math.round(hh * this.dpr));
       c.style.width = w + 'px'; c.style.height = hh + 'px';
@@ -282,6 +290,7 @@ export class Viewport {
     this.rulerKey = '';
     this.el.classList.toggle('no-rulers', !app.showRulers);
     if (this.doc && !this.doc.viewInitialized && this.width > 10) this.fit(true);
+    else if (keep && this.width > 10) { if (keep.whole) this.fit(true); else this.placeDocPoint(keep.c.x, keep.c.y, { x: this.width / 2, y: this.height / 2 }); }
     this.render();
   }
 

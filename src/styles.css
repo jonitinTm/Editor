@@ -241,7 +241,8 @@ kbd { background: var(--panel-3); border: 1px solid var(--border); border-radius
 ::-webkit-scrollbar-track { background: transparent; }
 
 @media (max-width: 900px) {
-  .side { width: 220px; }
+  .side { width: 250px; }
+  .layer-controls .lc-row { flex-wrap: wrap; row-gap: 4px; }
   .menu { padding: 0 6px; }
 }
 
@@ -874,7 +875,8 @@ html.i18n-wait body { visibility: hidden; }
 @keyframes spin { to { transform: rotate(360deg); } }
 /* ---- Menú del móvil: botón «Menú» y hoja desde abajo ---- */
 .top-menu { display: none; }
-@media (max-width: 700px) {
+/* tablets en vertical, pantalla dividida y plegables: la barra de menús de escritorio no cabe, se usa «Menú» */
+@media (max-width: 900px) {
   .menubar { display: none; }
   .top-menu { display: flex; }
 }
