@@ -220,7 +220,15 @@ export function renderStyles(out: CanvasRenderingContext2D, src: HTMLCanvasEleme
   };
   if (st.shadow?.enabled) {
     const s = st.shadow, a = s.angle * Math.PI / 180;
-    castSpread(rgba(s.color, s.opacity / 100), s.blur, s.spread ?? 0, -Math.cos(a) * s.distance, Math.sin(a) * s.distance);
+    if (s.long && s.distance > 1) {
+      // sombra larga: la silueta se repite a lo largo de toda la distancia (una estela continua en diagonal)
+      const trail = borrowCanvas(w, h), tx = ctx2d(trail), ux = -Math.cos(a), uy = Math.sin(a);
+      tx.clearRect(0, 0, w, h);
+      const step = Math.max(1, s.distance / 400);
+      for (let k = step; k <= s.distance + 0.01; k += step) tx.drawImage(src, ox + ux * k, oy + uy * k);
+      ctx.save(); ctx.shadowColor = rgba(s.color, s.opacity / 100); ctx.shadowBlur = s.blur; ctx.shadowOffsetX = FAR; ctx.shadowOffsetY = 0;
+      ctx.drawImage(trail, -FAR, 0); ctx.restore(); returnCanvas(trail);
+    } else castSpread(rgba(s.color, s.opacity / 100), s.blur, s.spread ?? 0, -Math.cos(a) * s.distance, Math.sin(a) * s.distance);
   }
   if (st.glow?.enabled) castSpread(rgba(st.glow.color, st.glow.opacity / 100), st.glow.size, st.glow.spread ?? 0, 0, 0, 2);
   if (tmp) {

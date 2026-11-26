@@ -136,7 +136,7 @@ export interface TextProps {
 }
 
 export interface LayerStyles {
-  shadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number; spread?: number };
+  shadow?: { enabled: boolean; color: string; opacity: number; angle: number; distance: number; blur: number; spread?: number; /** sombra larga: estela continua en vez de una copia desplazada */ long?: boolean };
   stroke?: { enabled: boolean; color: string; size: number; position?: 'outside' | 'inside' | 'center'; opacity?: number };
   glow?: { enabled: boolean; color: string; opacity: number; size: number; spread?: number };
   /** Satinado: sombreado interior ondulado (dos copias desplazadas de la forma). */

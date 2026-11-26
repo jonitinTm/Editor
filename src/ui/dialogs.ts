@@ -530,7 +530,8 @@ export function layerStyleDialog() {
   showDialog({
     title: `Estilo de capa: ${l.name}`, width: 400, side: true,
     body: [
-      ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 200, 'px'], ['spread', 'Extensión', 0, 100, '%'], ['blur', 'Tamaño', 0, 200, 'px']]),
+      ...section('Sombra paralela', st.shadow, [['opacity', 'Opacidad', 0, 100, '%'], ['angle', 'Ángulo', -180, 180, '°'], ['distance', 'Distancia', 0, 400, 'px'], ['spread', 'Extensión', 0, 100, '%'], ['blur', 'Tamaño', 0, 200, 'px']]),
+      (() => { const c = h('input', { type: 'checkbox', checked: !!st.shadow.long }) as HTMLInputElement; c.onchange = () => { st.shadow.long = c.checked; if (c.checked) st.shadow.enabled = true; update(); }; return row('', h('label', { class: 'check' }, c, ' Sombra larga (estela continua)')); })(),
       ...strokeSection(),
       ...section('Resplandor exterior', st.glow, [['opacity', 'Opacidad', 0, 100, '%'], ['spread', 'Extensión', 0, 100, '%'], ['size', 'Tamaño', 1, 200, 'px']]),
       ...satinSection(),

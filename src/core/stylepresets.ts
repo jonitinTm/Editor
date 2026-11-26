@@ -27,7 +27,7 @@ export const STYLE_PRESETS: { name: string; styles: LayerStyles }[] = [
   { name: 'Retro 3D', styles: { stroke: { enabled: true, color: '#1b1b3a', size: 3, position: 'outside', opacity: 100 }, shadow: sh({ color: '#ff3c7f', opacity: 100, distance: 8, blur: 0, angle: 135 }) } },
   { name: 'Satinado', styles: { satin: { enabled: true, color: '#000000', opacity: 45, angle: 19, distance: 11, size: 14, invert: true }, shadow: sh({ opacity: 30 }) } },
   { name: 'Arcoíris', styles: { gradientOverlay: gr(0, [0, '#ff004c'], [0.2, '#ff9900'], [0.4, '#ffee00'], [0.6, '#33dd55'], [0.8, '#2288ff'], [1, '#9933ff']) } },
-  { name: 'Sombra larga', styles: { shadow: sh({ opacity: 35, distance: 24, blur: 2, spread: 60, angle: 135 }) } },
+  { name: 'Sombra larga', styles: { shadow: { ...sh({ opacity: 28, distance: 90, blur: 0, spread: 0, angle: 135 }), long: true } } },
 ];
 
 const KEY = 'editor.userStyles';
