@@ -530,11 +530,30 @@ window.addEventListener('editor-font', (e: Event) => {
 let lastErr = 0;
 const reportError = (msg: string) => {
   console.error(msg);
+  if (!(window as any).__editorLogError) { try { const l = JSON.parse(localStorage.getItem('editor.errors') || '[]'); l.push({ t: Date.now(), m: msg.slice(0, 1500) }); localStorage.setItem('editor.errors', JSON.stringify(l.slice(-25))); } catch { /* */ } }
   if (Date.now() - lastErr < 4000) return; lastErr = Date.now();
   app.toast('Algo ha fallado en esta operación. Puedes deshacer (Ctrl+Z) y seguir trabajando.', 'warn');
 };
 window.addEventListener('error', e => { if (e.error) reportError(String(e.error?.stack ?? e.message)); });
-window.addEventListener('unhandledrejection', e => { const r = e.reason; if (r?.name === 'AbortError') return; reportError(String(r?.stack ?? r)); });
+window.addEventListener('unhandledrejection', e => {
+  const r = e.reason; if (r?.name === 'AbortError') return;
+  // tras publicar una versión nueva con el editor abierto, las piezas antiguas ya no existen: se recarga una vez
+  if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(r?.message ?? r))) {
+    try { const k = 'editor.chunkReload', last = +(sessionStorage.getItem(k) || 0); if (Date.now() - last > 60000) { sessionStorage.setItem(k, String(Date.now())); location.reload(); return; } } catch { /* */ }
+  }
+  reportError(String(r?.stack ?? r));
+});
+// «se cerró de golpe»: mientras el editor está a la vista se anota la hora; al ocultarlo o cerrarlo, se borra
+{
+  const beat = () => { try { if (document.visibilityState === 'visible') localStorage.setItem('editor.running', String(Date.now())); else localStorage.removeItem('editor.running'); } catch { /* */ } };
+  beat(); setInterval(beat, 30000); document.addEventListener('visibilitychange', beat);
+  addEventListener('pagehide', () => { try { localStorage.removeItem('editor.running'); } catch { /* */ } });
+  // si hubo fallos desde la última vez que se miró el informe, se dice dónde verlos
+  try {
+    const l = JSON.parse(localStorage.getItem('editor.errors') || '[]'), seen = +(localStorage.getItem('editor.errorsSeen') || 0);
+    if (l.some((x: any) => x.t > seen && /cerró de golpe|no ha arrancado|No se ha podido cargar/.test(x.m))) setTimeout(() => app.toast('La última vez hubo un fallo. Si quieres contárnoslo: Ayuda › Informe de errores', 'warn'), 2500);
+  } catch { /* */ }
+}
 
 // Con la app ya abierta y libre, se cargan en segundo plano las ventanas: así abrir la primera es inmediato
 // sin retrasar el arranque.

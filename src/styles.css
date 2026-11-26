@@ -1056,3 +1056,4 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .perf-bar > div { height: 100%; background: var(--accent); }
 .perf-bar.hot > div { background: #e67e22; }
 .perf-list { margin: 10px 0 0; padding-left: 18px; line-height: 1.5; }
+.err-log { max-height: 50vh; overflow: auto; white-space: pre-wrap; word-break: break-word; font: 11px/1.4 ui-monospace, monospace; background: var(--input); border: 1px solid var(--border); border-radius: 6px; padding: 8px; margin-top: 8px; user-select: text; -webkit-user-select: text; }

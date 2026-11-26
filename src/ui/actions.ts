@@ -407,6 +407,7 @@ export const ACTIONS: Action[] = [
   { id: 'drawMode', label: 'Modo dibujo (pantalla completa)', keys: ['F'], enabled: () => !!app.doc, run: () => import('./drawing').then(m => m.toggleDrawMode()) },
   { id: 'reference', label: 'Imagen de referencia', run: () => import('./artist').then(m => m.toggleReference()) },
   { id: 'quickBtnSettings', label: 'Botón rápido (tecla en pantalla)…', run: () => import('./quickbtn').then(m => m.quickBtnDialog()) },
+  { id: 'errorLog', label: 'Informe de errores…', run: () => import('./perf').then(m => m.errorLogDialog()) },
   { id: 'perf', label: 'Rendimiento y memoria…', run: () => import('./perf').then(m => m.perfDialog()) },
   { id: 'screenCheck', label: 'Comprobar la pantalla…', run: () => import('./perf').then(m => m.screenCheckDialog()) },
   { id: 'penSettings', label: 'Ajustes del lápiz…', run: () => import('./drawing').then(m => m.penSettingsDialog()) },

@@ -36,7 +36,7 @@ export const MENUS: { label: string; items: Item[] }[] = [
   { label: 'IA', items: ['aiRemoveBg', 'aiSubject', 'aiSky', 'aiSelTool', '-', 'aiErase', 'aiFill', '-', 'aiDepthBlur', 'aiRelight', 'aiFog', 'aiPhoto3d', 'aiDepthLayer', '-', 'aiUpscale'] },
   { label: 'Vista', items: ['zoomIn', 'zoomOut', 'fit', 'actual', 'resetRot', 'flipView', '-', 'proof', 'gamut', 'clipWarn', 'pixelGrid', '-', 'compare', 'comparePrev', 'compareDoc', { label: 'Simular visión', items: ['sim:none', '-', 'sim:protan', 'sim:deutan', 'sim:tritan', 'sim:achroma'] }, 'contrast', '-', 'drawMode', { label: 'Asistente de perspectiva', items: ['assist:off', 'assist:p1', 'assist:p2'] }, '-', 'extras', 'rulers', 'grid', 'guides', 'snap', 'newGuide', 'guideLayout', 'clearGuides'] },
   { label: 'Ventana', items: ['win:tools', 'win:options', '-', 'win:color', 'win:props', 'win:layers', 'win:timeline', 'reference', '-', 'panel:Acciones', 'panel:Canales', 'panel:Capas', 'panel:Carácter', 'panel:Color', 'panel:Composiciones', 'panel:Estilos', 'panel:Historial', 'panel:Histograma', 'panel:Info', 'panel:Muestras', 'panel:Navegador', 'panel:Párrafo', 'panel:Pinceles', 'panel:Propiedades', 'panel:Trazados', '-', 'panelsOnlyTools', 'win:all'] },
-  { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'touchTour', 'guide', 'shortcuts', '-', 'privacy', 'about'] },
+  { label: 'Ayuda', items: ['cmdSearch', 'quickTasks', 'tour', 'touchTour', 'guide', 'shortcuts', '-', 'errorLog', 'privacy', 'about'] },
 ];
 
 window.addEventListener('editor-keys', () => {

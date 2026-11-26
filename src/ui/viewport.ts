@@ -278,7 +278,11 @@ export class Viewport {
     // vuelve a encuadrar; si no (estabas ampliando), el punto que mirabas sigue en el centro
     const ow = this.width, oh = this.height, nw = wrap.clientWidth, nh = wrap.clientHeight;
     let keep: { whole: boolean; c: { x: number; y: number } } | null = null;
-    if (this.doc?.viewInitialized && ow > 10 && oh > 10 && (ow !== nw || oh !== nh)) {
+    // nunca a mitad de un trazo o un gesto (en el móvil la barra de direcciones aparece y desaparece al tocar), y los
+    // cambios pequeños de alto (esa barra, el teclado) no reencuadran
+    const busy = this.pointers.size > 0 || this.toolActive || !!this.pendingDown;
+    const small = ow === nw && Math.abs(oh - nh) < oh * 0.2;
+    if (!busy && !small && this.doc?.viewInitialized && ow > 10 && oh > 10 && (ow !== nw || oh !== nh)) {
       const d = this.doc, a = this.toScreen(0, 0), z = this.toScreen(d.width, d.height);
       keep = { whole: Math.min(a.x, z.x) >= -2 && Math.min(a.y, z.y) >= -2 && Math.max(a.x, z.x) <= ow + 2 && Math.max(a.y, z.y) <= oh + 2, c: this.toDoc(ow / 2, oh / 2) };
     }
