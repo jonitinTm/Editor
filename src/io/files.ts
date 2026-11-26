@@ -2,7 +2,7 @@
 // navegador: nada se envía a ningún servidor.
 
 import { maxCanvasPixels } from '../core/polyfills';
-import { readExif } from './exif';
+import { readExif, readExifRaw } from './exif';
 import { EditorDocument } from '../core/document';
 import { RasterLayer, TextLayer, ShapeLayer, SmartLayer, AdjustmentLayer, GroupLayer, LayerMask, Layer, bumpLayerId, isRaster, isParametric } from '../core/layers';
 import { canvasToBlob, ctx2d, makeCanvas } from '../core/canvas';
@@ -79,6 +79,7 @@ export async function documentFromImage(file: File | Blob, name = 'Sin título')
   }
   const c = await imageToCanvas(file);
   const doc = new EditorDocument(baseName(name), c.width, c.height);
+  try { const raw = await readExifRaw(file); if (raw) doc.meta.exifRaw = raw; } catch { /* sin EXIF */ }
   try { const ex = await readExif(file); if (ex) { doc.meta.exif = ex; if (ex['Autor']) doc.meta.author = ex['Autor']; if (ex['Copyright']) doc.meta.copyright = ex['Copyright']; if (ex['Descripción']) doc.meta.description = ex['Descripción']; } } catch { /* sin datos */ }
   const l = new RasterLayer('Fondo', c.width, c.height);
   l.canvas = c;

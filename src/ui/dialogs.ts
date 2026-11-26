@@ -103,6 +103,10 @@ export function exportDialog() {
   const perBoard = h('input', { type: 'checkbox', checked: hasBoards });
   const pbRow = row('', h('label', { class: 'check' }, perBoard, ' Cada mesa de trabajo en un archivo'));
   if (!hasBoards) pbRow.style.display = 'none';
+  // EXIF de la foto original (cámara, exposición, fecha…): se puede conservar al exportar en JPG; la ubicación, aparte
+  const hasExif = !!d.meta.exifRaw, keepExif = h('input', { type: 'checkbox', checked: true }) as HTMLInputElement, keepGps = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  const hasGps = !!d.meta.exif?.['GPS'];
+  const exifRow = row('Datos de la foto', h('div', { class: 'check-row' }, h('label', { class: 'check' }, keepExif, ' Conservar los datos de la cámara (EXIF)'), hasGps ? h('label', { class: 'check' }, keepGps, ' Incluir la ubicación (GPS)') : null));
   const info = h('div', { class: 'hint' }, '');
   // peso máximo: busca la mejor calidad que cabe (útil para webs, formularios o correos con límite)
   const maxOn = h('input', { type: 'checkbox' }) as HTMLInputElement, maxKb = h('input', { type: 'number', min: 10, max: 50000, value: 500, class: 'num', style: { width: '80px' } }) as HTMLInputElement;
@@ -127,6 +131,7 @@ export function exportDialog() {
     clearTimeout(timer);
     pvRow.style.display = maxRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
     qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' ? '' : 'none';
+    exifRow.style.display = hasExif && fmt.value === 'image/jpeg' ? '' : 'none';
     scRow.style.display = fmt.value.startsWith('image/') || fmt.value === 'pdf' || fmt.value === 'svg' ? '' : 'none';
     exRow.style.display = fmt.value.startsWith('image/') ? '' : 'none';
     qRow.style.display = fmt.value === 'image/jpeg' || fmt.value === 'image/webp' || fmt.value === 'pdf' ? '' : 'none';
@@ -150,7 +155,7 @@ export function exportDialog() {
   estimate();
   showDialog({
     title: 'Exportar como', okLabel: 'Guardar',
-    body: [row('Nombre', name), row('Formato', fmt), qRow, maxRow, scRow, exRow, pbRow, info, pvRow],
+    body: [row('Nombre', name), row('Formato', fmt), qRow, maxRow, scRow, exifRow, exRow, pbRow, info, pvRow],
     onOk: async () => {
       if ((fmt.value === 'image/jpeg' || fmt.value === 'image/webp') && maxOn.checked) quality = Math.round((await fitQuality()) * 100);
       if (fmt.value === 'project') { d.name = name.value || d.name; await ops.saveProject(true); return; }
@@ -166,7 +171,8 @@ export function exportDialog() {
         return;
       }
       try {
-        const b = await io.exportImage(d, fmt.value as any, quality / 100, scale / 100);
+        let b = await io.exportImage(d, fmt.value as any, quality / 100, scale / 100);
+        if (fmt.value === 'image/jpeg' && hasExif && keepExif.checked) { const ex = await import('../io/exif'); b = await ex.jpegWithExif(b, d.meta.exifRaw!, { keepGps: keepGps.checked, width: Math.round(d.width * scale / 100), height: Math.round(d.height * scale / 100) }); }
         if (fmt.value === 'image/webp' && b.type !== 'image/webp') app.toast('Este navegador no puede crear WebP; se guardó como PNG', 'warn');
         await io.saveBlob(b, (name.value || d.name) + (b.type === 'image/webp' || fmt.value !== 'image/webp' ? ext : '.png'));
         app.toast('Imagen exportada');

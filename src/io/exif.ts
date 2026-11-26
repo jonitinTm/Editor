@@ -67,3 +67,52 @@ function parseTiff(b: Uint8Array, base: number, end: number): Exif | null {
   if (isFinite(lat) && isFinite(lon)) out['GPS'] = `${(gps[1] === 'S' ? -lat : lat).toFixed(5)}, ${(gps[3] === 'W' ? -lon : lon).toFixed(5)}`;
   return Object.keys(out).length ? out : null;
 }
+
+// ---- Conservar el EXIF al exportar ---------------------------------------------------------------------
+/** Bloque EXIF original del JPEG (desde «Exif\0\0», tal cual), en base64; null si no tiene. */
+export async function readExifRaw(file: Blob): Promise<string | null> {
+  if (file.size < 4) return null;
+  const head = new Uint8Array(await file.slice(0, Math.min(file.size, 256 * 1024)).arrayBuffer());
+  if (head[0] !== 0xff || head[1] !== 0xd8) return null;
+  let p = 2;
+  while (p + 4 < head.length && head[p] === 0xff) {
+    const marker = head[p + 1], len = (head[p + 2] << 8) | head[p + 3];
+    if (marker === 0xe1 && String.fromCharCode(...head.subarray(p + 4, p + 8)) === 'Exif' && p + 2 + len <= head.length) {
+      const seg = head.subarray(p + 4, p + 2 + len); let s = ''; for (let i = 0; i < seg.length; i += 8192) s += String.fromCharCode(...seg.subarray(i, i + 8192)); return btoa(s);
+    }
+    if (marker === 0xda) return null;
+    p += 2 + len;
+  }
+  return null;
+}
+
+/** JPEG con el EXIF original: orientación «normal» (los píxeles ya están girados), tamaño actualizado y, si no se
+ *  pide lo contrario, sin la ubicación GPS. */
+export async function jpegWithExif(blob: Blob, rawB64: string, o: { keepGps: boolean; width: number; height: number }): Promise<Blob> {
+  const seg = Uint8Array.from(atob(rawB64), c => c.charCodeAt(0)); // «Exif\0\0» + TIFF
+  if (seg.length < 14 || seg.length > 65533) return blob;
+  const base = 6, v = new DataView(seg.buffer), le = seg[base] === 0x49;
+  const u16 = (off: number) => v.getUint16(base + off, le), u32 = (off: number) => v.getUint32(base + off, le);
+  const ok = (off: number, n: number) => base + off + n <= seg.length;
+  try {
+    const patchIfd = (off: number, depth = 0) => {
+      if (depth > 2 || !ok(off, 2)) return;
+      const n = u16(off);
+      for (let i = 0; i < n; i++) {
+        const e = off + 2 + i * 12; if (!ok(e, 12)) return;
+        const tag = u16(e), type = u16(e + 2);
+        if (tag === 0x0112) v.setUint16(base + e + 8, 1, le); // orientación normal
+        else if (tag === 0xa002 || tag === 0xa003) { const val = tag === 0xa002 ? o.width : o.height; if (type === 3) v.setUint16(base + e + 8, Math.min(65535, val), le); else v.setUint32(base + e + 8, val, le); }
+        else if (tag === 0x8769) patchIfd(u32(e + 8), depth + 1); // datos de la cámara
+        else if (tag === 0x8825 && !o.keepGps) { const g = u32(e + 8); if (ok(g, 2)) v.setUint16(base + g, 0, le); } // GPS: sin entradas
+      }
+    };
+    patchIfd(u32(4));
+  } catch { return blob; }
+  const b = new Uint8Array(await blob.arrayBuffer());
+  if (b[0] !== 0xff || b[1] !== 0xd8) return blob;
+  // detrás de la cabecera JFIF (APP0) si la hay
+  let p = 2; if (b[p] === 0xff && b[p + 1] === 0xe0) p += 2 + ((b[p + 2] << 8) | b[p + 3]);
+  const head = new Uint8Array([0xff, 0xe1, (seg.length + 2) >> 8, (seg.length + 2) & 255]);
+  return new Blob([b.subarray(0, p), head, seg, b.subarray(p)], { type: 'image/jpeg' });
+}
