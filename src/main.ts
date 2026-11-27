@@ -42,6 +42,7 @@ import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannels
 (app as any).debug = { filters: () => import('./filters/registry').then(async r => { await r.loadFilterImpls(); return r; }), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), icc: () => import('./io/icc'), projects: () => import('./io/projects'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS, contentBounds };
 (app as any).debug.rawdev = () => import('./ui/rawdev');
 (app as any).debug.textures = () => import('./ui/textures');
+(app as any).debug.gamedev = () => import('./ui/gamedev');
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';

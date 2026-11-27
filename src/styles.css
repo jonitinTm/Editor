@@ -1176,3 +1176,10 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .px-anim .px-frames { flex: 1 1 180px; }
 @media (max-width: 700px) { .anim-dock { width: calc(100% - 16px); bottom: 6px; } .px-onion-mode { max-width: 92px; } }
 .anim-dock .px-anim { border-bottom: 0; padding-bottom: 0; }
+
+/* Herramientas para videojuegos */
+.gd-pv-wrap { display: flex; justify-content: center; background: repeating-conic-gradient(#3a3b40 0 25%, #2c2d31 0 50%) 0 0 / 12px 12px; border-radius: 6px; padding: 6px; margin-bottom: 6px; }
+.gd-pv { max-width: 100%; height: auto; image-rendering: pixelated; }
+.gd-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 46vh; overflow: auto; }
+.gd-swap { display: flex; align-items: center; gap: 6px; }
+.gd-old { width: 24px; height: 24px; border-radius: 4px; border: 1px solid var(--border); flex: none; }
