@@ -1171,7 +1171,7 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 
 /* Barra de animación general (también en pixel art) */
 .anim-dock { width: min(900px, calc(100% - 16px)); }
-.px-onion-mode, .px-hold { flex: none; max-width: 120px; }
+.px-onion-mode, .px-hold, .px-play-mode { flex: none; max-width: 120px; }
 .px-anim { flex-wrap: wrap; }
 .px-anim .px-frames { flex: 1 1 180px; }
 @media (max-width: 700px) { .anim-dock { width: calc(100% - 16px); bottom: 6px; } .px-onion-mode { max-width: 92px; } }
@@ -1221,3 +1221,47 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 /* Tamaño para todas las redes */
 .mr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 12px; max-height: 34vh; overflow: auto; margin-bottom: 8px; }
 .mr-size { color: var(--text-dim, #999); font-size: 11px; }
+
+/* Creative Studio: «¿Qué quieres crear hoy?» */
+.studio-sub { letter-spacing: .18em; font-size: 12px; opacity: .75; margin-top: -6px; }
+.studio-q { margin: 6px 0 12px; opacity: .85; }
+.studio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 4px 0 14px; text-align: left; }
+.studio-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px; border-radius: 14px; border: 1px solid rgba(255,255,255,.06); color: #f2f4f8; cursor: pointer; font: inherit; text-align: left; min-height: 118px; transition: transform .12s, filter .12s; }
+.studio-card:hover { filter: brightness(1.12); }
+.studio-card:active { transform: scale(.98); }
+.studio-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.studio-ic svg { width: 28px; height: 28px; }
+.studio-name { font-size: 17px; font-weight: 700; }
+.studio-desc { font-size: 12.5px; opacity: .85; line-height: 1.35; }
+.studio-card.ws-game { grid-column: 1 / -1; min-height: 0; }
+.ws-photo { background: #1d2c4f; } .ws-photo .studio-ic { color: #8fb6ff; }
+.ws-illustration { background: #33224f; } .ws-illustration .studio-ic { color: #c9a2ff; }
+.ws-anim { background: #1f4a42; } .ws-anim .studio-ic { color: #82e0bd; }
+.ws-pixel { background: #4a3620; } .ws-pixel .studio-ic { color: #ffc96b; }
+.ws-game { background: #283244; } .ws-game .studio-ic { color: #9fb8ff; }
+.studio-head { display: flex; gap: 12px; align-items: center; padding: 12px; border-radius: 12px; color: #f2f4f8; margin-bottom: 10px; }
+.studio-head .hint { color: rgba(242,244,248,.75); }
+.studio-starts { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
+.studio-start { display: flex; align-items: center; gap: 8px; justify-content: flex-start; text-align: left; padding: 10px; }
+.studio-start svg { width: 20px; height: 20px; flex: none; }
+.modal .studio-grid { margin: 0; }
+.top-ws span { max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-fly .fly-item svg { width: 18px; height: 18px; }
+@media (max-width: 700px) {
+  .studio-card { min-height: 104px; padding: 12px; }
+  .studio-name { font-size: 15.5px; }
+  .top-ws span { display: none; }
+}
+/* la pantalla de inicio es más alta que la ventana: se desplaza en vez de salirse por arriba */
+.welcome { overflow-y: auto; align-items: flex-start; }
+.welcome-card { margin: auto; }
+@media (max-width: 480px) { .top-menu span { display: none; } }
+
+/* Pivote y colisiones, interfaz del juego */
+.pv-edit { cursor: crosshair; touch-action: none; }
+.pv-nav { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.pv-list { display: flex; flex-direction: column; gap: 3px; max-height: 20vh; overflow: auto; font-size: 12px; }
+.pv-item { display: flex; align-items: center; gap: 6px; }
+.pv-item .btn { padding: 0 8px; margin-left: auto; }
+.pv-dot { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.ui-pv, .anim-pv { max-width: 100%; }

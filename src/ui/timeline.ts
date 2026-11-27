@@ -8,7 +8,7 @@ import type { EditorDocument } from '../core/document';
 import { ctx2d, makeCanvas } from '../core/canvas';
 
 /** `own`: capa propia del cuadro (pixel art: cada fotograma es un dibujo en su capa). */
-export interface Frame { delay: number; visible: number[]; own?: number; /** veces que dura (×1, ×2…) */ hold?: number; /** nombre de la animación (andar, saltar…) */ tag?: string; }
+export interface Frame { delay: number; visible: number[]; own?: number; /** veces que dura (×1, ×2…) */ hold?: number; /** nombre de la animación (andar, saltar…) */ tag?: string; /** punto de apoyo del sprite */ pivot?: { x: number; y: number }; /** cajas de colisión (cuerpo, golpe, daño) */ boxes?: { kind: string; x: number; y: number; w: number; h: number }[]; }
 
 const visibleIds = (d: EditorDocument) => d.allLayers().filter(l => l.visible).map(l => l.id);
 export function applyFrame(d: EditorDocument, i: number) {

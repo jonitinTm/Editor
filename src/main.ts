@@ -18,6 +18,7 @@ import { installTouchTips } from './ui/touchtips';
 import { History } from './core/history';
 import { buildMenuBar } from './ui/menus';
 import { buildToolbar } from './ui/toolbar';
+import { studioCards, workspaceButton, initStudio } from './ui/studio';
 import { buildOptionsBar } from './ui/optionsbar';
 import { buildLayersPanel, buildHistoryPanel, buildPropertiesPanel, buildColorPanel, buildSwatchesPanel } from './ui/panels';
 import { ACTIONS, loadDialogs } from './ui/actions';
@@ -39,7 +40,7 @@ import { VanishingTool } from './ui/more3';
 import { AISelectTool } from './ai/aitools';
 import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
-(app as any).debug = { filters: () => import('./filters/registry').then(async r => { await r.loadFilterImpls(); return r; }), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), icc: () => import('./io/icc'), projects: () => import('./io/projects'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS, contentBounds, texdetails: () => import('./ui/texdetails'), gamextra: () => import('./ui/gamextra'), tilemap: () => import('./ui/tilemap'), anim: () => import('./ui/anim') };
+(app as any).debug = { filters: () => import('./filters/registry').then(async r => { await r.loadFilterImpls(); return r; }), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), icc: () => import('./io/icc'), projects: () => import('./io/projects'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS, contentBounds, texdetails: () => import('./ui/texdetails'), gamextra: () => import('./ui/gamextra'), tilemap: () => import('./ui/tilemap'), anim: () => import('./ui/anim'), gameui: () => import('./ui/gameui'), studio: () => import('./ui/studio') };
 (app as any).debug.rawdev = () => import('./ui/rawdev');
 (app as any).debug.textures = () => import('./ui/textures');
 (app as any).debug.gamedev = () => import('./ui/gamedev');
@@ -126,7 +127,8 @@ langBtn.onclick = e => {
   fly.style.top = r.bottom + 4 + 'px'; fly.style.left = Math.max(8, Math.min(innerWidth - fly.offsetWidth - 8, r.right - fly.offsetWidth)) + 'px';
   setTimeout(() => document.addEventListener('pointerdown', function close(ev) { if (!fly.contains(ev.target as Node)) { fly.remove(); document.removeEventListener('pointerdown', close); } }), 0);
 };
-header.append(h('div', { class: 'top-right' }, langBtn, undoBtn, redoBtn, quickBtn, searchBtn, sideToggle));
+initStudio();
+header.append(h('div', { class: 'top-right' }, workspaceButton(), langBtn, undoBtn, redoBtn, quickBtn, searchBtn, sideToggle));
 // fondo oscuro detrás del cajón: tocarlo lo cierra
 const sideBackdrop = h('div', { class: 'side-backdrop' });
 sideBackdrop.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); document.body.classList.remove('show-side'); });
@@ -366,7 +368,10 @@ function buildWelcome() {
     h('div', { class: 'welcome-card' },
       h('div', { class: 'welcome-logo', html: icon('logo') }),
       h('h1', {}, 'Photocap'),
-      h('p', {}, 'Editor de imágenes por capas. Todo se procesa en tu equipo: tus imágenes no salen de él.'),
+      h('div', { class: 'studio-sub no-i18n' }, 'CREATIVE STUDIO'),
+      h('p', { class: 'studio-q' }, '¿Qué quieres crear hoy?'),
+      studioCards(),
+      h('p', {}, 'Todo se procesa en tu equipo: tus imágenes no salen de él.'),
       h('div', { class: 'welcome-actions' }, openBtn, galBtn, newBtn, h('button', { class: 'btn big', type: 'button', onclick: () => easy.quickTasks(), html: icon('magic') + ' ¿Qué quieres hacer?' })),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,
       projectsStrip(),

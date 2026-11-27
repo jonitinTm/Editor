@@ -13,6 +13,12 @@ type Topic = { title: string; guides: Guide[] };
 
 export const TOPICS: Topic[] = [
   { title: 'Primeros pasos', guides: [
+    { id: 'studio', title: 'Elegir qué vas a crear', steps: [
+      'Al abrir Photocap eliges qué quieres crear: fotografía, ilustración, animación 2D, pixel art o videojuegos.',
+      'Cada espacio enseña en la barra solo las herramientas de ese trabajo y te da formas rápidas de empezar (tamaños, plantillas, abrir una foto…).',
+      'Cámbialo cuando quieras con el botón de arriba a la derecha. Allí también está «Todas las herramientas en la barra». Los menús siempre tienen todo.',
+      'Con algo abierto, vuelve a esta pantalla con ⟦Archivo › ¿Qué quieres crear hoy? (espacios de trabajo)…⟧.',
+    ], go: { act: 'studio' } },
     { id: 'screen', title: 'Conocer la pantalla', steps: [
       'Arriba está el menú con todas las funciones. En el móvil, pulsa ⟦Menú⟧.',
       'Las herramientas están a la izquierda (en el móvil, abajo). Las que tienen un pequeño triángulo esconden más: mantenlas pulsadas para verlas.',

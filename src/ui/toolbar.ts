@@ -7,6 +7,7 @@ import { icon } from './icons';
 import { colorDialog } from './colorpicker';
 import { actionById } from './actions';
 import type { Tool } from '../tools/tool';
+import { toolAllowed } from './studio';
 
 /** Orden de los botones. Los grupos comparten botón (clic derecho para elegir). */
 const LAYOUT: string[][] = [
@@ -20,7 +21,8 @@ export function buildToolbar(parent: HTMLElement) {
   let flyout: HTMLElement | null = null;
   const closeFly = () => { flyout?.remove(); flyout = null; };
 
-  const toolOf = (ids: string[]) => app.tools.get(ids.includes(app.tool?.id) ? app.tool.id : (ids.find(i => i === app.groupChoice[app.tools.get(ids[0])!.group ?? '']) ?? ids[0]))!;
+  // en cada botón se ve la herramienta en uso, la última elegida de su grupo o la primera que tiene sentido en el espacio de trabajo
+  const toolOf = (ids: string[]) => app.tools.get(ids.includes(app.tool?.id) ? app.tool.id : (ids.find(i => i === app.groupChoice[app.tools.get(ids[0])!.group ?? ''] && toolAllowed(i)) ?? ids.find(toolAllowed) ?? ids[0]))!;
 
   // Cualquier herramienta registrada que no esté en la lista va en su grupo o en un botón propio al final
   const layout = LAYOUT.map(ids => ids.filter(id => app.tools.has(id))).filter(ids => ids.length);
@@ -74,10 +76,11 @@ export function buildToolbar(parent: HTMLElement) {
       b.el.title = `${t.name}${t.key ? ` (${t.key})` : ''}${TOOL_DESC[t.id] ? '\n' + TOOL_DESC[t.id] : ''}${b.ids.length > 1 ? '\nMantén pulsado o clic derecho para ver más' : ''}`;
       b.el.setAttribute('aria-label', t.name);
       b.el.classList.toggle('active', b.ids.includes(app.tool?.id));
+      b.el.style.display = b.ids.some(toolAllowed) ? '' : 'none';
     }
     fgSw.style.background = app.fg; bgSw.style.background = app.bg;
   };
-  app.on('tool', update); app.on('colors', update);
+  app.on('tool', update); app.on('colors', update); app.on('workspace', update);
   update();
   parent.append(bar);
 }

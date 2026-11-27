@@ -47,7 +47,7 @@ export class EditorDocument {
   /** Resolución para imprimir (píxeles por pulgada). */
   ppi = 72;
   /** Información del archivo: datos de la cámara (solo lectura) y título, autor, copyright… (editables). */
-  meta: { /** dibujo de pixel art: se amplía sin suavizar al exportar y se muestra la barra de paleta */ pixelArt?: boolean; /** textura repetible (vista en mosaico) */ tileable?: boolean; exif?: Record<string, string>; /** bloque EXIF original (base64) para conservarlo al exportar en JPG */ exifRaw?: string; title?: string; author?: string; copyright?: string; description?: string; keywords?: string; /** mapa de tiles hecho con este documento como tileset */ tilemap?: TileMapData } = {};
+  meta: { /** dibujo de pixel art: se amplía sin suavizar al exportar y se muestra la barra de paleta */ pixelArt?: boolean; /** textura repetible (vista en mosaico) */ tileable?: boolean; exif?: Record<string, string>; /** bloque EXIF original (base64) para conservarlo al exportar en JPG */ exifRaw?: string; title?: string; author?: string; copyright?: string; description?: string; keywords?: string; /** mapa de tiles hecho con este documento como tileset */ tilemap?: TileMapData; /** pivote y colisiones si el documento no tiene fotogramas */ sprite?: { pivot?: { x: number; y: number }; boxes?: { kind: string; x: number; y: number; w: number; h: number }[] } } = {};
   /** Modo de color: en «gris» se trabaja en escala de grises. */
   mode: 'rgb' | 'gray' = 'rgb';
   /** Trazado activo en el panel (-1 = ninguno). */
@@ -58,7 +58,7 @@ export class EditorDocument {
   /** Vista previa de «Seleccionar y aplicar máscara». */
   refinePreview: { mask: HTMLCanvasElement; mode: 'overlay' | 'black' | 'white' | 'transparent' } | null = null;
   /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
-  frames: { delay: number; visible: number[]; own?: number; hold?: number; tag?: string }[] = [];
+  frames: { delay: number; visible: number[]; own?: number; hold?: number; tag?: string; pivot?: { x: number; y: number }; boxes?: { kind: string; x: number; y: number; w: number; h: number }[] }[] = [];
   frameIndex = 0;
   /** RAW revelado en alta precisión (16 bits, lineal) para volver a revelarlo sin pérdidas; solo en memoria. */
   raw16?: { layerId: number; w: number; h: number; data: Uint16Array; params?: Record<string, number> };

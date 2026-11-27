@@ -10,6 +10,7 @@ import { applyFrame, renderFrames, onion } from './timeline';
 import { RasterLayer } from '../core/layers';
 import { ctx2d, makeCanvas } from '../core/canvas';
 import type { EditorDocument } from '../core/document';
+import { t } from '../i18n/i18n';
 
 export const isAnim = (d: EditorDocument | null | undefined) => !!d && d.frames.some(f => f.own != null);
 const layerById = (d: EditorDocument, id?: number) => id == null ? undefined : d.allLayers().find(l => l.id === id);
@@ -23,16 +24,83 @@ const refresh = () => listeners.forEach(f => f());
 let playTimer = 0;
 export const isPlaying = () => !!playTimer;
 export function stopAnim() { if (playTimer) { clearTimeout(playTimer); playTimer = 0; refresh(); } }
+export type PlayMode = 'loop' | 'pingpong' | 'reverse' | 'once' | 'tag';
+const PLAY_KEY = 'editor.playMode';
+export function playMode(): PlayMode { try { return (localStorage.getItem(PLAY_KEY) as PlayMode) || 'loop'; } catch { return 'loop'; } }
+export function setPlayMode(m: PlayMode) { try { localStorage.setItem(PLAY_KEY, m); } catch { /* */ } refresh(); }
+/** Fotogramas que se reproducen: todos o, con «solo esta animación», los que tienen el mismo nombre que el actual. */
+export function playRange(d: EditorDocument, mode = playMode()): [number, number] {
+  const n = d.frames.length, tag = (d.frames[d.frameIndex] as any)?.tag;
+  if (mode !== 'tag' || !tag) return [0, n - 1];
+  let a = d.frameIndex, b = d.frameIndex;
+  while (a > 0 && (d.frames[a - 1] as any).tag === tag) a--;
+  while (b < n - 1 && (d.frames[b + 1] as any).tag === tag) b++;
+  return [a, b];
+}
+/** Siguiente fotograma según el modo (null = se acaba). `dir` es la dirección actual en ida y vuelta. */
+export function nextFrame(i: number, a: number, b: number, mode: PlayMode, dir: number): [number, number] | null {
+  if (b <= a) return [a, 1];
+  if (mode === 'reverse') return [i - 1 < a ? b : i - 1, -1];
+  if (mode === 'pingpong') { let j = i + dir; if (j > b) { dir = -1; j = b - 1; } else if (j < a) { dir = 1; j = a + 1; } return [j, dir]; }
+  if (mode === 'once') return i + 1 > b ? null : [i + 1, 1];
+  return [i + 1 > b ? a : i + 1, 1];
+}
 export function playAnim() {
   const d = app.doc; if (!d || d.frames.length < 2) return;
   if (playTimer) { stopAnim(); return; }
+  let dir = 1;
+  const mode = playMode();
+  if (mode === 'once') { const [a, b] = playRange(d, mode); if (d.frameIndex >= b) applyFrame(d, a); }
   const tick = () => {
     const dd = app.doc; if (!dd || dd !== d || dd.frames.length < 2 || (app.viewport as any).toolActive) { playTimer = 0; refresh(); return; }
-    applyFrame(dd, (dd.frameIndex + 1) % dd.frames.length);
+    const [a, b] = playRange(dd, mode), i = Math.min(b, Math.max(a, dd.frameIndex)), nx = nextFrame(i, a, b, mode, dir);
+    if (!nx) { playTimer = 0; refresh(); return; }
+    dir = nx[1]; applyFrame(dd, nx[0]);
     playTimer = window.setTimeout(tick, dd.frames[dd.frameIndex]?.delay ?? 125);
   };
   playTimer = window.setTimeout(tick, d.frames[d.frameIndex]?.delay ?? 125);
   refresh();
+}
+
+// ---- probador ----------------------------------------------------------------------------------
+/** Ventana para ver la animación como en el juego: a tamaño real o ampliada, sobre distintos fondos y con cada modo de reproducción. */
+export function previewDialog() {
+  const d = app.doc; if (!d) return;
+  stopAnim();
+  const frames = renderFrames(d); if (!frames.length) frames.push({ canvas: d.flatten(), delay: 100 });
+  const pix = !!d.meta.pixelArt, maxK = Math.max(1, Math.floor(420 / Math.max(d.width, d.height)));
+  let k = pix ? Math.min(4, maxK) : Math.min(1, 420 / Math.max(d.width, d.height)), bg = 'checker', mode: PlayMode = playMode(), i = 0, dir = 1, timer = 0;
+  const cv = h('canvas', { class: 'gd-pv anim-pv' }) as HTMLCanvasElement;
+  const info = h('div', { class: 'hint' });
+  const BGS: Record<string, string | null> = { checker: null, white: '#ffffff', black: '#000000', sky: '#7ec8f0', grass: '#5a9b3c', night: '#1a1f3a', dungeon: '#3a3330' };
+  const draw = () => {
+    const f = frames[i], W = Math.max(1, Math.round(d.width * k)), H = Math.max(1, Math.round(d.height * k));
+    if (cv.width !== W + 32 || cv.height !== H + 32) { cv.width = W + 32; cv.height = H + 32; }
+    const x = ctx2d(cv); x.imageSmoothingEnabled = !pix && k < 1;
+    if (BGS[bg]) { x.fillStyle = BGS[bg]!; x.fillRect(0, 0, cv.width, cv.height); }
+    else { const s = 8; for (let yy = 0; yy < cv.height; yy += s) for (let xx = 0; xx < cv.width; xx += s) { x.fillStyle = ((xx + yy) / s) % 2 ? '#3a3b40' : '#2c2d31'; x.fillRect(xx, yy, s, s); } }
+    if (bg === 'grass') { x.fillStyle = '#7ec8f0'; x.fillRect(0, 0, cv.width, 16 + H * 0.85); }
+    x.drawImage(f.canvas, 16, 16, W, H);
+    info.textContent = `${t('Fotograma')} ${i + 1} / ${frames.length} · ${Math.round(W)} × ${Math.round(H)} px`;
+  };
+  const run = () => {
+    clearTimeout(timer); draw();
+    const nx = nextFrame(i, 0, frames.length - 1, mode === 'tag' ? 'loop' : mode, dir);
+    if (!nx) { timer = window.setTimeout(() => { i = 0; dir = 1; run(); }, 700); return; }
+    timer = window.setTimeout(() => { i = nx[0]; dir = nx[1]; run(); }, frames[i].delay);
+  };
+  const sel = (opts: [string, string][], v: string, on: (x: string) => void) => { const s = h('select', {}, ...opts.map(([a, b]) => h('option', { value: a }, b))) as HTMLSelectElement; s.value = v; s.onchange = () => on(s.value); return s; };
+  const sizes: [string, string][] = pix ? [1, 2, 3, 4, 6, 8].filter(n => n <= Math.max(1, maxK)).map(n => [String(n), `×${n}`]) : [['0.25', '25 %'], ['0.5', '50 %'], ['1', '100 %']];
+  if (!sizes.some(([v]) => +v === k)) sizes.push([String(k), pix ? `×${k}` : `${Math.round(k * 100)} %`]);
+  run();
+  showDialog({
+    title: 'Probar animación', okLabel: 'Cerrar', cancelLabel: null, width: 520,
+    body: [h('div', { class: 'gd-pv-wrap' }, cv), info,
+      h('div', { class: 'form-row' }, h('label', {}, 'Tamaño'), sel(sizes, String(k), v => { k = +v; draw(); })),
+      h('div', { class: 'form-row' }, h('label', {}, 'Fondo'), sel([['checker', 'Transparente (cuadros)'], ['white', 'Blanco'], ['black', 'Negro'], ['sky', 'Cielo'], ['grass', 'Cielo y suelo'], ['night', 'Noche'], ['dungeon', 'Mazmorra']], bg, v => { bg = v; draw(); })),
+      h('div', { class: 'form-row' }, h('label', {}, 'Reproducción'), sel([['loop', 'En bucle'], ['pingpong', 'Ida y vuelta'], ['reverse', 'Al revés'], ['once', 'Una vez']], mode === 'tag' ? 'loop' : mode, v => { mode = v as PlayMode; i = 0; dir = 1; run(); }))],
+    onOk: () => clearTimeout(timer), onCancel: () => clearTimeout(timer),
+  });
 }
 
 // ---- fotogramas ---------------------------------------------------------------------------------
@@ -236,9 +304,18 @@ export async function exportAnimation(d: EditorDocument, fmt: string, k: number,
   // hoja de sprites: rejilla casi cuadrada + JSON con el formato de Aseprite (lo leen Godot, Phaser, Unity con plugins, Defold…)
   const W = fr[0].canvas.width, H = fr[0].canvas.height, cols = Math.ceil(Math.sqrt(fr.length)), rows = Math.ceil(fr.length / cols);
   const sheet = makeCanvas(W * cols, H * rows), sx = ctx2d(sheet), frames: Record<string, unknown>[] = [];
-  fr.forEach((f, i) => { const x = (i % cols) * W, y = Math.floor(i / cols) * H; sx.drawImage(f.canvas, x, y); frames.push({ filename: `${d.name} ${i}.png`, frame: { x, y, w: W, h: H }, rotated: false, trimmed: false, spriteSourceSize: { x: 0, y: 0, w: W, h: H }, sourceSize: { w: W, h: H }, duration: f.delay }); });
+  // pivote y cajas de colisión de cada fotograma (Juegos › Pivote y colisiones)
+  const { spriteJson } = await import('./gameui'), n = Math.max(1, d.frames.length), sj = (j: number) => spriteJson(d, Math.max(0, Math.min(n - 1, j)));
+  fr.forEach((f, i) => { const x = (i % cols) * W, y = Math.floor(i / cols) * H; sx.drawImage(f.canvas, x, y); frames.push({ filename: `${d.name} ${i}.png`, frame: { x, y, w: W, h: H }, rotated: false, trimmed: false, spriteSourceSize: { x: 0, y: 0, w: W, h: H }, sourceSize: { w: W, h: H }, duration: f.delay, ...scaleInfo(sj(i < n ? i : 2 * n - 2 - i), k) }); });
   const json = JSON.stringify({ frames, meta: { app: 'Photocap', version: '1.0', image: base + '.png', format: 'RGBA8888', size: { w: sheet.width, h: sheet.height }, scale: '1', frameTags: frameTags(d, pingpong ? fr.length : 0), frameSize: { w: W, h: H }, columns: cols, rows, frameCount: fr.length } }, null, 2);
   await save(makeZip([{ name: base + '.png', data: await png(sheet) }, { name: base + '.json', data: new TextEncoder().encode(json) }]), base + '_hoja.zip');
+}
+/** Las cajas y el pivote en píxeles se escalan con el tamaño de exportación. */
+function scaleInfo(o: Record<string, any>, k: number) {
+  if (k === 1) return o;
+  if (o.pivotPx) o.pivotPx = { x: Math.round(o.pivotPx.x * k), y: Math.round(o.pivotPx.y * k) };
+  if (o.boxes) o.boxes = o.boxes.map((b: any) => ({ ...b, x: Math.round(b.x * k), y: Math.round(b.y * k), w: Math.round(b.w * k), h: Math.round(b.h * k) }));
+  return o;
 }
 /** Etiquetas de animación en el formato de Aseprite: fotogramas seguidos con el mismo nombre. */
 export function frameTags(d: EditorDocument, pingTotal = 0) {
@@ -287,6 +364,9 @@ export function animRow(d: EditorDocument): HTMLElement {
   const om = h('select', { class: 'px-onion-mode', title: 'Qué enseña el papel cebolla', 'aria-label': 'Qué enseña el papel cebolla' },
     h('option', { value: 'prev' }, 'Anterior'), h('option', { value: 'prev2' }, '2 anteriores'), h('option', { value: 'both' }, 'Anterior y siguiente'), h('option', { value: 'color' }, 'Anterior y siguiente (en color)'));
   om.value = onionMode(); om.onchange = () => setOnionMode(om.value as OnionMode);
+  const pm = h('select', { class: 'px-play-mode', title: 'Cómo se reproduce', 'aria-label': 'Cómo se reproduce' },
+    h('option', { value: 'loop' }, 'En bucle'), h('option', { value: 'pingpong' }, 'Ida y vuelta'), h('option', { value: 'reverse' }, 'Al revés'), h('option', { value: 'once' }, 'Una vez'), h('option', { value: 'tag' }, 'Solo esta animación (su nombre)'));
+  pm.value = playMode(); pm.onchange = () => { stopAnim(); setPlayMode(pm.value as PlayMode); };
   return h('div', { class: 'px-row px-anim' }, play, strip,
     b('px-addf', 'Nuevo fotograma vacío', 'plus', () => addFrame(false)),
     b('px-dupf', 'Duplicar fotograma (copia del actual para cambiar un poco)', 'duplicate', () => addFrame(true)),
@@ -294,8 +374,9 @@ export function animRow(d: EditorDocument): HTMLElement {
     b('px-right', 'Mover el fotograma después', 'chevronRight', () => moveFrame(1)),
     b('px-delf', 'Eliminar fotograma', 'trash', () => deleteFrame()),
     b('px-onion', 'Papel cebolla: ver el fotograma anterior en transparencia', 'onion', () => { onion.on = !onion.on; refresh(); }, onion.on),
-    om, hl, fps,
+    om, hl, fps, pm,
     b('px-tween', 'Interpolar movimiento (crea los fotogramas intermedios)', 'move', () => tweenDialog()),
+    b('px-test', 'Probar animación (a tamaño real, sobre distintos fondos)', 'eye', () => previewDialog()),
     b('px-animexp', 'Exportar animación (GIF, vídeo, PNG, hoja de sprites)', 'download', () => exportAnimDialog()));
 }
 

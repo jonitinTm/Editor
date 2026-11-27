@@ -105,7 +105,7 @@ interface ProjLayer {
 }
 interface ProjFile {
   format: 'editor-proyecto'; version: 1; name: string; width: number; height: number;
-  guides: { h: number[]; v: number[] }; activeId: number | null; layers: ProjLayer[]; frames?: { delay: number; visible: number[]; own?: number; hold?: number; tag?: string }[];
+  guides: { h: number[]; v: number[] }; activeId: number | null; layers: ProjLayer[]; frames?: { delay: number; visible: number[]; own?: number; hold?: number; tag?: string; pivot?: { x: number; y: number }; boxes?: { kind: string; x: number; y: number; w: number; h: number }[] }[];
   channels?: { name: string; image: string }[];
   paths?: any[];
   layerComps?: any[];

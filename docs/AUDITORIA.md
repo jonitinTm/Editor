@@ -45,6 +45,12 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 - ✅ **Animación de pixel art**: fotogramas (cada uno en su capa), duplicar, mover, papel cebolla, velocidad en fps, reproducir, exportar GIF animado y tira de sprites ampliados y nítidos; los fotogramas se deshacen con el historial y se guardan en el proyecto.
 - ✅ **Pixel art**: Archivo › Nuevo pixel art (16–128 px, 7 paletas propias y «Mis colores»), **pincel de píxeles** (píxel perfecto sin escalones dobles, línea, rectángulo y elipse con o sin relleno, tramado, borrar, simetría, Alt = cuentagotas), barra de paleta sobre el lienzo, zoom entero y **exportación ampliada nítida** (×1 a ×32, sin suavizar).
 
+### Creative Studio (espacios de trabajo)
+- ✅ Pantalla «¿Qué quieres crear hoy?» con Fotografía, Ilustración, Animación 2D, Pixel art y Diseño de videojuegos; cada espacio filtra la barra de herramientas y da formas rápidas de empezar. Especificación completa por módulos, con requisitos y pruebas de aceptación, en `docs/ESTUDIO.md`.
+- ✅ Animación: reproducir en bucle, ida y vuelta, al revés, una vez o solo una animación con nombre; probador a tamaño real sobre fondos.
+- ✅ Juegos: pivote y cajas de colisión por fotograma (en el JSON de la hoja) e interfaz del juego (botones con 4 estados, barras de vida, paneles, corazones).
+- ⬜ Pendiente (ver `docs/ESTUDIO.md`): audio en la animación, cámara 2D, autotiles, esqueleto 2D (huesos, mallas, cinemática inversa), nube y colaboración.
+
 ### Videojuegos y animación
 - ✅ **Generador de texturas** repetibles (12 tipos: ladrillo, piedra, baldosas, madera, hierba, tierra, hormigón, asfalto, metal, tejas, agua, mármol), realista o pixel art, comprobado que no hay costuras; «Hacer repetible» para cualquier foto; vista en mosaico; **mapas normal/relieve/rugosidad/oclusión** (OpenGL o DirectX) en ZIP.
 - ✅ **Animación 2D** para cualquier documento: barra de animación, papel cebolla (anterior, 2 anteriores, anterior y siguiente, en color), duración por fotograma (×2, ×3…), fps, **interpolar movimiento** (mover, girar, escalar, desvanecer, con suavizado, rebote o impulso; ida y vuelta) y exportación GIF, vídeo, secuencia PNG y hoja de sprites + JSON.
