@@ -1115,7 +1115,15 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 @media (pointer: coarse) { .pin-item { min-height: 40px; } }
 
 /* Pixel art: barra de paleta sobre el lienzo y botones de tamaño */
-.px-bar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 6; display: flex; align-items: center; gap: 6px; max-width: calc(100% - 16px); padding: 5px 6px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.px-bar { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 6; display: flex; flex-direction: column; align-items: stretch; gap: 6px; max-width: calc(100% - 16px); padding: 5px 6px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 18px rgba(0,0,0,.45); }
+.px-row { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.px-anim { padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.px-frames { display: flex; gap: 4px; overflow-x: auto; min-width: 0; flex: 1 1 0; padding: 2px; scrollbar-width: thin; }
+.px-frame { position: relative; flex: none; width: 44px; height: 44px; padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: repeating-conic-gradient(#3a3b40 0 25%, #2c2d31 0 50%) 0 0 / 8px 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.px-frame canvas { image-rendering: pixelated; max-width: 100%; max-height: 100%; }
+.px-frame.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.px-fn { position: absolute; right: 2px; bottom: 1px; font-size: 10px; color: #fff; text-shadow: 0 0 2px #000, 0 0 2px #000; }
+.px-fps { flex: none; }
 .px-pal { flex: none; max-width: 150px; }
 .px-swatches { display: flex; gap: 3px; overflow-x: auto; scrollbar-width: thin; min-width: 0; padding: 2px; }
 .px-sw { flex: none; width: 24px; height: 24px; border: 1px solid rgba(0,0,0,.6); border-radius: 4px; padding: 0; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
@@ -1127,6 +1135,9 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 @media (max-width: 700px) {
   .px-pal { max-width: 84px; }
   .px-bar { bottom: 6px; gap: 4px; padding: 4px; width: calc(100% - 16px); }
+  .px-anim { flex-wrap: wrap; }
+  .px-anim .px-frames { order: 10; flex-basis: 100%; }
+  .px-frame { width: 40px; height: 40px; }
   /* en el móvil los colores van en dos filas (con desplazamiento si no caben) para ver más a la vez */
   .px-swatches { flex: 1 1 0; min-width: 0; flex-wrap: wrap; overflow-x: hidden; overflow-y: auto; max-height: 70px; align-content: flex-start; }
   .px-sw { width: 30px; height: 30px; }

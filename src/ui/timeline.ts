@@ -7,7 +7,8 @@ import { icon } from './icons';
 import type { EditorDocument } from '../core/document';
 import { ctx2d, makeCanvas } from '../core/canvas';
 
-export interface Frame { delay: number; visible: number[]; }
+/** `own`: capa propia del cuadro (pixel art: cada fotograma es un dibujo en su capa). */
+export interface Frame { delay: number; visible: number[]; own?: number; }
 
 const visibleIds = (d: EditorDocument) => d.allLayers().filter(l => l.visible).map(l => l.id);
 export function applyFrame(d: EditorDocument, i: number) {
@@ -15,10 +16,13 @@ export function applyFrame(d: EditorDocument, i: number) {
   d.frameIndex = i;
   const set = new Set(f.visible);
   for (const l of d.allLayers()) l.visible = set.has(l.id);
+  // el fotograma con capa propia la deja elegida: lo que se dibuja va a ese fotograma
+  if (f.own != null) { const l = d.allLayers().find(x => x.id === f.own); if (l && d.active !== l) d.setActive(l, false); }
   d.invalidate(); d.changed();
 }
 /** Papel cebolla: imagen del cuadro anterior (se guarda mientras no cambie nada). */
 let onionOn = false;
+export const onion = { get on() { return onionOn; }, set on(v: boolean) { onionOn = v; onionCache = null; app.viewport?.requestRender(); } };
 let onionCache: { key: string; c: HTMLCanvasElement } | null = null;
 (app as any).onionCanvas = (d: EditorDocument) => {
   if (!onionOn || d.frames.length < 2) return null;
@@ -59,10 +63,10 @@ export function buildTimeline(parent: HTMLElement) {
   const btn = (label: string, title: string, fn: () => void) => { const b = h('button', { class: 'btn', title }, label); b.onclick = fn; return b; };
   const playBtn = btn('', 'Reproducir / detener', play); playBtn.innerHTML = icon('play'); playBtn.classList.add('icon-btn');
   const bar = h('div', { class: 'tl-bar' }, h('b', {}, 'Línea de tiempo'), playBtn,
-    btn('+ Cuadro', 'Duplicar el cuadro actual', () => { const d = app.doc; if (!d) return; if (!d.frames.length) d.frames.push({ delay: 100, visible: visibleIds(d) }); d.frames.splice(d.frameIndex + 1, 0, { delay: d.frames[d.frameIndex].delay, visible: visibleIds(d) }); applyFrame(d, d.frameIndex + 1); }),
-    btn('Eliminar', 'Eliminar el cuadro actual', () => { const d = app.doc; if (!d || !d.frames.length) return; d.frames.splice(d.frameIndex, 1); if (d.frames.length) applyFrame(d, Math.min(d.frameIndex, d.frames.length - 1)); else d.changed(); }),
-    btn('Cuadros desde capas', 'Crea un cuadro por cada capa', () => { if (app.doc) framesFromLayers(app.doc); }),
-    (() => { const b = btn('Papel cebolla', 'Ver el cuadro anterior en transparencia mientras dibujas', () => { onionOn = !onionOn; b.classList.toggle('on', onionOn); app.viewport.requestRender(); }); return b; })(),
+    btn('+ Cuadro', 'Duplicar el cuadro actual', () => { const d = app.doc; if (!d) return; if (!d.frames.length) d.frames.push({ delay: 100, visible: visibleIds(d) }); d.frames.splice(d.frameIndex + 1, 0, { delay: d.frames[d.frameIndex].delay, visible: visibleIds(d) }); applyFrame(d, d.frameIndex + 1); d.commit('Añadir cuadro'); }),
+    btn('Eliminar', 'Eliminar el cuadro actual', () => { const d = app.doc; if (!d || !d.frames.length) return; d.frames.splice(d.frameIndex, 1); if (d.frames.length) applyFrame(d, Math.min(d.frameIndex, d.frames.length - 1)); else d.changed(); d.commit('Eliminar cuadro'); }),
+    btn('Cuadros desde capas', 'Crea un cuadro por cada capa', () => { if (app.doc) { framesFromLayers(app.doc); if (app.doc.frames.length) app.doc.commit('Cuadros desde capas'); } }),
+    (() => { const b = btn('Papel cebolla', 'Ver el cuadro anterior en transparencia mientras dibujas', () => { onion.on = !onionOn; b.classList.toggle('on', onionOn); }); return b; })(),
     h('span', { class: 'hint' }, 'Cada cuadro recuerda qué capas se ven. Exporta con Archivo › Exportar como (GIF animado o vídeo WebM).'));
   const el = h('div', { class: 'timeline closed', 'data-group': 'timeline' }, bar, strip);
   parent.append(el);
@@ -83,7 +87,7 @@ export function buildTimeline(parent: HTMLElement) {
       const delay = h('select', { class: 'tl-delay', title: 'Duración del cuadro' }, ...[20, 50, 100, 200, 500, 1000, 2000].map(ms => h('option', { value: String(ms) }, ms / 1000 + ' s')));
       if (![...delay.options].some(o => +o.value === f.delay)) delay.append(h('option', { value: String(f.delay) }, f.delay / 1000 + ' s'));
       delay.value = String(f.delay);
-      delay.onchange = () => { f.delay = +delay.value; };
+      delay.onchange = () => { f.delay = +delay.value; d.commit('Duración del cuadro'); };
       delay.onclick = e => e.stopPropagation();
       const cell = h('div', { class: 'tl-frame' + (i === d.frameIndex ? ' on' : '') }, h('span', { class: 'tl-n' }, String(i + 1)), shown, delay);
       cell.onclick = () => { stop(); applyFrame(d, i); };

@@ -57,7 +57,7 @@ export class EditorDocument {
   /** Vista previa de «Seleccionar y aplicar máscara». */
   refinePreview: { mask: HTMLCanvasElement; mode: 'overlay' | 'black' | 'white' | 'transparent' } | null = null;
   /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
-  frames: { delay: number; visible: number[] }[] = [];
+  frames: { delay: number; visible: number[]; own?: number }[] = [];
   frameIndex = 0;
   /** true = es el contenido de un objeto inteligente (vive dentro de otro documento). */
   embedded = false;

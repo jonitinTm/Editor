@@ -211,7 +211,8 @@ export const TOPICS: Topic[] = [
       'Pinta con el ⟦Pincel de píxeles⟧: cada toque pinta un píxel exacto. Elige el color en la barra de paleta de abajo.',
       'En ⟦Forma⟧ hay línea, rectángulo y elipse. ⟦Píxel perfecto⟧ deja las líneas a mano limpias, sin escalones dobles.',
       'Alt + clic (o mantener el botón rápido) toma un color del dibujo. El ⟦Bote de pintura⟧ rellena zonas.',
-      '⟦Archivo › Exportar pixel art ampliado…⟧ lo agranda ×8, ×16… sin que se vea borroso.',
+      'Para animarlo, pulsa el botón de la película en la barra de colores. Duplica el fotograma, cambia un poco el dibujo y repite: el papel cebolla muestra el anterior en transparencia.',
+      '⟦Archivo › Exportar pixel art ampliado…⟧ lo agranda ×8, ×16… sin que se vea borroso, también como GIF animado.',
     ], tip: 'Con ⟦Simetría⟧ en vertical dibujas medio personaje y sale entero.', go: { act: 'newPixelArt' } },
     { id: 'reference', title: 'Tener una imagen de referencia a la vista', steps: [
       '⟦Ventana › Imagen de referencia⟧ abre una ventana flotante con la foto que quieras.',

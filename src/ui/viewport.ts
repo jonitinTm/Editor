@@ -307,7 +307,7 @@ export class Viewport {
     const m = 40;
     // pixel art: deja sitio abajo para la barra de paleta y usa un zoom entero (todos los píxeles del mismo tamaño)
     const px = !!d.meta?.pixelArt;
-    let z = Math.min((this.width - m) / d.width, (this.height - m - (px ? 150 : 0)) / d.height);
+    let z = Math.min((this.width - m) / d.width, (this.height - m - (px ? (d.frames.some(f => f.own != null) ? 230 : 150) : 0)) / d.height);
     if (onlyShrink) z = Math.min(z, 1);
     if (px && z > 1) z = Math.floor(z);
     this.setZoom(z, null, true);
