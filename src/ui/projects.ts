@@ -179,11 +179,11 @@ async function previewPng(d: EditorDocument): Promise<Blob> {
   const x = c.getContext('2d')!; x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height);
   return new Promise((res, rej) => c.toBlob(b => b ? res(b) : rej(new Error('No se ha podido crear la imagen')), 'image/png'));
 }
-const sentNote = 'Ábrelo con Editor en el otro dispositivo: se abre con todas sus capas y se guarda en Mis proyectos. Envíalo con Quick Share, Drive, el correo o un cable (WhatsApp comprime las fotos y se perderían las capas).';
+const sentNote = 'Ábrelo con Photocap en el otro dispositivo: se abre con todas sus capas y se guarda en Mis proyectos. Envíalo con Quick Share, Drive, el correo o un cable (WhatsApp comprime las fotos y se perderían las capas).';
 async function send(png: Blob, fileName: string) {
   const r = await shareOrSave(new File([png], fileName, { type: 'image/png' }), (b, n) => io.saveBlob(b, n));
   if (r === 'saved') alertDialog('Listo para pasar a otro dispositivo', `Se ha guardado «${fileName}». ${sentNote}`);
-  else if (r === 'shared') app.toast('Enviado. En el otro dispositivo, ábrelo con Editor');
+  else if (r === 'shared') app.toast('Enviado. En el otro dispositivo, ábrelo con Photocap');
 }
 /** Envía el documento actual (proyecto completo dentro de un PNG). */
 export async function sendCurrent() {
@@ -207,7 +207,7 @@ async function sendAll() {
   const c = document.createElement('canvas'); c.width = cols * S; c.height = rows * S + 60; const x = c.getContext('2d')!;
   x.fillStyle = '#1d1e21'; x.fillRect(0, 0, c.width, c.height);
   await Promise.all(list.slice(0, n).map((p, i) => new Promise<void>(res => { if (!p.thumb) return res(); const im = new Image(); im.onload = () => { const k = Math.min((S - 12) / im.width, (S - 12) / im.height); x.drawImage(im, (i % cols) * S + (S - im.width * k) / 2, Math.floor(i / cols) * S + (S - im.height * k) / 2, im.width * k, im.height * k); res(); }; im.onerror = () => res(); im.src = p.thumb; })));
-  x.fillStyle = '#d7d9dd'; x.font = '600 26px sans-serif'; x.fillText(`Editor · ${list.length} proyecto(s)`, 16, c.height - 20);
+  x.fillStyle = '#d7d9dd'; x.font = '600 26px sans-serif'; x.fillText(`Photocap · ${list.length} proyecto(s)`, 16, c.height - 20);
   const png = await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/png'));
   await send(await embedInPng(png, 'edBk', new Uint8Array(await zip.arrayBuffer()), 'Mis proyectos'), `Mis proyectos ${new Date().toISOString().slice(0, 10)}.png`);
 }

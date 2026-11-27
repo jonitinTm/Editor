@@ -53,7 +53,7 @@ export const TOPICS: Topic[] = [
     { id: 'send', title: 'Pasar un proyecto del móvil a la tableta', steps: [
       '⟦Archivo › Enviar a otro dispositivo (con capas)…⟧',
       'Envíalo por Quick Share, Drive, correo o cable. WhatsApp comprime las fotos y las capas se perderían.',
-      'En el otro dispositivo, ábrelo con el Editor: se abre con todas las capas y queda en ⟦Mis proyectos⟧.',
+      'En el otro dispositivo, ábrelo con Photocap: se abre con todas las capas y queda en ⟦Mis proyectos⟧.',
     ], go: { act: 'sendProject' }, needsDoc: true },
   ] },
   { title: 'Mejorar fotos', guides: [

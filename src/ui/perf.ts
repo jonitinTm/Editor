@@ -102,7 +102,7 @@ export function errorLogDialog() {
   let list: { t: number; m: string }[] = [];
   try { list = JSON.parse(localStorage.getItem('editor.errors') || '[]'); localStorage.setItem('editor.errorsSeen', String(Date.now())); } catch { /* */ }
   const nav = navigator as any;
-  const head = `Editor ${typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : ''} · ${nav.userAgent} · pantalla ${innerWidth}×${innerHeight} ×${devicePixelRatio} · memoria ${nav.deviceMemory ?? '?'} GB · táctil ${nav.maxTouchPoints ?? 0}`;
+  const head = `Photocap ${typeof __BUILD_DATE__ !== 'undefined' ? __BUILD_DATE__ : ''} · ${nav.userAgent} · pantalla ${innerWidth}×${innerHeight} ×${devicePixelRatio} · memoria ${nav.deviceMemory ?? '?'} GB · táctil ${nav.maxTouchPoints ?? 0}`;
   const text = head + '\n\n' + (list.length ? list.slice().reverse().map(e => `[${new Date(e.t).toLocaleString()}] ${e.m}`).join('\n\n') : '(sin errores)');
   const pre = h('pre', { class: 'err-log no-i18n' }, text);
   const copy = h('button', { class: 'btn', type: 'button' }, 'Copiar');

@@ -194,8 +194,8 @@ export function autosaveData(doc: EditorDocument): Promise<ProjFile> {
 export function openProjectData(data: ProjFile): Promise<EditorDocument> { return docFromData(data); }
 export async function openProject(file: Blob): Promise<EditorDocument> {
   const data = JSON.parse(await file.text()) as ProjFile;
-  if (data.format !== 'editor-proyecto') throw new Error('El archivo no es un proyecto de Editor');
-  if (data.version > 1) throw new Error('Este proyecto se creó con una versión más nueva de Editor');
+  if (data.format !== 'editor-proyecto') throw new Error('El archivo no es un proyecto de Photocap');
+  if (data.version > 1) throw new Error('Este proyecto se creó con una versión más nueva de Photocap');
   return docFromData(data);
 }
 async function docFromData(data: ProjFile): Promise<EditorDocument> {

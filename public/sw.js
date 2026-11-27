@@ -1,4 +1,4 @@
-// Service worker: permite usar Editor sin conexión una vez abierto.
+// Service worker: permite usar Photocap sin conexión una vez abierto.
 // Siempre intenta primero la red (para tener la última versión) y, si falla, usa la copia guardada.
 const CACHE = 'editor-__BUILD__';
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './privacidad.html', '__ASSETS__']).catch(() => {}))); });

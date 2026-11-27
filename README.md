@@ -1,6 +1,6 @@
-# Editor
+# Photocap
 
-Editor de imágenes por capas que funciona en el navegador, con la interfaz en español.
+Photocap: editor de imágenes por capas que funciona en el navegador, con la interfaz en español.
 **Todo ocurre en tu equipo**: las imágenes no se suben a ningún servidor y funciona sin conexión a internet.
 (Las herramientas de IA descargan su modelo la primera vez que se usan; después también funcionan sin conexión.)
 
@@ -49,7 +49,7 @@ Ya disponible:
     efectos (sombra paralela e interior, resplandor exterior e interior, trazo, superposición de color y de degradado)
     y ajustes (brillo/contraste, niveles, curvas, tono/saturación, exposición, intensidad, equilibrio de color,
     blanco y negro, mezclador de canales, posterizar, umbral, invertir).
-  - *Al guardar*: todo lo anterior salvo que se guardan como píxeles el texto creado o editado en Editor, los objetos
+  - *Al guardar*: todo lo anterior salvo que se guardan como píxeles el texto creado o editado en Photocap, los objetos
     inteligentes y las formas con trazo. El texto de Photoshop que no hayas editado se devuelve intacto.
   - Sin soporte todavía: biselado, satinado y motivos; filtro de fotografía, mapa de degradado, corrección selectiva
     y consulta de colores; modos Lab e indexado.
@@ -422,10 +422,10 @@ Ya disponible:
 - **Funciona en móvil, tableta y ordenador**: revisado en 11 pantallas (iPhone SE y 14 Pro Max, Pixel 7, Galaxy en
   horizontal, iPad Mini vertical y horizontal, iPad Pro, portátiles de 1280 y 1366 px, 1920×1080 y 2560×1440): nada se
   sale de la pantalla, los menús largos se desplazan, los diálogos siempre muestran sus botones y en pantallas táctiles
-  los botones son más grandes. En Safari (iPhone, iPad y Mac), si el navegador no sabe desenfocar al dibujar, Editor lo
+  los botones son más grandes. En Safari (iPhone, iPad y Mac), si el navegador no sabe desenfocar al dibujar, Photocap lo
   hace por su cuenta; las fotos más grandes de lo que admite un iPhone/iPad (unos 16,7 megapíxeles) se abren reducidas
   con un aviso en vez de fallar, y el vídeo se graba en MP4 si el navegador no admite WebM.
-- **Funciones propias de Editor** (no las traen los editores habituales):
+- **Funciones propias de Photocap** (no las traen los editores habituales):
   - *Vista › Comparar antes / después* (`Mayús+Ctrl+Y`): una línea que arrastras separa el estado inicial (o el paso
     anterior) del actual, sobre la misma imagen.
   - *Vista › Simular visión*: ver el diseño como una persona con protanopía, deuteranopía, tritanopía o sin color.
@@ -491,7 +491,7 @@ Ya disponible:
   - *Imagen › Cálculos…*: mezcla dos canales (rojo, verde, azul, gris o transparencia de capas o canales) y crea un
     canal, una selección o una capa (para máscaras precisas de pelo o cielos).
 - En el móvil, los botones ✓ (aplicar) y ✕ (cancelar) de recortar, transformar o deformar se quedan siempre a la vista.
-- **Crear sin saber diseño** (funciones propias de Editor):
+- **Crear sin saber diseño** (funciones propias de Photocap):
   - *Archivo › Plantillas…*: 8 diseños listos para editar (oferta para Instagram, historia, miniatura de YouTube,
     invitación, tarjeta de visita, frase, cartel de evento y meme). Todo son capas normales: textos editables, formas y
     marcos para fotos (doble clic en un marco gris para poner tu foto).

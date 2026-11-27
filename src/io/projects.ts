@@ -102,7 +102,7 @@ export async function backupAll(): Promise<Blob> {
     files.push({ name: path + '.edp', data: new Uint8Array(await b.arrayBuffer()) });
     index.push({ file: path + '.edp', name: p.name, folder: p.folder, created: p.created, modified: p.modified, thumb: p.thumb, dims: p.dims });
   }
-  files.push({ name: 'proyectos.json', data: new TextEncoder().encode(JSON.stringify({ app: 'Editor', version: 1, folders: await listFolders(), projects: index })) });
+  files.push({ name: 'proyectos.json', data: new TextEncoder().encode(JSON.stringify({ app: 'Photocap', version: 1, folders: await listFolders(), projects: index })) });
   return makeZip(files);
 }
 /** Lee un ZIP sin comprimir (el de la copia de seguridad). */

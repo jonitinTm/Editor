@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Editor — editor de fotos por capas",
-  "short_name": "Editor",
-  "description": "Editor de imágenes por capas en español que funciona en tu dispositivo: tus fotos no se suben a ningún sitio.",
+  "name": "Photocap — editor de fotos por capas",
+  "short_name": "Photocap",
+  "description": "Photocap: editor de fotos por capas que funciona en tu dispositivo: tus fotos no se suben a ningún sitio.",
   "lang": "es",
   "dir": "ltr",
   "start_url": "./",

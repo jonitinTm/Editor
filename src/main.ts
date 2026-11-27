@@ -81,7 +81,7 @@ app.registerTool(new AISelectTool());
 
 // ---- Estructura de la página ----------------------------------------------------------
 const root = document.getElementById('app')!;
-const header = h('header', { class: 'topbar' }, h('span', { class: 'logo', html: icon('logo') }, h('span', {}, 'Editor')));
+const header = h('header', { class: 'topbar' }, h('span', { class: 'logo', html: icon('logo') }, h('span', {}, 'Photocap')));
 root.append(header);
 // en el móvil, un solo botón «Menú» que abre la hoja con todas las categorías (la barra de menús no cabe)
 const menuBtn = h('button', { class: 'top-btn top-menu', type: 'button', title: 'Menú: archivo, edición, imagen, capa, filtros…', 'aria-label': 'Menú', html: icon('menu') + '<span>Menú</span>' });
@@ -355,7 +355,7 @@ function buildWelcome() {
   return h('div', { class: 'welcome' },
     h('div', { class: 'welcome-card' },
       h('div', { class: 'welcome-logo', html: icon('logo') }),
-      h('h1', {}, 'Editor'),
+      h('h1', {}, 'Photocap'),
       h('p', {}, 'Editor de imágenes por capas. Todo se procesa en tu equipo: tus imágenes no salen de él.'),
       h('div', { class: 'welcome-actions' }, openBtn, galBtn, newBtn, h('button', { class: 'btn big', type: 'button', onclick: () => easy.quickTasks(), html: icon('magic') + ' ¿Qué quieres hacer?' })),
       h('div', { class: 'hint' }, 'Tamaños rápidos:'), presets,

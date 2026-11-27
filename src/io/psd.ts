@@ -989,7 +989,7 @@ function adjustmentBlock(l: AdjustmentLayer): { key: string; bytes: Uint8Array }
     case 'gradfill': { const gstops: { t: number; color: string; a: number }[] = (p.grad ?? [{ t: 0, color: p.c1 ?? '#000000', a: 1 }, { t: 1, color: p.c2 ?? '#ffffff', a: 1 }]).slice().sort((x: any, y: any) => x.t - y.t);
       w.u32(16); writeDescriptor(w, 'null', {
       Angl: ['UntF', '#Ang', p.angle], Type: ['enum', 'GrdT', p.radial ? 'Rdl ' : 'Lnr '], Algn: ['bool', false], 'Scl ': ['UntF', '#Prc', p.scale],
-      Grad: ['Objc', 'Grdn', { 'Nm  ': ['TEXT', 'Editor'], GrdF: ['enum', 'GrdF', 'CstS'], Intr: ['doub', 4096],
+      Grad: ['Objc', 'Grdn', { 'Nm  ': ['TEXT', 'Photocap'], GrdF: ['enum', 'GrdF', 'CstS'], Intr: ['doub', 4096],
         Clrs: ['VlLs', gstops.map(s => ['Objc', 'Clrt', { 'Clr ': rgbDV(s.color), Type: ['enum', 'Clry', 'UsrS'], Lctn: ['long', Math.round(s.t * 4096)], Mdpn: ['long', 50] }] as DV)],
         Trns: ['VlLs', gstops.map(s => ['Objc', 'TrnS', { Opct: ['UntF', '#Prc', Math.round((s.a ?? 1) * 100)], Lctn: ['long', Math.round(s.t * 4096)], Mdpn: ['long', 50] }] as DV)] }] });
       return done('GdFl'); }
@@ -1054,7 +1054,7 @@ function effectsBlock(st: LayerStyles): Uint8Array {
   if (st.gradientOverlay?.enabled) {
     const g = st.gradientOverlay;
     items.GrFl = ['Objc', 'GrFl', { enab: ['bool', true], present: ['bool', true], showInDialog: ['bool', true], 'Md  ': md('Nrml'), Opct: pc(g.opacity), Grad: ['Objc', 'Grdn', {
-      'Nm  ': ['TEXT', 'Editor'], GrdF: ['enum', 'GrdF', 'CstS'], Intr: ['doub', 4096],
+      'Nm  ': ['TEXT', 'Photocap'], GrdF: ['enum', 'GrdF', 'CstS'], Intr: ['doub', 4096],
       Clrs: ['VlLs', g.stops.map(([t, c]) => ['Objc', 'Clrt', { 'Clr ': rgbDV(c), Type: ['enum', 'Clry', 'UsrS'], Lctn: ['long', Math.round(t * 4096)], Mdpn: ['long', 50] }] as DV)],
       Trns: ['VlLs', [0, 4096].map(l => ['Objc', 'TrnS', { Opct: pc(100), Lctn: ['long', l], Mdpn: ['long', 50] }] as DV)],
     }], Angl: ang(g.angle), Type: ['enum', 'GrdT', 'Lnr '], Rvrs: ['bool', false], Algn: ['bool', true], 'Scl ': pc(100), Ofst: ['Objc', 'Pnt ', { Hrzn: pc(0), Vrtc: pc(0) }] }];
@@ -1203,7 +1203,7 @@ export function writePsd(doc: EditorDocument): { blob: Blob; warnings: string[] 
   };
   visit(doc.root);
   if (skipped) warnings.push(`${skipped} capa(s) no se pueden guardar en PSD y se han omitido`);
-  if (asPixels) warnings.push(`${asPixels} capa(s) se guardan como píxeles: texto creado o editado en Editor, objetos inteligentes y formas con trazo`);
+  if (asPixels) warnings.push(`${asPixels} capa(s) se guardan como píxeles: texto creado o editado en Photocap, objetos inteligentes y formas con trazo`);
   void vectors;
 
   const li = new Writer();

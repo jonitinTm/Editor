@@ -88,7 +88,7 @@ export function exportDialog() {
     h('option', { value: 'pdf' }, 'PDF (para imprimir o enviar)'),
     h('option', { value: 'svg' }, 'SVG (imagen incrustada, se puede ampliar en diseño web)'),
     h('option', { value: 'psd' }, 'PSD (Photoshop, conserva capas)'),
-    h('option', { value: 'project' }, 'Proyecto de Editor (.edp, conserva todo)'));
+    h('option', { value: 'project' }, 'Proyecto de Photocap (.edp, conserva todo)'));
   let quality = 90;
   const q = numberSlider({ label: '', min: 1, max: 100, value: quality, unit: '%', onInput: v => { quality = v; estimate(); } });
   const qRow = row('Calidad', q.el);
@@ -615,9 +615,9 @@ export function shortcutsDialog(list: [string, string][]) {
 
 export function aboutDialog() {
   showDialog({
-    title: 'Acerca de Editor', cancelLabel: null, okLabel: 'Cerrar',
+    title: 'Acerca de Photocap', cancelLabel: null, okLabel: 'Cerrar',
     body: [
-      h('p', {}, h('b', {}, 'Editor'), ' — editor de imágenes por capas que funciona en tu navegador.'),
+      h('p', {}, h('b', {}, 'Photocap'), ' — editor de imágenes por capas que funciona en tu navegador.'),
       h('p', {}, 'Todo se procesa en tu equipo: tus imágenes no se envían a ningún servidor.'),
       h('p', {}, 'Funciona sin conexión una vez abierto y se puede instalar como aplicación desde el navegador.'),
       h('p', {}, h('a', { href: './privacidad.html', target: '_blank', rel: 'noopener' }, 'Política de privacidad'), ' · ', h('a', { href: '#', onclick: (e: Event) => { e.preventDefault(); thirdPartyDialog(); } }, 'Licencias de terceros')),

@@ -1,4 +1,4 @@
-# Cómo publicar Editor (web y Google Play)
+# Cómo publicar Photocap (web y Google Play)
 
 Esta guía resume los pasos que quedan para publicar. Lo técnico ya está preparado en el proyecto: manifiesto de
 aplicación, iconos (también el adaptable de Android), funcionamiento sin conexión, política de privacidad
@@ -14,8 +14,10 @@ aplicación, iconos (también el adaptable de Android), funcionamiento sin conex
    libre. Al menos añade un archivo `LICENSE` con «Todos los derechos reservados». Si el repositorio de GitHub es
    público, cualquiera puede ver el código; puedes hacerlo privado (GitHub Pages en repositorios privados requiere
    un plan de pago de GitHub).
-3. **Nombre.** «Editor» es muy genérico: cuesta encontrarlo en la tienda y no se puede registrar como marca. Conviene
-   elegir un nombre propio antes de publicar.
+3. **Nombre.** Elegido: **Photocap** (en la ficha de Google Play se puede titular «Photocap – Editor de fotos»).
+   Antes de publicar, comprobar que no hay otra app o marca registrada con ese nombre o uno muy parecido
+   (buscar en Google Play y en el registro de marcas de la EUIPO); se cree que existió un programa de Windows
+   llamado «PhotoCap», pero no se ha podido confirmar.
 4. **Dominio.** Ver el apartado siguiente.
 
 ## 1. La web
