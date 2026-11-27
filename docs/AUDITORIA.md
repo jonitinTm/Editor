@@ -49,11 +49,22 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 - ✅ **Generador de texturas** repetibles (12 tipos: ladrillo, piedra, baldosas, madera, hierba, tierra, hormigón, asfalto, metal, tejas, agua, mármol), realista o pixel art, comprobado que no hay costuras; «Hacer repetible» para cualquier foto; vista en mosaico; **mapas normal/relieve/rugosidad/oclusión** (OpenGL o DirectX) en ZIP.
 - ✅ **Animación 2D** para cualquier documento: barra de animación, papel cebolla (anterior, 2 anteriores, anterior y siguiente, en color), duración por fotograma (×2, ×3…), fps, **interpolar movimiento** (mover, girar, escalar, desvanecer, con suavizado, rebote o impulso; ida y vuelta) y exportación GIF, vídeo, secuencia PNG y hoja de sprites + JSON.
 - ✅ Herramientas de juego: cortar hoja de sprites en fotogramas, atlas de sprites + JSON, contorno de 1 píxel, cambiar colores del sprite (variantes), potencia de 2, cuadrícula de tiles, paletas .gpl/.pal/.hex, sombrear con la paleta, tramas 25/50/75 %, GIF animado como fotogramas editables.
+- ✅ **Texturas propias**: nueva textura repetible en la que pincel y herramienta de píxeles envuelven por los bordes; **10 detalles** (musgo, grietas, suciedad, óxido, humedad, hollín, arañazos, pintura desconchada, nieve, polvo) que se adaptan a la imagen (musgo y suciedad en juntas, nieve en bordes de arriba), repetibles, en capa aparte, realistas o pixel art sin semitransparencias.
+- ✅ **Animación**: 12 animaciones rápidas (rebotar con aplastamiento, flotar, latido, respirar, temblor, girar, moneda, balanceo, parpadeo, aparecer/desaparecer, aparecer con rebote); interpolar con estirar/aplastar y punto de giro; nombres de animación (etiquetas); invertir fotogramas; JSON de la hoja compatible con Aseprite (frameTags, sourceSize…).
+- ✅ **Pixel art**: ajustar a la paleta (sin tramado, tramado regular, difusión), rampas de color con cambio de tono, ampliar nítido o Scale2x, degradado tramado.
+- ✅ **Editor de mapas de tiles** (capas, pintar, borrar, rellenar, rectángulo, cuentagotas, bloques de varios tiles, deshacer; se guarda en el proyecto; exporta Tiled .tmj, CSV y PNG, o crea la imagen) e **iconos en todos los tamaños** (Android con capa de primer plano, Google Play, iOS, web, .ico, Steam, itch.io).
+- ⚠️ Sin probar en un móvil real: el editor de mapas se ha comprobado con un Pixel 7 simulado (cabe y se pinta con el dedo).
 
 ### Funciones que otras apps cobran (aquí gratis)
 - ✅ Efectos: glitch, destellos de luz, bokeh, toque de color, película antigua, doble exposición.
 - ✅ Retrato: blanquear dientes, iluminar ojos, quitar ojeras (además de suavizar piel, ya existente).
 - ✅ Copiar y pegar ajustes entre fotos (también en todas las abiertas a la vez).
+- ✅ Crear pegatina (borde blanco, sombra, 512 × 512 en WebP para WhatsApp y Telegram).
+- ✅ Tamaño para todas las redes de una vez (15 formatos; llenar con punto importante, encajar con fondo difuminado o de color; ZIP o documentos).
+- ✅ Carrusel panorámico para Instagram (sin saltos entre fotos), antes y después (al lado, encima, partido o GIF con cortinilla).
+- ✅ Foto en movimiento: lo seleccionado (agua, nubes, humo) fluye en bucle; se exporta como GIF o vídeo.
+- ✅ Rotar pixel art sin píxeles sueltos ni colores nuevos (como RotSprite).
+- 🔧 Arreglos encontrados con las pruebas al azar: el modo «Disolver» cambiaba de punteado al redibujar una zona; una mesa de trabajo muy lejana podía agrandar el lienzo hasta colgar el navegador (ahora hay límite); el pincel en texturas repetibles fallaba si el trazo empezaba muy fuera del lienzo.
 
 ### Texto y diseño
 - ✅ Texto editable (fuentes del sistema y de la biblioteca, estilos mezclados en un mismo párrafo, interletraje, interlineado, alineación, texto en trazado, deformado), formas vectoriales, estilos de capa (sombra, sombra larga, resplandor, trazo, bisel, superposiciones), plantillas, marcas de agua, marcos, collage.

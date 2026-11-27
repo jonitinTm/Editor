@@ -20,8 +20,8 @@ function channel(mode: CustomBlend, b: number, s: number): number {
   }
 }
 
-let seed = 1;
-const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+/** Valor 0..1 fijo para cada píxel del lienzo (el punteado de «Disolver» no cambia al redibujar solo una zona). */
+function pixelNoise(x: number, y: number) { let h = (x * 374761393 + y * 668265263) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; }
 
 /**
  * Dibuja `src` (en dx, dy) sobre `ctx` con un modo propio y la opacidad `alpha`, solo dentro de `rect` si se da.
@@ -33,11 +33,10 @@ export function drawCustomBlend(ctx: CanvasRenderingContext2D, src: CanvasImageS
   const w = x1 - x0, h = y1 - y0; if (w <= 0 || h <= 0) return;
   const t = document.createElement('canvas'); t.width = w; t.height = h; const tc = t.getContext('2d')!; tc.drawImage(src, dx - x0, dy - y0);
   const S = tc.getImageData(0, 0, w, h).data, Dimg = ctx.getImageData(x0, y0, w, h), D = Dimg.data;
-  seed = 1 + x0 * 7919 + y0 * 104729;
   for (let i = 0; i < D.length; i += 4) {
     let as = S[i + 3] / 255 * alpha; if (as <= 0) continue;
     const ab = D[i + 3] / 255;
-    if (mode === 'dissolve') { if (rnd() < as) { D[i] = S[i]; D[i + 1] = S[i + 1]; D[i + 2] = S[i + 2]; D[i + 3] = 255; } continue; }
+    if (mode === 'dissolve') { const k = i >> 2; if (pixelNoise(x0 + k % w, y0 + ((k / w) | 0)) < as) { D[i] = S[i]; D[i + 1] = S[i + 1]; D[i + 2] = S[i + 2]; D[i + 3] = 255; } continue; }
     const sr = S[i] / 255, sg = S[i + 1] / 255, sb = S[i + 2] / 255, br = D[i] / 255, bg = D[i + 1] / 255, bb = D[i + 2] / 255;
     let mr: number, mg: number, mb: number;
     if (mode === 'darker-color' || mode === 'lighter-color') {

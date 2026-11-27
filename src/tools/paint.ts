@@ -303,7 +303,8 @@ export class Stroke {
     this.last = { x, y, p: pressure };
   }
 
-  private addDirty(r: Rect) {
+  private addDirty(r: Rect | null) {
+    if (!r) return; // el toque cayó fuera del lienzo
     const ri = rectInt(r);
     const d = this.dirty;
     this.dirty = d ? { x: Math.min(d.x, ri.x), y: Math.min(d.y, ri.y), w: Math.max(d.x + d.w, ri.x + ri.w) - Math.min(d.x, ri.x), h: Math.max(d.y + d.h, ri.y + ri.h) - Math.min(d.y, ri.y) } : ri;

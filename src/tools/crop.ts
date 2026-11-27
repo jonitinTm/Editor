@@ -1,4 +1,5 @@
 // Herramienta Recortar: ajusta un marco y pulsa Intro (o ✓) para recortar.
+import { maxCanvasPixels } from '../core/polyfills';
 
 import { app } from '../ui/app';
 import { Tool, ToolEvent } from './tool';
@@ -369,6 +370,7 @@ export class ArtboardTool implements Tool {
     if (g.h !== 'new') {
       const a = this.sel!.artboard!;
       if (a.x < 0 || a.y < 0) { const ox = Math.max(0, -a.x), oy = Math.max(0, -a.y); a.x += ox; a.y += oy; a.w -= ox; a.h -= oy; }
+      if (Math.max(d.width, a.x + a.w) * Math.max(d.height, a.y + a.h) > Math.min(maxCanvasPixels(), 64e6)) { Object.assign(a, g.orig); app.toast('El lienzo sería demasiado grande', 'warn'); d.invalidate(); return; }
       if (a.x + a.w > d.width || a.y + a.h > d.height) d.resizeCanvas(Math.max(d.width, a.x + a.w), Math.max(d.height, a.y + a.h), 0, 0);
       d.invalidate(); d.commit('Tamaño de la mesa de trabajo'); return;
     }

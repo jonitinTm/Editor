@@ -152,25 +152,27 @@ function contentBox(c: HTMLCanvasElement) {
   for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
   return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
-export type TweenParams = { frames: number; dx: number; dy: number; rot: number; scale: number; opacity: number; ease: string; pingpong: boolean };
-/** Crea los fotogramas intermedios moviendo, girando, escalando o desvaneciendo la capa elegida. */
-export function tween(d: EditorDocument, src: RasterLayer, p: TweenParams) {
+export type TweenParams = { frames: number; dx: number; dy: number; rot: number; scale: number; opacity: number; ease: string; pingpong: boolean; sx?: number; sy?: number; pivot?: string };
+export type Pose = { dx: number; dy: number; rot: number; sx: number; sy: number; alpha: number };
+/** Crea un fotograma por cada postura (mover, girar, estirar y aplastar, transparencia) de la capa elegida. */
+export function buildFrames(d: EditorDocument, src: RasterLayer, poses: Pose[], label: string, pivot = 'center', delayMs?: number) {
   const box = contentBox(src.canvas); if (!box) { app.toast('La capa está vacía', 'warn'); return false; }
-  const cx = box.x + box.w / 2, cy = box.y + box.h / 2, ease = EASE[p.ease] ?? EASE.smooth, pix = !!d.meta.pixelArt;
+  const pix = !!d.meta.pixelArt;
+  // punto de giro: centro, abajo (los pies: para saltos y aplastar contra el suelo) o arriba (algo colgado)
+  const cx = box.x + box.w / 2, cy = pivot === 'bottom' ? box.y + box.h : pivot === 'top' ? box.y : box.y + box.h / 2;
   const anim = isAnim(d), cur = anim ? d.frames[d.frameIndex] : null;
   // lo que se ve en todos: lo visible ahora, menos la capa que se anima y menos los dibujos de otros fotogramas
   const owned = new Set(d.frames.map(f => f.own).filter(x => x != null));
   const shared = (cur ? cur.visible.filter(id => id !== cur.own) : d.allLayers().filter(l => l.visible).map(l => l.id)).filter(id => id !== src.id && !owned.has(id));
-  const steps: number[] = []; for (let i = 0; i < p.frames; i++) steps.push(p.frames === 1 ? 1 : i / (p.frames - 1));
-  if (p.pingpong) for (let i = p.frames - 2; i > 0; i--) steps.push(steps[i]);
-  const parent = (src.parent ?? d.root) as any; let idx = parent.children.indexOf(src) + 1, at = anim ? d.frameIndex + 1 : 0;
-  const delay = anim ? baseDelay(d) : 83;
+  const parent = (src.parent ?? d.root) as any; let idx = parent.children.indexOf(src) + 1; const at = anim ? d.frameIndex + 1 : 0;
+  const delay = delayMs ?? (anim ? baseDelay(d) : 83);
   if (!anim) d.frames = [];
-  steps.forEach((t, k) => {
-    const e = ease(t), l = new RasterLayer(`Fotograma ${d.frames.length + 1}`, d.width, d.height), x = ctx2d(l.canvas);
+  poses.forEach((q, k) => {
+    const l = new RasterLayer(`Fotograma ${d.frames.length + 1}`, d.width, d.height), x = ctx2d(l.canvas);
     x.imageSmoothingEnabled = !pix;
-    x.globalAlpha = 1 + (p.opacity / 100 - 1) * e;
-    x.translate(cx + p.dx * e, cy + p.dy * e); x.rotate(p.rot * e * Math.PI / 180); const s = 1 + (p.scale / 100 - 1) * e; x.scale(s, s);
+    x.globalAlpha = Math.max(0, Math.min(1, q.alpha));
+    const tx = cx + q.dx, ty = cy + q.dy;
+    x.translate(pix ? Math.round(tx) : tx, pix ? Math.round(ty) : ty); x.rotate(q.rot * Math.PI / 180); x.scale(q.sx, q.sy);
     if (pix) x.translate(-Math.round(cx), -Math.round(cy)); else x.translate(-cx, -cy);
     x.drawImage(src.canvas, 0, 0);
     parent.add(l, idx++);
@@ -178,14 +180,23 @@ export function tween(d: EditorDocument, src: RasterLayer, p: TweenParams) {
   });
   src.visible = false;
   applyFrame(d, at);
-  d.commit('Interpolar movimiento');
+  d.commit(label);
   return true;
+}
+/** Crea los fotogramas intermedios moviendo, girando, escalando o desvaneciendo la capa elegida. */
+export function tween(d: EditorDocument, src: RasterLayer, p: TweenParams) {
+  const ease = EASE[p.ease] ?? EASE.smooth;
+  const steps: number[] = []; for (let i = 0; i < p.frames; i++) steps.push(p.frames === 1 ? 1 : i / (p.frames - 1));
+  if (p.pingpong) for (let i = p.frames - 2; i > 0; i--) steps.push(steps[i]);
+  const sx = (p.sx ?? 100) / 100, sy = (p.sy ?? 100) / 100, s = p.scale / 100;
+  return buildFrames(d, src, steps.map(t => { const e = ease(t); return { dx: p.dx * e, dy: p.dy * e, rot: p.rot * e, sx: 1 + (s * sx - 1) * e, sy: 1 + (s * sy - 1) * e, alpha: 1 + (p.opacity / 100 - 1) * e }; }), 'Interpolar movimiento', p.pivot);
 }
 export function tweenDialog() {
   const d = app.doc, src = d?.activeRaster(); if (!d || !src) { app.toast('Elige la capa con el objeto que quieres animar', 'warn'); return; }
-  const p: TweenParams = { frames: 12, dx: Math.round(d.width / 3), dy: 0, rot: 0, scale: 100, opacity: 100, ease: 'smooth', pingpong: false };
-  const num = (k: 'frames' | 'dx' | 'dy' | 'rot' | 'scale' | 'opacity', label: string, min: number, max: number, unit = '') =>
-    h('div', { class: 'form-row' }, h('label', {}, label), numberSlider({ min, max, value: p[k], unit, onInput: v => { p[k] = v; } }).el);
+  const p: TweenParams = { frames: 12, dx: Math.round(d.width / 3), dy: 0, rot: 0, scale: 100, opacity: 100, ease: 'smooth', pingpong: false, sx: 100, sy: 100, pivot: 'center' };
+  const num = (k: 'frames' | 'dx' | 'dy' | 'rot' | 'scale' | 'opacity' | 'sx' | 'sy', label: string, min: number, max: number, unit = '') =>
+    h('div', { class: 'form-row' }, h('label', {}, label), numberSlider({ min, max, value: p[k] ?? 100, unit, onInput: v => { p[k] = v; } }).el);
+  const piv = h('select', {}, h('option', { value: 'center' }, 'Centro'), h('option', { value: 'bottom' }, 'Abajo (los pies)'), h('option', { value: 'top' }, 'Arriba')); piv.onchange = () => { p.pivot = piv.value; };
   const ease = h('select', {}, ...[['smooth', 'Suave (acelera y frena)'], ['linear', 'Constante'], ['in', 'Acelerando'], ['out', 'Frenando'], ['bounce', 'Rebote'], ['back', 'Con impulso (se pasa y vuelve)']].map(([v, n]) => h('option', { value: v }, n)));
   ease.onchange = () => { p.ease = ease.value; };
   const pp = h('input', { type: 'checkbox' }) as HTMLInputElement; pp.onchange = () => { p.pingpong = pp.checked; };
@@ -195,6 +206,8 @@ export function tweenDialog() {
       h('div', { class: 'hint' }, `Anima la capa «${src.name}»: se crean los fotogramas intermedios desde donde está ahora hasta el final que indiques.`),
       num('frames', 'Fotogramas', 2, 60), num('dx', 'Mover en horizontal', -d.width, d.width, ' px'), num('dy', 'Mover en vertical', -d.height, d.height, ' px'),
       num('rot', 'Girar', -720, 720, '°'), num('scale', 'Tamaño final', 5, 500, '%'), num('opacity', 'Opacidad final', 0, 100, '%'),
+      num('sx', 'Ancho final (estirar)', 10, 300, '%'), num('sy', 'Alto final (aplastar)', 10, 300, '%'),
+      h('div', { class: 'form-row' }, h('label', {}, 'Punto de giro'), piv),
       h('div', { class: 'form-row' }, h('label', {}, 'Movimiento'), ease),
       h('label', { class: 'check' }, pp, ' Ida y vuelta (vuelve al principio)'),
     ],
@@ -220,12 +233,19 @@ export async function exportAnimation(d: EditorDocument, fmt: string, k: number,
   if (fmt === 'video') { const { recordFrames } = await import('./unique'); await recordFrames(fr, base); return; }
   const { makeZip } = await import('../io/zip');
   if (fmt === 'png') { const files = []; for (let i = 0; i < fr.length; i++) files.push({ name: `${d.name}_${String(i + 1).padStart(3, '0')}.png`, data: await png(fr[i].canvas) }); await save(makeZip(files), base + '_fotogramas.zip'); return; }
-  // hoja de sprites: rejilla casi cuadrada + JSON con la posición y la duración de cada fotograma
+  // hoja de sprites: rejilla casi cuadrada + JSON con el formato de Aseprite (lo leen Godot, Phaser, Unity con plugins, Defold…)
   const W = fr[0].canvas.width, H = fr[0].canvas.height, cols = Math.ceil(Math.sqrt(fr.length)), rows = Math.ceil(fr.length / cols);
   const sheet = makeCanvas(W * cols, H * rows), sx = ctx2d(sheet), frames: Record<string, unknown>[] = [];
-  fr.forEach((f, i) => { const x = (i % cols) * W, y = Math.floor(i / cols) * H; sx.drawImage(f.canvas, x, y); frames.push({ filename: `${d.name}_${i + 1}`, frame: { x, y, w: W, h: H }, duration: f.delay }); });
-  const json = JSON.stringify({ frames, meta: { app: 'Photocap', image: base + '.png', size: { w: sheet.width, h: sheet.height }, frameSize: { w: W, h: H }, columns: cols, rows, frameCount: fr.length } }, null, 2);
+  fr.forEach((f, i) => { const x = (i % cols) * W, y = Math.floor(i / cols) * H; sx.drawImage(f.canvas, x, y); frames.push({ filename: `${d.name} ${i}.png`, frame: { x, y, w: W, h: H }, rotated: false, trimmed: false, spriteSourceSize: { x: 0, y: 0, w: W, h: H }, sourceSize: { w: W, h: H }, duration: f.delay }); });
+  const json = JSON.stringify({ frames, meta: { app: 'Photocap', version: '1.0', image: base + '.png', format: 'RGBA8888', size: { w: sheet.width, h: sheet.height }, scale: '1', frameTags: frameTags(d, pingpong ? fr.length : 0), frameSize: { w: W, h: H }, columns: cols, rows, frameCount: fr.length } }, null, 2);
   await save(makeZip([{ name: base + '.png', data: await png(sheet) }, { name: base + '.json', data: new TextEncoder().encode(json) }]), base + '_hoja.zip');
+}
+/** Etiquetas de animación en el formato de Aseprite: fotogramas seguidos con el mismo nombre. */
+export function frameTags(d: EditorDocument, pingTotal = 0) {
+  const tags: { name: string; from: number; to: number; direction: string }[] = [];
+  d.frames.forEach((f, i) => { const t = (f as any).tag as string | undefined; if (!t) return; const last = tags[tags.length - 1]; if (last && last.name === t && last.to === i - 1) last.to = i; else tags.push({ name: t, from: i, to: i, direction: 'forward' }); });
+  if (!tags.length && pingTotal) tags.push({ name: d.name, from: 0, to: pingTotal - 1, direction: 'forward' });
+  return tags;
 }
 export function exportAnimDialog() {
   const d = app.doc; if (!d) return;

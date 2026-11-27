@@ -10,24 +10,24 @@ import { EditorDocument } from '../core/document';
 import { RasterLayer } from '../core/layers';
 
 // ---- ruido periódico -------------------------------------------------------------------------
-const hash = (x: number, y: number, s: number) => { let n = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); n ^= n >>> 16; return (n >>> 0) / 4294967296; };
+export const hash = (x: number, y: number, s: number) => { let n = (x * 374761393 + y * 668265263 + s * 2147483647) | 0; n = Math.imul(n ^ (n >>> 13), 1274126177); n ^= n >>> 16; return (n >>> 0) / 4294967296; };
 const fade = (t: number) => t * t * (3 - 2 * t);
-const mod = (a: number, p: number) => ((a % p) + p) % p;
+export const mod = (a: number, p: number) => ((a % p) + p) % p;
 /** Ruido de valor en (x, y) con periodo p (en celdas): repetible. */
-function vnoise(x: number, y: number, p: number, s: number) {
+export function vnoise(x: number, y: number, p: number, s: number) {
   const x0 = Math.floor(x), y0 = Math.floor(y), fx = fade(x - x0), fy = fade(y - y0);
   const a = mod(x0, p), b = mod(y0, p), a1 = mod(x0 + 1, p), b1 = mod(y0 + 1, p);
   const v00 = hash(a, b, s), v10 = hash(a1, b, s), v01 = hash(a, b1, s), v11 = hash(a1, b1, s);
   return (v00 + (v10 - v00) * fx) * (1 - fy) + (v01 + (v11 - v01) * fx) * fy;
 }
 /** Ruido fractal repetible en (u, v) ∈ [0,1): `px` y `py` celdas en cada eje en la primera octava. */
-function fbm(u: number, v: number, px: number, py: number, oct: number, s: number) {
+export function fbm(u: number, v: number, px: number, py: number, oct: number, s: number) {
   let sum = 0, amp = 0.5, norm = 0;
   for (let o = 0; o < oct; o++) { const k = 1 << o; sum += amp * vnoise(u * px * k, v * py * k, px * k, s + o * 101); norm += amp; amp *= 0.5; }
   // (el periodo en y es py·k: se usa el mismo truco con una segunda llamada si px ≠ py)
   return sum / norm;
 }
-function fbm2(u: number, v: number, px: number, py: number, oct: number, s: number) {
+export function fbm2(u: number, v: number, px: number, py: number, oct: number, s: number) {
   if (px === py) return fbm(u, v, px, py, oct, s);
   // periodos distintos en cada eje: ruido de valor con periodo independiente
   let sum = 0, amp = 0.5, norm = 0;
@@ -40,7 +40,7 @@ function fbm2(u: number, v: number, px: number, py: number, oct: number, s: numb
   return sum / norm;
 }
 /** Voronoi repetible: distancias a los dos puntos más cercanos y el identificador de la celda. */
-function voronoi(u: number, v: number, p: number, s: number, jitter = 0.85) {
+export function voronoi(u: number, v: number, p: number, s: number, jitter = 0.85) {
   const X = u * p, Y = v * p, cx = Math.floor(X), cy = Math.floor(Y);
   let f1 = 9, f2 = 9, id = 0;
   for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) {
@@ -51,11 +51,11 @@ function voronoi(u: number, v: number, p: number, s: number, jitter = 0.85) {
   }
   return { f1, f2, id };
 }
-const clamp = (v: number, a = 0, b = 1) => v < a ? a : v > b ? b : v;
-const sstep = (a: number, b: number, x: number) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
-const rgb = (hex: string): [number, number, number] => { const n = parseInt(hex.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
-const mix = (a: number[], b: number[], t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-const mul = (a: number[], k: number) => [a[0] * k, a[1] * k, a[2] * k];
+export const clamp = (v: number, a = 0, b = 1) => v < a ? a : v > b ? b : v;
+export const sstep = (a: number, b: number, x: number) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+export const rgb = (hex: string): [number, number, number] => { const n = parseInt(hex.slice(1), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; };
+export const mix = (a: number[], b: number[], t: number) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+export const mul = (a: number[], k: number) => [a[0] * k, a[1] * k, a[2] * k];
 
 /** Grietas: bordes de celdas de Voronoi con el espacio deformado por ruido (repetible), solo donde el ruido lo permite. */
 function cracks(u: number, v: number, p: TexParams, cells: number) {

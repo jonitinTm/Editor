@@ -189,3 +189,5 @@ export async function exportPalette() {
   const io = await import('../io/files');
   try { await io.saveBlob(new Blob([gpl], { type: 'text/plain' }), `${p.name.replace(/[^\w-]+/g, '_')}.gpl`); app.toast('Paleta exportada (.gpl: GIMP, Aseprite, Krita…)'); } catch (e: any) { if (e?.name !== 'AbortError') app.toast(String(e?.message ?? e), 'warn'); }
 }
+/** Guarda una lista como «Mis colores» y la deja elegida (la usan las rampas de color). */
+export function setMyColors(list: string[], add = false) { saveMine(add ? [...mine(), ...list.filter(c => !mine().includes(c))] : list); setPalette('mine'); }

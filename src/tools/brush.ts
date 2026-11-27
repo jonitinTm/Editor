@@ -312,6 +312,21 @@ abstract class StrokeTool implements Tool {
       for (const q of symPoints(sym, x, y)) { const b = dab0(q.x, q.y, p); if (!b) continue; if (!r) r = { ...b }; else { const x1 = Math.max(r.x + r.w, b.x + b.w), y1 = Math.max(r.y + r.h, b.y + b.h); r.x = Math.min(r.x, b.x); r.y = Math.min(r.y, b.y); r.w = x1 - r.x; r.h = y1 - r.y; } }
       return r;
     };
+    // textura repetible: lo que se sale por un borde entra por el contrario (así no quedan cortes al repetirla)
+    if (app.doc?.meta.tileable) {
+      const inner = this.dab!, W = t.canvas.width, H = t.canvas.height;
+      this.dab = (x: number, y: number, p: number) => {
+        const rad = (app.opt<number>('size', this.id) ?? 20) * 0.75 + 4;
+        let r: any = null;
+        for (const ox of [0, -W, W]) for (const oy of [0, -H, H]) {
+          const qx = x + ox, qy = y + oy; if (qx < -rad || qy < -rad || qx > W + rad || qy > H + rad) continue;
+          const b = inner(qx, qy, p); if (!b) continue;
+          if (!r) r = { ...b }; else { const x1 = Math.max(r.x + r.w, b.x + b.w), y1 = Math.max(r.y + r.h, b.y + b.h); r.x = Math.min(r.x, b.x); r.y = Math.min(r.y, b.y); r.w = x1 - r.x; r.h = y1 - r.y; }
+        }
+        // muy lejos del lienzo: se pinta como siempre (queda fuera)
+        return r ?? inner(x, y, p);
+      };
+    }
     this.sm = { x: e.x, y: e.y, p: e.pressure };
     if (!this.qsReplay) {
       assistBegin(e.x, e.y);

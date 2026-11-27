@@ -255,22 +255,51 @@ export const TOPICS: Topic[] = [
   ] },
   { title: 'Videojuegos y animación', guides: [
     { id: 'textures', title: 'Texturas para videojuegos', steps: [
-      '⟦Juegos › Generador de texturas…⟧: elige ladrillo, piedra, madera, hierba, metal… en estilo realista o pixel art.',
-      'Todas se repiten sin cortes. ⟦Juegos › Vista en mosaico (ver la imagen repetida)⟧ enseña cómo queda.',
-      '⟦Juegos › Mapas para videojuegos (normal, relieve, rugosidad, oclusión)…⟧ crea los mapas para el material del motor (Godot, Unity, Unreal, Blender).',
-      'Con una foto propia, ⟦Juegos › Hacer repetible (sin costuras)…⟧ la convierte en textura repetible.',
+      '⟦Juegos › Texturas › Generador de texturas…⟧: elige ladrillo, piedra, madera, hierba, metal… en estilo realista o pixel art.',
+      'Todas se repiten sin cortes. ⟦Juegos › Texturas › Vista en mosaico (ver la imagen repetida)⟧ enseña cómo queda.',
+      '⟦Juegos › Texturas › Mapas para videojuegos (normal, relieve, rugosidad, oclusión)…⟧ crea los mapas para el material del motor (Godot, Unity, Unreal, Blender).',
+      'Con una foto propia, ⟦Juegos › Texturas › Hacer repetible (sin costuras)…⟧ la convierte en textura repetible.',
     ], go: { act: 'texGen' } },
     { id: 'anim2d', title: 'Animar dibujos', steps: [
-      '⟦Juegos › Animación (fotogramas, papel cebolla)⟧ abre la barra de animación abajo: cada fotograma es un dibujo y el fondo se ve en todos.',
+      '⟦Juegos › Animación › Animación (fotogramas, papel cebolla)⟧ abre la barra de animación abajo: cada fotograma es un dibujo y el fondo se ve en todos.',
       'Duplica el fotograma y cambia un poco el dibujo. El papel cebolla enseña el anterior (o también el siguiente, en color).',
       'Cada fotograma puede durar ×2, ×3… y la velocidad se elige en fps.',
-      '⟦Juegos › Interpolar movimiento…⟧ crea solo los fotogramas intermedios para mover, girar, escalar o desvanecer un objeto.',
+      '⟦Juegos › Animación › Interpolar movimiento…⟧ crea solo los fotogramas intermedios para mover, girar, escalar o desvanecer un objeto.',
     ], go: { act: 'animDock' }, needsDoc: true },
     { id: 'gametools', title: 'Sprites para el juego', steps: [
-      '⟦Juegos › Cortar hoja de sprites en fotogramas…⟧ convierte una tira o rejilla de sprites en una animación.',
-      '⟦Juegos › Exportar animación (GIF, vídeo, PNG, hoja de sprites)…⟧ saca la hoja de sprites con su JSON para el motor.',
-      '⟦Juegos › Atlas de sprites (capas a una imagen + JSON)…⟧ junta todas las capas en una imagen, y ⟦Juegos › Contorno de 1 píxel (sprites)…⟧ y ⟦Juegos › Cambiar colores del sprite (variantes)…⟧ ayudan a terminarlos.',
+      '⟦Juegos › Animación › Cortar hoja de sprites en fotogramas…⟧ convierte una tira o rejilla de sprites en una animación.',
+      '⟦Juegos › Animación › Exportar animación (GIF, vídeo, PNG, hoja de sprites)…⟧ saca la hoja de sprites con su JSON para el motor.',
+      '⟦Juegos › Mapas, sprites e iconos › Atlas de sprites (capas a una imagen + JSON)…⟧ junta todas las capas en una imagen, y ⟦Juegos › Pixel art › Contorno de 1 píxel (sprites)…⟧ y ⟦Juegos › Pixel art › Cambiar colores del sprite (variantes)…⟧ ayudan a terminarlos.',
     ], go: { act: 'sliceSheet' }, needsDoc: true },
+    { id: 'texdetails', title: 'Tu propia textura con detalles', steps: [
+      '⟦Juegos › Texturas › Nueva textura (repetible, la dibujas tú)…⟧ crea un lienzo que se repite: lo que pintas en un borde sale por el contrario.',
+      'Dibuja la base (piedras, tablas, baldosas) con el pincel o con la herramienta de píxeles.',
+      '⟦Juegos › Texturas › Añadir detalles (musgo, grietas, suciedad, óxido, nieve…)…⟧ añade musgo, grietas, suciedad, óxido, humedad, hollín, arañazos, pintura desconchada, nieve o polvo.',
+      'Los detalles se colocan solos donde tienen sentido (el musgo en las juntas, la nieve arriba) y van en su propia capa. Marca el estilo pixel art para que salgan sin bordes suaves.',
+    ], go: { act: 'newTexture' } },
+    { id: 'quickanim', title: 'Animaciones rápidas y nombres', steps: [
+      'Elige la capa del personaje y abre ⟦Juegos › Animación › Animaciones rápidas (rebotar, flotar, girar…)…⟧: rebotar, flotar, latido, temblor, moneda girando, parpadear, aparecer…',
+      '⟦Juegos › Animación › Interpolar movimiento…⟧ también estira y aplasta, con el punto de giro en los pies para los saltos.',
+      '⟦Juegos › Animación › Nombre de animación (andar, saltar…)…⟧ agrupa fotogramas; la hoja de sprites los guarda como etiquetas que leen Godot, Phaser o Unity.',
+    ], go: { act: 'animPresets' }, needsDoc: true },
+    { id: 'pixeltools', title: 'Colores del pixel art', steps: [
+      '⟦Juegos › Pixel art › Rampa de color (sombras y luces)…⟧ crea las sombras y luces de un color con cambio de tono.',
+      '⟦Juegos › Pixel art › Ajustar a la paleta (con tramado)…⟧ convierte cualquier dibujo o foto a los colores de tu paleta.',
+      '⟦Juegos › Pixel art › Degradado tramado…⟧ hace cielos y luces con pocos colores, y ⟦Juegos › Pixel art › Ampliar pixel art (nítido o Scale2x)…⟧ cambia el tamaño sin emborronar.',
+    ], go: { act: 'colorRamp' } },
+    { id: 'social', title: 'Fotos para redes sociales', steps: [
+      '⟦Imagen › Para redes sociales › Tamaño para todas las redes (Instagram, TikTok, YouTube…)…⟧ adapta la foto a la vez a publicación, historia, miniatura, portada…',
+      '⟦Imagen › Para redes sociales › Carrusel panorámico para Instagram…⟧ parte una panorámica en fotos seguidas.',
+      '⟦Imagen › Para redes sociales › Antes y después…⟧ enseña el retoque, también como GIF con cortinilla.',
+      'Con el fondo quitado, ⟦Imagen › Para redes sociales › Crear pegatina (WhatsApp, Telegram)…⟧ le pone el borde blanco y la guarda en WebP.',
+      'Selecciona el agua o el cielo y usa ⟦Imagen › Foto en movimiento (agua, nubes, humo)…⟧ para que fluya en bucle.',
+    ], go: { act: 'magicResize' }, needsDoc: true },
+    { id: 'tilemap', title: 'Mapas de tiles e iconos', steps: [
+      'Abre la imagen con tus tiles y entra en ⟦Juegos › Mapas, sprites e iconos › Editor de mapas de tiles…⟧.',
+      'Toca un tile (o arrastra para coger un bloque) y pinta el mapa por casillas. Hay capas, borrar, rellenar, rectángulo y cuentagotas.',
+      'Exporta el mapa para Tiled, Godot o Phaser, en CSV, o como imagen.',
+      '⟦Juegos › Mapas, sprites e iconos › Iconos en todos los tamaños (Android, iPhone, web…)…⟧ saca el icono del juego para cada tienda de una vez.',
+    ], go: { act: 'tileMap' }, needsDoc: true },
   ] },
   { title: 'Trabajar más rápido', guides: [
     { id: 'search', title: 'Buscar cualquier función', steps: [

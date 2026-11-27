@@ -1427,6 +1427,8 @@ export function newArtboardAt(r: Rect, bg: string | null = '#ffffff') {
   }
   const x = Math.max(0, Math.round(r.x)), y = Math.max(0, Math.round(r.y)), w = Math.max(1, Math.round(r.w)), h = Math.max(1, Math.round(r.h));
   const W = Math.max(d.width, x + w), H = Math.max(d.height, y + h);
+  // el lienzo crece para que quepa la mesa nueva: con un límite (cada capa ocupa el lienzo entero)
+  if (W * H > Math.min(maxCanvasPixels(), 64e6)) { app.toast('La mesa de trabajo queda demasiado lejos: el lienzo sería demasiado grande', 'warn'); return; }
   if (W !== d.width || H !== d.height) d.resizeCanvas(W, H, 0, 0);
   const g = new GroupLayer(`Mesa de trabajo ${boards.length + 1}`);
   g.artboard = { x, y, w, h, bg };
@@ -1450,6 +1452,8 @@ export function newArtboard(w: number, h: number, bg: string | null, name?: stri
   const x = boards.length ? Math.max(...boards.map(b => b.artboard!.x + b.artboard!.w)) + gap : 0;
   const y = boards.length ? Math.min(...boards.map(b => b.artboard!.y)) : 0;
   const W = Math.max(d.width, x + w), H = Math.max(d.height, y + h);
+  // el lienzo crece para que quepa la mesa nueva: con un límite (cada capa ocupa el lienzo entero)
+  if (W * H > Math.min(maxCanvasPixels(), 64e6)) { app.toast('La mesa de trabajo queda demasiado lejos: el lienzo sería demasiado grande', 'warn'); return; }
   if (W !== d.width || H !== d.height) d.resizeCanvas(W, H, 0, 0);
   const g = new GroupLayer(name || `Mesa de trabajo ${boards.length + 1}`);
   g.artboard = { x, y, w, h, bg };

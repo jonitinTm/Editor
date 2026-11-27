@@ -1,3 +1,4 @@
+export type TileMapData = { tile: number; cols: number; rows: number; layers: { name: string; data: number[]; visible?: boolean }[] };
 // Documento: tamaño, árbol de capas, selección, guías, historial y vista.
 import { tName } from '../i18n/i18n';
 
@@ -46,7 +47,7 @@ export class EditorDocument {
   /** Resolución para imprimir (píxeles por pulgada). */
   ppi = 72;
   /** Información del archivo: datos de la cámara (solo lectura) y título, autor, copyright… (editables). */
-  meta: { /** dibujo de pixel art: se amplía sin suavizar al exportar y se muestra la barra de paleta */ pixelArt?: boolean; /** textura repetible (vista en mosaico) */ tileable?: boolean; exif?: Record<string, string>; /** bloque EXIF original (base64) para conservarlo al exportar en JPG */ exifRaw?: string; title?: string; author?: string; copyright?: string; description?: string; keywords?: string } = {};
+  meta: { /** dibujo de pixel art: se amplía sin suavizar al exportar y se muestra la barra de paleta */ pixelArt?: boolean; /** textura repetible (vista en mosaico) */ tileable?: boolean; exif?: Record<string, string>; /** bloque EXIF original (base64) para conservarlo al exportar en JPG */ exifRaw?: string; title?: string; author?: string; copyright?: string; description?: string; keywords?: string; /** mapa de tiles hecho con este documento como tileset */ tilemap?: TileMapData } = {};
   /** Modo de color: en «gris» se trabaja en escala de grises. */
   mode: 'rgb' | 'gray' = 'rgb';
   /** Trazado activo en el panel (-1 = ninguno). */
@@ -57,7 +58,7 @@ export class EditorDocument {
   /** Vista previa de «Seleccionar y aplicar máscara». */
   refinePreview: { mask: HTMLCanvasElement; mode: 'overlay' | 'black' | 'white' | 'transparent' } | null = null;
   /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
-  frames: { delay: number; visible: number[]; own?: number; hold?: number }[] = [];
+  frames: { delay: number; visible: number[]; own?: number; hold?: number; tag?: string }[] = [];
   frameIndex = 0;
   /** RAW revelado en alta precisión (16 bits, lineal) para volver a revelarlo sin pérdidas; solo en memoria. */
   raw16?: { layerId: number; w: number; h: number; data: Uint16Array; params?: Record<string, number> };
@@ -324,12 +325,12 @@ export class EditorDocument {
   }
 
   /** Remuestrea todas las capas a un nuevo tamaño. */
-  resample(w: number, h: number) {
+  resample(w: number, h: number, scaler?: (src: HTMLCanvasElement) => HTMLCanvasElement) {
     const sx = w / this.width, sy = h / this.height;
-    const scale = (src: HTMLCanvasElement) => {
+    const scale = scaler ?? ((src: HTMLCanvasElement) => {
       const c = makeCanvas(w, h); const ctx = ctx2d(c);
       ctx.imageSmoothingQuality = 'high'; ctx.drawImage(src, 0, 0, w, h); return c;
-    };
+    });
     for (const l of this.allLayers()) {
       if (isParametric(l)) { l.canvas = l.props.keepPixels ? scale(l.canvas) : makeCanvas(w, h); l.scale(sx, sy); }
       else if (isRaster(l)) { l.canvas = scale(l.canvas); l.touch(); }

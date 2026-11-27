@@ -78,24 +78,27 @@ export class PixelTool implements Tool {
     const s = this.size(), off = Math.floor((s - 1) / 2), ctx = ctx2d(st.buffer), W = st.buffer.width, H = st.buffer.height;
     const mode = this.opt<string>('mode'), sym = this.opt<string>('symmetry') || 'none';
     const skip = (x: number, y: number) => mode === 'dither' ? (x + y) % 2 !== 0 : mode === 'dither25' ? !(x % 2 === 0 && y % 2 === 0) : mode === 'dither75' ? (x % 2 === 1 && y % 2 === 1) : false;
+    const tile = !!app.doc?.meta.tileable;
     const pts = sym === 'none' ? [p] : symPoints(sym, p.x + 0.5, p.y + 0.5).map(q => ({ x: Math.floor(q.x), y: Math.floor(q.y) }));
     ctx.fillStyle = this.color;
     for (const q of pts) {
       const x0 = q.x - off, y0 = q.y - off;
       for (let y = y0; y < y0 + s; y++) for (let x = x0; x < x0 + s; x++) {
-        if (x < 0 || y < 0 || x >= W || y >= H) continue;
-        if (skip(x, y)) continue;
-        const k = y * W + x, n = this.count.get(k) ?? 0;
+        let X = x, Y = y;
+        if (tile) { X = ((x % W) + W) % W; Y = ((y % H) + H) % H; } // textura repetible: sale por el lado contrario
+        else if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        if (skip(X, Y)) continue;
+        const k = Y * W + X, n = this.count.get(k) ?? 0;
         if (add) {
           if (n === 0) {
-            if (this.ramp) { const c = this.shadeColor(k); if (!c) { this.count.set(k, n + 1); continue; } ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); ctx.fillStyle = this.color; }
-            else ctx.fillRect(x, y, 1, 1);
+            if (this.ramp) { const c = this.shadeColor(k); if (!c) { this.count.set(k, n + 1); continue; } ctx.fillStyle = c; ctx.fillRect(X, Y, 1, 1); ctx.fillStyle = this.color; }
+            else ctx.fillRect(X, Y, 1, 1);
           }
           this.count.set(k, n + 1);
         }
-        else if (n > 0) { if (n === 1) { ctx.clearRect(x, y, 1, 1); this.count.delete(k); } else this.count.set(k, n - 1); }
+        else if (n > 0) { if (n === 1) { ctx.clearRect(X, Y, 1, 1); this.count.delete(k); } else this.count.set(k, n - 1); }
       }
-      (st as any).addDirty({ x: x0, y: y0, w: s, h: s });
+      (st as any).addDirty(tile ? { x: 0, y: 0, w: W, h: H } : { x: x0, y: y0, w: s, h: s });
     }
   }
   /** Añade un píxel al trazo a mano, quitando la «L» si el píxel perfecto está activo. */
@@ -123,7 +126,7 @@ export class PixelTool implements Tool {
     for (const p of pts) this.plot(p, true);
     // zona que ocupa la forma (con sus copias simétricas, por si hay que borrarla en el siguiente movimiento)
     const W = st.buffer.width, H = st.buffer.height, sym = this.opt<string>('symmetry') || 'none', pad = this.size();
-    if (sym === 'none') { const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad; this.shapeBounds = { x: x0, y: y0, w: Math.abs(b.x - a.x) + 2 * pad + 1, h: Math.abs(b.y - a.y) + 2 * pad + 1 }; }
+    if (sym === 'none' && !app.doc?.meta.tileable) { const x0 = Math.min(a.x, b.x) - pad, y0 = Math.min(a.y, b.y) - pad; this.shapeBounds = { x: x0, y: y0, w: Math.abs(b.x - a.x) + 2 * pad + 1, h: Math.abs(b.y - a.y) + 2 * pad + 1 }; }
     else this.shapeBounds = { x: 0, y: 0, w: W, h: H };
     st.update();
   }
