@@ -45,6 +45,16 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 - ✅ **Animación de pixel art**: fotogramas (cada uno en su capa), duplicar, mover, papel cebolla, velocidad en fps, reproducir, exportar GIF animado y tira de sprites ampliados y nítidos; los fotogramas se deshacen con el historial y se guardan en el proyecto.
 - ✅ **Pixel art**: Archivo › Nuevo pixel art (16–128 px, 7 paletas propias y «Mis colores»), **pincel de píxeles** (píxel perfecto sin escalones dobles, línea, rectángulo y elipse con o sin relleno, tramado, borrar, simetría, Alt = cuentagotas), barra de paleta sobre el lienzo, zoom entero y **exportación ampliada nítida** (×1 a ×32, sin suavizar).
 
+### Videojuegos y animación
+- ✅ **Generador de texturas** repetibles (12 tipos: ladrillo, piedra, baldosas, madera, hierba, tierra, hormigón, asfalto, metal, tejas, agua, mármol), realista o pixel art, comprobado que no hay costuras; «Hacer repetible» para cualquier foto; vista en mosaico; **mapas normal/relieve/rugosidad/oclusión** (OpenGL o DirectX) en ZIP.
+- ✅ **Animación 2D** para cualquier documento: barra de animación, papel cebolla (anterior, 2 anteriores, anterior y siguiente, en color), duración por fotograma (×2, ×3…), fps, **interpolar movimiento** (mover, girar, escalar, desvanecer, con suavizado, rebote o impulso; ida y vuelta) y exportación GIF, vídeo, secuencia PNG y hoja de sprites + JSON.
+- ✅ Herramientas de juego: cortar hoja de sprites en fotogramas, atlas de sprites + JSON, contorno de 1 píxel, cambiar colores del sprite (variantes), potencia de 2, cuadrícula de tiles, paletas .gpl/.pal/.hex, sombrear con la paleta, tramas 25/50/75 %, GIF animado como fotogramas editables.
+
+### Funciones que otras apps cobran (aquí gratis)
+- ✅ Efectos: glitch, destellos de luz, bokeh, toque de color, película antigua, doble exposición.
+- ✅ Retrato: blanquear dientes, iluminar ojos, quitar ojeras (además de suavizar piel, ya existente).
+- ✅ Copiar y pegar ajustes entre fotos (también en todas las abiertas a la vez).
+
 ### Texto y diseño
 - ✅ Texto editable (fuentes del sistema y de la biblioteca, estilos mezclados en un mismo párrafo, interletraje, interlineado, alineación, texto en trazado, deformado), formas vectoriales, estilos de capa (sombra, sombra larga, resplandor, trazo, bisel, superposiciones), plantillas, marcas de agua, marcos, collage.
 

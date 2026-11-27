@@ -72,7 +72,8 @@ export async function documentFromImage(file: File | Blob, name = 'Sin título')
     const frames = await decodeGifFrames(file);
     if (frames) { // GIF animado: una capa y un cuadro por fotograma
       const doc = new EditorDocument(baseName(name), frames[0].canvas.width, frames[0].canvas.height);
-      frames.forEach((f, i) => { const l = new RasterLayer(`Cuadro ${i + 1}`, doc.width, doc.height); ctx2d(l.canvas).drawImage(f.canvas, 0, 0); l.visible = i === 0; doc.root.add(l); doc.frames.push({ delay: f.delay, visible: [l.id] }); });
+      frames.forEach((f, i) => { const l = new RasterLayer(`Fotograma ${i + 1}`, doc.width, doc.height); ctx2d(l.canvas).drawImage(f.canvas, 0, 0); l.visible = i === 0; doc.root.add(l); doc.frames.push({ delay: f.delay, visible: [l.id], own: l.id }); });
+      if (doc.width * doc.height <= 256 * 256) doc.meta.pixelArt = true; // los GIF pequeños suelen ser pixel art
       doc.setActive(doc.root.children[0], false);
       return doc;
     }

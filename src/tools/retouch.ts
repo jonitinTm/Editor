@@ -9,13 +9,13 @@ import { cloneCanvas, ctx2d } from '../core/canvas';
 import { getPaintTarget, setPreview, setTargetCanvas, PaintTarget } from './paint';
 import { drawBrushCursor } from './brush';
 
-type Mode = 'blur' | 'sharpen' | 'smudge' | 'dodge' | 'burn' | 'sponge';
+type Mode = 'blur' | 'sharpen' | 'smudge' | 'dodge' | 'burn' | 'sponge' | 'teeth' | 'eyes' | 'circles';
 
 class RetouchTool implements Tool {
   cursor = 'none';
   options = [
     { key: 'size', label: 'Tamaño', type: 'range', min: 1, max: 500, default: 40, unit: 'px' },
-    { key: 'strength', label: this.mode === 'dodge' || this.mode === 'burn' ? 'Exposición' : this.mode === 'sponge' ? 'Flujo' : 'Intensidad', type: 'range', min: 1, max: 100, default: 50, unit: '%' },
+    { key: 'strength', label: this.mode === 'dodge' || this.mode === 'burn' ? 'Exposición' : this.mode === 'sponge' ? 'Flujo' : 'Intensidad', type: 'range', min: 1, max: 100, default: this.mode === 'teeth' || this.mode === 'eyes' || this.mode === 'circles' ? 40 : 50, unit: '%' },
     { key: 'hardness', label: 'Dureza', type: 'range', min: 0, max: 100, default: 0, unit: '%' },
     ...(this.mode === 'sponge' ? [{ key: 'spongeMode', label: 'Modo', type: 'select', default: 'desat', choices: [{ value: 'desat', label: 'Reducir saturación' }, { value: 'sat', label: 'Saturar' }] },
       { key: 'vibrance', label: 'Intensidad natural', type: 'checkbox', default: true }] : []),
@@ -102,6 +102,22 @@ class RetouchTool implements Tool {
           f *= (1 - cs) * skin;
         }
         for (let ch = 0; ch < 3; ch++) d[i + ch] = sat ? src[i + ch] + (src[i + ch] - l) * f : src[i + ch] + (l - src[i + ch]) * f;
+      } else if (mode === 'teeth') {
+        // blanquear dientes: quita el amarillo (más cuanto más amarillo) y aclara un poco, sin pasarse a gris
+        const l = src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11, yellow = Math.max(0, Math.min(1, ((src[i] + src[i + 1]) / 2 - src[i + 2]) / 60));
+        const g = f * 0.8;
+        for (let ch = 0; ch < 3; ch++) { let v = src[i + ch] + (l - src[i + ch]) * g * yellow; v += (255 - v) * g * 0.22 * (l / 255); d[i + ch] = v; }
+      } else if (mode === 'eyes') {
+        // iluminar ojos: más brillo y color en el iris y en lo blanco, y un poco más de contraste
+        const l = src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11, g = f * 0.22, sat = Math.max(src[i], src[i + 1], src[i + 2]) - Math.min(src[i], src[i + 1], src[i + 2]);
+        // cuanto más saturado está ya, menos color se añade (evita colores chillones al repasar)
+        const sk = Math.max(0, 1 - sat / 150);
+        for (let ch = 0; ch < 3; ch++) { let v = src[i + ch] + (src[i + ch] - l) * g * 0.5 * sk; v = v + (v - 128) * g * 0.12; v += (255 - v) * g * 0.12; d[i + ch] = v; }
+      } else if (mode === 'circles') {
+        // quitar ojeras: aclara las sombras y les quita el tono azulado o violeta
+        const l = src[i] * 0.3 + src[i + 1] * 0.59 + src[i + 2] * 0.11, g = f * 0.4, dark = 1 - l / 255;
+        const blue = Math.max(0, Math.min(1, (src[i + 2] - (src[i] + src[i + 1]) / 2 + 20) / 50));
+        for (let ch = 0; ch < 3; ch++) { let v = src[i + ch] + (255 - src[i + ch]) * g * 0.35 * dark; if (ch === 2) v -= g * 14 * blue; if (ch === 0) v += g * 6 * blue; d[i + ch] = v; }
       } else if (carry) {
         f = Math.min(0.95, f * 1.6);
         for (let ch = 0; ch < 4; ch++) { const v = src[i + ch] + (carry[i + ch] - src[i + ch]) * f; carry[i + ch] = carry[i + ch] * 0.75 + src[i + ch] * 0.25; d[i + ch] = v; }
@@ -128,4 +144,8 @@ export const retouchTools = () => [
   new RetouchTool('dodge', 'Sobreexponer', icon('dodge'), 'dodge', 'tone', 'O'),
   new RetouchTool('burn', 'Subexponer', icon('burn'), 'burn', 'tone', 'O'),
   new RetouchTool('sponge', 'Esponja', icon('sponge'), 'sponge', 'tone', 'O'),
+  // retoque de retrato (lo que otras apps cobran): se pinta encima de la zona
+  new RetouchTool('teeth', 'Blanquear dientes', icon('teeth'), 'teeth', 'portrait'),
+  new RetouchTool('eyes', 'Iluminar ojos', icon('eyeBright'), 'eyes', 'portrait'),
+  new RetouchTool('circles', 'Quitar ojeras', icon('circles'), 'circles', 'portrait'),
 ];

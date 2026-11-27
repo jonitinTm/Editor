@@ -43,6 +43,9 @@ import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannels
 (app as any).debug.rawdev = () => import('./ui/rawdev');
 (app as any).debug.textures = () => import('./ui/textures');
 (app as any).debug.gamedev = () => import('./ui/gamedev');
+(app as any).debug.pixelart = () => import('./ui/pixelart');
+(app as any).debug.gif = () => import('./io/gif');
+(app as any).debug.layers = () => import('./core/layers');
 io.setDeviceLimitNotice((ow, oh, w, h) => app.toast(`La imagen (${ow} × ${oh}) es más grande de lo que este dispositivo puede editar; se ha abierto a ${w} × ${h}`, 'warn')); // para pruebas automáticas
 
 import { MoveTool } from './tools/move';

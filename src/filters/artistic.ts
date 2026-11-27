@@ -344,3 +344,76 @@ export function normalMap(img: ImageData, p: any) {
     d[i * 4] = clamp((nx / n * 0.5 + 0.5) * 255); d[i * 4 + 1] = clamp((-ny / n * 0.5 + 0.5) * 255); d[i * 4 + 2] = clamp((nz / n * 0.5 + 0.5) * 255); d[i * 4 + 3] = 255;
   }
 }
+
+// ---- Efectos de foto (los que otras apps cobran) -------------------------------------------------
+/** Glitch: canales de color desplazados, franjas horizontales corridas y líneas de pantalla. */
+export function glitch(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, src = new Uint8ClampedArray(d), r = rng(p.seed ?? 7);
+  const shift = Math.round((p.shift ?? 8) * w / 600), amount = (p.amount ?? 40) / 100, lines = (p.scanlines ?? 30) / 100;
+  // franjas: cada una se corre un poco a un lado
+  const rowShift = new Int32Array(h); let y = 0;
+  while (y < h) { const bh = 2 + Math.floor(r() * h * 0.06), s = r() < amount ? Math.round((r() - 0.5) * w * 0.15 * amount) : 0; for (let k = 0; k < bh && y < h; k++, y++) rowShift[y] = s; }
+  const at = (x: number, yy: number, c: number) => src[(yy * w + Math.min(w - 1, Math.max(0, x))) * 4 + c];
+  for (let yy = 0; yy < h; yy++) for (let x = 0; x < w; x++) {
+    const i = (yy * w + x) * 4, sx = x - rowShift[yy];
+    d[i] = at(sx + shift, yy, 0); d[i + 1] = at(sx, yy, 1); d[i + 2] = at(sx - shift, yy, 2);
+    if (lines && yy % 3 === 0) for (let c = 0; c < 3; c++) d[i + c] = d[i + c] * (1 - lines * 0.45);
+  }
+}
+/** Destellos de luz (light leaks): manchas cálidas de luz que entran por un borde, como en las cámaras de carrete. */
+export function lightLeak(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, amt = (p.amount ?? 60) / 100, r = rng(p.seed ?? 5);
+  const pal: Record<string, number[][]> = { warm: [[255, 120, 40], [255, 200, 90], [255, 70, 90]], pink: [[255, 90, 160], [255, 150, 120], [200, 80, 255]], blue: [[80, 170, 255], [140, 230, 255], [120, 120, 255]] };
+  const cols = pal[p.tone ?? 'warm'] ?? pal.warm, side = p.side ?? 'left';
+  const spots = [0, 1, 2].map(k => { const t = 0.15 + r() * 0.7, along = side === 'left' || side === 'right' ? { x: side === 'left' ? -0.1 : 1.1, y: t } : { x: t, y: side === 'top' ? -0.1 : 1.1 }; return { ...along, rad: 0.35 + r() * 0.4, c: cols[k % cols.length] }; });
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, u = x / w, v = y / h; let lr = 0, lg = 0, lb = 0;
+    for (const s of spots) { const dd = Math.hypot((u - s.x) * (w / Math.max(w, h)), (v - s.y) * (h / Math.max(w, h))) / s.rad; if (dd < 1) { const f = (1 - dd) ** 2 * amt; lr += s.c[0] * f; lg += s.c[1] * f; lb += s.c[2] * f; } }
+    // fusión «trama»: aclara sin quemar
+    d[i] = 255 - (255 - d[i]) * (1 - Math.min(1, lr / 255)); d[i + 1] = 255 - (255 - d[i + 1]) * (1 - Math.min(1, lg / 255)); d[i + 2] = 255 - (255 - d[i + 2]) * (1 - Math.min(1, lb / 255));
+  }
+}
+/** Bokeh: círculos de luz desenfocados, con los colores de las luces de la propia foto. */
+export function bokeh(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, r = rng(p.seed ?? 9), n = Math.round(p.count ?? 40), size = (p.size ?? 6) / 100 * Math.min(w, h), amt = (p.amount ?? 50) / 100;
+  // colores: de los píxeles más claros de la imagen
+  const lights: number[][] = []; for (let k = 0; k < 400; k++) { const i = Math.floor(r() * w * h) * 4; if (d[i] + d[i + 1] + d[i + 2] > 450) lights.push([d[i], d[i + 1], d[i + 2]]); }
+  if (!lights.length) lights.push([255, 220, 160], [255, 180, 120]);
+  const add = new Float32Array(w * h * 3);
+  for (let k = 0; k < n; k++) {
+    const cx = r() * w, cy = r() * h, rad = size * (0.5 + r()), c = lights[Math.floor(r() * lights.length)], a = (0.25 + r() * 0.5) * amt;
+    const x0 = Math.max(0, Math.floor(cx - rad)), x1 = Math.min(w, Math.ceil(cx + rad)), y0 = Math.max(0, Math.floor(cy - rad)), y1 = Math.min(h, Math.ceil(cy + rad));
+    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+      const dd = Math.hypot(x + 0.5 - cx, y + 0.5 - cy) / rad; if (dd >= 1) continue;
+      const f = a * (dd > 0.85 ? (1 - dd) / 0.15 : 0.55 + dd * 0.45); // disco con el borde algo más claro, como un objetivo real
+      const i = (y * w + x) * 3; add[i] += c[0] * f; add[i + 1] += c[1] * f; add[i + 2] += c[2] * f;
+    }
+  }
+  for (let i = 0; i < w * h; i++) for (let c = 0; c < 3; c++) d[i * 4 + c] = 255 - (255 - d[i * 4 + c]) * (1 - Math.min(1, add[i * 3 + c] / 255));
+}
+/** Toque de color: todo en blanco y negro salvo un color (con su tolerancia y un paso suave). */
+export function colorSplash(img: ImageData, p: any) {
+  const { data: d } = img, hue = p.hue ?? 0, tol = p.tolerance ?? 25, soft = Math.max(1, p.softness ?? 15);
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), dl = mx - mn;
+    let hh = 0; if (dl) hh = mx === r ? ((g - b) / dl) % 6 : mx === g ? (b - r) / dl + 2 : (r - g) / dl + 4; hh = (hh * 60 + 360) % 360;
+    const dist = Math.min(Math.abs(hh - hue), 360 - Math.abs(hh - hue)), sat = mx ? dl / mx : 0;
+    const keep = sat < 0.12 ? 0 : dist <= tol ? 1 : dist >= tol + soft ? 0 : 1 - (dist - tol) / soft;
+    const l = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+    for (let c = 0; c < 3; c++) d[i + c] = l + (d[i + c] - l) * keep;
+  }
+}
+/** Película antigua: colores desvaídos y cálidos, polvo, rayas verticales y viñeta. */
+export function oldFilm(img: ImageData, p: any) {
+  const { width: w, height: h, data: d } = img, r = rng(p.seed ?? 11), age = (p.age ?? 60) / 100, dust = (p.dust ?? 50) / 100, scratches = (p.scratches ?? 40) / 100;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, l = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+    const sep = [l * 1.07 + 18, l * 0.95 + 10, l * 0.78], vg = 1 - age * 0.55 * Math.pow(Math.hypot(x / w - 0.5, y / h - 0.5) / 0.7071, 2.2);
+    for (let c = 0; c < 3; c++) { const v = d[i + c] + (sep[c] - d[i + c]) * age * 0.75; d[i + c] = clamp((v * (1 - age * 0.18) + 255 * age * 0.06) * vg); }
+  }
+  // polvo (puntos y pelusas claros y oscuros) y rayas
+  const nd = Math.round(w * h / 9000 * dust * 3);
+  for (let k = 0; k < nd; k++) { const cx = r() * w, cy = r() * h, rad = 0.6 + r() * 2.2 * Math.max(1, w / 1200), light = r() < 0.6, a = 0.4 + r() * 0.5; for (let y = Math.max(0, Math.floor(cy - rad)); y < Math.min(h, cy + rad); y++) for (let x = Math.max(0, Math.floor(cx - rad)); x < Math.min(w, cx + rad); x++) { if (Math.hypot(x - cx, y - cy) > rad) continue; const i = (y * w + x) * 4; for (let c = 0; c < 3; c++) d[i + c] = light ? d[i + c] + (240 - d[i + c]) * a : d[i + c] * (1 - a * 0.8); } }
+  const ns = Math.round(scratches * 6);
+  for (let k = 0; k < ns; k++) { let x = r() * w; const y0 = Math.floor(r() * h * 0.5), y1 = Math.min(h, y0 + Math.floor(h * (0.3 + r() * 0.7))), light = r() < 0.5; for (let y = y0; y < y1; y++) { x += (r() - 0.5) * 0.6; const xi = Math.floor(x); if (xi < 0 || xi >= w) continue; const i = (y * w + xi) * 4; for (let c = 0; c < 3; c++) d[i + c] = light ? Math.min(255, d[i + c] + 70) : d[i + c] * 0.45; } }
+}

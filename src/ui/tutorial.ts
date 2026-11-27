@@ -115,6 +115,15 @@ export const TOPICS: Topic[] = [
       'Elige el nuevo formato o el margen y hacia qué lado crece.',
       'La zona nueva se rellena con lo que hay alrededor. Funciona mejor con fondos sencillos (cielo, pared, suelo).',
     ], go: { act: 'expandImage' }, needsDoc: true },
+    { id: 'portrait', title: 'Retoque de retrato', steps: [
+      'En el grupo del ⟦Pincel corrector puntual⟧ están ⟦Blanquear dientes⟧, ⟦Iluminar ojos⟧ y ⟦Quitar ojeras⟧.',
+      'Elige una y pinta encima de la zona con suavidad: cada pasada añade un poco más.',
+    ], go: { tool: 'teeth' }, needsDoc: true },
+    { id: 'fx', title: 'Efectos de foto y copiar ajustes', steps: [
+      'En ⟦Filtro › Efectos de foto⟧ hay glitch, destellos de luz, bokeh, toque de color (todo en blanco y negro menos un color) y película antigua.',
+      '⟦Imagen › Doble exposición…⟧ mezcla otra foto encima, dentro de la silueta si antes seleccionas a la persona.',
+      '⟦Edición › Copiar ajustes (looks, curvas, niveles…)⟧ y después ⟦Edición › Pegar ajustes en todas las fotos abiertas⟧ aplica el mismo retoque a muchas fotos.',
+    ], go: { act: 'filter:colorsplash' }, needsDoc: true },
     { id: 'upscale', title: 'Ampliar una foto pequeña', steps: [
       '⟦IA › Ampliar con IA (×2 / ×4)…⟧',
       'Elige cuánto ampliar: la IA añade detalle en vez de solo estirar los píxeles.',
@@ -243,6 +252,25 @@ export const TOPICS: Topic[] = [
       '⟦Archivo › Añadir marca de agua…⟧',
       'Escribe tu nombre o ©, y elige la posición (en una esquina o repetida por toda la imagen), el tamaño y la opacidad.',
     ], go: { act: 'watermark' }, needsDoc: true },
+  ] },
+  { title: 'Videojuegos y animación', guides: [
+    { id: 'textures', title: 'Texturas para videojuegos', steps: [
+      '⟦Juegos › Generador de texturas…⟧: elige ladrillo, piedra, madera, hierba, metal… en estilo realista o pixel art.',
+      'Todas se repiten sin cortes. ⟦Juegos › Vista en mosaico (ver la imagen repetida)⟧ enseña cómo queda.',
+      '⟦Juegos › Mapas para videojuegos (normal, relieve, rugosidad, oclusión)…⟧ crea los mapas para el material del motor (Godot, Unity, Unreal, Blender).',
+      'Con una foto propia, ⟦Juegos › Hacer repetible (sin costuras)…⟧ la convierte en textura repetible.',
+    ], go: { act: 'texGen' } },
+    { id: 'anim2d', title: 'Animar dibujos', steps: [
+      '⟦Juegos › Animación (fotogramas, papel cebolla)⟧ abre la barra de animación abajo: cada fotograma es un dibujo y el fondo se ve en todos.',
+      'Duplica el fotograma y cambia un poco el dibujo. El papel cebolla enseña el anterior (o también el siguiente, en color).',
+      'Cada fotograma puede durar ×2, ×3… y la velocidad se elige en fps.',
+      '⟦Juegos › Interpolar movimiento…⟧ crea solo los fotogramas intermedios para mover, girar, escalar o desvanecer un objeto.',
+    ], go: { act: 'animDock' }, needsDoc: true },
+    { id: 'gametools', title: 'Sprites para el juego', steps: [
+      '⟦Juegos › Cortar hoja de sprites en fotogramas…⟧ convierte una tira o rejilla de sprites en una animación.',
+      '⟦Juegos › Exportar animación (GIF, vídeo, PNG, hoja de sprites)…⟧ saca la hoja de sprites con su JSON para el motor.',
+      '⟦Juegos › Atlas de sprites (capas a una imagen + JSON)…⟧ junta todas las capas en una imagen, y ⟦Juegos › Contorno de 1 píxel (sprites)…⟧ y ⟦Juegos › Cambiar colores del sprite (variantes)…⟧ ayudan a terminarlos.',
+    ], go: { act: 'sliceSheet' }, needsDoc: true },
   ] },
   { title: 'Trabajar más rápido', guides: [
     { id: 'search', title: 'Buscar cualquier función', steps: [

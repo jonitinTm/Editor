@@ -24,7 +24,7 @@ export const PALETTES: { id: string; name: string; colors: string[] }[] = [
 const MINE = 'editor.pixelMine', CUR = 'editor.pixelPalette';
 const mine = (): string[] => { try { const v = JSON.parse(localStorage.getItem(MINE) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string').slice(0, 64) : []; } catch { return []; } };
 const saveMine = (l: string[]) => { try { localStorage.setItem(MINE, JSON.stringify(l.slice(0, 64))); } catch { /* sin almacenamiento */ } };
-function currentPalette(): { id: string; name: string; colors: string[] } {
+export function currentPalette(): { id: string; name: string; colors: string[] } {
   let id = 'basic16'; try { id = localStorage.getItem(CUR) || id; } catch { /* */ }
   if (id === 'mine') return { id, name: 'Mis colores', colors: mine() };
   return PALETTES.find(p => p.id === id) ?? PALETTES[0];
@@ -163,4 +163,29 @@ export function initPixelBar() {
   for (const ev of ['tool', 'docs', 'doc', 'colors'] as const) app.on(ev, () => renderBar());
   onAnimChange(renderBar);
   renderBar();
+}
+
+// ---- importar y exportar paletas ---------------------------------------------------------------
+/** Lee una paleta en formato GIMP/Aseprite (.gpl), JASC (.pal) o lista de colores hexadecimales (.hex, .txt). */
+export function parsePalette(text: string): string[] {
+  const out: string[] = [], hex = (n: number) => n.toString(16).padStart(2, '0');
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (/^JASC-PAL/i.test(lines[0] ?? '')) { for (const l of lines.slice(3)) { const m = l.match(/^(\d+)\s+(\d+)\s+(\d+)/); if (m) out.push('#' + [m[1], m[2], m[3]].map(v => hex(Math.min(255, +v))).join('')); } }
+  else if (/^GIMP Palette/i.test(lines[0] ?? '')) { for (const l of lines.slice(1)) { if (/^(Name|Columns):|^#/.test(l)) continue; const m = l.match(/^(\d+)\s+(\d+)\s+(\d+)/); if (m) out.push('#' + [m[1], m[2], m[3]].map(v => hex(Math.min(255, +v))).join('')); } }
+  else for (const l of lines) { const m = l.match(/#?([0-9a-f]{6})\b/i); if (m) out.push('#' + m[1].toLowerCase()); }
+  return [...new Set(out)].slice(0, 256);
+}
+export async function importPalette() {
+  const io = await import('../io/files'); const [f] = await io.pickFiles('.gpl,.pal,.hex,.txt'); if (!f) return;
+  const colors = parsePalette(await f.text());
+  if (!colors.length) { app.toast('No se han encontrado colores en el archivo', 'warn'); return; }
+  try { localStorage.setItem(MINE, JSON.stringify(colors.slice(0, 64))); } catch { /* */ }
+  setPalette('mine'); app.toast(`Paleta importada: ${Math.min(64, colors.length)} colores en «Mis colores»`);
+}
+export async function exportPalette() {
+  const p = currentPalette(); if (!p.colors.length) { app.toast('La paleta está vacía', 'warn'); return; }
+  const rgb = (c: string) => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  const gpl = ['GIMP Palette', `Name: ${p.name}`, 'Columns: 8', '#', ...p.colors.map(c => rgb(c).map(v => String(v).padStart(3)).join(' ') + '\t' + c)].join('\n') + '\n';
+  const io = await import('../io/files');
+  try { await io.saveBlob(new Blob([gpl], { type: 'text/plain' }), `${p.name.replace(/[^\w-]+/g, '_')}.gpl`); app.toast('Paleta exportada (.gpl: GIMP, Aseprite, Krita…)'); } catch (e: any) { if (e?.name !== 'AbortError') app.toast(String(e?.message ?? e), 'warn'); }
 }

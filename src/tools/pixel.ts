@@ -10,6 +10,7 @@ import { Stroke, getPaintTarget, strokeSetup } from './paint';
 import { ctx2d, rgbToHex } from '../core/canvas';
 import { SYM, symPoints, drawSymAxes } from './brush';
 import type { Viewport } from '../ui/viewport';
+import { currentPalette } from '../ui/pixelart';
 
 type P = { x: number; y: number };
 /** Píxeles de la recta entre dos puntos (Bresenham). */
@@ -43,7 +44,7 @@ export class PixelTool implements Tool {
     { key: 'shape', label: 'Forma', type: 'select', default: 'free', choices: [
       { value: 'free', label: 'A mano' }, { value: 'line', label: 'Línea' }, { value: 'rect', label: 'Rectángulo' }, { value: 'rectFill', label: 'Rectángulo relleno' },
       { value: 'ellipse', label: 'Elipse' }, { value: 'ellipseFill', label: 'Elipse rellena' }] },
-    { key: 'mode', label: 'Modo', type: 'select', default: 'draw', choices: [{ value: 'draw', label: 'Pintar' }, { value: 'erase', label: 'Borrar' }, { value: 'dither', label: 'Tramado (un píxel sí y otro no)' }] },
+    { key: 'mode', label: 'Modo', type: 'select', default: 'draw', choices: [{ value: 'draw', label: 'Pintar' }, { value: 'erase', label: 'Borrar' }, { value: 'dither', label: 'Tramado (un píxel sí y otro no)' }, { value: 'dither25', label: 'Tramado suave (1 de cada 4)' }, { value: 'dither75', label: 'Tramado fuerte (3 de cada 4)' }, { value: 'shade', label: 'Sombrear (oscurece con la paleta)' }, { value: 'light', label: 'Iluminar (aclara con la paleta)' }] },
     { key: 'perfect', label: 'Píxel perfecto', type: 'checkbox', default: true },
     SYM,
   ] as any[];
@@ -56,6 +57,16 @@ export class PixelTool implements Tool {
   private lastEnd: P | null = null;
   private shapeBounds: { x: number; y: number; w: number; h: number } | null = null;
   private hoverPx: P | null = null;
+  private ramp: string[] | null = null;
+  private dir = -1;
+  private under: Uint8ClampedArray | null = null;
+  /** Color sombreado para el píxel k (null si está vacío: el sombreado no pinta donde no hay nada). */
+  private shadeColor(k: number): string | null {
+    const u = this.under!, i = k * 4; if (!u[i + 3]) return null;
+    const ramp = this.ramp!; let best = 0, bd = 1e9;
+    for (let j = 0; j < ramp.length; j++) { const n = parseInt(ramp[j].slice(1), 16), dd = ((n >> 16) - u[i]) ** 2 + ((n >> 8 & 255) - u[i + 1]) ** 2 + ((n & 255) - u[i + 2]) ** 2; if (dd < bd) { bd = dd; best = j; } }
+    return ramp[Math.max(0, Math.min(ramp.length - 1, best + this.dir))];
+  }
 
   private opt<T>(k: string) { return app.opt<T>(k, this.id); }
   private size() { return Math.max(1, Math.round(this.opt<number>('size') ?? 1)); }
@@ -65,16 +76,23 @@ export class PixelTool implements Tool {
   private plot(p: P, add: boolean) {
     const st = this.stroke; if (!st) return;
     const s = this.size(), off = Math.floor((s - 1) / 2), ctx = ctx2d(st.buffer), W = st.buffer.width, H = st.buffer.height;
-    const dither = this.opt<string>('mode') === 'dither', sym = this.opt<string>('symmetry') || 'none';
+    const mode = this.opt<string>('mode'), sym = this.opt<string>('symmetry') || 'none';
+    const skip = (x: number, y: number) => mode === 'dither' ? (x + y) % 2 !== 0 : mode === 'dither25' ? !(x % 2 === 0 && y % 2 === 0) : mode === 'dither75' ? (x % 2 === 1 && y % 2 === 1) : false;
     const pts = sym === 'none' ? [p] : symPoints(sym, p.x + 0.5, p.y + 0.5).map(q => ({ x: Math.floor(q.x), y: Math.floor(q.y) }));
     ctx.fillStyle = this.color;
     for (const q of pts) {
       const x0 = q.x - off, y0 = q.y - off;
       for (let y = y0; y < y0 + s; y++) for (let x = x0; x < x0 + s; x++) {
         if (x < 0 || y < 0 || x >= W || y >= H) continue;
-        if (dither && (x + y) % 2) continue;
+        if (skip(x, y)) continue;
         const k = y * W + x, n = this.count.get(k) ?? 0;
-        if (add) { if (n === 0) ctx.fillRect(x, y, 1, 1); this.count.set(k, n + 1); }
+        if (add) {
+          if (n === 0) {
+            if (this.ramp) { const c = this.shadeColor(k); if (!c) { this.count.set(k, n + 1); continue; } ctx.fillStyle = c; ctx.fillRect(x, y, 1, 1); ctx.fillStyle = this.color; }
+            else ctx.fillRect(x, y, 1, 1);
+          }
+          this.count.set(k, n + 1);
+        }
         else if (n > 0) { if (n === 1) { ctx.clearRect(x, y, 1, 1); this.count.delete(k); } else this.count.set(k, n - 1); }
       }
       (st as any).addDirty({ x: x0, y: y0, w: s, h: s });
@@ -123,6 +141,14 @@ export class PixelTool implements Tool {
     const erase = this.opt<string>('mode') === 'erase', s = strokeSetup(t, erase);
     this.color = s.color;
     this.stroke = new Stroke(t, s.mode, 1, s.maskValue);
+    this.ramp = null; this.under = null;
+    const md = this.opt<string>('mode');
+    if ((md === 'shade' || md === 'light') && !t.isMask) {
+      // sombrear: cada píxel pasa al color siguiente (más oscuro o más claro) de la paleta, ordenada por brillo
+      const lum = (c: string) => { const n = parseInt(c.slice(1), 16); return (n >> 16) * 0.299 + (n >> 8 & 255) * 0.587 + (n & 255) * 0.114; };
+      const ramp = [...currentPalette().colors].sort((a, b) => lum(a) - lum(b));
+      if (ramp.length >= 2) { this.ramp = ramp; this.dir = md === 'shade' ? -1 : 1; this.under = ctx2d(t.canvas).getImageData(0, 0, t.canvas.width, t.canvas.height).data; }
+    }
     this.path = []; this.count.clear(); this.shapeBounds = null;
     const shape = this.opt<string>('shape') || 'free';
     if (shape !== 'free') { this.start = p; this.drawShape(p, e.shift); return; }
