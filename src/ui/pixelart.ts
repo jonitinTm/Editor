@@ -5,7 +5,8 @@ import { h } from './dom';
 import { showDialog } from './dialog';
 import { icon } from './icons';
 import * as more from './more';
-import { applyFrame, renderFrames, onion } from './timeline';
+import { renderFrames } from './timeline';
+import { isAnim, isPlaying, startAnim, stopAnim, animRow, onAnimChange } from './anim';
 import { RasterLayer } from '../core/layers';
 import { ctx2d, makeCanvas } from '../core/canvas';
 import { EditorDocument } from '../core/document';
@@ -122,123 +123,12 @@ export function exportPixelDialog() {
   });
 }
 
-// ---- Animación (fotogramas) -------------------------------------------------------------------
-// Cada fotograma es un dibujo en su propia capa («Fotograma 1», «Fotograma 2»…); las demás capas (p. ej. un fondo)
-// se ven en todos. Usa los mismos cuadros que la línea de tiempo, así que también se exporta a GIF desde allí.
-const isAnim = (d: EditorDocument | null) => !!d && d.frames.some(f => f.own != null);
-const layerById = (d: EditorDocument, id?: number) => id == null ? undefined : d.allLayers().find(l => l.id === id);
-let playTimer = 0;
-export function stopAnim() { if (playTimer) { clearTimeout(playTimer); playTimer = 0; renderBar(); } }
-export function playAnim() {
-  const d = app.doc; if (!d || d.frames.length < 2) return;
-  if (playTimer) { stopAnim(); return; }
-  const tick = () => {
-    const dd = app.doc; if (!dd || dd !== d || dd.frames.length < 2 || (app.viewport as any).toolActive) { playTimer = 0; renderBar(); return; }
-    applyFrame(dd, (dd.frameIndex + 1) % dd.frames.length);
-    playTimer = window.setTimeout(tick, dd.frames[dd.frameIndex]?.delay ?? 125);
-  };
-  playTimer = window.setTimeout(tick, d.frames[d.frameIndex]?.delay ?? 125);
-  renderBar();
-}
-/** Si el dibujo está sobre un fondo liso opaco (las 4 esquinas del mismo color), el fondo pasa a una capa «Fondo»
- *  común a todos los fotogramas y el dibujo se queda solo en la suya. Así los fotogramas nuevos también tienen fondo
- *  y el papel cebolla no tapa lo que se dibuja. */
-function splitBackground(d: EditorDocument, l: RasterLayer) {
-  const W = l.canvas.width, H = l.canvas.height, x = ctx2d(l.canvas), img = x.getImageData(0, 0, W, H), D = img.data;
-  for (let i = 3; i < D.length; i += 4) if (D[i] !== 255) return; // ya tiene transparencias: no hace falta
-  const at = (px: number, py: number) => (py * W + px) * 4, c0 = at(0, 0);
-  const same = (i: number) => D[i] === D[c0] && D[i + 1] === D[c0 + 1] && D[i + 2] === D[c0 + 2];
-  if (![at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)].every(same)) return;
-  const bgL = new RasterLayer('Fondo', W, H), bx = ctx2d(bgL.canvas);
-  bx.fillStyle = `rgb(${D[c0]},${D[c0 + 1]},${D[c0 + 2]})`; bx.fillRect(0, 0, W, H);
-  for (let i = 0; i < D.length; i += 4) if (same(i)) D[i + 3] = 0;
-  x.putImageData(img, 0, 0); l.touch();
-  const parent = (l.parent ?? d.root) as any; parent.add(bgL, parent.children.indexOf(l));
-}
-/** Convierte el dibujo en el primer fotograma de una animación. */
-export function startAnim() {
-  const d = app.doc; if (!d) return;
-  if (isAnim(d)) return;
-  let l = d.activeRaster();
-  if (!l) { l = new RasterLayer('Fotograma 1', d.width, d.height); d.root.add(l); }
-  splitBackground(d, l);
-  l.name = 'Fotograma 1';
-  const shared = d.allLayers().filter(x => x.visible && x !== l).map(x => x.id);
-  d.frames = [{ delay: 125, visible: [...shared, l.id], own: l.id }];
-  d.frameIndex = 0; d.setActive(l, false);
-  d.commit('Empezar animación');
-  app.toast('Animación: pulsa ＋ para añadir fotogramas. El papel cebolla muestra el anterior en transparencia');
-  renderBar();
-}
-/** Añade un fotograma después del actual: vacío o copia del actual. */
-export function addFrame(copy: boolean) {
-  const d = app.doc; if (!d) return;
-  if (!isAnim(d)) startAnim();
-  stopAnim();
-  const cur = d.frames[d.frameIndex], curL = layerById(d, cur.own);
-  const nl = new RasterLayer(`Fotograma ${d.frames.length + 1}`, d.width, d.height);
-  if (copy && curL instanceof RasterLayer) ctx2d(nl.canvas).drawImage(curL.canvas, 0, 0);
-  const parent = (curL?.parent ?? d.root) as any, idx = curL ? parent.children.indexOf(curL) + 1 : parent.children.length;
-  parent.add(nl, idx);
-  const shared = cur.visible.filter(id => id !== cur.own);
-  d.frames.splice(d.frameIndex + 1, 0, { delay: cur.delay, visible: [...shared, nl.id], own: nl.id });
-  applyFrame(d, d.frameIndex + 1);
-  d.commit(copy ? 'Duplicar fotograma' : 'Nuevo fotograma');
-}
-export function deleteFrame() {
-  const d = app.doc; if (!d || !isAnim(d)) return;
-  if (d.frames.length < 2) { app.toast('La animación necesita al menos un fotograma', 'warn'); return; }
-  stopAnim();
-  const f = d.frames[d.frameIndex], l = layerById(d, f.own);
-  d.frames.splice(d.frameIndex, 1);
-  if (l && !d.frames.some(x => x.visible.includes(l.id))) (l.parent as any)?.remove(l);
-  applyFrame(d, Math.min(d.frameIndex, d.frames.length - 1));
-  d.commit('Eliminar fotograma');
-}
-export function moveFrame(dir: -1 | 1) {
-  const d = app.doc; if (!d || !isAnim(d)) return;
-  const i = d.frameIndex, j = i + dir; if (j < 0 || j >= d.frames.length) return;
-  [d.frames[i], d.frames[j]] = [d.frames[j], d.frames[i]];
-  applyFrame(d, j); d.commit('Mover fotograma');
-}
-export function setFps(fps: number) {
-  const d = app.doc; if (!d) return;
-  const ms = Math.round(1000 / fps); for (const f of d.frames) f.delay = ms;
-  d.commit('Velocidad de la animación'); renderBar();
-}
-const FPS = [2, 4, 6, 8, 10, 12, 15, 24];
-function animRow(d: EditorDocument): HTMLElement {
-  const b = (cls: string, title: string, ic: string, fn: () => void, on = false) => { const x = h('button', { type: 'button', class: 'btn icon-btn ' + cls + (on ? ' on' : ''), title, 'aria-label': title, html: icon(ic) }); x.onclick = fn; return x; };
-  const play = b('px-play', playTimer ? 'Detener' : 'Reproducir', playTimer ? 'stop' : 'play', () => playAnim(), !!playTimer);
-  const strip = h('div', { class: 'px-frames' });
-  const small = d.width * d.height <= 512 * 512;
-  d.frames.forEach((f, i) => {
-    const cell = h('button', { type: 'button', class: 'px-frame' + (i === d.frameIndex ? ' on' : ''), title: `Fotograma ${i + 1}`, 'aria-label': `Fotograma ${i + 1}` });
-    const l = layerById(d, f.own);
-    if (small && l instanceof RasterLayer) { const k = Math.min(36 / d.width, 36 / d.height), c = makeCanvas(Math.max(1, Math.round(d.width * k)), Math.max(1, Math.round(d.height * k))), x = ctx2d(c); x.imageSmoothingEnabled = false; x.drawImage(l.canvas, 0, 0, c.width, c.height); cell.append(c); }
-    cell.append(h('span', { class: 'px-fn' }, String(i + 1)));
-    cell.onclick = () => { stopAnim(); applyFrame(d, i); };
-    strip.append(cell);
-  });
-  const fps = h('select', { class: 'px-fps', title: 'Velocidad (fotogramas por segundo)', 'aria-label': 'Velocidad (fotogramas por segundo)' }, ...FPS.map(n => h('option', { value: String(n) }, `${n} fps`)));
-  const cur = Math.round(1000 / (d.frames[d.frameIndex]?.delay || 125)); fps.value = String(FPS.reduce((a, x) => Math.abs(x - cur) < Math.abs(a - cur) ? x : a, FPS[0]));
-  fps.onchange = () => setFps(+fps.value);
-  return h('div', { class: 'px-row px-anim' }, play, strip,
-    b('px-addf', 'Nuevo fotograma vacío', 'plus', () => addFrame(false)),
-    b('px-dupf', 'Duplicar fotograma (copia del actual para cambiar un poco)', 'duplicate', () => addFrame(true)),
-    b('px-left', 'Mover el fotograma antes', 'chevronLeft', () => moveFrame(-1)),
-    b('px-right', 'Mover el fotograma después', 'chevronRight', () => moveFrame(1)),
-    b('px-delf', 'Eliminar fotograma', 'trash', () => deleteFrame()),
-    b('px-onion', 'Papel cebolla: ver el fotograma anterior en transparencia', 'onion', () => { onion.on = !onion.on; renderBar(); }, onion.on),
-    fps);
-}
-
 // ---- Barra de colores sobre el lienzo --------------------------------------------------------
 let bar: HTMLElement | null = null;
 const wanted = () => !!app.doc && (app.doc.meta.pixelArt || app.tool?.id === 'pixel');
 export function renderBar() {
   if (!wanted()) { bar?.remove(); bar = null; return; }
-  if (playTimer && bar?.querySelector('.px-anim') && app.doc && bar.querySelectorAll('.px-frame').length === app.doc.frames.length) {
+  if (isPlaying() && bar?.querySelector('.px-anim') && app.doc && bar.querySelectorAll('.px-frame').length === app.doc.frames.length) {
     const i = app.doc.frameIndex; bar.querySelectorAll('.px-frame').forEach((c, j) => c.classList.toggle('on', j === i)); return;
   }
   const host = app.viewport.canvas.parentElement; if (!host) return;
@@ -271,6 +161,6 @@ export function renderBar() {
 }
 export function initPixelBar() {
   for (const ev of ['tool', 'docs', 'doc', 'colors'] as const) app.on(ev, () => renderBar());
-  app.on('docs', () => { if (playTimer && !isAnim(app.doc)) stopAnim(); });
+  onAnimChange(renderBar);
   renderBar();
 }

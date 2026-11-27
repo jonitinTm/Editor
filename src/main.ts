@@ -74,7 +74,7 @@ for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSe
 }
 app.registerTool(new PixelTool());
 // barra de paleta del pixel art (aparece con el pincel de píxeles o en un documento de pixel art)
-setTimeout(() => import('./ui/pixelart').then(m => m.initPixelBar()), 0);
+setTimeout(() => import('./ui/anim').then(m => m.initAnim()).then(() => import('./ui/pixelart')).then(m => m.initPixelBar()), 0);
 app.registerTool(new PolyLassoTool());
 app.registerTool(new MagneticLassoTool());
 app.registerTool(new SpotHealTool());

@@ -307,7 +307,7 @@ export class Viewport {
     const m = 40;
     // pixel art: deja sitio abajo para la barra de paleta y usa un zoom entero (todos los píxeles del mismo tamaño)
     const px = !!d.meta?.pixelArt;
-    let z = Math.min((this.width - m) / d.width, (this.height - m - (px ? (d.frames.some(f => f.own != null) ? 230 : 150) : 0)) / d.height);
+    let z = Math.min((this.width - m) / d.width, (this.height - m - (px ? (d.frames.some(f => f.own != null) ? 230 : 150) : d.frames.some(f => f.own != null) || document.querySelector('.anim-dock') ? 120 : 0)) / d.height);
     if (onlyShrink) z = Math.min(z, 1);
     if (px && z > 1) z = Math.floor(z);
     this.setZoom(z, null, true);
@@ -400,7 +400,7 @@ export class Viewport {
     else this.drawComposite(ctx, d.getComposite());
     // papel cebolla: el cuadro anterior de la animación, en transparencia
     const onion = (app as any).onionCanvas?.(d) as HTMLCanvasElement | null;
-    if (onion) { ctx.save(); ctx.globalAlpha = 0.3; this.docTransform(ctx); ctx.drawImage(onion, 0, 0); ctx.restore(); }
+    if (onion) { ctx.save(); ctx.globalAlpha = (onion as any).alpha ?? 0.3; this.docTransform(ctx); ctx.drawImage(onion, 0, 0); ctx.restore(); }
     ctx.restore();
     // vistas especiales: antes/después y simulación de daltonismo
     (app as any).drawCompare?.(ctx, this);

@@ -57,7 +57,7 @@ export class EditorDocument {
   /** Vista previa de «Seleccionar y aplicar máscara». */
   refinePreview: { mask: HTMLCanvasElement; mode: 'overlay' | 'black' | 'white' | 'transparent' } | null = null;
   /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
-  frames: { delay: number; visible: number[]; own?: number }[] = [];
+  frames: { delay: number; visible: number[]; own?: number; hold?: number }[] = [];
   frameIndex = 0;
   /** RAW revelado en alta precisión (16 bits, lineal) para volver a revelarlo sin pérdidas; solo en memoria. */
   raw16?: { layerId: number; w: number; h: number; data: Uint16Array; params?: Record<string, number> };

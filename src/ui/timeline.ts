@@ -8,7 +8,7 @@ import type { EditorDocument } from '../core/document';
 import { ctx2d, makeCanvas } from '../core/canvas';
 
 /** `own`: capa propia del cuadro (pixel art: cada fotograma es un dibujo en su capa). */
-export interface Frame { delay: number; visible: number[]; own?: number; }
+export interface Frame { delay: number; visible: number[]; own?: number; /** veces que dura (×1, ×2…) */ hold?: number; }
 
 const visibleIds = (d: EditorDocument) => d.allLayers().filter(l => l.visible).map(l => l.id);
 export function applyFrame(d: EditorDocument, i: number) {
@@ -27,19 +27,9 @@ let onionCache: { key: string; c: HTMLCanvasElement } | null = null;
 (app as any).onionCanvas = (d: EditorDocument) => {
   if (!onionOn || d.frames.length < 2) return null;
   const prev = (d.frameIndex - 1 + d.frames.length) % d.frames.length, key = `${d.name}|${prev}|${d.frameIndex}|${d.history.index}|${d.width}x${d.height}`;
-  if (onionCache?.key === key) return onionCache.c;
-  // pixel art (cada fotograma en su capa): solo el dibujo del fotograma anterior, y solo donde el actual no tiene
-  // nada pintado, para que la transparencia no aclare lo que se está dibujando
-  const pf = d.frames[prev], cf = d.frames[d.frameIndex];
-  if (pf?.own != null && cf?.own != null) {
-    const pl = d.allLayers().find(l => l.id === pf.own) as any, cl = d.allLayers().find(l => l.id === cf.own) as any;
-    if (pl?.canvas) {
-      const c = makeCanvas(d.width, d.height), x = ctx2d(c);
-      x.drawImage(pl.canvas, 0, 0);
-      if (cl?.canvas) { x.globalCompositeOperation = 'destination-out'; x.drawImage(cl.canvas, 0, 0); }
-      onionCache = { key, c }; return c;
-    }
-  }
+  if (onionCache?.key === key || onionCache?.key === key + '|' + (localStorage.getItem('editor.onionMode') ?? '')) return onionCache.c;
+  // fotogramas con capa propia: papel cebolla configurable del módulo de animación
+  if (d.frames[d.frameIndex]?.own != null && (app as any).onionImage) { const c = (app as any).onionImage(d); onionCache = { key: key + '|' + (localStorage.getItem('editor.onionMode') ?? ''), c }; return c; }
   // solo lo que se ve en el cuadro anterior y no en el actual (el fondo común no tapa el dibujo)
   const vis = new Map(d.allLayers().map(l => [l, l.visible])), set = new Set(d.frames[prev].visible), now = new Set(d.frames[d.frameIndex]?.visible ?? []);
   for (const l of d.allLayers()) l.visible = l.kind === 'group' ? set.has(l.id) || now.has(l.id) : set.has(l.id) && !now.has(l.id);

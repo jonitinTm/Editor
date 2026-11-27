@@ -1,0 +1,303 @@
+// Animación 2D (para cualquier documento, también pixel art): cada fotograma es un dibujo en su propia capa
+// («Fotograma 1», «Fotograma 2»…); las demás capas (un fondo, un decorado) se ven en todos. Papel cebolla
+// configurable, duración de cada fotograma, interpolación de movimiento y exportación (GIF, vídeo, secuencia PNG y
+// hoja de sprites con JSON para motores de juego). Usa los mismos cuadros que la línea de tiempo y el historial.
+import { app } from './app';
+import { h, numberSlider } from './dom';
+import { icon } from './icons';
+import { showDialog } from './dialog';
+import { applyFrame, renderFrames, onion } from './timeline';
+import { RasterLayer } from '../core/layers';
+import { ctx2d, makeCanvas } from '../core/canvas';
+import type { EditorDocument } from '../core/document';
+
+export const isAnim = (d: EditorDocument | null | undefined) => !!d && d.frames.some(f => f.own != null);
+const layerById = (d: EditorDocument, id?: number) => id == null ? undefined : d.allLayers().find(l => l.id === id);
+
+// quién tiene que repintarse cuando cambia la animación (la barra del pixel art y la barra general)
+const listeners = new Set<() => void>();
+export function onAnimChange(fn: () => void) { listeners.add(fn); }
+const refresh = () => listeners.forEach(f => f());
+
+// ---- reproducción -----------------------------------------------------------------------------
+let playTimer = 0;
+export const isPlaying = () => !!playTimer;
+export function stopAnim() { if (playTimer) { clearTimeout(playTimer); playTimer = 0; refresh(); } }
+export function playAnim() {
+  const d = app.doc; if (!d || d.frames.length < 2) return;
+  if (playTimer) { stopAnim(); return; }
+  const tick = () => {
+    const dd = app.doc; if (!dd || dd !== d || dd.frames.length < 2 || (app.viewport as any).toolActive) { playTimer = 0; refresh(); return; }
+    applyFrame(dd, (dd.frameIndex + 1) % dd.frames.length);
+    playTimer = window.setTimeout(tick, dd.frames[dd.frameIndex]?.delay ?? 125);
+  };
+  playTimer = window.setTimeout(tick, d.frames[d.frameIndex]?.delay ?? 125);
+  refresh();
+}
+
+// ---- fotogramas ---------------------------------------------------------------------------------
+/** Si el dibujo está sobre un fondo liso opaco (las 4 esquinas del mismo color), el fondo pasa a una capa «Fondo»
+ *  común a todos los fotogramas y el dibujo se queda solo en la suya. */
+function splitBackground(d: EditorDocument, l: RasterLayer) {
+  const W = l.canvas.width, H = l.canvas.height, x = ctx2d(l.canvas), img = x.getImageData(0, 0, W, H), D = img.data;
+  for (let i = 3; i < D.length; i += 4) if (D[i] !== 255) return; // ya tiene transparencias: no hace falta
+  const at = (px: number, py: number) => (py * W + px) * 4, c0 = at(0, 0);
+  const same = (i: number) => D[i] === D[c0] && D[i + 1] === D[c0 + 1] && D[i + 2] === D[c0 + 2];
+  if (![at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)].every(same)) return;
+  const bgL = new RasterLayer('Fondo', W, H), bx = ctx2d(bgL.canvas);
+  bx.fillStyle = `rgb(${D[c0]},${D[c0 + 1]},${D[c0 + 2]})`; bx.fillRect(0, 0, W, H);
+  for (let i = 0; i < D.length; i += 4) if (same(i)) D[i + 3] = 0;
+  x.putImageData(img, 0, 0); l.touch();
+  const parent = (l.parent ?? d.root) as any; parent.add(bgL, parent.children.indexOf(l));
+}
+/** Convierte el dibujo en el primer fotograma de una animación. */
+export function startAnim() {
+  const d = app.doc; if (!d) return;
+  if (isAnim(d)) return;
+  let l = d.activeRaster();
+  if (!l) { l = new RasterLayer('Fotograma 1', d.width, d.height); d.root.add(l); }
+  splitBackground(d, l);
+  l.name = 'Fotograma 1';
+  const shared = d.allLayers().filter(x => x.visible && x !== l).map(x => x.id);
+  d.frames = [{ delay: 125, visible: [...shared, l.id], own: l.id }];
+  d.frameIndex = 0; d.setActive(l, false);
+  d.commit('Empezar animación');
+  app.toast('Animación: pulsa ＋ para añadir fotogramas. El papel cebolla muestra el anterior en transparencia');
+  refresh();
+}
+/** Añade un fotograma después del actual: vacío o copia del actual. */
+export function addFrame(copy: boolean) {
+  const d = app.doc; if (!d) return;
+  if (!isAnim(d)) startAnim();
+  stopAnim();
+  const cur = d.frames[d.frameIndex], curL = layerById(d, cur.own);
+  const nl = new RasterLayer(`Fotograma ${d.frames.length + 1}`, d.width, d.height);
+  if (copy && curL instanceof RasterLayer) ctx2d(nl.canvas).drawImage(curL.canvas, 0, 0);
+  const parent = (curL?.parent ?? d.root) as any, idx = curL ? parent.children.indexOf(curL) + 1 : parent.children.length;
+  parent.add(nl, idx);
+  const shared = cur.visible.filter(id => id !== cur.own);
+  d.frames.splice(d.frameIndex + 1, 0, { delay: baseDelay(d), visible: [...shared, nl.id], own: nl.id });
+  applyFrame(d, d.frameIndex + 1);
+  d.commit(copy ? 'Duplicar fotograma' : 'Nuevo fotograma');
+}
+export function deleteFrame() {
+  const d = app.doc; if (!d || !isAnim(d)) return;
+  if (d.frames.length < 2) { app.toast('La animación necesita al menos un fotograma', 'warn'); return; }
+  stopAnim();
+  const f = d.frames[d.frameIndex], l = layerById(d, f.own);
+  d.frames.splice(d.frameIndex, 1);
+  if (l && !d.frames.some(x => x.visible.includes(l.id))) (l.parent as any)?.remove(l);
+  applyFrame(d, Math.min(d.frameIndex, d.frames.length - 1));
+  d.commit('Eliminar fotograma');
+}
+export function moveFrame(dir: -1 | 1) {
+  const d = app.doc; if (!d || !isAnim(d)) return;
+  const i = d.frameIndex, j = i + dir; if (j < 0 || j >= d.frames.length) return;
+  [d.frames[i], d.frames[j]] = [d.frames[j], d.frames[i]];
+  applyFrame(d, j); d.commit('Mover fotograma');
+}
+// ---- velocidad y duración de cada fotograma (×1, ×2…: «mantener» un dibujo varios fotogramas) ---------------------
+const hold = (f: { hold?: number }) => f.hold ?? 1;
+/** Duración base (de un fotograma ×1). */
+export function baseDelay(d: EditorDocument) { const f = d.frames[d.frameIndex] ?? d.frames[0]; return f ? Math.round(f.delay / hold(f)) : 125; }
+export function setFps(fps: number) {
+  const d = app.doc; if (!d) return;
+  const ms = Math.round(1000 / fps); for (const f of d.frames) f.delay = ms * hold(f);
+  d.commit('Velocidad de la animación'); refresh();
+}
+export function setHold(n: number) {
+  const d = app.doc; if (!d) return; const f = d.frames[d.frameIndex]; if (!f) return;
+  const base = baseDelay(d); f.hold = n; f.delay = base * n;
+  d.commit('Duración del fotograma'); refresh();
+}
+
+// ---- papel cebolla -------------------------------------------------------------------------------
+export type OnionMode = 'prev' | 'prev2' | 'both' | 'color';
+const ONION_KEY = 'editor.onionMode';
+export function onionMode(): OnionMode { try { return (localStorage.getItem(ONION_KEY) as OnionMode) || 'prev'; } catch { return 'prev'; } }
+export function setOnionMode(m: OnionMode) { try { localStorage.setItem(ONION_KEY, m); } catch { /* */ } onion.on = true; refresh(); }
+/** Imagen del papel cebolla con la transparencia ya aplicada: fotogramas anteriores (y siguientes) solo donde el
+ *  fotograma actual no tiene dibujo, para no aclarar lo que se está dibujando. */
+export function onionImage(d: EditorDocument): HTMLCanvasElement | null {
+  const n = d.frames.length, cf = d.frames[d.frameIndex]; if (n < 2 || cf?.own == null) return null;
+  const mode = onionMode(), list: { i: number; a: number; tint?: string }[] = [];
+  const at = (k: number) => (d.frameIndex + k + n) % n;
+  if (mode === 'prev') list.push({ i: at(-1), a: 0.35 });
+  else if (mode === 'prev2') list.push({ i: at(-2), a: 0.18 }, { i: at(-1), a: 0.35 });
+  else if (mode === 'both') list.push({ i: at(-1), a: 0.35 }, { i: at(1), a: 0.25 });
+  else list.push({ i: at(-1), a: 0.4, tint: '#ff3b3b' }, { i: at(1), a: 0.35, tint: '#25c25b' });
+  const c = makeCanvas(d.width, d.height), x = ctx2d(c);
+  for (const it of list) {
+    if (it.i === d.frameIndex) continue;
+    const l = layerById(d, d.frames[it.i]?.own) as any; if (!l?.canvas) continue;
+    let src: HTMLCanvasElement = l.canvas;
+    if (it.tint) { const t = makeCanvas(d.width, d.height), tx = ctx2d(t); tx.drawImage(l.canvas, 0, 0); tx.globalCompositeOperation = 'source-atop'; tx.globalAlpha = 0.65; tx.fillStyle = it.tint; tx.fillRect(0, 0, d.width, d.height); src = t; }
+    x.globalAlpha = it.a; x.drawImage(src, 0, 0);
+  }
+  const cur = layerById(d, cf.own) as any;
+  if (cur?.canvas) { x.globalAlpha = 1; x.globalCompositeOperation = 'destination-out'; x.drawImage(cur.canvas, 0, 0); }
+  (c as any).alpha = 1; // la transparencia ya está puesta
+  return c;
+}
+
+// ---- interpolar movimiento ----------------------------------------------------------------------
+const EASE: Record<string, (t: number) => number> = {
+  linear: t => t, smooth: t => t * t * (3 - 2 * t), in: t => t * t, out: t => 1 - (1 - t) * (1 - t),
+  bounce: t => { const n = 7.5625, d = 2.75; if (t < 1 / d) return n * t * t; if (t < 2 / d) return n * (t -= 1.5 / d) * t + 0.75; if (t < 2.5 / d) return n * (t -= 2.25 / d) * t + 0.9375; return n * (t -= 2.625 / d) * t + 0.984375; },
+  back: t => { const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); },
+};
+/** Caja de lo que hay pintado en un lienzo (o null si está vacío). */
+function contentBox(c: HTMLCanvasElement) {
+  const d = ctx2d(c).getImageData(0, 0, c.width, c.height).data; let x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+  for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  return x1 < 0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
+}
+export type TweenParams = { frames: number; dx: number; dy: number; rot: number; scale: number; opacity: number; ease: string; pingpong: boolean };
+/** Crea los fotogramas intermedios moviendo, girando, escalando o desvaneciendo la capa elegida. */
+export function tween(d: EditorDocument, src: RasterLayer, p: TweenParams) {
+  const box = contentBox(src.canvas); if (!box) { app.toast('La capa está vacía', 'warn'); return false; }
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2, ease = EASE[p.ease] ?? EASE.smooth, pix = !!d.meta.pixelArt;
+  const anim = isAnim(d), cur = anim ? d.frames[d.frameIndex] : null;
+  // lo que se ve en todos: lo visible ahora, menos la capa que se anima y menos los dibujos de otros fotogramas
+  const owned = new Set(d.frames.map(f => f.own).filter(x => x != null));
+  const shared = (cur ? cur.visible.filter(id => id !== cur.own) : d.allLayers().filter(l => l.visible).map(l => l.id)).filter(id => id !== src.id && !owned.has(id));
+  const steps: number[] = []; for (let i = 0; i < p.frames; i++) steps.push(p.frames === 1 ? 1 : i / (p.frames - 1));
+  if (p.pingpong) for (let i = p.frames - 2; i > 0; i--) steps.push(steps[i]);
+  const parent = (src.parent ?? d.root) as any; let idx = parent.children.indexOf(src) + 1, at = anim ? d.frameIndex + 1 : 0;
+  const delay = anim ? baseDelay(d) : 83;
+  if (!anim) d.frames = [];
+  steps.forEach((t, k) => {
+    const e = ease(t), l = new RasterLayer(`Fotograma ${d.frames.length + 1}`, d.width, d.height), x = ctx2d(l.canvas);
+    x.imageSmoothingEnabled = !pix;
+    x.globalAlpha = 1 + (p.opacity / 100 - 1) * e;
+    x.translate(cx + p.dx * e, cy + p.dy * e); x.rotate(p.rot * e * Math.PI / 180); const s = 1 + (p.scale / 100 - 1) * e; x.scale(s, s);
+    if (pix) x.translate(-Math.round(cx), -Math.round(cy)); else x.translate(-cx, -cy);
+    x.drawImage(src.canvas, 0, 0);
+    parent.add(l, idx++);
+    d.frames.splice(at + k, 0, { delay, visible: [...shared, l.id], own: l.id });
+  });
+  src.visible = false;
+  applyFrame(d, at);
+  d.commit('Interpolar movimiento');
+  return true;
+}
+export function tweenDialog() {
+  const d = app.doc, src = d?.activeRaster(); if (!d || !src) { app.toast('Elige la capa con el objeto que quieres animar', 'warn'); return; }
+  const p: TweenParams = { frames: 12, dx: Math.round(d.width / 3), dy: 0, rot: 0, scale: 100, opacity: 100, ease: 'smooth', pingpong: false };
+  const num = (k: 'frames' | 'dx' | 'dy' | 'rot' | 'scale' | 'opacity', label: string, min: number, max: number, unit = '') =>
+    h('div', { class: 'form-row' }, h('label', {}, label), numberSlider({ min, max, value: p[k], unit, onInput: v => { p[k] = v; } }).el);
+  const ease = h('select', {}, ...[['smooth', 'Suave (acelera y frena)'], ['linear', 'Constante'], ['in', 'Acelerando'], ['out', 'Frenando'], ['bounce', 'Rebote'], ['back', 'Con impulso (se pasa y vuelve)']].map(([v, n]) => h('option', { value: v }, n)));
+  ease.onchange = () => { p.ease = ease.value; };
+  const pp = h('input', { type: 'checkbox' }) as HTMLInputElement; pp.onchange = () => { p.pingpong = pp.checked; };
+  showDialog({
+    title: 'Interpolar movimiento', okLabel: 'Crear fotogramas', width: 460,
+    body: [
+      h('div', { class: 'hint' }, `Anima la capa «${src.name}»: se crean los fotogramas intermedios desde donde está ahora hasta el final que indiques.`),
+      num('frames', 'Fotogramas', 2, 60), num('dx', 'Mover en horizontal', -d.width, d.width, ' px'), num('dy', 'Mover en vertical', -d.height, d.height, ' px'),
+      num('rot', 'Girar', -720, 720, '°'), num('scale', 'Tamaño final', 5, 500, '%'), num('opacity', 'Opacidad final', 0, 100, '%'),
+      h('div', { class: 'form-row' }, h('label', {}, 'Movimiento'), ease),
+      h('label', { class: 'check' }, pp, ' Ida y vuelta (vuelve al principio)'),
+    ],
+    onOk: () => { if (tween(d, src, p)) app.toast(`${p.frames} fotogramas creados: pulsa reproducir para verlo`); refresh(); },
+  });
+}
+
+// ---- exportar -------------------------------------------------------------------------------------
+function scaled(c: HTMLCanvasElement, k: number, nearest: boolean) {
+  if (k === 1) return c; const n = makeCanvas(Math.max(1, Math.round(c.width * k)), Math.max(1, Math.round(c.height * k))), x = ctx2d(n);
+  x.imageSmoothingEnabled = !nearest; x.imageSmoothingQuality = 'high'; x.drawImage(c, 0, 0, n.width, n.height); return n;
+}
+/** Exporta la animación: 'gif' | 'video' | 'png' (secuencia en ZIP) | 'sheet' (hoja de sprites PNG + JSON en ZIP). */
+export async function exportAnimation(d: EditorDocument, fmt: string, k: number, nearest: boolean, pingpong: boolean) {
+  stopAnim();
+  let fr = renderFrames(d).map(f => ({ canvas: scaled(f.canvas, k, nearest), delay: f.delay }));
+  if (!fr.length) fr = [{ canvas: scaled(d.flatten(), k, nearest), delay: 100 }];
+  if (pingpong && fr.length > 2) fr = [...fr, ...fr.slice(1, -1).reverse()];
+  const io = await import('../io/files'), base = d.name + (k !== 1 ? `-x${+k.toFixed(2)}` : '');
+  const png = async (c: HTMLCanvasElement) => new Uint8Array(await (await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/png'))).arrayBuffer());
+  const save = async (b: Blob, name: string) => { try { await io.saveBlob(b, name); app.toast('Exportado'); } catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); } };
+  if (fmt === 'gif') { const { encodeGif } = await import('../io/gif'); await save(encodeGif(fr), base + '.gif'); return; }
+  if (fmt === 'video') { const { recordFrames } = await import('./unique'); await recordFrames(fr, base); return; }
+  const { makeZip } = await import('../io/zip');
+  if (fmt === 'png') { const files = []; for (let i = 0; i < fr.length; i++) files.push({ name: `${d.name}_${String(i + 1).padStart(3, '0')}.png`, data: await png(fr[i].canvas) }); await save(makeZip(files), base + '_fotogramas.zip'); return; }
+  // hoja de sprites: rejilla casi cuadrada + JSON con la posición y la duración de cada fotograma
+  const W = fr[0].canvas.width, H = fr[0].canvas.height, cols = Math.ceil(Math.sqrt(fr.length)), rows = Math.ceil(fr.length / cols);
+  const sheet = makeCanvas(W * cols, H * rows), sx = ctx2d(sheet), frames: Record<string, unknown>[] = [];
+  fr.forEach((f, i) => { const x = (i % cols) * W, y = Math.floor(i / cols) * H; sx.drawImage(f.canvas, x, y); frames.push({ filename: `${d.name}_${i + 1}`, frame: { x, y, w: W, h: H }, duration: f.delay }); });
+  const json = JSON.stringify({ frames, meta: { app: 'Photocap', image: base + '.png', size: { w: sheet.width, h: sheet.height }, frameSize: { w: W, h: H }, columns: cols, rows, frameCount: fr.length } }, null, 2);
+  await save(makeZip([{ name: base + '.png', data: await png(sheet) }, { name: base + '.json', data: new TextEncoder().encode(json) }]), base + '_hoja.zip');
+}
+export function exportAnimDialog() {
+  const d = app.doc; if (!d) return;
+  const pix = !!d.meta.pixelArt;
+  const fmt = h('select', {}, h('option', { value: 'gif' }, 'GIF animado'), h('option', { value: 'video' }, 'Vídeo (WebM o MP4)'), h('option', { value: 'png' }, 'Secuencia de imágenes PNG (ZIP)'), h('option', { value: 'sheet' }, 'Hoja de sprites + JSON para motores de juego (ZIP)'));
+  const sizes = pix ? [1, 2, 4, 8, 16] : [0.25, 0.5, 1, 2];
+  let k = pix ? 4 : 1;
+  const sz = h('select', {}, ...sizes.map(n => h('option', { value: String(n) }, pix ? `×${n}` : `${n * 100} %`))); sz.value = String(k); sz.onchange = () => { k = +sz.value; upd(); };
+  const info = h('div', { class: 'hint' }); const upd = () => { info.textContent = `${Math.round(d.width * k)} × ${Math.round(d.height * k)} px · ${Math.max(1, d.frames.length)} fotogramas`; }; upd();
+  const pp = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  showDialog({
+    title: 'Exportar animación', okLabel: 'Exportar', width: 460,
+    body: [h('div', { class: 'form-row' }, h('label', {}, 'Formato'), fmt), h('div', { class: 'form-row' }, h('label', {}, 'Tamaño'), sz), h('label', { class: 'check' }, pp, ' Ida y vuelta (al terminar vuelve hacia atrás)'), info],
+    onOk: () => exportAnimation(d, fmt.value, k, pix, pp.checked),
+  });
+}
+
+// ---- barra de animación ------------------------------------------------------------------------
+const FPS = [2, 4, 6, 8, 10, 12, 15, 24, 30];
+/** Fila de controles de la animación (la usan la barra del pixel art y la barra general). */
+export function animRow(d: EditorDocument): HTMLElement {
+  const b = (cls: string, title: string, ic: string, fn: () => void, on = false) => { const x = h('button', { type: 'button', class: 'btn icon-btn ' + cls + (on ? ' on' : ''), title, 'aria-label': title, html: icon(ic) }); x.onclick = fn; return x; };
+  const play = b('px-play', playTimer ? 'Detener' : 'Reproducir', playTimer ? 'stop' : 'play', () => playAnim(), !!playTimer);
+  const strip = h('div', { class: 'px-frames' });
+  const small = d.width * d.height <= 1024 * 1024, pix = !!d.meta.pixelArt;
+  d.frames.forEach((f, i) => {
+    const cell = h('button', { type: 'button', class: 'px-frame' + (i === d.frameIndex ? ' on' : ''), title: `Fotograma ${i + 1}`, 'aria-label': `Fotograma ${i + 1}` });
+    const l = layerById(d, f.own);
+    if (small && l instanceof RasterLayer) { const k = Math.min(36 / d.width, 36 / d.height), c = makeCanvas(Math.max(1, Math.round(d.width * k)), Math.max(1, Math.round(d.height * k))), x = ctx2d(c); x.imageSmoothingEnabled = !pix; x.drawImage(l.canvas, 0, 0, c.width, c.height); cell.append(c); }
+    cell.append(h('span', { class: 'px-fn' }, String(i + 1) + (hold(f) > 1 ? ` ×${hold(f)}` : '')));
+    cell.onclick = () => { stopAnim(); applyFrame(d, i); };
+    strip.append(cell);
+  });
+  const fps = h('select', { class: 'px-fps', title: 'Velocidad (fotogramas por segundo)', 'aria-label': 'Velocidad (fotogramas por segundo)' }, ...FPS.map(n => h('option', { value: String(n) }, `${n} fps`)));
+  const cur = Math.round(1000 / (baseDelay(d) || 125)); fps.value = String(FPS.reduce((a, x) => Math.abs(x - cur) < Math.abs(a - cur) ? x : a, FPS[0]));
+  fps.onchange = () => setFps(+fps.value);
+  const hl = h('select', { class: 'px-hold', title: 'Duración de este fotograma', 'aria-label': 'Duración de este fotograma' }, ...[1, 2, 3, 4, 6, 8].map(n => h('option', { value: String(n) }, `×${n}`)));
+  hl.value = String(hold(d.frames[d.frameIndex] ?? {})); hl.onchange = () => setHold(+hl.value);
+  const om = h('select', { class: 'px-onion-mode', title: 'Qué enseña el papel cebolla', 'aria-label': 'Qué enseña el papel cebolla' },
+    h('option', { value: 'prev' }, 'Anterior'), h('option', { value: 'prev2' }, '2 anteriores'), h('option', { value: 'both' }, 'Anterior y siguiente'), h('option', { value: 'color' }, 'Anterior y siguiente (en color)'));
+  om.value = onionMode(); om.onchange = () => setOnionMode(om.value as OnionMode);
+  return h('div', { class: 'px-row px-anim' }, play, strip,
+    b('px-addf', 'Nuevo fotograma vacío', 'plus', () => addFrame(false)),
+    b('px-dupf', 'Duplicar fotograma (copia del actual para cambiar un poco)', 'duplicate', () => addFrame(true)),
+    b('px-left', 'Mover el fotograma antes', 'chevronLeft', () => moveFrame(-1)),
+    b('px-right', 'Mover el fotograma después', 'chevronRight', () => moveFrame(1)),
+    b('px-delf', 'Eliminar fotograma', 'trash', () => deleteFrame()),
+    b('px-onion', 'Papel cebolla: ver el fotograma anterior en transparencia', 'onion', () => { onion.on = !onion.on; refresh(); }, onion.on),
+    om, hl, fps,
+    b('px-tween', 'Interpolar movimiento (crea los fotogramas intermedios)', 'move', () => tweenDialog()),
+    b('px-animexp', 'Exportar animación (GIF, vídeo, PNG, hoja de sprites)', 'download', () => exportAnimDialog()));
+}
+
+// ---- barra general (documentos que no son pixel art) ---------------------------------------------
+let dock: HTMLElement | null = null, dockWanted = false;
+export function toggleAnimDock() { dockWanted = !dockWanted || !dock; if (dockWanted && app.doc && !isAnim(app.doc)) startAnim(); renderDock(); requestAnimationFrame(() => app.viewport.fit()); }
+export const dockShown = () => !!dock;
+function renderDock() {
+  const d = app.doc;
+  const show = !!d && !d.meta.pixelArt && (isAnim(d) || dockWanted);
+  if (!show) { dock?.remove(); dock = null; return; }
+  const host = app.viewport.canvas.parentElement; if (!host) return;
+  if (!dock || dock.parentElement !== host) { dock?.remove(); dock = h('div', { class: 'px-bar anim-dock', role: 'toolbar', 'aria-label': 'Animación' }); host.append(dock); }
+  if (playTimer && dock.querySelectorAll('.px-frame').length === d!.frames.length) { const i = d!.frameIndex; dock.querySelectorAll('.px-frame').forEach((c, j) => c.classList.toggle('on', j === i)); return; }
+  if (!isAnim(d)) { const st = h('button', { type: 'button', class: 'btn primary' }, 'Empezar animación'); st.onclick = () => startAnim(); dock.replaceChildren(h('div', { class: 'px-row' }, h('span', { class: 'hint' }, 'Cada fotograma es un dibujo en su capa; el fondo se ve en todos.'), st)); return; }
+  dock.replaceChildren(animRow(d!));
+  // el botón rápido flotante no debe tapar la barra
+  requestAnimationFrame(() => { const qb = document.querySelector<HTMLElement>('.quick-btn.show'); if (!qb || !dock) return; const q = qb.getBoundingClientRect(), r = dock.getBoundingClientRect(); if (q.right > r.left && q.left < r.right && q.bottom > r.top && q.top < r.bottom) qb.style.top = Math.max(4, qb.offsetTop - (q.bottom - r.top) - 8) + 'px'; });
+}
+export function initAnim() {
+  onAnimChange(renderDock);
+  for (const ev of ['docs', 'doc', 'tool'] as const) app.on(ev, () => refresh());
+  app.on('docs', () => { if (playTimer && !isAnim(app.doc)) stopAnim(); });
+  (app as any).onionImage = onionImage;
+}

@@ -1168,3 +1168,11 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
   .tex-type canvas { width: 52px; height: 52px; }
   .tex-maps { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Barra de animación general (también en pixel art) */
+.anim-dock { width: min(900px, calc(100% - 16px)); }
+.px-onion-mode, .px-hold { flex: none; max-width: 120px; }
+.px-anim { flex-wrap: wrap; }
+.px-anim .px-frames { flex: 1 1 180px; }
+@media (max-width: 700px) { .anim-dock { width: calc(100% - 16px); bottom: 6px; } .px-onion-mode { max-width: 92px; } }
+.anim-dock .px-anim { border-bottom: 0; padding-bottom: 0; }
