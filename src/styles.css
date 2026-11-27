@@ -1143,3 +1143,7 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
   .px-sw { width: 30px; height: 30px; }
   .px-add, .px-exp { min-width: 34px; padding: 0 4px; }
 }
+
+/* Revelado RAW (16 bits): vista previa */
+.raw-pv-wrap { display: flex; justify-content: center; background: #111; border-radius: 6px; padding: 6px; margin-bottom: 8px; }
+.raw-pv { max-width: 100%; height: auto; }

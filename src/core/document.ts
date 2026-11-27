@@ -59,6 +59,8 @@ export class EditorDocument {
   /** Animación por cuadros: duración (ms) y capas visibles de cada cuadro. */
   frames: { delay: number; visible: number[]; own?: number }[] = [];
   frameIndex = 0;
+  /** RAW revelado en alta precisión (16 bits, lineal) para volver a revelarlo sin pérdidas; solo en memoria. */
+  raw16?: { layerId: number; w: number; h: number; data: Uint16Array; params?: Record<string, number> };
   /** true = es el contenido de un objeto inteligente (vive dentro de otro documento). */
   embedded = false;
   /** Proyecto de «Mis proyectos» al que corresponde (Guardar lo actualiza ahí). */

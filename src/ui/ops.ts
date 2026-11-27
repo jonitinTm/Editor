@@ -1,6 +1,7 @@
 // Operaciones del editor (capas, edición, imagen, selección, archivos).
 // Los menús y los atajos de teclado llaman a estas funciones.
 
+import { takeLastLinear } from '../io/rawlinear';
 import { app } from './app';
 import { EditorDocument, type LayerComp } from '../core/document';
 import { effectiveMask, dashPattern } from '../core/layers';
@@ -48,6 +49,10 @@ export function gotoHistory(i: number) { if (busy) { busy.then(() => gotoHistory
 
 // ---- Documentos -------------------------------------------------------------
 
+/** Guarda en el documento la versión de 16 bits del RAW recién revelado (si cupo en memoria). */
+function keepRaw16(d: EditorDocument, l: RasterLayer) {
+  const lin = takeLastLinear(); if (lin && lin.w === d.width && lin.h === d.height) d.raw16 = { layerId: l.id, ...lin };
+}
 export function newDocument(name: string, w: number, h: number, bg: string | null) {
   const d = new EditorDocument(name, w, h);
   const l = new RasterLayer(bg ? 'Fondo' : 'Capa 1', w, h);
@@ -108,8 +113,9 @@ export async function openFiles(files: File[], asLayers = false, remember = true
             const img = cam === 'Canon' ? decodeCr2(bytes) : cam === 'Sony' ? decodeArw(bytes) : decodeNef(bytes);
             const rd = new EditorDocument(io.baseName(f.name), img.width, img.height);
             const rl = new RasterLayer('Fondo', img.width, img.height); ctx2d(rl.canvas).putImageData(img, 0, 0); rd.root.add(rl); rd.setActive(rl, false);
+            keepRaw16(rd, rl);
             app.addDocument(rd);
-            app.toast('RAW revelado. Ajusta exposición, blancos y color con Filtro › Revelado (Mayús+Ctrl+A)');
+            app.toast(rd.raw16 ? 'RAW revelado. Para ajustarlo sin perder calidad: Filtro › Revelado RAW (16 bits)' : 'RAW revelado. Ajusta exposición, blancos y color con Filtro › Revelado (Mayús+Ctrl+A)');
             continue;
           } catch (er: any) { app.toast('No se pudo revelar este RAW (' + (er?.message ?? er) + '); se abre su vista previa', 'warn'); }
         }
@@ -119,8 +125,9 @@ export async function openFiles(files: File[], asLayers = false, remember = true
             const img = decodeDng(bytes);
             const rd = new EditorDocument(io.baseName(f.name), img.width, img.height);
             const rl = new RasterLayer('Fondo', img.width, img.height); ctx2d(rl.canvas).putImageData(img, 0, 0); rd.root.add(rl); rd.setActive(rl, false);
+            keepRaw16(rd, rl);
             app.addDocument(rd);
-            app.toast('RAW revelado. Para ajustar exposición, blancos y color: Filtro › Revelado (Mayús+Ctrl+A)');
+            app.toast(rd.raw16 ? 'RAW revelado. Para ajustarlo sin perder calidad: Filtro › Revelado RAW (16 bits)' : 'RAW revelado. Para ajustar exposición, blancos y color: Filtro › Revelado (Mayús+Ctrl+A)');
             continue;
           } catch (er: any) { app.toast('No se pudo revelar este DNG (' + (er?.message ?? er) + '); se abre su vista previa', 'warn'); }
         }

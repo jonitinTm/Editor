@@ -1,3 +1,4 @@
+import { beginLinear, encLin } from './rawlinear';
 // Revelado de Canon CR2: los datos del sensor van en JPEG sin pérdida repartido en franjas verticales
 // («slices»). Los márgenes del sensor salen de las notas del fabricante (SensorInfo); el negro se mide
 // en la zona tapada del sensor y el equilibrio de blancos se calcula sobre la propia foto.
@@ -108,12 +109,15 @@ export function developBayer(sens: Uint16Array, W: number, crop: { x: number; y:
   lums.sort((a, b) => a - b); const p99 = lums[Math.floor(lums.length * 0.99)] || 1, exp = Math.min(4, Math.max(0.5, 0.92 / p99));
   const tone = (v: number) => { v = v <= 0 ? 0 : v >= 1 ? 1 : v; const s = v <= 0.0031308 ? 12.92 * v : 1.055 * Math.pow(v, 1 / 2.4) - 0.055; return s + (s * s * (3 - 2 * s) - s) * 0.25; };
   const swap = ori >= 5, OW = swap ? h : w, OH = swap ? w : h, out = new ImageData(OW, OH), o = out.data;
+  const L = beginLinear(OW, OH)?.data;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = (y * w + x) * 3, r = rgb[i] * exp, g = rgb[i + 1] * exp, bb = rgb[i + 2] * exp;
     let X = x, Y = y;
     switch (ori) { case 2: X = w - 1 - x; break; case 3: X = w - 1 - x; Y = h - 1 - y; break; case 4: Y = h - 1 - y; break; case 5: X = y; Y = x; break; case 6: X = h - 1 - y; Y = x; break; case 7: X = h - 1 - y; Y = w - 1 - x; break; case 8: X = y; Y = w - 1 - x; break; }
     const k = (Y * OW + X) * 4;
-    o[k] = 255 * tone(M[0] * r + M[1] * g + M[2] * bb); o[k + 1] = 255 * tone(M[3] * r + M[4] * g + M[5] * bb); o[k + 2] = 255 * tone(M[6] * r + M[7] * g + M[8] * bb); o[k + 3] = 255;
+    const R = M[0] * r + M[1] * g + M[2] * bb, G = M[3] * r + M[4] * g + M[5] * bb, B = M[6] * r + M[7] * g + M[8] * bb;
+    o[k] = 255 * tone(R); o[k + 1] = 255 * tone(G); o[k + 2] = 255 * tone(B); o[k + 3] = 255;
+    if (L) { const q = (Y * OW + X) * 3; L[q] = encLin(R); L[q + 1] = encLin(G); L[q + 2] = encLin(B); }
   }
   return out;
 }

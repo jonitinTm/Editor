@@ -321,6 +321,7 @@ export const ACTIONS: Action[] = [
   { id: 'defringe', label: 'Quitar halo…', enabled: hasLayer, run: more.defringeDialog },
   { id: 'matteBlack', label: 'Quitar mate negro', enabled: hasLayer, run: () => more.removeMatte(false) },
   { id: 'matteWhite', label: 'Quitar mate blanco', enabled: hasLayer, run: () => more.removeMatte(true) },
+  { id: 'rawDevelop', label: 'Revelado RAW (16 bits)…', enabled: () => !!app.doc?.raw16, run: () => { import('./rawdev').then(m => m.rawDevelopDialog()); } },
   { id: 'newPixelArt', label: 'Nuevo pixel art…', run: () => { import('./pixelart').then(m => m.newPixelArtDialog()); } },
   { id: 'pixelExport', label: 'Exportar pixel art ampliado…', enabled: hasDoc, run: () => { import('./pixelart').then(m => m.exportPixelDialog()); } },
   { id: 'pixelMode', label: 'Modo pixel art (paleta y exportación nítida)', enabled: hasDoc, checked: () => !!app.doc?.meta.pixelArt, run: () => { import('./pixelart').then(m => m.togglePixelMode()); } },

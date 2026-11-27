@@ -1,3 +1,4 @@
+import { beginLinear, encLin } from './rawlinear';
 // Revelado de DNG (el formato RAW abierto: móviles, muchas cámaras y los RAW convertidos por Adobe).
 // Lee los datos del sensor (sin comprimir o JPEG sin pérdida), corrige negros y blancos, equilibra el
 // blanco como la cámara, reconstruye el color del mosaico de Bayer, aplica la matriz de color de la
@@ -179,13 +180,15 @@ export function decodeDng(b: Uint8Array): ImageData {
   // ---- orientación
   const ori = (ifd0[274] as number[] | undefined)?.[0] ?? 1, swap = ori >= 5;
   const OW = swap ? h : w, OH = swap ? w : h;
-  const out = new ImageData(OW, OH), o = out.data;
+  const out = new ImageData(OW, OH), o = out.data, L = beginLinear(OW, OH)?.data;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = (y * w + x) * 3, r = rgb[i] * exp, gg = rgb[i + 1] * exp, bb = rgb[i + 2] * exp;
     let X = x, Y = y;
     switch (ori) { case 2: X = w - 1 - x; break; case 3: X = w - 1 - x; Y = h - 1 - y; break; case 4: Y = h - 1 - y; break; case 5: X = y; Y = x; break; case 6: X = h - 1 - y; Y = x; break; case 7: X = h - 1 - y; Y = w - 1 - x; break; case 8: X = y; Y = w - 1 - x; break; }
     const j = (Y * OW + X) * 4;
-    o[j] = 255 * tone(M[0] * r + M[1] * gg + M[2] * bb); o[j + 1] = 255 * tone(M[3] * r + M[4] * gg + M[5] * bb); o[j + 2] = 255 * tone(M[6] * r + M[7] * gg + M[8] * bb); o[j + 3] = 255;
+    const R = M[0] * r + M[1] * gg + M[2] * bb, G = M[3] * r + M[4] * gg + M[5] * bb, B = M[6] * r + M[7] * gg + M[8] * bb;
+    o[j] = 255 * tone(R); o[j + 1] = 255 * tone(G); o[j + 2] = 255 * tone(B); o[j + 3] = 255;
+    if (L) { const q = (Y * OW + X) * 3; L[q] = encLin(R); L[q + 1] = encLin(G); L[q + 2] = encLin(B); }
   }
   return out;
 }

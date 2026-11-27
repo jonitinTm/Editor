@@ -42,6 +42,7 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 
 ### Dibujo y pixel art
 - ✅ Botones fijos en la barra de opciones (como Photoshop): **presión = tamaño** (desactivado = grosor fijo), **presión = opacidad** y **simetría** (vertical, horizontal, doble, radial, mandala), también en el modo dibujo.
+- ✅ **Animación de pixel art**: fotogramas (cada uno en su capa), duplicar, mover, papel cebolla, velocidad en fps, reproducir, exportar GIF animado y tira de sprites ampliados y nítidos; los fotogramas se deshacen con el historial y se guardan en el proyecto.
 - ✅ **Pixel art**: Archivo › Nuevo pixel art (16–128 px, 7 paletas propias y «Mis colores»), **pincel de píxeles** (píxel perfecto sin escalones dobles, línea, rectángulo y elipse con o sin relleno, tramado, borrar, simetría, Alt = cuentagotas), barra de paleta sobre el lienzo, zoom entero y **exportación ampliada nítida** (×1 a ×32, sin suavizar).
 
 ### Texto y diseño
@@ -52,7 +53,9 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 - ✅ Perfiles ICC: un PSD en Adobe RGB/Display P3 se convierte a sRGB (comparado con LittleCMS: diferencia máx. 1/255); al guardar, PSD/PNG/JPG declaran sRGB.
 - ✅ EXIF: se lee al abrir y **se puede conservar al exportar en JPG** (orientación corregida; GPS fuera salvo que se pida). Comprobado con PIL.
 - ✅ Histograma, avisos de luces quemadas y sombras empastadas, prueba de impresión CMYK.
-- ❌ Edición a 16 bits por canal (el editor trabaja a 8 bits). Es el principal hueco técnico.
+- 🟡 **16 bits — etapa 1 hecha: revelado RAW de alta precisión.** Al abrir un RAW (DNG, CR2, NEF, ARW) se guarda la imagen lineal en 16 bits (codificación perceptiva, 2 pasos de margen sobre el blanco). «Filtro › Revelado RAW (16 bits)» la revela de nuevo en coma flotante (exposición, luces, sombras, contraste, temperatura, matiz, saturación) y solo al final pasa a 8 bits con tramado. Medido: aclarar +4 EV una foto muy oscura da 148 tonos distintos y saltos de 2 niveles, frente a 40 tonos y saltos de 4–5 (bandas) con el revelado de 8 bits; «Luces −100» recupera todo lo quemado tras +2 EV. Exporta TIFF de 16 bits por canal real (verificado con PIL).
+  - Límites: la versión de 16 bits vive solo mientras el documento está abierto (no se guarda en el proyecto) y deja de valer si se recorta o cambia el tamaño; con poca memoria (móviles de 2–4 GB y fotos muy grandes) no se guarda. Las capas, filtros y la exportación normal siguen a 8 bits.
+  - Siguientes etapas: guardar la versión de 16 bits en el proyecto; capas de ajuste calculadas en 16 bits sobre la capa RAW; exportar PNG de 16 bits.
 
 ### Proyectos y guardado
 - ✅ Formato propio `.edp` (capas, máscaras, ajustes, textos, formas, estilos, objetos inteligentes).
@@ -106,7 +109,7 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 
 1. **Android y publicación** (necesita decisiones y cuentas tuyas): ver §5.
 2. **Idiomas**: coreano, hindi y árabe (con diseño de derecha a izquierda).
-3. **16 bits por canal** para revelado y ajustes (cambio profundo: se haría por etapas, empezando por el revelado RAW).
+3. **16 bits por canal**: etapa 1 hecha (revelado RAW). Faltan: guardarlo en el proyecto, ajustes en 16 bits y PNG de 16 bits.
 4. **IA en la nube** (expansión generativa, restauración, colorización) solo como paquete opcional y con costes medidos; hoy toda la IA es local y gratuita.
 
 ## 5. Estrategia para Google Play (recomendación)

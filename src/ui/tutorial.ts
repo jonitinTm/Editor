@@ -66,6 +66,7 @@ export const TOPICS: Topic[] = [
       'Mueve ⟦Exposición⟧, ⟦Contraste⟧, ⟦Luces⟧ y ⟦Sombras⟧. ⟦Temperatura⟧ hace la foto más cálida o más fría.',
       'El botón ↺ junto a un control lo devuelve a su valor inicial. También un doble toque en el deslizador.',
       '⟦Aceptar⟧ lo aplica. Si no te gusta, Ctrl+Z lo deshace.',
+      'Si la foto es un RAW (DNG, CR2, NEF, ARW), ⟦Filtro › Revelado RAW (16 bits)…⟧ la ajusta desde los datos originales de la cámara: aclara sombras y recupera luces sin bandas.',
     ], go: { act: 'filter:develop' }, needsDoc: true },
     { id: 'looks', title: 'Aplicar un look (filtro de color)', steps: [
       'Abre el panel ⟦Ajustes⟧.',
