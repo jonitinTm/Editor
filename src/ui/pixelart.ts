@@ -4,12 +4,11 @@ import { app } from './app';
 import { h } from './dom';
 import { showDialog } from './dialog';
 import { icon } from './icons';
-import * as ops from './ops';
 import * as more from './more';
 import { applyFrame, renderFrames, onion } from './timeline';
 import { RasterLayer } from '../core/layers';
 import { ctx2d, makeCanvas } from '../core/canvas';
-import type { EditorDocument } from '../core/document';
+import { EditorDocument } from '../core/document';
 
 /** Paletas propias (colores elegidos para que combinen entre sí). */
 export const PALETTES: { id: string; name: string; colors: string[] }[] = [
@@ -62,9 +61,13 @@ export function newPixelArtDialog() {
     ],
     onOk: () => {
       setPalette(pal.value);
-      ops.newDocument(`Pixel art ${w}×${hh}`, w, hh, bg.value === 'none' ? null : bg.value);
-      const d = app.doc; if (!d) return;
+      // con fondo de color, se dibuja en una capa transparente encima del fondo (así, al animar, el fondo es común
+      // a todos los fotogramas y el papel cebolla solo muestra el dibujo)
+      const d = new EditorDocument(`Pixel art ${w}×${hh}`, w, hh);
+      if (bg.value !== 'none') { const f = new RasterLayer('Fondo', w, hh), x = ctx2d(f.canvas); x.fillStyle = bg.value; x.fillRect(0, 0, w, hh); d.root.add(f); }
+      const l = new RasterLayer(bg.value !== 'none' ? 'Capa 1' : 'Capa 1', w, hh); d.root.add(l); d.setActive(l, false);
       d.meta.pixelArt = true;
+      app.addDocument(d, 'Nuevo');
       const p = currentPalette(); if (p.colors.length) app.setColors(p.colors[0], p.colors[p.colors.length - 1] ?? '#ffffff');
       app.setTool('pixel');
       if (!more.viewOpts.pixelGrid) more.togglePixelGrid();
@@ -130,12 +133,27 @@ export function playAnim() {
   const d = app.doc; if (!d || d.frames.length < 2) return;
   if (playTimer) { stopAnim(); return; }
   const tick = () => {
-    const dd = app.doc; if (!dd || dd !== d || dd.frames.length < 2) { playTimer = 0; renderBar(); return; }
+    const dd = app.doc; if (!dd || dd !== d || dd.frames.length < 2 || (app.viewport as any).toolActive) { playTimer = 0; renderBar(); return; }
     applyFrame(dd, (dd.frameIndex + 1) % dd.frames.length);
     playTimer = window.setTimeout(tick, dd.frames[dd.frameIndex]?.delay ?? 125);
   };
   playTimer = window.setTimeout(tick, d.frames[d.frameIndex]?.delay ?? 125);
   renderBar();
+}
+/** Si el dibujo está sobre un fondo liso opaco (las 4 esquinas del mismo color), el fondo pasa a una capa «Fondo»
+ *  común a todos los fotogramas y el dibujo se queda solo en la suya. Así los fotogramas nuevos también tienen fondo
+ *  y el papel cebolla no tapa lo que se dibuja. */
+function splitBackground(d: EditorDocument, l: RasterLayer) {
+  const W = l.canvas.width, H = l.canvas.height, x = ctx2d(l.canvas), img = x.getImageData(0, 0, W, H), D = img.data;
+  for (let i = 3; i < D.length; i += 4) if (D[i] !== 255) return; // ya tiene transparencias: no hace falta
+  const at = (px: number, py: number) => (py * W + px) * 4, c0 = at(0, 0);
+  const same = (i: number) => D[i] === D[c0] && D[i + 1] === D[c0 + 1] && D[i + 2] === D[c0 + 2];
+  if (![at(W - 1, 0), at(0, H - 1), at(W - 1, H - 1)].every(same)) return;
+  const bgL = new RasterLayer('Fondo', W, H), bx = ctx2d(bgL.canvas);
+  bx.fillStyle = `rgb(${D[c0]},${D[c0 + 1]},${D[c0 + 2]})`; bx.fillRect(0, 0, W, H);
+  for (let i = 0; i < D.length; i += 4) if (same(i)) D[i + 3] = 0;
+  x.putImageData(img, 0, 0); l.touch();
+  const parent = (l.parent ?? d.root) as any; parent.add(bgL, parent.children.indexOf(l));
 }
 /** Convierte el dibujo en el primer fotograma de una animación. */
 export function startAnim() {
@@ -143,6 +161,7 @@ export function startAnim() {
   if (isAnim(d)) return;
   let l = d.activeRaster();
   if (!l) { l = new RasterLayer('Fotograma 1', d.width, d.height); d.root.add(l); }
+  splitBackground(d, l);
   l.name = 'Fotograma 1';
   const shared = d.allLayers().filter(x => x.visible && x !== l).map(x => x.id);
   d.frames = [{ delay: 125, visible: [...shared, l.id], own: l.id }];
@@ -219,6 +238,9 @@ let bar: HTMLElement | null = null;
 const wanted = () => !!app.doc && (app.doc.meta.pixelArt || app.tool?.id === 'pixel');
 export function renderBar() {
   if (!wanted()) { bar?.remove(); bar = null; return; }
+  if (playTimer && bar?.querySelector('.px-anim') && app.doc && bar.querySelectorAll('.px-frame').length === app.doc.frames.length) {
+    const i = app.doc.frameIndex; bar.querySelectorAll('.px-frame').forEach((c, j) => c.classList.toggle('on', j === i)); return;
+  }
   const host = app.viewport.canvas.parentElement; if (!host) return;
   if (!bar || bar.parentElement !== host) { bar?.remove(); bar = h('div', { class: 'px-bar', role: 'toolbar', 'aria-label': 'Paleta de pixel art' }); host.append(bar); }
   const p = currentPalette();
