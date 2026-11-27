@@ -46,7 +46,7 @@ export class EditorDocument {
   /** Resolución para imprimir (píxeles por pulgada). */
   ppi = 72;
   /** Información del archivo: datos de la cámara (solo lectura) y título, autor, copyright… (editables). */
-  meta: { /** dibujo de pixel art: se amplía sin suavizar al exportar y se muestra la barra de paleta */ pixelArt?: boolean; exif?: Record<string, string>; /** bloque EXIF original (base64) para conservarlo al exportar en JPG */ exifRaw?: string; title?: string; author?: string; copyright?: string; description?: string; keywords?: string } = {};
+  meta: { /** dibujo de pixel art: se amplía sin suavizar al exportar y se muestra la barra de paleta */ pixelArt?: boolean; /** textura repetible (vista en mosaico) */ tileable?: boolean; exif?: Record<string, string>; /** bloque EXIF original (base64) para conservarlo al exportar en JPG */ exifRaw?: string; title?: string; author?: string; copyright?: string; description?: string; keywords?: string } = {};
   /** Modo de color: en «gris» se trabaja en escala de grises. */
   mode: 'rgb' | 'gray' = 'rgb';
   /** Trazado activo en el panel (-1 = ninguno). */

@@ -118,6 +118,7 @@ export const TASKS: Task[] = [
   { label: 'Abrir una foto', ic: 'folder', desc: 'Desde tu equipo o el móvil', run: act('open') },
   { label: 'Usar una plantilla', ic: 'comps', desc: 'Posts, historias, invitaciones…', run: act('templates') },
   { label: 'Hacer un collage', ic: 'swatches', desc: 'Varias fotos juntas', run: act('collage') },
+  { label: 'Texturas para juegos', ic: 'swatches', desc: 'Ladrillo, piedra, madera… repetibles', run: act('texGen') },
   { label: 'Hacer pixel art', ic: 'pixel', desc: 'Dibujos de píxeles con paletas listas', run: act('newPixelArt') },
   { label: 'Mejorar la foto', ic: 'magic', desc: 'Luz y color automáticos', needDoc: true, run: () => autoEnhance() },
   { label: 'Quitar el fondo (IA)', ic: 'removeBg', desc: 'Deja solo a la persona u objeto', needDoc: true, run: act('aiRemoveBg') },

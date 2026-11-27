@@ -1147,3 +1147,24 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 /* Revelado RAW (16 bits): vista previa */
 .raw-pv-wrap { display: flex; justify-content: center; background: #111; border-radius: 6px; padding: 6px; margin-bottom: 8px; }
 .raw-pv { max-width: 100%; height: auto; }
+
+/* Generador de texturas y mapas */
+.tex-wrap { display: flex; gap: 14px; }
+.tex-left { width: 300px; flex: none; }
+.tex-right { flex: 1; min-width: 0; }
+.tex-types { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-height: 62vh; overflow: auto; }
+.tex-type { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 3px; border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 11px; cursor: pointer; }
+.tex-type canvas { width: 64px; height: 64px; image-rendering: auto; border-radius: 3px; }
+.tex-type.on { border-color: var(--accent); background: var(--accent-soft); }
+.tex-pv-wrap { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-bottom: 8px; }
+.tex-pv { width: 256px; height: 256px; max-width: 100%; image-rendering: pixelated; border-radius: 4px; }
+.tex-maps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+.tex-map-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; }
+.tex-map { width: 100%; max-width: 150px; height: auto; border-radius: 4px; }
+@media (max-width: 700px) {
+  .tex-wrap { flex-direction: column; }
+  .tex-left { width: auto; }
+  .tex-types { grid-template-columns: repeat(4, 1fr); max-height: 34vh; }
+  .tex-type canvas { width: 52px; height: 52px; }
+  .tex-maps { grid-template-columns: repeat(2, 1fr); }
+}

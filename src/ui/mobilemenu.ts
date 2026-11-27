@@ -7,7 +7,7 @@ import { actionById } from './actions';
 import { MENUS, refreshStates, type Item } from './menus';
 import { t } from '../i18n/i18n';
 
-const ICON: Record<string, string> = { Archivo: 'open', Edición: 'edit', Imagen: 'image', Capa: 'layers', Selección: 'marqueeRect', Filtro: 'fx', IA: 'magic', Vista: 'eye', Ventana: 'colorPanel', Ayuda: 'info' };
+const ICON: Record<string, string> = { Archivo: 'open', Edición: 'edit', Imagen: 'image', Capa: 'layers', Selección: 'marqueeRect', Filtro: 'fx', IA: 'magic', Juegos: 'pixel', Vista: 'eye', Ventana: 'colorPanel', Ayuda: 'info' };
 const KEY = 'editor.mmTab';
 let sheet: HTMLElement | null = null;
 

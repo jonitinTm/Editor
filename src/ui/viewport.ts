@@ -386,6 +386,12 @@ export class Viewport {
     // Imagen combinada (mientras se arrastra algo que cambia toda la imagen, una vista previa ya reducida)
     const eff = d.view.zoom * this.dpr; let ps = 1; while (ps / 2 >= eff && ps > 1 / 32) ps /= 2;
     const quick = this.toolActive && ps < 1 ? d.interactivePreview(ps) : null;
+    // vista en mosaico (texturas): copias de la imagen alrededor para ver cómo queda repetida
+    if ((d as any).tilePreview && !quick) {
+      const comp = d.getComposite(); ctx.save(); this.docTransform(ctx); ctx.imageSmoothingEnabled = zoom < 1;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) if (i || j) ctx.drawImage(comp, i * d.width, j * d.height);
+      ctx.restore();
+    }
     ctx.save();
     this.areaPath(ctx); ctx.clip();
     ctx.imageSmoothingEnabled = zoom < 1 || (this.skewed && zoom < 4);
