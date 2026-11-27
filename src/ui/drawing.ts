@@ -84,13 +84,23 @@ export function toggleDrawMode(force?: boolean) {
       // asistente de perspectiva: cada toque cambia sin → 1 punto → 2 puntos
       const ps = h('button', { class: 'dm-btn dm-persp', type: 'button', title: 'Asistente de perspectiva (toca para cambiar: sin, 1 punto, 2 puntos)', 'aria-label': 'Asistente de perspectiva', html: icon('persp') }, h('span', { class: 'dm-lbl' }, 'Perspectiva'));
       ps.onclick = () => import('../tools/assist').then(m => { const next = ({ off: 'p1', p1: 'p2', p2: 'off' } as const)[m.assist.mode]; import('./actions').then(a => a.actionById.get('assist:' + next)?.run()); ps.classList.toggle('on', next !== 'off'); });
-      miniBar = h('div', { class: 'draw-bar' }, tool('brush', 'brush', 'Pincel'), tool('eraser', 'eraser', 'Borrador'), tool('smudge', 'finger', 'Dedo'), tool('eyedropper', 'eyedropper', 'Cuentagotas'), br, sw, ref, ps, gal, u, r, x);
+      // presión = grosor y simetría a mano, como en la barra de opciones (se aplican a la herramienta de pintar activa)
+      const paintTool = () => { const t = app.tool as any; return t?.options?.some((o: any) => o.key === 'pressure') ? t : (app.setTool('brush'), app.tool as any); };
+      const optDef = (key: string) => (paintTool()?.options ?? []).find((o: any) => o.key === key);
+      const pr = h('button', { class: 'dm-btn dm-press', type: 'button', title: 'Presión = tamaño\nLa presión del lápiz controla el grosor. Desactívalo para pintar siempre con el mismo grosor', 'aria-label': 'Presión = tamaño', html: icon('pressureSize') }, h('span', { class: 'dm-lbl' }, 'Presión'));
+      pr.onclick = () => { const t = paintTool(); if (!t) return; const v = !app.opt('pressure', t.id); app.setOpt(t.id, 'pressure', v); app.toast(`Presión = tamaño: ${v ? 'activado' : 'desactivado'}`); };
+      const sy = h('button', { class: 'dm-btn dm-sym', type: 'button', title: 'Simetría\nLo que pintas se repite como en un espejo. El eje pasa por el centro de la imagen, o de la selección si hay una', 'aria-label': 'Simetría', 'aria-haspopup': 'menu', html: icon('symmetry') }, h('span', { class: 'dm-lbl' }, 'Simetría'));
+      sy.onclick = ev => { ev.stopPropagation(); const d = optDef('symmetry'); if (!d) { app.toast('Esta herramienta no tiene simetría', 'warn'); return; } import('./optionsbar').then(m => m.pinMenu(sy, d, app.tool!.id)); };
+      miniBar = h('div', { class: 'draw-bar' }, tool('brush', 'brush', 'Pincel'), tool('eraser', 'eraser', 'Borrador'), tool('smudge', 'finger', 'Dedo'), tool('eyedropper', 'eyedropper', 'Cuentagotas'), br, sw, pr, sy, ref, ps, gal, u, r, x);
       document.body.append(miniBar);
       const sync = () => {
         miniBar!.querySelectorAll<HTMLElement>('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === app.tool?.id));
         sw.style.background = app.fg;
+        const id = app.tool?.id ?? '', has = (k: string) => (app.tool as any)?.options?.some((o: any) => o.key === k);
+        pr.classList.toggle('on', has('pressure') && !!app.opt('pressure', id));
+        sy.classList.toggle('on', has('symmetry') && (app.opt<string>('symmetry', id) || 'none') !== 'none');
       };
-      app.on('tool', sync); app.on('colors', sync); sync();
+      app.on('tool', sync); app.on('colors', sync); app.on('options', sync); sync();
     }
     if (!PAINT(app.tool?.id)) app.setTool('brush');
     try { if (!document.fullscreenElement) document.documentElement.requestFullscreen?.().then(() => { byUs = true; }).catch(() => { /* no permitido */ }); } catch { /* */ }

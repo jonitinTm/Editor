@@ -19,8 +19,33 @@ export function buildOptionsBar(parent: HTMLElement) {
     const presetBtn = h('button', { class: 'opt-tool btn', type: 'button', title: 'Ajustes predefinidos de la herramienta', html: t.icon + '<span class="caret">▾</span>' });
     presetBtn.onclick = ev => { ev.stopPropagation(); presetMenu(presetBtn, t); };
     bar.append(presetBtn, h('span', { class: 'opt-name' }, t.name), h('span', { class: 'opt-sep' }));
+    // opciones importantes como botones de icono, siempre a la vista (como en Photoshop): presión = tamaño,
+    // presión = opacidad y simetría. No pasan nunca al desplegable «Más».
+    const PIN_ORDER = ['pressure', 'pressureOpacity', 'symmetry'];
+    const pinned = (t.options ?? []).filter((d: any) => d.pin).sort((x: any, y: any) => PIN_ORDER.indexOf(x.key) - PIN_ORDER.indexOf(y.key));
+    if (pinned.length) {
+      const pins = h('div', { class: 'opt-pins btn-group' });
+      for (const d of pinned as any[]) {
+        const get = () => app.opt(d.key, t.id);
+        const tip = d.label + (d.title ? '\n' + d.title : '');
+        const b = h('button', { class: 'btn icon-btn opt-pin', type: 'button', title: tip, 'aria-label': d.label, 'data-pin': d.key, html: icon(d.pin) });
+        if (d.type === 'checkbox') {
+          b.onclick = () => { app.setOpt(t.id, d.key, !get()); app.toast(`${d.label}: ${get() ? 'activado' : 'desactivado'}`); };
+          const upd = () => { const on = !!get(); b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); };
+          upd(); setters.push(upd);
+        } else if (d.type === 'select') {
+          b.setAttribute('aria-haspopup', 'menu');
+          b.onclick = ev => { ev.stopPropagation(); pinMenu(b, d, t.id); };
+          const upd = () => { const on = get() !== d.default; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); };
+          upd(); setters.push(upd);
+        }
+        pins.append(b);
+      }
+      bar.append(pins);
+    }
     if (t.extraFirst) t.extraOptions?.(bar);
     for (const d of t.options ?? []) {
+      if ((d as any).pin) continue;
       const get = () => app.opt(d.key, t.id);
       const set = (v: any) => app.setOpt(t.id, d.key, v);
       if (d.type === 'range') {
@@ -83,7 +108,7 @@ export function buildOptionsBar(parent: HTMLElement) {
     const pop = h('div', { class: 'opt-more-pop' });
     more.append(btn, pop); bar.append(more);
     // los botones de aplicar y cancelar (✓ ✕) se quedan siempre a la vista
-    const items = [...bar.children].slice(3).filter(el => el !== more && !(el as HTMLElement).matches('.icon-btn.ok') && !((el as HTMLElement).matches('.icon-btn') && (el.previousElementSibling as HTMLElement | null)?.matches('.icon-btn.ok'))) as HTMLElement[];
+    const items = [...bar.children].slice(3).filter(el => el !== more && !(el as HTMLElement).matches('.opt-pins') && !(el as HTMLElement).matches('.icon-btn.ok') && !((el as HTMLElement).matches('.icon-btn') && (el.previousElementSibling as HTMLElement | null)?.matches('.icon-btn.ok'))) as HTMLElement[];
     while (bar.scrollWidth > bar.clientWidth + 1 && items.length > 0) pop.prepend(items.pop()!);
     btn.onclick = e => {
       e.stopPropagation(); pop.classList.toggle('open');
@@ -96,6 +121,28 @@ export function buildOptionsBar(parent: HTMLElement) {
   app.on('tool', render);
   app.on('options', () => setters.forEach(s => s()));
   render();
+}
+
+/** Menú de un botón de opción con varias elecciones (p. ej. los modos de simetría). */
+export function pinMenu(anchor: HTMLElement, d: any, toolId: string) {
+  const old = document.querySelector('.pin-fly') as (HTMLElement & { _close?: () => void }) | null;
+  if (old) { old._close ? old._close() : old.remove(); if (old.dataset.key === d.key) return; } // segundo toque: se cierra
+  const fly = h('div', { class: 'flyout pin-fly', role: 'menu', 'data-key': d.key }) as HTMLElement & { _close?: () => void };
+  const done = () => { fly.remove(); document.removeEventListener('pointerdown', close, true); };
+  fly._close = done;
+  fly.append(h('div', { class: 'pin-fly-head' }, d.label));
+  for (const c of d.choices) {
+    const it = h('button', { type: 'button', class: 'fly-item pin-item' + (app.opt(d.key, toolId) === c.value ? ' on' : ''), role: 'menuitemradio', 'aria-checked': String(app.opt(d.key, toolId) === c.value) }, c.label);
+    it.onclick = () => { app.setOpt(toolId, d.key, c.value); done(); app.viewport?.requestRender(); };
+    fly.append(it);
+  }
+  if (d.title) fly.append(h('div', { class: 'hint pin-fly-hint' }, d.title));
+  document.body.append(fly);
+  const r = anchor.getBoundingClientRect(), w = fly.offsetWidth;
+  fly.style.left = Math.max(8, Math.min(innerWidth - w - 8, r.left)) + 'px'; fly.style.top = r.bottom + 4 + 'px';
+  // fuera del menú se cierra; el propio botón (o su dibujo) no cuenta como «fuera»: su toque lo cierra él mismo
+  const close = (ev: Event) => { if (!fly.contains(ev.target as Node) && !anchor.contains(ev.target as Node)) done(); };
+  setTimeout(() => document.addEventListener('pointerdown', close, true));
 }
 
 // ---- Ajustes predefinidos de herramienta --------------------------------------------------------

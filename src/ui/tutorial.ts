@@ -182,10 +182,11 @@ export const TOPICS: Topic[] = [
       'Elige el ⟦Pincel⟧ y un color en el panel ⟦Color⟧.',
       'Cambia el tamaño en la barra de opciones o con las teclas [ y ].',
       '⟦Opacidad⟧ y ⟦Flujo⟧ hacen el trazo más suave. El panel ⟦Pinceles⟧ tiene puntas distintas.',
-      '⟦Simetría⟧ (en la barra de opciones) repite el trazo como en un espejo.',
+      'El botón ⟦Simetría⟧, al principio de la barra de opciones, repite el trazo como en un espejo (vertical, horizontal, radial o mandala).',
     ], go: { tool: 'brush' }, needsDoc: true },
     { id: 'pen', title: 'Dibujar con lápiz en la tableta', steps: [
       'El lápiz dibuja con presión e inclinación; el dedo solo mueve la vista, así puedes apoyar la mano.',
+      'El botón ⟦Presión = tamaño⟧, al principio de la barra de opciones, hace que apretar más dibuje más grueso. Desactívalo para pintar siempre con el mismo grosor, como en Photoshop.',
       '⟦Edición › Ajustes del lápiz…⟧ cambia la sensibilidad a la presión.',
       '⟦Vista › Modo dibujo (pantalla completa)⟧ esconde todo menos el lienzo y una barra pequeña.',
     ], go: { act: 'penSettings' } },

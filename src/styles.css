@@ -1102,3 +1102,14 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
   .tut-back { display: inline-flex; }
   .tut-item { min-height: 40px; font-size: 14px; }
 }
+
+/* Botones de opción fijos (presión = tamaño, presión = opacidad, simetría) y su menú */
+.opt-pins { flex: none; margin-right: 6px; }
+.opt-pin.on { color: var(--accent); }
+.pin-fly { min-width: 220px; max-width: min(340px, calc(100vw - 16px)); }
+.pin-fly-head { padding: 4px 12px 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.pin-item { display: block; width: 100%; text-align: left; border: 0; background: transparent; color: var(--text); font: inherit; cursor: pointer; }
+.pin-item.on { background: var(--accent-soft); }
+.pin-item.on::before { content: '✓ '; }
+.pin-fly-hint { padding: 6px 12px 4px; max-width: 320px; line-height: 1.4; }
+@media (pointer: coarse) { .pin-item { min-height: 40px; } }

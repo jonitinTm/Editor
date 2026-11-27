@@ -19,8 +19,8 @@ const SIZE = { key: 'size', label: 'Tamaño', type: 'range' as const, min: 1, ma
 const HARD = { key: 'hardness', label: 'Dureza', type: 'range' as const, min: 0, max: 100, default: 80, unit: '%' };
 const OPAC = { key: 'opacity', label: 'Opacidad', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
 const FLOW = { key: 'flow', label: 'Flujo', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
-const PRESS = { key: 'pressure', label: 'Presión = tamaño', type: 'checkbox' as const, default: true };
-const PRESS_OP = { key: 'pressureOpacity', label: 'Presión = opacidad', type: 'checkbox' as const, default: false };
+const PRESS = { key: 'pressure', label: 'Presión = tamaño', type: 'checkbox' as const, default: true, pin: 'pressureSize', title: 'La presión del lápiz controla el grosor. Desactívalo para pintar siempre con el mismo grosor' };
+const PRESS_OP = { key: 'pressureOpacity', label: 'Presión = opacidad', type: 'checkbox' as const, default: false, pin: 'pressureOpacity', title: 'La presión del lápiz controla la opacidad: apretando poco, el trazo sale más transparente' };
 const SMOOTH = { key: 'smoothing', label: 'Suavizar', type: 'range' as const, min: 0, max: 100, default: 10, unit: '%' };
 const ANGLE = { key: 'angle', label: 'Ángulo', type: 'range' as const, min: -180, max: 180, default: 0, unit: '°' };
 const ROUND = { key: 'roundness', label: 'Redondez', type: 'range' as const, min: 1, max: 100, default: 100, unit: '%' };
@@ -32,7 +32,7 @@ const BLEND = { key: 'blendMode', label: 'Modo', type: 'select' as const, defaul
   { value: 'soft-light', label: 'Luz suave' }, { value: 'hard-light', label: 'Luz fuerte' }, { value: 'color-dodge', label: 'Sobreexponer color' }, { value: 'color-burn', label: 'Subexponer color' },
   { value: 'darken', label: 'Oscurecer' }, { value: 'lighten', label: 'Aclarar' }, { value: 'difference', label: 'Diferencia' }, { value: 'hue', label: 'Tono' }, { value: 'saturation', label: 'Saturación' },
   { value: 'color', label: 'Color' }, { value: 'luminosity', label: 'Luminosidad' }] };
-const SYM = { key: 'symmetry', label: 'Simetría', type: 'select' as const, default: 'none', choices: [
+const SYM = { key: 'symmetry', label: 'Simetría', type: 'select' as const, default: 'none', pin: 'symmetry', title: 'Lo que pintas se repite como en un espejo. El eje pasa por el centro de la imagen, o de la selección si hay una', choices: [
   { value: 'none', label: 'Sin simetría' }, { value: 'v', label: 'Vertical (espejo izq./der.)' }, { value: 'h', label: 'Horizontal (arriba/abajo)' }, { value: 'vh', label: 'Doble (4 partes)' },
   { value: 'r3', label: 'Radial 3' }, { value: 'r4', label: 'Radial 4' }, { value: 'r6', label: 'Radial 6' }, { value: 'r8', label: 'Radial 8' }, { value: 'r12', label: 'Radial 12' },
   { value: 'm6', label: 'Mandala 6 (radial + espejo)' }, { value: 'm8', label: 'Mandala 8 (radial + espejo)' }] };
