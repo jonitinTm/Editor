@@ -206,6 +206,13 @@ export const TOPICS: Topic[] = [
       'Elige el ⟦Bote de pintura⟧ y pulsa dentro de la zona.',
       'Para colorear un dibujo de líneas en otra capa: selecciona la capa de las líneas y usa ⟦Capa › Usar como capa de referencia (el bote y la varita miran sus líneas)⟧. Después pinta en la capa de color.',
     ], go: { tool: 'bucket' }, needsDoc: true },
+    { id: 'pixelart', title: 'Hacer pixel art', steps: [
+      '⟦Archivo › Nuevo pixel art…⟧ y elige el tamaño (32 × 32 es un buen comienzo) y una paleta.',
+      'Pinta con el ⟦Pincel de píxeles⟧: cada toque pinta un píxel exacto. Elige el color en la barra de paleta de abajo.',
+      'En ⟦Forma⟧ hay línea, rectángulo y elipse. ⟦Píxel perfecto⟧ deja las líneas a mano limpias, sin escalones dobles.',
+      'Alt + clic (o mantener el botón rápido) toma un color del dibujo. El ⟦Bote de pintura⟧ rellena zonas.',
+      '⟦Archivo › Exportar pixel art ampliado…⟧ lo agranda ×8, ×16… sin que se vea borroso.',
+    ], tip: 'Con ⟦Simetría⟧ en vertical dibujas medio personaje y sale entero.', go: { act: 'newPixelArt' } },
     { id: 'reference', title: 'Tener una imagen de referencia a la vista', steps: [
       '⟦Ventana › Imagen de referencia⟧ abre una ventana flotante con la foto que quieras.',
       'Puedes moverla y cambiar su tamaño mientras dibujas.',

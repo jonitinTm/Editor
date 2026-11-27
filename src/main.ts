@@ -57,6 +57,7 @@ import { AddAnchorTool, DeleteAnchorTool, ConvertPointTool, PathSelectTool, Curv
 import { MagneticLassoTool } from './tools/maglasso';
 import { HistoryBrushTool, ArtHistoryBrushTool } from './tools/brush';
 import { PuppetTool } from './tools/puppet';
+import { PixelTool } from './tools/pixel';
 import { PatchTool, ContentMoveTool } from './tools/patch';
 import { buildCharacterPanel, buildParagraphPanel } from './ui/textpanels';
 import { ColorSamplerTool, CountTool, NoteTool } from './tools/extra';
@@ -69,6 +70,9 @@ for (const T of [MoveTool, RectSelectTool, EllipseSelectTool, LassoTool, QuickSe
   BrushTool, PencilTool, EraserTool, GradientTool, BucketTool, LassoFillTool, TextTool, PenTool, NodeTool, ShapeTool, HandTool, RotateViewTool, ZoomTool, TransformTool]) {
   app.registerTool(new T());
 }
+app.registerTool(new PixelTool());
+// barra de paleta del pixel art (aparece con el pincel de píxeles o en un documento de pixel art)
+setTimeout(() => import('./ui/pixelart').then(m => m.initPixelBar()), 0);
 app.registerTool(new PolyLassoTool());
 app.registerTool(new MagneticLassoTool());
 app.registerTool(new SpotHealTool());

@@ -244,9 +244,13 @@ export async function saveBlob(blob: Blob, filename: string, handle?: any): Prom
 export type ExportType = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/tiff' | 'image/x-tga' | 'image/bmp' | 'image/x-icon';
 export const EXPORT_EXT: Record<ExportType, string> = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/tiff': '.tif', 'image/x-tga': '.tga', 'image/bmp': '.bmp', 'image/x-icon': '.ico' };
 
-export async function exportImage(doc: EditorDocument, type: ExportType, quality: number, scale = 1, src?: HTMLCanvasElement): Promise<Blob> {
+export async function exportImage(doc: EditorDocument, type: ExportType, quality: number, scale = 1, src?: HTMLCanvasElement, nearest = false): Promise<Blob> {
   let c = src ?? doc.flatten();
-  if (scale !== 1) { // Cambio de tamaño en pasos de como mucho ½ para que quede nítido
+  // pixel art: al ampliar, cada píxel pasa a ser un cuadrado nítido (sin suavizar)
+  if (scale > 1 && (nearest || doc.meta?.pixelArt)) {
+    const tw = Math.max(1, Math.round(c.width * scale)), th = Math.max(1, Math.round(c.height * scale)), n = makeCanvas(tw, th), x = ctx2d(n);
+    x.imageSmoothingEnabled = false; x.drawImage(c, 0, 0, tw, th); c = n;
+  } else if (scale !== 1) { // Cambio de tamaño en pasos de como mucho ½ para que quede nítido
     let cur = c, w = c.width, hh = c.height; const tw = Math.max(1, Math.round(w * scale)), th = Math.max(1, Math.round(hh * scale));
     while (w / 2 > tw && hh / 2 > th) { w = Math.round(w / 2); hh = Math.round(hh / 2); const n = makeCanvas(w, hh), x = ctx2d(n); x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, w, hh); cur = n; }
     const n = makeCanvas(tw, th), x = ctx2d(n); x.imageSmoothingQuality = 'high'; x.drawImage(cur, 0, 0, tw, th); c = n;

@@ -120,6 +120,7 @@ export const ICONS: Record<string, string> = {
   dice: S('<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="8.5" cy="8.5" r="1" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1" fill="currentColor"/>'),
   play: S('<path d="M8 5.5v13l10.5-6.5z" fill="currentColor"/>'),
   stop: S('<rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="currentColor"/>'),
+  pixel: S('<path d="M4 16h4v4H4zM8 12h4v4H8zM12 8h4v4h-4zM16 4h4v4h-4z" fill="currentColor" stroke="none"/><path d="M4 16h4v4H4z" fill="none"/>'),
   pressureSize: S('<path d="M16 3l4 4-7 7-5 1 1-5z"/><path d="M3 19.5c4-2.2 9-3.2 17-2.4-8 1.6-13 2.8-17 4.4z" fill="currentColor" stroke="none"/>'),
   pressureOpacity: S('<path d="M16 3l4 4-7 7-5 1 1-5z"/><circle cx="4.5" cy="19.5" r="1.7" fill="currentColor" stroke="none" opacity=".25"/><circle cx="9.5" cy="19.5" r="1.7" fill="currentColor" stroke="none" opacity=".55"/><circle cx="14.5" cy="19.5" r="1.7" fill="currentColor" stroke="none"/>'),
   symmetry: S('<path d="M12 2.5v19" stroke-dasharray="2 2.2"/><path d="M9.5 6.5C5 6 3 8.5 3 11.5s2.5 5 6.5 2.5"/><path d="M14.5 6.5C19 6 21 8.5 21 11.5s-2.5 5-6.5 2.5"/><path d="M9.5 14c-2 1.5-2.5 3.5-1 5 1 .8 1.5-.5 1.5-2"/><path d="M14.5 14c2 1.5 2.5 3.5 1 5-1 .8-1.5-.5-1.5-2"/>'),

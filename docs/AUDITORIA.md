@@ -40,6 +40,10 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
 - ✅ Marcos, lazos, varita, selección rápida, gama de colores, luminosidad, cielo, sujeto; sumar/restar/intersecar, invertir, calar, expandir, contraer, borde, «Seleccionar y aplicar máscara».
 - 🟡 Selección de cabello: «Seleccionar y aplicar máscara» con refinado de bordes y el modelo de quitar fondo; no es una segmentación profesional de cabello pelo a pelo.
 
+### Dibujo y pixel art
+- ✅ Botones fijos en la barra de opciones (como Photoshop): **presión = tamaño** (desactivado = grosor fijo), **presión = opacidad** y **simetría** (vertical, horizontal, doble, radial, mandala), también en el modo dibujo.
+- ✅ **Pixel art**: Archivo › Nuevo pixel art (16–128 px, 7 paletas propias y «Mis colores»), **pincel de píxeles** (píxel perfecto sin escalones dobles, línea, rectángulo y elipse con o sin relleno, tramado, borrar, simetría, Alt = cuentagotas), barra de paleta sobre el lienzo, zoom entero y **exportación ampliada nítida** (×1 a ×32, sin suavizar).
+
 ### Texto y diseño
 - ✅ Texto editable (fuentes del sistema y de la biblioteca, estilos mezclados en un mismo párrafo, interletraje, interlineado, alineación, texto en trazado, deformado), formas vectoriales, estilos de capa (sombra, sombra larga, resplandor, trazo, bisel, superposiciones), plantillas, marcas de agua, marcos, collage.
 

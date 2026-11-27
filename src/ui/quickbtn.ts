@@ -106,6 +106,9 @@ export function buildQuickButton(host: HTMLElement) {
   const restore = () => { let p: { x: number; y: number } | null = null; try { p = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); } catch { /* sin almacenamiento */ } const W = host.clientWidth, H = host.clientHeight; place(p ? p.x * W : 44, p ? p.y * H : H - 140); };
   let st: { x: number; y: number; bx: number; by: number; t: number; drag: boolean; held: boolean; timer: number; id: number } | null = null;
   b.addEventListener('pointerdown', e => {
+    // otro dedo (o el lápiz) sobre el botón mientras ya se mantiene pulsado: no cuenta (si sustituyera al primero,
+    // al soltar el primero la tecla se quedaría pegada)
+    if (st && st.id !== e.pointerId) { e.preventDefault(); e.stopPropagation(); return; }
     e.preventDefault(); e.stopPropagation(); b.setPointerCapture(e.pointerId); closeRing();
     st = { x: e.clientX, y: e.clientY, bx: b.offsetLeft, by: b.offsetTop, t: performance.now(), drag: false, held: false, timer: 0, id: e.pointerId };
     const s = st;
@@ -132,7 +135,7 @@ export function buildQuickButton(host: HTMLElement) {
     // teclado (Intro o espacio con el foco en el botón): abre el menú
     if (e.detail === 0 && !ring) openRing();
   });
-  b.addEventListener('pointerup', up);
+  b.addEventListener('pointerup', e => { if (st && e.pointerId === st.id) up(); });
   // si el dedo se suelta fuera del botón (o el navegador pierde la captura), la tecla se suelta igual
   addEventListener('pointerup', e => { if (st && e.pointerId === st.id && e.target !== b) up(); }, true);
   b.addEventListener('lostpointercapture', e => { if (st && e.pointerId === st.id) { const s2 = st; setTimeout(() => { if (st === s2) up(); }, 0); } }); b.addEventListener('pointercancel', () => { if (st) { clearTimeout(st.timer); st = null; } if (!sticky) setMod(false); });

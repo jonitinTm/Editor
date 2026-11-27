@@ -135,15 +135,21 @@ export class Selection {
   /** Expandir (r>0) o contraer (r<0) la selección. */
   grow(r: number) {
     if (!this.mask || r === 0) return;
+    // contraer = lo mismo que expandir lo de fuera, pero sin invertir la selección (si ocupaba toda la imagen, al
+    // invertirla quedaba vacía y fallaba): se desenfoca y solo queda lo que estaba del todo dentro
     const shrink = r < 0;
-    if (shrink) this.invert();
-    const img = getPixels(this.mask!);
+    const img = getPixels(this.mask);
     gaussianBlur(img, Math.abs(r) / 2, true);
     const d = img.data;
-    for (let i = 3; i < d.length; i += 4) d[i] = d[i] > 8 ? 255 : 0;
-    putPixels(this.mask!, img);
+    for (let i = 3; i < d.length; i += 4) d[i] = shrink ? (d[i] < 247 ? 0 : 255) : (d[i] > 8 ? 255 : 0);
+    // al contraer, el borde de la imagen también cuenta como borde de la selección (como «aplicar en los límites del
+    // lienzo»): así «Borde» o «Contraer» con toda la imagen seleccionada dan un marco y no una selección vacía
+    if (shrink) {
+      const W = img.width, H = img.height, k = Math.min(Math.round(Math.abs(r)), W, H);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < k || y < k || x >= W - k || y >= H - k) d[(y * W + x) * 4 + 3] = 0;
+    }
+    putPixels(this.mask, img);
     this.changed();
-    if (shrink) this.invert();
   }
   /** `known`: caja y forma ya conocidas de ese lienzo (p. ej. al deshacer): no hace falta volver a buscarlas. */
   setMask(c: HTMLCanvasElement | null, known?: SelInfo | null) {
