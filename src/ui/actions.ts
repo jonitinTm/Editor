@@ -335,6 +335,7 @@ export const ACTIONS: Action[] = [
   { id: 'texDetails', label: 'Añadir detalles (musgo, grietas, suciedad, óxido, nieve…)…', enabled: hasDoc, run: () => { import('./texdetails').then(m => m.detailsDialog()); } },
   { id: 'animPresets', label: 'Animaciones rápidas (rebotar, flotar, girar…)…', enabled: hasLayer, run: () => { import('./gamextra').then(m => m.presetDialog()); } },
   { id: 'animPreview', label: 'Probar animación (tamaño real, fondos, bucle, ida y vuelta)…', enabled: hasDoc, run: () => { import('./anim').then(m => m.previewDialog()); } },
+  { id: 'audioStudio', label: 'Estudio de sonido (grabar, editar, efectos para juegos)…', run: () => { import('./audiostudio').then(m => m.audioStudio()); } },
   { id: 'animSound', label: 'Sonido de la animación (voz, música, efectos)…', enabled: hasDoc, run: () => { import('./animaudio').then(m => m.audioDialog()); } },
   { id: 'particles', label: 'Partículas y efectos (explosión, fuego, humo, magia…)…', run: () => { import('./particles').then(m => m.particlesDialog()); } },
   { id: 'rig', label: 'Animar con huesos (personaje por piezas)…', enabled: hasDoc, run: () => { import('./rig').then(m => m.rigDialog()); } },

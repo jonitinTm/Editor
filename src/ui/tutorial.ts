@@ -277,10 +277,16 @@ export const TOPICS: Topic[] = [
       '⟦Juegos › Animación › Exportar animación (GIF, vídeo, PNG, hoja de sprites)…⟧ saca la hoja de sprites con su JSON para el motor.',
       '⟦Juegos › Mapas, sprites e iconos › Atlas de sprites (capas a una imagen + JSON)…⟧ junta todas las capas en una imagen, y ⟦Juegos › Pixel art › Contorno de 1 píxel (sprites)…⟧ y ⟦Juegos › Pixel art › Cambiar colores del sprite (variantes)…⟧ ayudan a terminarlos.',
     ], go: { act: 'sliceSheet' }, needsDoc: true },
+    { id: 'sound', title: 'Estudio de sonido', steps: [
+      '⟦Juegos › Animación › Estudio de sonido (grabar, editar, efectos para juegos)…⟧: abre un sonido, grábalo con el micrófono o genera un efecto de juego (moneda, salto, láser, explosión…).',
+      'Arrastra sobre la onda para elegir un trozo y córtalo, recórtalo, súbele el volumen, ponle eco, fundidos o cambia la velocidad. Sin elegir nada se edita todo.',
+      'Guárdalo en WAV o pulsa «Usar en la animación» para que suene con tus dibujos.',
+    ], go: { act: 'audioStudio' } },
     { id: 'particles', title: 'Partículas y efectos', steps: [
       '⟦Juegos › Animación › Partículas y efectos (explosión, fuego, humo, magia…)…⟧: explosión, fuego, humo, chispas, magia, lluvia, nieve, impacto, burbujas, hojas o confeti.',
       'Los efectos continuos (fuego, humo, lluvia…) se repiten sin salto. Cambia colores, cantidad y tamaño, o pide «Otra variante».',
       'Con «Pixel art» salen sin bordes suaves y solo con sus colores. Expórtalos como hoja de sprites para el juego.',
+      'Cámbialos a tu gusto en «Ajustes del efecto», usa tu propio dibujo como partícula y guárdalos en «Mis efectos». Con «Dónde» los pones encima de tu dibujo o tu animación.',
     ], go: { act: 'particles' } },
     { id: 'texdetails', title: 'Tu propia textura con detalles', steps: [
       '⟦Juegos › Texturas › Nueva textura (repetible, la dibujas tú)…⟧ crea un lienzo que se repite: lo que pintas en un borde sale por el contrario.',

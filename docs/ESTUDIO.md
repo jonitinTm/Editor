@@ -6,7 +6,9 @@ Photocap es un estudio creativo 2D: fotografía (el núcleo), ilustración, anim
 
 Estados: ✅ hecho y con prueba automática · 🟡 hecho en parte · ⬜ pendiente.
 
-## 0. Pantalla de inicio y espacios de trabajo — ✅
+## 0. Pantalla de inicio y espacios de trabajo — ✅ (t247, t255)
+
+Cada tarjeta lleva directa a su parte (crea su proyecto) y cada espacio tiene su propio menú detrás de Archivo; los demás menús siguen ahí.
 
 | Requisito | Prueba de aceptación |
 |---|---|
@@ -62,7 +64,14 @@ Píxel perfecto, cuadrícula, paletas (importar y exportar .gpl, .pal y .hex), t
 | Terrenos automáticos (bloque 3×3 + rincones 2×2) | ✅ t249 |
 | Exportación directa de escenas para Godot o Unity (.tscn, prefab) | ⬜ por ahora: JSON, .tmj y PNG, que los dos importan |
 
-## 6. Comunes
+## 6. Audio — ✅ (t258)
+Estudio de sonido: abrir, grabar con el micrófono, onda con selección, cortar, recortar, silencio, fundidos, volumen, normalizar, invertir, velocidad, eco y quitar ruido, con deshacer; generador de efectos retro para juegos (9 tipos, con variantes); WAV; usar como sonido de la animación.
+
+## 7. Lo tuyo dentro de las herramientas — ✅ (t256, t257)
+- Partículas: todos los parámetros editables, tu propio dibujo como partícula (teñido o no), «Mis efectos» (guardar, actualizar, borrar, exportar e importar) y aplicar sobre el dibujo o la animación abierta.
+- «Mis ajustes» en el generador de texturas, los detalles, la interfaz del juego, la cámara, las animaciones rápidas y la interpolación.
+
+## 8. Comunes
 
 | Requisito | Estado |
 |---|---|

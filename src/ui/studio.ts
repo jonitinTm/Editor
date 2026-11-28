@@ -80,6 +80,13 @@ export const WORKSPACES: Workspace[] = [
       { label: 'Cortar una hoja de sprites', icon: 'slice', run: () => openThen('image/*', () => act('sliceSheet')) },
       { label: 'Iconos del juego en todos los tamaños', icon: 'image', run: () => openThen('image/*', () => act('iconSet')) },
     ] },
+  { id: 'audio', name: 'Audio', desc: 'Grabar, editar y crear sonidos y efectos para juegos.', icon: 'music', tools: null,
+    tip: 'Graba con el micrófono, recorta, aplica fundidos, eco o velocidad, genera efectos retro y úsalos en tus animaciones.',
+    starts: () => [
+      { label: 'Estudio de sonido', icon: 'music', run: () => act('audioStudio') },
+      { label: 'Sonido para la animación abierta', icon: 'film', run: () => act('animSound') },
+      { label: 'Sincronía labial', icon: 'film', run: () => act('lipSync') },
+    ] },
 ];
 
 /** Para calcar: la foto se aclara y se bloquea, y encima queda una capa vacía para dibujar. */
@@ -91,13 +98,14 @@ async function traceSetup() {
   d.invalidate(); d.commit('Preparar para calcar'); app.emit('docs'); app.setTool('brush');
 }
 /** Nombre corto del espacio (para su menú de arriba). */
-export const WS_SHORT: Record<string, string> = { photo: 'Fotografía', illustration: 'Ilustración', anim: 'Animación', pixel: 'Pixel art', game: 'Videojuegos' };
+export const WS_SHORT: Record<string, string> = { photo: 'Fotografía', illustration: 'Ilustración', anim: 'Animación', pixel: 'Pixel art', game: 'Videojuegos', audio: 'Audio' };
 /** Menú propio de cada espacio: sus funciones a un toque (todo lo demás sigue en los otros menús). */
 export const WS_MENU: Record<string, string[]> = {
   photo: ['wsNew', 'wsMore', '-', 'autoEnhance', 'removeBg', 'blurBg', 'aiSky', 'aiErase', 'aiUpscale', '-', 'rawDevelop', 'freqSep', 'copyAdj', 'pasteAdj', 'pasteAdjAll', '-', 'magicResize', 'carousel', 'beforeAfter', 'sticker', 'cinemagraph', 'doubleExposure', 'collage'],
   illustration: ['wsNew', 'wsMore', '-', 'panel:Pinceles', 'reference', 'refLayer', '-', 'assist:off', 'assist:p1', 'assist:p2', '-', 'traceImage', 'colorRamp', 'perspWarp', '-', 'animDock', 'rig'],
   anim: ['wsNew', 'wsMore', '-', 'animDock', 'animPresets', 'animTween', 'rig', 'camera2d', 'particles', 'cinemagraph', '-', 'animSound', 'lipSync', '-', 'animTag', 'animReverse', 'animPreview', '-', 'animExport', 'sliceSheet'],
   pixel: ['wsNew', 'wsMore', '-', 'pixelMode', 'pixelExport', 'pixelScale', 'rotSprite', '-', 'paletteSnap', 'colorRamp', 'ditherGradient', 'outline1px', 'recolor', '-', 'paletteImport', 'paletteExport', '-', 'animDock', 'animPresets', 'particles', 'animExport', '-', 'newTexture', 'tileMap'],
+  audio: ['wsNew', 'wsMore', '-', 'audioStudio', '-', 'animSound', 'lipSync', '-', 'animExport'],
   game: ['wsNew', 'wsMore', '-', 'newTexture', 'texGen', 'texDetails', 'seamless', 'tilePreview', 'texMaps', '-', 'tileMap', 'tileGrid', '-', 'particles', 'gameUi', 'pivotBoxes', 'animPresets', 'animExport', 'sliceSheet', '-', 'atlas', 'pot', 'iconSet'],
 };
 /** Lo que se crea al entrar en cada espacio desde su tarjeta. */
@@ -107,6 +115,7 @@ const ENTER: Record<string, () => void | Promise<void>> = {
   anim: () => animDoc('Animación', 1920, 1080),
   pixel: () => pixelDoc('Personaje', 32, 32),
   game: async () => { await blank('Sprite', 256, 256, null); app.setTool('brush'); },
+  audio: () => act('audioStudio'),
 };
 /** Entra en el espacio: lo elige y crea su proyecto (en fotografía, abre la galería). */
 export async function enterWorkspace(id: string) {
