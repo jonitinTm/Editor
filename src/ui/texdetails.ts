@@ -82,8 +82,10 @@ function analyse(base: HTMLCanvasElement, W: number, H: number) {
   for (let i = 0; i < W * H; i++) L[i] = d[i * 4 + 3] ? (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255 : 0.5;
   // media del entorno (caja repetible), en dos pasadas
   const r = Math.max(1, Math.round(Math.min(W, H) / 48)), tmp = new Float32Array(W * H), blur = new Float32Array(W * H);
-  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) { let s = 0; for (let k = -r; k <= r; k++) s += L[y * W + ((xx + k) % W + W) % W]; tmp[y * W + xx] = s / (2 * r + 1); }
-  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) { let s = 0; for (let k = -r; k <= r; k++) s += tmp[((y + k) % H + H) % H * W + xx]; blur[y * W + xx] = s / (2 * r + 1); }
+  // suma corrida: al avanzar se suma el que entra y se resta el que sale (mismo resultado, sin repetir la suma entera)
+  const n = 2 * r + 1, wx = (v: number) => ((v % W) + W) % W, wy = (v: number) => ((v % H) + H) % H;
+  for (let y = 0; y < H; y++) { const o = y * W; let s = 0; for (let k = -r; k <= r; k++) s += L[o + wx(k)]; for (let xx = 0; xx < W; xx++) { tmp[o + xx] = s / n; s += L[o + wx(xx + r + 1)] - L[o + wx(xx - r)]; } }
+  for (let xx = 0; xx < W; xx++) { let s = 0; for (let k = -r; k <= r; k++) s += tmp[wy(k) * W + xx]; for (let y = 0; y < H; y++) { blur[y * W + xx] = s / n; s += tmp[wy(y + r + 1) * W + xx] - tmp[wy(y - r) * W + xx]; } }
   const cav = new Float32Array(W * H), top = new Float32Array(W * H), k2 = Math.max(1, Math.round(r / 2));
   for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
     const i = y * W + xx; cav[i] = clamp((blur[i] - L[i]) * 5);
@@ -92,8 +94,17 @@ function analyse(base: HTMLCanvasElement, W: number, H: number) {
   }
   return { L, cav, top };
 }
-/** Capa de detalle (RGBA) del tamaño indicado. */
+/** Capa de detalle (RGBA) del tamaño indicado (de una vez: para las vistas previas pequeñas). */
 export function renderDetail(base: HTMLCanvasElement, p: DetailParams, W = base.width, H = base.height): HTMLCanvasElement {
+  const g = detailGen(base, p, W, H); let r = g.next(); while (!r.done) r = g.next(); return r.value;
+}
+/** Igual, pero a trozos: entre trozo y trozo la pantalla sigue respondiendo (y se puede ver el avance). */
+export async function renderDetailAsync(base: HTMLCanvasElement, p: DetailParams, onProgress?: (f: number) => void): Promise<HTMLCanvasElement> {
+  const g = detailGen(base, p, base.width, base.height); let r = g.next(), t0 = performance.now();
+  while (!r.done) { if (performance.now() - t0 > 30) { onProgress?.(r.value); await new Promise(res => setTimeout(res, 0)); t0 = performance.now(); } r = g.next(); }
+  return r.value;
+}
+function* detailGen(base: HTMLCanvasElement, p: DetailParams, W: number, H: number): Generator<number, HTMLCanvasElement> {
   const det = DETAILS.find(d => d.id === p.type) ?? DETAILS[0], { L, cav, top } = analyse(base, W, H);
   const cx: Ctx = { W, H, L, cav, top, p, c: rgb(p.color) };
   const out = makeCanvas(W, H), o = ctx2d(out), img = o.createImageData(W, H), D = img.data;
@@ -103,7 +114,7 @@ export function renderDetail(base: HTMLCanvasElement, p: DetailParams, W = base.
     for (let k = 0; k < 3; k++) D[i + k] = (c[k] * 255 * a + D[i + k] * (D[i + 3] / 255) * (1 - a)) / na;
     D[i + 3] = na * 255;
   };
-  if (det.fn) for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const [a, c] = det.fn((x + 0.5) / W, (y + 0.5) / H, y * W + x, cx); if (a > 0.003) put(x, y, clamp(a), c); }
+  if (det.fn) for (let y = 0; y < H; y++) { for (let x = 0; x < W; x++) { const [a, c] = det.fn((x + 0.5) / W, (y + 0.5) / H, y * W + x, cx); if (a > 0.003) put(x, y, clamp(a), c); } if ((y & 7) === 7) yield y / H; }
   if (det.draw) det.draw(cx, put);
   if (p.pixel) {
     // pixel art: sin semitransparencias (tramado ordenado para los bordes) y solo 3 tonos del color del detalle
@@ -161,9 +172,9 @@ export function detailsDialog() {
         h('label', { class: 'check' }, pix, ' Estilo pixel art (sin bordes suaves)'),
         h('label', { class: 'check' }, merge, ' Pintar sobre la capa actual (si no, va en una capa nueva que puedes cambiar o borrar)'),
         presetBar({ key: 'texDetail', lastKey: 'editor.texDetail', current: () => p, close: () => dlg?.close(), reopen: detailsDialog })))],
-    onOk: () => {
+    onOk: async () => {
       try { localStorage.setItem('editor.texDetail', JSON.stringify(p)); } catch { /* */ }
-      const ov = renderDetail(d.flatten(), p), name = DETAILS.find(t => t.id === p.type)!.name;
+      const ov = await renderDetailAsync(d.flatten(), p), name = DETAILS.find(t => t.id === p.type)!.name;
       const cur = d.activeRaster();
       if (merge.checked && cur) { ctx2d(cur.canvas).drawImage(ov, 0, 0); cur.touch(); }
       else { const l = new RasterLayer(name, d.width, d.height); ctx2d(l.canvas).drawImage(ov, 0, 0); const parent = (cur?.parent ?? d.root) as any; parent.add(l, cur ? parent.children.indexOf(cur) + 1 : parent.children.length); d.setActive(l, false); }
