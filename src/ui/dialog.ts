@@ -30,7 +30,10 @@ export function showDialog(o: DialogOptions) {
   overlay.append(form);
   document.body.append(overlay);
   open++;
-  const close = () => { overlay.remove(); open--; document.removeEventListener('keydown', onKey, true); };
+  // los deslizadores y casillas de número llevan su etiqueta al lado pero no unida: se les da como nombre accesible
+  nameControls(form);
+  const mo = new MutationObserver(() => nameControls(form)); mo.observe(form, { childList: true, subtree: true });
+  const close = () => { mo.disconnect(); overlay.remove(); open--; document.removeEventListener('keydown', onKey, true); };
   const cancel = () => { o.onCancel?.(); close(); };
   const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cancel(); } };
   document.addEventListener('keydown', onKey, true);
@@ -62,6 +65,15 @@ export function showDialog(o: DialogOptions) {
   // en pantallas táctiles no se enfoca nada: abriría el teclado y taparía medio cuadro
   if (!matchMedia('(pointer: coarse)').matches) setTimeout(() => (form.querySelector('input:not([type=range]):not([type=checkbox]), select') as HTMLElement | null)?.focus(), 0);
   return { close, form };
+}
+
+/** Da nombre (aria-label) a los controles sin nombre de cada fila, a partir de la etiqueta de esa fila. */
+export function nameControls(root: HTMLElement) {
+  for (const el of root.querySelectorAll<HTMLElement>('input:not([type=hidden]), select, textarea')) {
+    if (el.getAttribute('aria-label') || el.title || el.closest('label:not(.num-slider)') || (el.id && root.querySelector(`label[for="${el.id}"]`))) continue;
+    const lab = el.closest('.form-row')?.querySelector(':scope > label:not(.num-slider), :scope > .lbl')?.textContent?.trim();
+    if (lab) el.setAttribute('aria-label', lab);
+  }
 }
 
 export function row(label: string, ...controls: (HTMLElement | string)[]) {

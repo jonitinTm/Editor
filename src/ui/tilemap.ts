@@ -142,9 +142,24 @@ export function tileMapDialog() {
     if (tool === 'fill') { floodFill(m, layer, c.x, c.y, stamp, erase); draw(); return; }
     if (tool === 'rect') { rectFrom = c; draw(); return; }
     if (tool === 'terrain' && !m.terrains?.length) { app.toast('Primero crea un terreno: arrastra en el tileset sobre su bloque de 3 × 3 tiles y pulsa «Crear terreno»', 'warn'); return; }
-    painting = true; if (erase) eraseAt(c); else apply(c); draw();
+    painting = true; last = c; if (erase) eraseAt(c); else apply(c); draw();
   };
-  mc.onpointermove = e => { const c = cell(e); hover = inside(c) ? c : null; if (painting && hover) { if (e.buttons === 2) eraseAt(c); else apply(c); } draw(); };
+  // un trazo rápido (sobre todo con el dedo) salta casillas entre dos eventos: se rellenan las de en medio
+  let last: { x: number; y: number } | null = null;
+  const along = (a: { x: number; y: number }, b: { x: number; y: number }, f: (c: { x: number; y: number }) => void) => {
+    const n = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y));
+    for (let i = 1; i <= n; i++) f({ x: Math.round(a.x + (b.x - a.x) * i / n), y: Math.round(a.y + (b.y - a.y) * i / n) });
+  };
+  mc.onpointermove = e => {
+    const c = cell(e); hover = inside(c) ? c : null;
+    if (painting && hover) {
+      const f = (q: { x: number; y: number }) => { if (!inside(q)) return; if (e.buttons === 2) eraseAt(q); else apply(q); };
+      // con un sello de varios tiles se pinta solo donde está el dedo (si no, los sellos se pisarían)
+      if (last && (last.x !== c.x || last.y !== c.y) && (e.buttons === 2 || tool !== 'paint' || stamp.w * stamp.h === 1)) along(last, c, f); else f(c);
+      last = c;
+    }
+    draw();
+  };
   mc.onpointerup = e => {
     if (rectFrom) { const c = cell(e), a = rectFrom, x0 = Math.max(0, Math.min(a.x, c.x)), y0 = Math.max(0, Math.min(a.y, c.y)), x1 = Math.min(m.cols - 1, Math.max(a.x, c.x)), y1 = Math.min(m.rows - 1, Math.max(a.y, c.y)); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) m.layers[layer].data[y * m.cols + x] = stamp.ids[((y - y0) % stamp.h) * stamp.w + (x - x0) % stamp.w]; rectFrom = null; }
     painting = false; draw();
@@ -243,7 +258,13 @@ export function tileMapDialog() {
   const img = h('button', { type: 'button', class: 'btn' }, 'Crear imagen del mapa'); img.onclick = toImage;
   drawTs(); draw();
   showDialog({ title: 'Editor de mapas de tiles', okLabel: 'Guardar mapa', width: 980, body: wrap, extraButtons: [exp, img], onOk: () => { save(); app.toast('Mapa guardado con el documento (se guarda en el proyecto)'); } });
-  requestAnimationFrame(() => wrap.focus());
+  requestAnimationFrame(() => {
+    wrap.focus();
+    // el mapa entra entero con el zoom más grande que quepa (en píxeles enteros, nítido)
+    const mw = mc.parentElement as HTMLElement, W = mw.clientWidth - 4, Hh = parseFloat(getComputedStyle(mw).maxHeight) || 400;
+    const z = Math.floor(Math.min(W / (m.cols * m.tile), Hh / (m.rows * m.tile)));
+    if (z > zoom) setZoom(z);
+  });
 }
 /** Intenta adivinar el tamaño de los tiles (16 px si encaja; si no, el mayor divisor común razonable). */
 function guessTile(d: EditorDocument) {

@@ -123,6 +123,13 @@ Leyenda: ✅ hecho y con prueba automática · 🟡 hecho con limitaciones · �
   - 1 prueba con un error de programación propio (corregido).
   - **1 fallo real de la app:** en el panel Ajustes el deslizador de intensidad de los looks (con el botón ↺ nuevo) se salía del panel y provocaba desplazamiento lateral. Corregido: los deslizadores se encogen si no caben.
   - Tras las correcciones, todas las pruebas afectadas pasan.
+- **Prueba de uso completa por áreas (28-11-2026)**, haciendo lo que haría un usuario (tarjetas, ratón, menús) y mirando cada resultado. Fallos encontrados y corregidos (prueba t260 y t186):
+  - Fotografía: el fondo difuminado de «Tamaño para todas las redes» se oscurecía en los bordes.
+  - Ilustración: los puntos de fuga de la perspectiva salían fuera de la pantalla y no se podían arrastrar; el temblor del inicio del trazo a veces elegía la línea de fuga equivocada.
+  - Animación: las partículas aplicadas sobre el dibujo solo cubrían un cuadrado de 256 px en el centro; la barra de animación tapaba la parte de abajo de la imagen.
+  - Videojuegos: un trazo rápido en el editor de mapas saltaba casillas; el mapa se abría a ×1 en un tercio del espacio; «Mis ajustes» cortaba su texto.
+  - Accesibilidad: los deslizadores de muchas ventanas no tenían nombre para lectores de pantalla (arreglado para todas las ventanas a la vez).
+  - Pixel art y Audio: sin fallos.
 - **Fallo del proceso de publicación corregido:** compilar dos veces seguidas borraba las partes de la versión publicada (lo que provocaba el «Algo ha fallado» en pestañas abiertas). Ahora siempre se conservan las de la versión del último commit.
 - Batería automática: 228 pruebas (`t1`–`t228`) con navegador real (Chromium), incluidas emulaciones de iPhone, Pixel, iPad, Galaxy Tab y plegables.
 - «Prueba del mono»: miles de acciones al azar (escritorio y táctil) comprobando que la vista coincide con la imagen, que no hay errores y que guardar/abrir (proyecto y PSD) conserva la imagen.

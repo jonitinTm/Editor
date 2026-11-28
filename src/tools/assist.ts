@@ -13,7 +13,11 @@ let start: Pt | null = null, lock: { o: Pt; d: Pt } | null = null;
 /** Coloca los puntos de fuga por defecto para el documento actual (horizonte a un 40 % de la altura). */
 function defaults() {
   const d = app.doc!; const y = d.height * 0.4;
-  assist.vps = assist.mode === 'p1' ? [{ x: d.width / 2, y }] : [{ x: -d.width * 0.35, y }, { x: d.width * 1.35, y }];
+  let l = -d.width * 0.35, r = d.width * 1.35;
+  // los puntos tienen que verse para poder arrastrarlos: dentro de la parte visible del lienzo
+  const vp = app.viewport;
+  if (vp && vp.width > 80) { const m = 28, a = vp.toDoc(m, 0).x, b = vp.toDoc(vp.width - m, 0).x; l = Math.max(l, Math.min(a, b)); r = Math.min(r, Math.max(a, b)); if (r - l < d.width * 0.5) { l = -d.width * 0.35; r = d.width * 1.35; } }
+  assist.vps = assist.mode === 'p1' ? [{ x: d.width / 2, y }] : [{ x: l, y }, { x: r, y }];
   assist.forDoc = d; assist.forMode = assist.mode;
 }
 export function setAssist(m: AssistMode) {
@@ -40,7 +44,7 @@ export function assistMap(x: number, y: number, zoom: number): Pt {
   if (!assistOn() || !start) return { x, y };
   if (!lock) {
     const dx = x - start.x, dy = y - start.y, len = Math.hypot(dx, dy);
-    if (len * zoom < 8) return start;
+    if (len * zoom < 14) return start; // con menos, el temblor del inicio del trazo elige mal la dirección
     const m = { x: dx / len, y: dy / len };
     const dirs: Pt[] = [{ x: 0, y: 1 }];
     if (assist.mode === 'p1') dirs.push({ x: 1, y: 0 });

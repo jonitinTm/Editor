@@ -42,6 +42,7 @@ import { buildTimeline } from './ui/timeline';
 import { buildNavigatorPanel, buildHistogramPanel, buildInfoPanel, buildChannelsPanel, buildPathsPanel, buildCompsPanel, buildStylesPanel, buildActionsPanel } from './ui/panels2';
 (app as any).debug = { filters: () => import('./filters/registry').then(async r => { await r.loadFilterImpls(); return r; }), lut: () => Promise.all([import('./core/adjlut'), import('./core/compositor')]), psd: () => import('./io/psd'), icc: () => import('./io/icc'), projects: () => import('./io/projects'), readPsd: async (...a: Parameters<typeof import('./io/psd').readPsd>) => (await import('./io/psd')).readPsd(...a), writePsd: async (...a: Parameters<typeof import('./io/psd').writePsd>) => (await import('./io/psd')).writePsd(...a), ops, io, uniq, more, cr, actions: ACTIONS, contentBounds, texdetails: () => import('./ui/texdetails'), gamextra: () => import('./ui/gamextra'), tilemap: () => import('./ui/tilemap'), anim: () => import('./ui/anim'), gameui: () => import('./ui/gameui'), studio: () => import('./ui/studio'), animaudio: () => import('./ui/animaudio'), camera: () => import('./ui/camera'), rig: () => import('./ui/rig'), particles: () => import('./ui/particles'), audiostudio: () => import('./ui/audiostudio') };
 (app as any).debug.rawdev = () => import('./ui/rawdev');
+(app as any).debug.assist = () => import('./tools/assist');
 (app as any).debug.textures = () => import('./ui/textures');
 (app as any).debug.gamedev = () => import('./ui/gamedev');
 (app as any).debug.pixelart = () => import('./ui/pixelart');

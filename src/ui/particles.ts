@@ -261,15 +261,16 @@ export function particlesDialog() {
  *  (o en el centro). Si no era una animación, pasa a serlo: el dibujo se ve en todos los fotogramas. */
 export async function applyOnto(d: EditorDocument, s: PSettings) {
   const b = d.selection.active && d.selection.bounds ? d.selection.bounds : null;
-  const cx = b ? b.x + b.w / 2 : d.width / 2, cy = b ? b.y + b.h / 2 : d.height / 2;
-  const k = b ? Math.max(b.w / s.W, b.h / s.H) : 1, W = s.W * k, H = s.H * k;
+  // el efecto ocupa la selección o, sin ella, toda la imagen; se calcula a ese tamaño (nítido, sin estirar)
+  const bx = b ? Math.round(b.x) : 0, by = b ? Math.round(b.y) : 0, W = Math.max(8, Math.round(b ? b.w : d.width)), H = Math.max(8, Math.round(b ? b.h : d.height));
+  const fs: PSettings = { ...s, W, H };
   const anim = d.frames.length > 1 && d.frames.some(f => f.own != null), n = anim ? d.frames.length : s.frames;
   const { framesFit } = await import('./anim'); if (!framesFit(d, n)) return;
   if (!anim) { const vis = d.allLayers().filter(l => l.visible).map(l => l.id); d.frames = Array.from({ length: n }, () => ({ delay: Math.round(1000 / s.fps), visible: [...vis] })); }
   const parent = d.root;
   for (let i = 0; i < n; i++) {
     const l = new RasterLayer(`${t('Efecto')} ${i + 1}`, d.width, d.height), x = ctx2d(l.canvas); x.imageSmoothingEnabled = !s.pixel;
-    x.drawImage(particleFrame(s, i % s.frames), cx - W / 2, cy - H / 2, W, H);
+    x.drawImage(particleFrame(fs, i % s.frames), bx, by);
     l.visible = i === d.frameIndex; parent.add(l);
     const fr = d.frames[i]; fr.visible.push(l.id); if (!anim) fr.own = l.id;
   }

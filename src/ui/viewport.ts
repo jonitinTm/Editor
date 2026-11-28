@@ -307,10 +307,13 @@ export class Viewport {
     const m = 40;
     // pixel art: deja sitio abajo para la barra de paleta y usa un zoom entero (todos los píxeles del mismo tamaño)
     const px = !!d.meta?.pixelArt;
-    let z = Math.min((this.width - m) / d.width, (this.height - m - (px ? (d.frames.some(f => f.own != null) ? 230 : 150) : d.frames.some(f => f.own != null) || document.querySelector('.anim-dock') ? 120 : 0)) / d.height);
+    const below = px ? (d.frames.some(f => f.own != null) ? 230 : 150) : d.frames.some(f => f.own != null) || document.querySelector('.anim-dock') ? 120 : 0;
+    let z = Math.min((this.width - m) / d.width, (this.height - m - below) / d.height);
     if (onlyShrink) z = Math.min(z, 1);
     if (px && z > 1) z = Math.floor(z);
     this.setZoom(z, null, true);
+    // centrada en el hueco que deja la barra de abajo, para que no tape la imagen
+    if (below && !this.skewed) { this.placeDocPoint(d.width / 2, d.height / 2, { x: this.width / 2, y: (this.height - below) / 2 }); d.view.panX = Math.round(d.view.panX); d.view.panY = Math.round(d.view.panY); this.requestRender(); }
     d.viewInitialized = true;
   }
 

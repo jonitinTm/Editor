@@ -1309,8 +1309,8 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .tex-chip.mine { border-style: dashed; }
 /* Mis ajustes */
 .preset-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
-.preset-sel { flex: 1 1 140px; min-width: 0; }
-.preset-name { flex: 1 1 110px; min-width: 0; width: auto; }
+.preset-sel { flex: 1 1 17em; min-width: 0; }
+.preset-name { flex: 1 1 80px; min-width: 0; width: auto; }
 
 /* Estudio de sonido */
 .snd-top, .snd-edit, .snd-out { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }

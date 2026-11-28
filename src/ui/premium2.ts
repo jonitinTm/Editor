@@ -104,7 +104,12 @@ export function fitTo(src: HTMLCanvasElement, W: number, H: number, mode: string
   const cover = Math.max(W / src.width, H / src.height), contain = Math.min(W / src.width, H / src.height);
   const drawAt = (k: number, fx: number, fy: number) => { const w = src.width * k, hh = src.height * k; const dx = Math.min(0, Math.max(W - w, W / 2 - fx * w)), dy = Math.min(0, Math.max(H - hh, H / 2 - fy * hh)); x.drawImage(src, w > W ? dx : (W - w) / 2, hh > H ? dy : (H - hh) / 2, w, hh); };
   if (mode === 'fill') { drawAt(cover, focus.x, focus.y); return c; }
-  if (mode === 'blur') { x.filter = `blur(${Math.round(Math.max(W, H) / 40)}px) brightness(0.85)`; drawAt(cover * 1.08, 0.5, 0.5); x.filter = 'none'; }
+  if (mode === 'blur') {
+    // el fondo se dibuja más grande que el lienzo (un margen de 3 veces el desenfoque por cada lado): así el desenfoque
+    // no «trae» transparencia de fuera y los bordes no se oscurecen
+    const r = Math.round(Math.max(W, H) / 40), k = Math.max((W + 6 * r) / src.width, (H + 6 * r) / src.height), w = src.width * k, hh = src.height * k;
+    x.filter = `blur(${r}px) brightness(0.85)`; x.drawImage(src, (W - w) / 2, (H - hh) / 2, w, hh); x.filter = 'none';
+  }
   else { x.fillStyle = color; x.fillRect(0, 0, W, H); }
   drawAt(contain, 0.5, 0.5); return c;
 }
