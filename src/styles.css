@@ -1301,3 +1301,10 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 }
 .pfx-pv { max-width: 100%; image-rendering: pixelated; }
 .pfx-colors { display: flex; gap: 4px; flex-wrap: wrap; }
+.pfx-sec { border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; margin-top: 6px; }
+.pfx-sec > summary { cursor: pointer; padding: 4px 0; font-weight: 600; font-size: 12.5px; color: var(--title); }
+.pfx-edit .form-row .num-slider { flex: 1 1 120px; min-width: 0; }
+.pfx-sprite { display: flex; flex-direction: column; gap: 4px; }
+.pfx-sprite-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pfx-sprite-img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; border: 1px solid var(--border); border-radius: 4px; background: repeating-conic-gradient(#3a3b40 0 25%, #2c2d31 0 50%) 0 0 / 8px 8px; }
+.tex-chip.mine { border-style: dashed; }
