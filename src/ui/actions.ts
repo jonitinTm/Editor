@@ -322,6 +322,8 @@ export const ACTIONS: Action[] = [
   { id: 'matteBlack', label: 'Quitar mate negro', enabled: hasLayer, run: () => more.removeMatte(false) },
   { id: 'matteWhite', label: 'Quitar mate blanco', enabled: hasLayer, run: () => more.removeMatte(true) },
   { id: 'rawDevelop', label: 'Revelado RAW (16 bits)…', enabled: () => !!app.doc?.raw16, run: () => { import('./rawdev').then(m => m.rawDevelopDialog()); } },
+  { id: 'wsNew', label: 'Nuevo proyecto de este tipo', run: () => { import('./studio').then(m => m.newInWorkspace()); } },
+  { id: 'wsMore', label: 'Más formas de empezar…', run: () => { import('./studio').then(m => m.startDialog(m.currentWorkspace().id)); } },
   { id: 'studio', label: '¿Qué quieres crear hoy? (espacios de trabajo)…', run: () => { import('./studio').then(m => m.studioDialog()); } },
   { id: 'sticker', label: 'Crear pegatina (WhatsApp, Telegram)…', enabled: hasDoc, run: () => { import('./premium2').then(m => m.stickerDialog()); } },
   { id: 'magicResize', label: 'Tamaño para todas las redes (Instagram, TikTok, YouTube…)…', enabled: hasDoc, run: () => { import('./premium2').then(m => m.magicResizeDialog()); } },

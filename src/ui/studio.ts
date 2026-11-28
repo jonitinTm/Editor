@@ -90,6 +90,31 @@ async function traceSetup() {
   const l = new RasterLayer(t('Dibujo'), d.width, d.height); d.insertAboveActive(l); d.setActive(l, false);
   d.invalidate(); d.commit('Preparar para calcar'); app.emit('docs'); app.setTool('brush');
 }
+/** Nombre corto del espacio (para su menú de arriba). */
+export const WS_SHORT: Record<string, string> = { photo: 'Fotografía', illustration: 'Ilustración', anim: 'Animación', pixel: 'Pixel art', game: 'Videojuegos' };
+/** Menú propio de cada espacio: sus funciones a un toque (todo lo demás sigue en los otros menús). */
+export const WS_MENU: Record<string, string[]> = {
+  photo: ['wsNew', 'wsMore', '-', 'autoEnhance', 'removeBg', 'blurBg', 'aiSky', 'aiErase', 'aiUpscale', '-', 'rawDevelop', 'freqSep', 'copyAdj', 'pasteAdj', 'pasteAdjAll', '-', 'magicResize', 'carousel', 'beforeAfter', 'sticker', 'cinemagraph', 'doubleExposure', 'collage'],
+  illustration: ['wsNew', 'wsMore', '-', 'panel:Pinceles', 'reference', 'refLayer', '-', 'assist:off', 'assist:p1', 'assist:p2', '-', 'traceImage', 'colorRamp', 'perspWarp', '-', 'animDock', 'rig'],
+  anim: ['wsNew', 'wsMore', '-', 'animDock', 'animPresets', 'animTween', 'rig', 'camera2d', 'particles', 'cinemagraph', '-', 'animSound', 'lipSync', '-', 'animTag', 'animReverse', 'animPreview', '-', 'animExport', 'sliceSheet'],
+  pixel: ['wsNew', 'wsMore', '-', 'pixelMode', 'pixelExport', 'pixelScale', 'rotSprite', '-', 'paletteSnap', 'colorRamp', 'ditherGradient', 'outline1px', 'recolor', '-', 'paletteImport', 'paletteExport', '-', 'animDock', 'animPresets', 'particles', 'animExport', '-', 'newTexture', 'tileMap'],
+  game: ['wsNew', 'wsMore', '-', 'newTexture', 'texGen', 'texDetails', 'seamless', 'tilePreview', 'texMaps', '-', 'tileMap', 'tileGrid', '-', 'particles', 'gameUi', 'pivotBoxes', 'animPresets', 'animExport', 'sliceSheet', '-', 'atlas', 'pot', 'iconSet'],
+};
+/** Lo que se crea al entrar en cada espacio desde su tarjeta. */
+const ENTER: Record<string, () => void | Promise<void>> = {
+  photo: () => openThen('image/*'),
+  illustration: async () => { await blank('Ilustración', 2048, 2048); app.setTool('brush'); },
+  anim: () => animDoc('Animación', 1920, 1080),
+  pixel: () => pixelDoc('Personaje', 32, 32),
+  game: async () => { await blank('Sprite', 256, 256, null); app.setTool('brush'); },
+};
+/** Entra en el espacio: lo elige y crea su proyecto (en fotografía, abre la galería). */
+export async function enterWorkspace(id: string) {
+  setWorkspace(id);
+  try { await ENTER[id]?.(); } catch (e: any) { if (e?.name !== 'AbortError') app.toast(String(e?.message ?? e), 'warn'); }
+  requestAnimationFrame(() => app.viewport.fit());
+}
+export const newInWorkspace = () => enterWorkspace(currentWorkspace().id);
 async function pixelDoc(name: string, w: number, h0: number, tile = false) {
   const ops = await import('./ops'); ops.newDocument(name, w, h0, null);
   const d = app.doc; if (!d) return;
@@ -128,7 +153,7 @@ export function studioCards(onPick?: () => void): HTMLElement {
   const grid = h('div', { class: 'studio-grid' });
   for (const w of WORKSPACES) {
     const card = h('button', { type: 'button', class: `studio-card ws-${w.id}`, 'data-ws': w.id }, h('span', { class: 'studio-ic', html: icon(w.icon) }), h('span', { class: 'studio-name' }, w.name), h('span', { class: 'studio-desc' }, w.desc));
-    card.onclick = () => { onPick?.(); startDialog(w.id); };
+    card.onclick = () => { onPick?.(); enterWorkspace(w.id); };
     grid.append(card);
   }
   return grid;

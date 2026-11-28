@@ -5,6 +5,7 @@ import { app } from './app';
 import { h } from './dom';
 import { actionById } from './actions';
 import { FILTERS } from '../filters/registry';
+import { currentWorkspace, WS_MENU, WS_SHORT } from './studio';
 
 export type Item = string | '-' | { label: string; items: Item[] };
 
@@ -109,11 +110,18 @@ function fitList(top: HTMLElement) {
   if (r.bottom > window.innerHeight - 4) { list.style.maxHeight = Math.max(160, window.innerHeight - r.top - 8) + 'px'; list.style.overflowY = 'auto'; }
 }
 
+/** Menús que se ven: los de siempre y, detrás de Archivo, el del espacio de trabajo con sus funciones a mano. */
+export function visibleMenus(): { label: string; items: Item[] }[] {
+  const w = currentWorkspace(), items = WS_MENU[w.id]; if (!items) return MENUS;
+  const ok = items.filter(i => i === '-' || actionById.has(i)); // (por si alguna función falta en esta versión)
+  return [MENUS[0], { label: WS_SHORT[w.id] ?? w.name, items: ok }, ...MENUS.slice(1)];
+}
 export function buildMenuBar(parent: HTMLElement) {
   const bar = h('nav', { class: 'menubar' });
   let openMenu: HTMLElement | null = null;
   const close = () => { openMenu?.classList.remove('open'); openMenu = null; };
-  for (const m of MENUS) {
+  const fill = () => { close(); bar.replaceChildren();
+  for (const m of visibleMenus()) {
     const top = h('div', { class: 'menu' }, h('span', { class: 'menu-title' }, m.label), buildList(m.items, close));
     top.addEventListener('click', e => {
       if ((e.target as HTMLElement).closest('.menu-list')) return;
@@ -133,6 +141,8 @@ export function buildMenuBar(parent: HTMLElement) {
     });
     bar.append(top);
   }
+  };
+  fill(); app.on('workspace', fill);
   document.addEventListener('pointerdown', e => { if (openMenu && !bar.contains(e.target as Node)) close(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && openMenu) close(); });
   parent.append(bar);

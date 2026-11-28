@@ -4,10 +4,10 @@ import { app } from './app';
 import { h } from './dom';
 import { icon } from './icons';
 import { actionById } from './actions';
-import { MENUS, refreshStates, type Item } from './menus';
+import { visibleMenus, refreshStates, type Item } from './menus';
 import { t } from '../i18n/i18n';
 
-const ICON: Record<string, string> = { Archivo: 'open', Edición: 'edit', Imagen: 'image', Capa: 'layers', Selección: 'marqueeRect', Filtro: 'fx', IA: 'magic', Juegos: 'pixel', Vista: 'eye', Ventana: 'colorPanel', Ayuda: 'info' };
+const ICON: Record<string, string> = { Archivo: 'open', Edición: 'edit', Imagen: 'image', Capa: 'layers', Selección: 'marqueeRect', Filtro: 'fx', IA: 'magic', Juegos: 'pixel', Fotografía: 'image', Ilustración: 'palette', Animación: 'film', 'Pixel art': 'pixel', Videojuegos: 'gamepad', Audio: 'music', Vista: 'eye', Ventana: 'colorPanel', Ayuda: 'info' };
 const KEY = 'editor.mmTab';
 let sheet: HTMLElement | null = null;
 
@@ -42,6 +42,7 @@ function rows(items: Item[], close: () => void, depth = 0): HTMLElement {
 
 export function openMobileMenu() {
   if (sheet) { closeMobileMenu(); return; }
+  const MENUS = visibleMenus();
   let tab = 0; try { tab = Math.max(0, Math.min(MENUS.length - 1, +(localStorage.getItem(KEY) ?? 0) || 0)); } catch { /* */ }
   const body = h('div', { class: 'mm-body' });
   const tabs = h('div', { class: 'mm-tabs', role: 'tablist' });
