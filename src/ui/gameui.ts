@@ -1,5 +1,6 @@
 // Recursos de juego: punto de pivote y cajas de colisión por fotograma (se guardan en el proyecto y salen en el JSON de la
 // hoja de sprites), y generador de interfaz del juego (botones con sus estados, barras de vida o energía y paneles).
+import { presetBar } from './presets';
 import { app } from './app';
 import { h, numberSlider } from './dom';
 import { showDialog } from './dialog';
@@ -174,8 +175,9 @@ export function gameUiDialog() {
     draw();
   };
   build();
-  showDialog({
-    title: 'Interfaz del juego', okLabel: 'Crear', width: 520, body: [body],
+  let dlg: { close: () => void } | null = null;
+  dlg = showDialog({
+    title: 'Interfaz del juego', okLabel: 'Crear', width: 520, body: [body, presetBar({ key: 'gameUi', lastKey: 'editor.gameUi', current: () => o, close: () => dlg?.close(), reopen: gameUiDialog })],
     onOk: () => {
       try { localStorage.setItem('editor.gameUi', JSON.stringify(o)); } catch { /* */ }
       const parts: [string, HTMLCanvasElement][] = o.kind === 'button' ? (['normal', 'hover', 'pressed', 'disabled'] as const).map(s => [`${t('Botón')} – ${t({ normal: 'Normal', hover: 'Encima', pressed: 'Pulsado', disabled: 'Desactivado' }[s])}`, drawUi(o, s)])

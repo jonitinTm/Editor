@@ -2,6 +2,7 @@
 // hierba, tierra, hormigón, asfalto, metal, tejas, agua y mármol, en estilo realista o pixel art; «Hacer repetible»
 // para cualquier imagen; vista en mosaico; y mapas para motores de juego (normal, relieve, rugosidad y oclusión).
 // Todo el ruido es periódico: lo que sale por un borde entra por el contrario, así la textura se repite sin cortes.
+import { presetBar } from './presets';
 import { app } from './app';
 import { h, numberSlider } from './dom';
 import { showDialog } from './dialog';
@@ -232,7 +233,8 @@ export function textureDialog() {
         h('div', { class: 'tex-pv-wrap' }, pv, h('div', { class: 'hint' }, 'Vista previa repetida 2 × 2: no se ven cortes entre copias.')),
         row('Tamaño', size), row('Estilo', style), row('Escala', sc.el), row('Colores', c1, c2), pct('variation', 'Variación'), pct('wear', 'Desgaste'),
         row('Relieve', numberSlider({ min: 0, max: 100, value: p.relief, unit: '%', onInput: v => { p.relief = v; redraw(); } }).el),
-        row('Semilla', seed, dice)))],
+        row('Semilla', seed, dice),
+        presetBar({ key: 'texGen', lastKey: LAST, current: () => p, close: () => dlg?.close(), reopen: textureDialog })))],
     onOk: () => {
       save(); const t = make(), name = TEX_TYPES.find(x => x.id === p.type)!.name;
       const d = new EditorDocument(`${name} ${p.size}`, p.size, p.size), l = new RasterLayer('Textura', p.size, p.size);

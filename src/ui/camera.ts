@@ -1,6 +1,7 @@
 // Cámara 2D: un encuadre inicial y uno final sobre la imagen o la animación, y la cámara se mueve (y acerca o aleja) de uno
 // a otro con suavizado. También puede temblar (golpes, explosiones). El resultado es una animación nueva del tamaño de
 // salida, lista para exportar a vídeo o GIF. Sirve para escenas animadas y para el efecto Ken Burns en fotos.
+import { presetBar } from './presets';
 import { app } from './app';
 import { h, numberSlider } from './dom';
 import { showDialog } from './dialog';
@@ -48,6 +49,9 @@ export function cameraDialog() {
   if (pix) SIZES.unshift(['320x180', 'Pixel art 320 × 180'], ['256x224', 'Pixel art 256 × 224']);
   const p: CamParams = { W: 1280, H: 720, a: { cx: 0.5, cy: 0.5, zoom: 1 }, b: { cx: 0.5, cy: 0.5, zoom: 1.6 }, ease: 'smooth', frames: anim ? src.length : 48, fps: 24, shake: 0, loops: 1 };
   if (pix) { p.W = 320; p.H = 180; }
+  // lo último usado (o los ajustes elegidos en «Mis ajustes»)
+  try { const sv = JSON.parse(localStorage.getItem('editor.camera') || 'null'); if (sv && typeof sv === 'object') { for (const k of ['ease', 'shake', 'fps'] as const) if (sv[k] != null) (p as any)[k] = sv[k]; if (sv.a) p.a = { ...p.a, ...sv.a }; if (sv.b) p.b = { ...p.b, ...sv.b }; if (sv.W && sv.H && !pix === !sv.pixel) { p.W = sv.W; p.H = sv.H; } if (!anim && sv.frames) p.frames = sv.frames; } } catch { /* */ }
+  const remember = () => { try { localStorage.setItem('editor.camera', JSON.stringify({ a: p.a, b: p.b, ease: p.ease, shake: p.shake, fps: p.fps, W: p.W, H: p.H, frames: p.frames, pixel: pix })); } catch { /* */ } };
   const PV = 420, k = Math.min(PV / src[0].canvas.width, 300 / src[0].canvas.height), pw = Math.round(src[0].canvas.width * k), ph = Math.round(src[0].canvas.height * k);
   const pv = h('canvas', { class: 'gd-pv cam-pv', width: pw, height: ph }) as HTMLCanvasElement;
   const out = h('canvas', { class: 'gd-pv cam-out' }) as HTMLCanvasElement;
@@ -80,12 +84,13 @@ export function cameraDialog() {
   pv.onpointerup = () => { drag = null; };
   const zA = numberSlider({ min: 50, max: 800, value: p.a.zoom * 100, unit: '%', onInput: v => { p.a.zoom = v / 100; draw(); } }), zB = numberSlider({ min: 50, max: 800, value: p.b.zoom * 100, unit: '%', onInput: v => { p.b.zoom = v / 100; draw(); } });
   const whichSel = h('select', {}, h('option', { value: 'a' }, 'Encuadre de inicio'), h('option', { value: 'b' }, 'Encuadre final')) as HTMLSelectElement; whichSel.onchange = () => { which = whichSel.value as 'a' | 'b'; draw(); };
-  const size = h('select', {}, ...SIZES.map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement; size.value = pix ? '320x180' : '1280x720';
+  const size = h('select', {}, ...SIZES.map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement; size.value = SIZES.some(([v]) => v === `${p.W}x${p.H}`) ? `${p.W}x${p.H}` : 'doc';
   size.onchange = () => { const [W, H] = size.value === 'doc' ? [d.width, d.height] : size.value.split('x').map(Number); p.W = W; p.H = H; draw(); };
-  const ease = h('select', {}, ...[['smooth', 'Suave (acelera y frena)'], ['linear', 'Constante'], ['in', 'Acelerando'], ['out', 'Frenando']].map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement; ease.onchange = () => { p.ease = ease.value; };
+  const ease = h('select', {}, ...[['smooth', 'Suave (acelera y frena)'], ['linear', 'Constante'], ['in', 'Acelerando'], ['out', 'Frenando']].map(([v, n]) => h('option', { value: v }, n))) as HTMLSelectElement; ease.value = p.ease; ease.onchange = () => { p.ease = ease.value; };
   const row = (l: string, ...e: HTMLElement[]) => h('div', { class: 'form-row' }, h('label', {}, l), ...e);
   draw(); anim1();
-  showDialog({
+  let dlg: { close: () => void } | null = null;
+  dlg = showDialog({
     title: 'Cámara 2D', okLabel: 'Crear animación', width: 560,
     body: [h('div', { class: 'hint' }, anim ? 'La cámara recorre tu animación: arrastra los recuadros para colocar el encuadre de inicio (verde) y el final (naranja), y elige cuánto se acerca.' : 'Mueve la cámara sobre la imagen (efecto Ken Burns): arrastra los recuadros de inicio (verde) y final (naranja) y elige cuánto se acerca.'),
       h('div', { class: 'cam-wrap' }, h('div', { class: 'gd-pv-wrap' }, pv), h('div', { class: 'cam-side' }, h('div', { class: 'hint' }, 'Resultado'), out)),
@@ -93,12 +98,13 @@ export function cameraDialog() {
       row('Zoom de inicio', zA.el), row('Zoom final', zB.el), row('Movimiento', ease),
       row(anim ? 'Fotogramas' : 'Fotogramas', numberSlider({ min: 2, max: anim ? src.length * 8 : 240, value: p.frames, onInput: v => { p.frames = v; } }).el),
       ...(anim ? [] : [row('Velocidad', numberSlider({ min: 6, max: 60, value: p.fps, unit: ' fps', onInput: v => { p.fps = v; } }).el)]),
-      row('Temblor', numberSlider({ min: 0, max: 100, value: 0, unit: '%', onInput: v => { p.shake = v; } }).el)],
+      row('Temblor', numberSlider({ min: 0, max: 100, value: p.shake, unit: '%', onInput: v => { p.shake = v; } }).el),
+      presetBar({ key: 'camera', lastKey: 'editor.camera', current: () => ({ a: p.a, b: p.b, ease: p.ease, shake: p.shake, fps: p.fps, W: p.W, H: p.H, frames: p.frames, pixel: pix }), close: () => { clearTimeout(timer); dlg?.close(); }, reopen: cameraDialog })],
     onCancel: () => clearTimeout(timer),
     onOk: () => {
       // cada fotograma es una imagen entera: se limita para no agotar la memoria (sobre todo en el móvil)
       if (p.W * p.H * p.frames > 80e6) { app.toast(`${t('Demasiado grande')}: ${p.frames} × ${p.W} × ${p.H}. ${t('Usa menos fotogramas o un tamaño menor')}`, 'warn'); return false; }
-      clearTimeout(timer);
+      clearTimeout(timer); remember();
       const fr = renderCamera(src, p, pix), nd = new EditorDocument(`${d.name} ${t('cámara')}`, p.W, p.H);
       fr.forEach((f, i) => { const l = new RasterLayer(`Fotograma ${i + 1}`, p.W, p.H); ctx2d(l.canvas).drawImage(f.canvas, 0, 0); l.visible = i === 0; nd.root.add(l); nd.frames.push({ delay: f.delay, visible: [l.id], own: l.id }); });
       nd.frameIndex = 0; if (pix) nd.meta.pixelArt = true;

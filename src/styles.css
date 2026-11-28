@@ -1308,3 +1308,7 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .pfx-sprite-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .pfx-sprite-img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; border: 1px solid var(--border); border-radius: 4px; background: repeating-conic-gradient(#3a3b40 0 25%, #2c2d31 0 50%) 0 0 / 8px 8px; }
 .tex-chip.mine { border-style: dashed; }
+/* Mis ajustes */
+.preset-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+.preset-sel { flex: 1 1 140px; min-width: 0; }
+.preset-name { flex: 1 1 110px; min-width: 0; width: auto; }

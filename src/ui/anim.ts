@@ -2,6 +2,7 @@
 // («Fotograma 1», «Fotograma 2»…); las demás capas (un fondo, un decorado) se ven en todos. Papel cebolla
 // configurable, duración de cada fotograma, interpolación de movimiento y exportación (GIF, vídeo, secuencia PNG y
 // hoja de sprites con JSON para motores de juego). Usa los mismos cuadros que la línea de tiempo y el historial.
+import { presetBar } from './presets';
 import { app } from './app';
 import { h, numberSlider } from './dom';
 import { icon } from './icons';
@@ -267,13 +268,15 @@ export function tween(d: EditorDocument, src: RasterLayer, p: TweenParams) {
 export function tweenDialog() {
   const d = app.doc, src = d?.activeRaster(); if (!d || !src) { app.toast('Elige la capa con el objeto que quieres animar', 'warn'); return; }
   const p: TweenParams = { frames: 12, dx: Math.round(d.width / 3), dy: 0, rot: 0, scale: 100, opacity: 100, ease: 'smooth', pingpong: false, sx: 100, sy: 100, pivot: 'center' };
+  try { const sv = JSON.parse(localStorage.getItem('editor.tween') || 'null'); if (sv && typeof sv === 'object') Object.assign(p, sv); } catch { /* */ }
   const num = (k: 'frames' | 'dx' | 'dy' | 'rot' | 'scale' | 'opacity' | 'sx' | 'sy', label: string, min: number, max: number, unit = '') =>
     h('div', { class: 'form-row' }, h('label', {}, label), numberSlider({ min, max, value: p[k] ?? 100, unit, onInput: v => { p[k] = v; } }).el);
-  const piv = h('select', {}, h('option', { value: 'center' }, 'Centro'), h('option', { value: 'bottom' }, 'Abajo (los pies)'), h('option', { value: 'top' }, 'Arriba')); piv.onchange = () => { p.pivot = piv.value; };
+  const piv = h('select', {}, h('option', { value: 'center' }, 'Centro'), h('option', { value: 'bottom' }, 'Abajo (los pies)'), h('option', { value: 'top' }, 'Arriba')); piv.value = p.pivot ?? 'center'; piv.onchange = () => { p.pivot = piv.value; };
   const ease = h('select', {}, ...[['smooth', 'Suave (acelera y frena)'], ['linear', 'Constante'], ['in', 'Acelerando'], ['out', 'Frenando'], ['bounce', 'Rebote'], ['back', 'Con impulso (se pasa y vuelve)']].map(([v, n]) => h('option', { value: v }, n)));
-  ease.onchange = () => { p.ease = ease.value; };
-  const pp = h('input', { type: 'checkbox' }) as HTMLInputElement; pp.onchange = () => { p.pingpong = pp.checked; };
-  showDialog({
+  ease.value = p.ease; ease.onchange = () => { p.ease = ease.value; };
+  const pp = h('input', { type: 'checkbox', checked: p.pingpong }) as HTMLInputElement; pp.onchange = () => { p.pingpong = pp.checked; };
+  let dlg: { close: () => void } | null = null;
+  dlg = showDialog({
     title: 'Interpolar movimiento', okLabel: 'Crear fotogramas', width: 460,
     body: [
       h('div', { class: 'hint' }, `Anima la capa «${src.name}»: se crean los fotogramas intermedios desde donde está ahora hasta el final que indiques.`),
@@ -283,8 +286,9 @@ export function tweenDialog() {
       h('div', { class: 'form-row' }, h('label', {}, 'Punto de giro'), piv),
       h('div', { class: 'form-row' }, h('label', {}, 'Movimiento'), ease),
       h('label', { class: 'check' }, pp, ' Ida y vuelta (vuelve al principio)'),
+      presetBar({ key: 'tween', lastKey: 'editor.tween', current: () => p, close: () => dlg?.close(), reopen: tweenDialog }),
     ],
-    onOk: () => { if (tween(d, src, p)) app.toast(`${p.frames} fotogramas creados: pulsa reproducir para verlo`); refresh(); },
+    onOk: () => { try { localStorage.setItem('editor.tween', JSON.stringify(p)); } catch { /* */ } if (tween(d, src, p)) app.toast(`${p.frames} fotogramas creados: pulsa reproducir para verlo`); refresh(); },
   });
 }
 

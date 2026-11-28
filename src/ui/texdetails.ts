@@ -2,6 +2,7 @@
 // nieve y polvo. Se calculan sobre la imagen que ya hay (el musgo y la suciedad se meten en las grietas y zonas
 // hundidas; la nieve se queda en los bordes de arriba), van en una capa aparte para poder cambiarlos y son repetibles
 // (lo que sale por un borde entra por el otro). En estilo pixel art salen sin bordes suaves y con pocos tonos.
+import { presetBar } from './presets';
 import { app } from './app';
 import { h, numberSlider } from './dom';
 import { showDialog } from './dialog';
@@ -148,7 +149,8 @@ export function detailsDialog() {
   const seed = h('button', { type: 'button', class: 'btn' }, 'Otra variante'); seed.onclick = () => { p.seed = 1 + Math.floor(Math.random() * 9999); redraw(); };
   const merge = h('input', { type: 'checkbox' }) as HTMLInputElement;
   redraw();
-  showDialog({
+  let dlg: { close: () => void } | null = null;
+  dlg = showDialog({
     title: 'Añadir detalles a la textura', okLabel: 'Añadir', width: 640,
     body: [h('div', { class: 'tex-wrap' },
       h('div', { class: 'tex-left' }, types, h('div', { class: 'hint' }, 'Se adaptan a la imagen: el musgo y la suciedad se meten en las juntas y zonas hundidas, y la nieve se queda en los bordes de arriba. Puedes añadir varios, uno detrás de otro.')),
@@ -157,7 +159,8 @@ export function detailsDialog() {
         row('Escala', numberSlider({ min: 1, max: 16, value: p.scale, onInput: v => { p.scale = v; redraw(); } }).el),
         row('Color', color), row('', seed),
         h('label', { class: 'check' }, pix, ' Estilo pixel art (sin bordes suaves)'),
-        h('label', { class: 'check' }, merge, ' Pintar sobre la capa actual (si no, va en una capa nueva que puedes cambiar o borrar)')))],
+        h('label', { class: 'check' }, merge, ' Pintar sobre la capa actual (si no, va en una capa nueva que puedes cambiar o borrar)'),
+        presetBar({ key: 'texDetail', lastKey: 'editor.texDetail', current: () => p, close: () => dlg?.close(), reopen: detailsDialog })))],
     onOk: () => {
       try { localStorage.setItem('editor.texDetail', JSON.stringify(p)); } catch { /* */ }
       const ov = renderDetail(d.flatten(), p), name = DETAILS.find(t => t.id === p.type)!.name;

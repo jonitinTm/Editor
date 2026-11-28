@@ -1,5 +1,6 @@
 // Extras de videojuegos: animaciones rápidas, etiquetas de animación, invertir orden, ajustar a la paleta (con tramado),
 // rampas de color con cambio de tono, ampliar pixel art (vecino más próximo y Scale2x), degradado tramado e iconos.
+import { presetBar } from './presets';
 import { app } from './app';
 import { h, numberSlider } from './dom';
 import { showDialog } from './dialog';
@@ -40,17 +41,22 @@ export function presetPoses(id: string, frames: number, amount: number, W: numbe
 }
 export function presetDialog() {
   const d = app.doc, src = d?.activeRaster(); if (!d || !src) { app.toast('Elige la capa con el personaje u objeto que quieres animar', 'warn'); return; }
-  let cur = PRESETS[0], frames = cur.frames, amount = 100, fps = 12;
+  let cur = PRESETS[0], frames = cur.frames, amount = 100, fps = 12, tagName = '';
+  try { const sv = JSON.parse(localStorage.getItem('editor.animPreset') || 'null'); if (sv) { cur = PRESETS.find(x => x.id === sv.id) ?? cur; frames = +sv.frames || cur.frames; amount = +sv.amount || 100; fps = +sv.fps || 12; tagName = typeof sv.tag === 'string' ? sv.tag : ''; } } catch { /* */ }
+  const state = () => ({ id: cur.id, frames, amount, fps, tag: tag.value.trim() });
   const chips = h('div', { class: 'tex-chips' });
   const fr = numberSlider({ min: 2, max: 48, value: frames, onInput: v => { frames = v; } });
   for (const p of PRESETS) { const b = h('button', { type: 'button', class: 'btn tex-chip' + (p === cur ? ' on' : ''), 'data-p': p.id }, p.name); b.onclick = () => { cur = p; frames = p.frames; fr.set?.(frames); chips.querySelectorAll('.tex-chip').forEach(x => x.classList.toggle('on', x === b)); }; chips.append(b); }
-  const tag = h('input', { type: 'text', placeholder: 'Por ejemplo: quieto, saltar', class: 'input' }) as HTMLInputElement;
-  showDialog({
+  const tag = h('input', { type: 'text', placeholder: 'Por ejemplo: quieto, saltar', class: 'input', value: tagName }) as HTMLInputElement;
+  let dlg: { close: () => void } | null = null;
+  dlg = showDialog({
     title: 'Animaciones rápidas', okLabel: 'Crear fotogramas', width: 520,
     body: [h('div', { class: 'hint' }, `Anima la capa «${src.name}» con un movimiento típico de videojuego. Se crean los fotogramas a partir del actual; luego puedes retocar cada uno.`),
       chips, row('Fotogramas', fr.el), row('Intensidad', numberSlider({ min: 10, max: 200, value: amount, unit: '%', onInput: v => { amount = v; } }).el),
-      row('Velocidad', numberSlider({ min: 2, max: 30, value: fps, unit: ' fps', onInput: v => { fps = v; } }).el), row('Nombre de la animación', tag)],
+      row('Velocidad', numberSlider({ min: 2, max: 30, value: fps, unit: ' fps', onInput: v => { fps = v; } }).el), row('Nombre de la animación', tag),
+      presetBar({ key: 'animPreset', lastKey: 'editor.animPreset', current: state, close: () => dlg?.close(), reopen: presetDialog })],
     onOk: () => {
+      try { localStorage.setItem('editor.animPreset', JSON.stringify(state())); } catch { /* */ }
       const start = isAnim(d) ? d.frameIndex + 1 : 0;
       if (!buildFrames(d, src, presetPoses(cur.id, frames, amount / 100, d.width, d.height), `Animación: ${cur.name}`, cur.pivot, Math.round(1000 / fps))) return;
       const name = tag.value.trim(); if (name) { for (let i = start; i < start + frames && i < d.frames.length; i++) (d.frames[i] as any).tag = name; d.commit('Etiquetar animación'); }
