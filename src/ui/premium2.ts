@@ -290,17 +290,27 @@ export async function rotSprite(src: HTMLCanvasElement, deg: number): Promise<HT
 }
 export function rotSpriteDialog() {
   const d = app.doc, l = d?.activeRaster(); if (!d || !l) { app.toast('Elige una capa de píxeles', 'warn'); return; }
+  // solo se trabaja con lo dibujado (en un cuadrado donde cabe girado), no con la capa entera
+  const b = contentBounds(l.canvas, 0); if (!b) { app.toast('La capa está vacía', 'warn'); return; }
+  const S = Math.ceil(Math.hypot(b.w, b.h)) + 2;
+  if (S > 384) { app.toast('Es demasiado grande para girarlo como pixel art: usa Edición › Transformar', 'warn'); return; }
+  const cx = b.x + b.w / 2, cy = b.y + b.h / 2, ox = Math.round(cx - S / 2), oy = Math.round(cy - S / 2);
+  const crop = makeCanvas(S, S); ctx2d(crop).drawImage(l.canvas, b.x, b.y, b.w, b.h, b.x - ox, b.y - oy, b.w, b.h);
   let deg = 45;
-  const pv = h('canvas', { class: 'gd-pv' }) as HTMLCanvasElement, k = Math.max(1, Math.floor(240 / Math.max(l.canvas.width, l.canvas.height)));
-  pv.width = l.canvas.width * k; pv.height = l.canvas.height * k;
-  let busy = 0;
-  const draw = async () => { const my = ++busy; const r = await rotSprite(l.canvas, deg); if (my !== busy) return; const x = ctx2d(pv); x.imageSmoothingEnabled = false; x.clearRect(0, 0, pv.width, pv.height); x.drawImage(r, 0, 0, pv.width, pv.height); };
+  const pv = h('canvas', { class: 'gd-pv' }) as HTMLCanvasElement, k = Math.max(1, Math.floor(240 / S));
+  pv.width = S * k; pv.height = S * k;
+  let busy = 0, timer = 0;
+  const draw = () => { clearTimeout(timer); timer = window.setTimeout(async () => { const my = ++busy; const r = await rotSprite(crop, deg); if (my !== busy) return; const x = ctx2d(pv); x.imageSmoothingEnabled = false; x.clearRect(0, 0, pv.width, pv.height); x.drawImage(r, 0, 0, pv.width, pv.height); }, 40); };
   draw();
-  const big = l.canvas.width * l.canvas.height > 512 * 512;
   showDialog({
     title: 'Rotar pixel art', okLabel: 'Girar', width: 440,
-    body: [h('div', { class: 'hint' }, 'Gira la capa sin que el dibujo se llene de píxeles sueltos ni de colores nuevos (como RotSprite).'), ...(big ? [h('div', { class: 'hint' }, 'Es una imagen grande: puede tardar unos segundos.')] : []), h('div', { class: 'gd-pv-wrap' }, pv),
+    body: [h('div', { class: 'hint' }, 'Gira la capa sin que el dibujo se llene de píxeles sueltos ni de colores nuevos (como RotSprite).'), h('div', { class: 'gd-pv-wrap' }, pv),
       row('Ángulo', numberSlider({ min: -180, max: 180, value: deg, unit: '°', onInput: v => { deg = v; draw(); } }).el)],
-    onOk: async () => { const r = await rotSprite(l.canvas, deg), x = ctx2d(l.canvas); x.clearRect(0, 0, l.canvas.width, l.canvas.height); x.drawImage(r, 0, 0); l.touch(); d.invalidate(); d.commit(`Rotar pixel art ${deg}°`); },
+    onCancel: () => clearTimeout(timer),
+    onOk: async () => {
+      clearTimeout(timer); const r = await rotSprite(crop, deg), x = ctx2d(l.canvas);
+      x.clearRect(b.x, b.y, b.w, b.h); x.drawImage(r, ox, oy);
+      l.touch(); d.invalidate(); d.commit(`Rotar pixel art ${deg}°`);
+    },
   });
 }

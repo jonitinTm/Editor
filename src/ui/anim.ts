@@ -229,7 +229,13 @@ function contentBox(c: HTMLCanvasElement) {
 export type TweenParams = { frames: number; dx: number; dy: number; rot: number; scale: number; opacity: number; ease: string; pingpong: boolean; sx?: number; sy?: number; pivot?: string };
 export type Pose = { dx: number; dy: number; rot: number; sx: number; sy: number; alpha: number };
 /** Crea un fotograma por cada postura (mover, girar, estirar y aplastar, transparencia) de la capa elegida. */
+/** ¿Caben n fotogramas más del tamaño del documento? (cada uno es una imagen entera: se limita para no agotar la memoria) */
+export function framesFit(d: EditorDocument, n: number) {
+  if (d.width * d.height * n <= 100e6) return true;
+  app.toast(`${t('Demasiado grande')}: ${n} × ${d.width} × ${d.height}. ${t('Usa menos fotogramas o reduce la imagen')}`, 'warn'); return false;
+}
 export function buildFrames(d: EditorDocument, src: RasterLayer, poses: Pose[], label: string, pivot = 'center', delayMs?: number) {
+  if (!framesFit(d, poses.length)) return false;
   const box = contentBox(src.canvas); if (!box) { app.toast('La capa está vacía', 'warn'); return false; }
   const pix = !!d.meta.pixelArt;
   // punto de giro: centro, abajo (los pies: para saltos y aplastar contra el suelo) o arriba (algo colgado)

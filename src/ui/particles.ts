@@ -259,11 +259,12 @@ export function particlesDialog() {
 }
 /** Pone el efecto encima del dibujo o la animación abierta: una capa de efecto por fotograma, centrada en la selección
  *  (o en el centro). Si no era una animación, pasa a serlo: el dibujo se ve en todos los fotogramas. */
-export function applyOnto(d: EditorDocument, s: PSettings) {
+export async function applyOnto(d: EditorDocument, s: PSettings) {
   const b = d.selection.active && d.selection.bounds ? d.selection.bounds : null;
   const cx = b ? b.x + b.w / 2 : d.width / 2, cy = b ? b.y + b.h / 2 : d.height / 2;
   const k = b ? Math.max(b.w / s.W, b.h / s.H) : 1, W = s.W * k, H = s.H * k;
   const anim = d.frames.length > 1 && d.frames.some(f => f.own != null), n = anim ? d.frames.length : s.frames;
+  const { framesFit } = await import('./anim'); if (!framesFit(d, n)) return;
   if (!anim) { const vis = d.allLayers().filter(l => l.visible).map(l => l.id); d.frames = Array.from({ length: n }, () => ({ delay: Math.round(1000 / s.fps), visible: [...vis] })); }
   const parent = d.root;
   for (let i = 0; i < n; i++) {

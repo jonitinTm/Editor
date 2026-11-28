@@ -550,7 +550,7 @@ const reportError = (msg: string) => {
 };
 window.addEventListener('error', e => { if (e.error) reportError(String(e.error?.stack ?? e.message)); });
 window.addEventListener('unhandledrejection', e => {
-  const r = e.reason; if (r?.name === 'AbortError') return;
+  const r = e.reason; if (r?.name === 'AbortError') { e.preventDefault(); return; } // cancelar un «Guardar como» no es un error
   // tras publicar una versión nueva con el editor abierto, las piezas antiguas ya no existen: se recarga una vez
   if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(String(r?.message ?? r))) {
     // sin cambios sin guardar, se recarga solo (una vez); si hay trabajo sin guardar, se avisa para no perderlo

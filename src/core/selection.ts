@@ -119,8 +119,9 @@ export class Selection {
     this.grow(Math.max(1, Math.round(w / 2)));
     const outer = cloneCanvas(this.mask!);
     this.mask = cloneCanvas(orig); this.grow(-Math.max(1, Math.round(w / 2)));
-    const inner = this.mask!;
-    const c = ctx2d(outer); c.globalCompositeOperation = 'destination-out'; c.drawImage(inner, 0, 0);
+    // si la selección es más estrecha que el borde, al encogerla desaparece: el borde es entonces todo lo de fuera
+    const inner = this.mask;
+    const c = ctx2d(outer); c.globalCompositeOperation = 'destination-out'; if (inner) c.drawImage(inner, 0, 0);
     this.mask = outer; this.feather(0.7);
     this.changed();
   }
