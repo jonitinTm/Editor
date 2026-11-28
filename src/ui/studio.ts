@@ -76,6 +76,7 @@ export const WORKSPACES: Workspace[] = [
       { label: 'Generador de texturas', icon: 'magic', run: () => act('texGen') },
       { label: 'Mapa de tiles con mi tileset', icon: 'marqueeRow', run: () => openThen('image/*', () => act('tileMap')) },
       { label: 'Interfaz del juego (botones, barras de vida…)', icon: 'shape', run: () => act('gameUi') },
+      { label: 'Partículas y efectos (explosión, fuego, magia…)', icon: 'magic', run: () => act('particles') },
       { label: 'Cortar una hoja de sprites', icon: 'slice', run: () => openThen('image/*', () => act('sliceSheet')) },
       { label: 'Iconos del juego en todos los tamaños', icon: 'image', run: () => openThen('image/*', () => act('iconSet')) },
     ] },

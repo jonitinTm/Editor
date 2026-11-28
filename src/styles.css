@@ -1203,7 +1203,9 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .tm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .tm-bar .icon-btn.on { border-color: var(--accent); background: var(--accent-soft); }
 .tm-sep { width: 1px; height: 22px; background: var(--border); margin: 0 4px; }
-.tm-zoom { min-width: 150px; flex: 1 1 150px; max-width: 220px; }
+.tm-zoom { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.tm-zlbl { min-width: 28px; text-align: center; font-size: 12px; color: var(--muted); }
+.tm-zbtn { font-size: 16px; line-height: 1; }
 .tm-layers { display: flex; flex-direction: column; gap: 3px; }
 .tm-layer { display: flex; align-items: center; gap: 6px; padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; cursor: pointer; font-size: 12px; }
 .tm-layer.on { border-color: var(--accent); background: var(--accent-soft); }
@@ -1291,3 +1293,11 @@ body.hide-side-only .side, body.hide-side-only .side-handle { display: none; }
 .rig-item select { font-size: 11px; min-width: 0; }
 .rig-deg { color: var(--muted); text-align: right; }
 @media (max-width: 700px) { .rig-side { min-width: 0; } }
+
+@media (max-width: 700px) {
+  /* animar con huesos: la vista se queda arriba mientras se baja por las piezas */
+  .rig-wrap > div:first-child { position: sticky; top: -1px; z-index: 2; background: var(--panel); padding-bottom: 4px; }
+  .rig-pv { max-height: 34vh; width: auto; }
+}
+.pfx-pv { max-width: 100%; image-rendering: pixelated; }
+.pfx-colors { display: flex; gap: 4px; flex-wrap: wrap; }

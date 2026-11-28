@@ -12,7 +12,7 @@ import { EditorDocument } from '../core/document';
 import { t } from '../i18n/i18n';
 
 export type Bone = { id: number; parent: number | null; px: number; py: number; tx: number; ty: number };
-export type Pose = { frame: number; rot: Record<number, number>; dx: number; dy: number };
+export type Pose = { frame: number; rot: Record<number, number>; dx: number; dy: number; /** curvatura de cada pieza (grados entre la base y la punta) */ bend?: Record<number, number> };
 export type Rig = { bones: Bone[]; poses: Pose[]; frames: number; fps: number; loop: boolean };
 type M = [number, number, number, number, number, number]; // a b c d e f (como DOMMatrix 2D)
 const mul = (p: M, q: M): M => [p[0] * q[0] + p[2] * q[1], p[1] * q[0] + p[3] * q[1], p[0] * q[2] + p[2] * q[3], p[1] * q[2] + p[3] * q[3], p[0] * q[4] + p[2] * q[5] + p[4], p[1] * q[4] + p[3] * q[5] + p[5]];
@@ -29,19 +29,35 @@ export function poseAt(rig: Rig, f: number): Pose {
   for (let i = 0; i < ps.length - 1; i++) {
     const a = ps[i], b = ps[i + 1]; if (f > b.frame) continue;
     const k = smooth((f - a.frame) / Math.max(1, b.frame - a.frame)), rot: Record<number, number> = {};
-    for (const bn of rig.bones) { const ra = a.rot[bn.id] ?? 0, rb = b.rot[bn.id] ?? 0; rot[bn.id] = ra + (rb - ra) * k; }
-    return { frame: f, rot, dx: a.dx + (b.dx - a.dx) * k, dy: a.dy + (b.dy - a.dy) * k };
+    const bend: Record<number, number> = {};
+    for (const bn of rig.bones) { const ra = a.rot[bn.id] ?? 0, rb = b.rot[bn.id] ?? 0; rot[bn.id] = ra + (rb - ra) * k; const ba = a.bend?.[bn.id] ?? 0, bb = b.bend?.[bn.id] ?? 0; if (ba || bb) bend[bn.id] = ba + (bb - ba) * k; }
+    return { frame: f, rot, dx: a.dx + (b.dx - a.dx) * k, dy: a.dy + (b.dy - a.dy) * k, bend };
   }
   return ps[ps.length - 1];
 }
 /** Matriz de cada pieza (encadenando las de sus padres). */
+/** Doblado de una pieza: la parte que está a la distancia s de la articulación (a lo largo del hueso) se lleva a su sitio
+ *  en el arco y se gira lo que toca. La curvatura es constante: entre la base y la punta gira `deg` grados en total. */
+export function bendMatrix(b: Bone, deg: number, s: number): M {
+  const L = Math.hypot(b.tx - b.px, b.ty - b.py); if (!deg || L < 1) return [1, 0, 0, 1, 0, 0];
+  const k = deg * Math.PI / 180 / L, th = Math.atan2(b.ty - b.py, b.tx - b.px), cx = Math.sin(k * s) / k, cy = (1 - Math.cos(k * s)) / k;
+  // en el sistema del hueso (eje x a lo largo): punto (s+du, v) → C(s) + R(k·s)·(du, v)
+  const local: M = mul([1, 0, 0, 1, cx, cy], mul(rotAt(k * s * 180 / Math.PI, 0, 0), [1, 0, 0, 1, -s, 0]));
+  const toBone: M = mul(rotAt(-th * 180 / Math.PI, 0, 0), [1, 0, 0, 1, -b.px, -b.py]), fromBone: M = mul([1, 0, 0, 1, b.px, b.py], rotAt(th * 180 / Math.PI, 0, 0));
+  return mul(fromBone, mul(local, toBone));
+}
+/** Distancia a lo largo del hueso del punto (x, y) (de 0 a su largo). */
+const along = (b: Bone, x: number, y: number) => { const L = Math.hypot(b.tx - b.px, b.ty - b.py) || 1; return Math.max(0, Math.min(L, ((x - b.px) * (b.tx - b.px) + (y - b.py) * (b.ty - b.py)) / L)); };
+/** Matriz de cada pieza (encadenando las de sus padres; si el padre está doblado, la hija sigue la curva). */
 export function worldMatrices(rig: Rig, pose: Pose): Map<number, M> {
   const out = new Map<number, M>(), byId = new Map(rig.bones.map(b => [b.id, b]));
   const get = (id: number, depth = 0): M => {
     const c = out.get(id); if (c) return c;
     const b = byId.get(id)!; let m = rotAt(pose.rot[id] ?? 0, b.px, b.py);
-    if (b.parent != null && byId.has(b.parent) && depth < 32) m = mul(get(b.parent, depth + 1), m);
-    else m = mul([1, 0, 0, 1, pose.dx, pose.dy], m);
+    if (b.parent != null && byId.has(b.parent) && depth < 32) {
+      const P = byId.get(b.parent)!, pb = pose.bend?.[P.id] ?? 0;
+      m = mul(get(b.parent, depth + 1), pb ? mul(bendMatrix(P, pb, along(P, b.px, b.py)), m) : m);
+    } else m = mul([1, 0, 0, 1, pose.dx, pose.dy], m);
     out.set(id, m); return m;
   };
   for (const b of rig.bones) get(b.id);
@@ -54,9 +70,23 @@ export function renderPose(d: EditorDocument, rig: Rig, pose: Pose, W = d.width,
   for (const l of d.allLayers()) {
     if (!(l instanceof RasterLayer) || !l.visible && !ids.has(l.id)) continue;
     if (!ids.has(l.id)) { if (withRest) { x.globalAlpha = l.opacity; x.drawImage(l.canvas, 0, 0); x.globalAlpha = 1; } continue; }
-    const m = mats.get(l.id)!; x.save(); x.transform(...m); x.globalAlpha = l.opacity; x.drawImage(l.canvas, 0, 0); x.restore();
+    const m = mats.get(l.id)!, b = rig.bones.find(q => q.id === l.id)!, deg = pose.bend?.[l.id] ?? 0;
+    if (!deg) { x.save(); x.transform(...m); x.globalAlpha = l.opacity; x.drawImage(l.canvas, 0, 0); x.restore(); continue; }
+    drawBent(x, l.canvas, b, deg, m, l.opacity);
   }
   return c;
+}
+/** Pieza doblada: se corta en tiras perpendiculares al hueso y cada tira se coloca en su punto del arco (un poco solapadas
+ *  para que no queden rendijas). Lo que queda antes de la articulación o después de la punta va con la primera o la última. */
+function drawBent(x: CanvasRenderingContext2D, img: HTMLCanvasElement, b: Bone, deg: number, m: M, alpha: number) {
+  const L = Math.hypot(b.tx - b.px, b.ty - b.py), th = Math.atan2(b.ty - b.py, b.tx - b.px), N = Math.max(8, Math.min(64, Math.round(L / 3))), R = Math.hypot(img.width, img.height);
+  for (let i = 0; i < N; i++) {
+    const s0 = i === 0 ? -R : i * L / N, s1 = i === N - 1 ? L + R : (i + 1) * L / N + 0.8, sm = Math.max(0, Math.min(L, (i + 0.5) * L / N));
+    x.save(); x.transform(...m); x.transform(...bendMatrix(b, deg, sm));
+    // tira en el sistema del hueso
+    x.translate(b.px, b.py); x.rotate(th); x.beginPath(); x.rect(s0, -R, s1 - s0, 2 * R); x.rotate(-th); x.translate(-b.px, -b.py); x.clip();
+    x.globalAlpha = alpha; x.drawImage(img, 0, 0); x.restore();
+  }
 }
 /** Cinemática inversa de dos huesos: gira `upper` y `lower` para que la punta (tx, ty) de `lower` llegue a (gx, gy). */
 export function solveTwoBone(rig: Rig, pose: Pose, upper: number, lower: number, gx: number, gy: number) {
@@ -119,7 +149,7 @@ export function rigDialog() {
     const x = ctx2d(pv); x.clearRect(0, 0, pw, ph); x.drawImage(renderPose(d, rig, pose(), pw, ph), 0, 0);
     const mats = worldMatrices(rig, pose());
     for (const b of rig.bones) {
-      const m = mats.get(b.id)!, p = apply(m, b.px, b.py), q = apply(m, b.tx, b.ty), on = b.id === sel;
+      const m = mats.get(b.id)!, bd = pose().bend?.[b.id] ?? 0, p = apply(m, b.px, b.py), q = apply(bd ? mul(m, bendMatrix(b, bd, Math.hypot(b.tx - b.px, b.ty - b.py))) : m, b.tx, b.ty), on = b.id === sel;
       x.strokeStyle = on ? '#ffb020' : 'rgba(255,255,255,.75)'; x.lineWidth = on ? 3 : 1.5; x.beginPath(); x.moveTo(p.x * k, p.y * k); x.lineTo(q.x * k, q.y * k); x.stroke();
       x.fillStyle = on ? '#ffb020' : '#3d8bfd'; x.beginPath(); x.arc(p.x * k, p.y * k, on ? 5 : 4, 0, 7); x.fill(); x.strokeStyle = '#000'; x.lineWidth = 1; x.stroke();
       x.fillStyle = '#ff4fd8'; x.beginPath(); x.arc(q.x * k, q.y * k, 3, 0, 7); x.fill();
@@ -148,8 +178,11 @@ export function rigDialog() {
   };
   pv.onpointerup = () => { drag = null; };
   // lista de piezas: padre y giro en la postura actual
+  // doblar la pieza elegida (cola, brazo, pelo…): curvatura en esta postura
+  const bendSl = numberSlider({ min: -180, max: 180, value: 0, unit: '°', onInput: v => { const p = pose(); (p.bend ??= {})[sel] = v; draw(); } });
   const list = h('div', { class: 'rig-list' });
   const renderList = () => {
+    bendSl.set(Math.round(pose().bend?.[sel] ?? 0));
     list.replaceChildren(...rig.bones.map(b => {
       const par = h('select', { title: 'De qué pieza cuelga' }, h('option', { value: '' }, t('Ninguna')), ...rig.bones.filter(o => o.id !== b.id).map(o => h('option', { value: String(o.id) }, name(o.id)))) as HTMLSelectElement;
       par.value = b.parent == null ? '' : String(b.parent);
@@ -188,7 +221,7 @@ export function rigDialog() {
         h('div', { class: 'rig-side' }, h('div', { class: 'tm-sub' }, t('Posturas clave')), poses, row('Esta postura en el fotograma', frameOf.el),
           row('Fotogramas', numberSlider({ min: 2, max: 240, value: rig.frames, onInput: v => { rig.frames = v; } }).el), row('Velocidad', numberSlider({ min: 2, max: 30, value: rig.fps, unit: ' fps', onInput: v => { rig.fps = v; } }).el),
           h('label', { class: 'check' }, loop, ' En bucle (al final vuelve a la primera postura)'),
-          h('div', { class: 'tm-sub' }, t('Piezas')), list))],
+          h('div', { class: 'tm-sub' }, t('Piezas')), list, h('div', { class: 'form-row' }, h('label', {}, 'Doblar la pieza elegida'), bendSl.el)))],
     onCancel: stop,
     onOk: () => {
       stop();

@@ -105,3 +105,55 @@ export function audioDialog() {
     onCancel: () => { stopAudio(); Object.assign(a, prev); },
   });
 }
+
+// ---- sincronía labial automática ----------------------------------------------------------------------
+/** Volumen (RMS) del sonido en cada fotograma, normalizado de 0 a 1 (1 = de lo más fuerte del sonido). */
+export function frameLoudness(buf: AudioBuffer, offset: number, times: [number, number][]) {
+  const ch = buf.getChannelData(0), sr = buf.sampleRate, vals = times.map(([a, b]) => {
+    const i0 = Math.max(0, Math.floor((a - offset) / 1000 * sr)), i1 = Math.min(ch.length, Math.floor((b - offset) / 1000 * sr)); if (i1 <= i0) return 0;
+    let s = 0; for (let i = i0; i < i1; i++) s += ch[i] * ch[i]; return Math.sqrt(s / (i1 - i0));
+  });
+  const sorted = [...vals].sort((a, b) => a - b), ref = sorted[Math.floor(sorted.length * 0.95)] || 1;
+  return vals.map(v => Math.min(1, v / (ref || 1)));
+}
+/** Qué boca va en cada fotograma (0 = cerrada … n-1 = la más abierta), sin parpadeos de un solo fotograma. */
+export function mouthLevels(loud: number[], n: number, silence = 0.12) {
+  const lv = loud.map(e => e < silence ? 0 : Math.min(n - 1, 1 + Math.floor((e - silence) / ((1 - silence) / (n - 1)) * 0.999)));
+  for (let i = 1; i < lv.length - 1; i++) if (lv[i - 1] === lv[i + 1] && lv[i] !== lv[i - 1]) lv[i] = lv[i - 1];
+  return lv;
+}
+export function lipSyncDialog() {
+  const d = app.doc; if (!d) return;
+  if (!audioOf(d)) { app.toast('Añade antes el sonido (la voz) con Juegos › Animación › Sonido de la animación', 'warn'); return; }
+  const layers = d.allLayers().filter(l => l.kind === 'raster');
+  const guess = layers.filter(l => /boca|mouth|labio|lip/i.test(l.name));
+  const NAMES = ['Boca cerrada', 'Boca medio abierta', 'Boca abierta', 'Boca muy abierta (opcional)'];
+  const sels = NAMES.map((n, i) => { const s = h('select', {}, h('option', { value: '' }, '—'), ...layers.map(l => h('option', { value: String(l.id) }, l.name))) as HTMLSelectElement; const g = guess[i]; if (g) s.value = String(g.id); return s; });
+  let fps = 12; const useCur = h('input', { type: 'checkbox', checked: d.frames.length > 1 }) as HTMLInputElement;
+  showDialog({
+    title: 'Sincronía labial automática', okLabel: 'Sincronizar', width: 480,
+    body: [h('div', { class: 'hint' }, 'Pon cada boca en su capa. Según lo fuerte que suena la voz en cada fotograma se ve una boca u otra: cerrada en los silencios y más abierta cuanto más fuerte.'),
+      ...sels.map((s, i) => h('div', { class: 'form-row' }, h('label', {}, NAMES[i]), s)),
+      h('label', { class: 'check' }, useCur, ' Usar los fotogramas que ya tengo (si no, se crean los que dura el sonido)'),
+      h('div', { class: 'form-row' }, h('label', {}, 'Velocidad'), numberSlider({ min: 6, max: 30, value: fps, unit: ' fps', onInput: v => { fps = v; } }).el)],
+    onOk: async () => {
+      const mouths = sels.map(s => s.value ? +s.value : null).filter((v): v is number => v != null);
+      if (mouths.length < 2 || new Set(mouths).size !== mouths.length) { app.toast('Elige al menos dos bocas distintas (cerrada y abierta)', 'warn'); return false; }
+      const dec = await decoded(d).catch(() => null), a = audioOf(d)!; if (!dec) return false;
+      const ms = new Set(mouths), others = d.allLayers().filter(l => l.visible && !ms.has(l.id)).map(l => l.id);
+      if (!useCur.checked || d.frames.length < 2) {
+        const n = Math.max(2, Math.ceil((dec.buf.duration * 1000 + Math.max(0, a.offset)) / (1000 / fps)));
+        if (n > 1500) { app.toast('El sonido es demasiado largo para crear un fotograma por cada momento', 'warn'); return false; }
+        d.frames = Array.from({ length: n }, () => ({ delay: Math.round(1000 / fps), visible: [...others] }));
+      }
+      const times = d.frames.map((_, i) => [frameTime(d, i), frameTime(d, i + 1)] as [number, number]);
+      const lv = mouthLevels(frameLoudness(dec.buf, a.offset, times), mouths.length);
+      // cada fotograma «es» su boca: al elegirlo se edita esa boca, y la barra de animación lo trata como animación
+      d.frames.forEach((f, i) => { f.visible = f.visible.filter(id => !ms.has(id)); f.visible.push(mouths[lv[i]]); if (f.own == null || ms.has(f.own)) f.own = mouths[lv[i]]; });
+      const { applyFrame } = await import('./timeline'); applyFrame(d, 0);
+      d.commit('Sincronía labial'); app.emit('docs');
+      import('./anim').then(m => { if (!d.meta.pixelArt && !m.dockShown()) m.toggleAnimDock(); });
+      app.toast(`${d.frames.length} fotogramas sincronizados con la voz`);
+    },
+  });
+}

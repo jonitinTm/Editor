@@ -40,7 +40,10 @@ Pinceles con presión (activable), estabilizador, simetría, asistente de perspe
 | Sonido: importar, onda bajo los fotogramas, desfase y volumen, suena al reproducir y sale en el vídeo | ✅ t248 |
 | Cámara 2D: encuadre inicial y final, zoom, suavizado y temblor | ✅ t250 |
 | Huesos sobre piezas (una capa por pieza), jerarquía automática, posturas clave con interpolación, cinemática inversa de dos huesos | ✅ t251 |
-| Mallas deformables, sincronía labial automática, partículas | ⬜ |
+| Sincronía labial automática (bocas en capas según el volumen de la voz) | ✅ t253 |
+| Partículas: 11 efectos, bucle sin salto, pixel art | ✅ t252 |
+| Piezas que se doblan (curvatura a lo largo del hueso, sin rendijas; las hijas siguen la curva) | ✅ t254 |
+| Mallas libres con puntos de control | ⬜ |
 
 ## 4. Pixel art — ✅
 Píxel perfecto, cuadrícula, paletas (importar y exportar .gpl, .pal y .hex), tramas, sombreado con la paleta, rampas de color, ajustar a la paleta, contorno de 1 píxel, cambiar colores, Scale2x, rotación sin píxeles sueltos (RotSprite), degradado tramado, mosaico repetible y exportación nítida (t229–t246).
@@ -68,7 +71,7 @@ Píxel perfecto, cuadrícula, paletas (importar y exportar .gpl, .pal y .hex), t
 | Plugins | ⬜ |
 
 ## Orden de trabajo restante
-1. Mallas deformables y partículas.
+1. Mallas libres con puntos de control (deformación arbitraria de una pieza).
 2. Nube y colaboración, solo si el producto lo pide.
 
 Antes de cada fase: no romper lo que ya funciona (la batería completa de pruebas, más las pruebas al azar con ratón y con dedo) y medir en un móvil Android real con lienzos grandes.

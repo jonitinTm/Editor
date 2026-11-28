@@ -277,6 +277,11 @@ export const TOPICS: Topic[] = [
       '⟦Juegos › Animación › Exportar animación (GIF, vídeo, PNG, hoja de sprites)…⟧ saca la hoja de sprites con su JSON para el motor.',
       '⟦Juegos › Mapas, sprites e iconos › Atlas de sprites (capas a una imagen + JSON)…⟧ junta todas las capas en una imagen, y ⟦Juegos › Pixel art › Contorno de 1 píxel (sprites)…⟧ y ⟦Juegos › Pixel art › Cambiar colores del sprite (variantes)…⟧ ayudan a terminarlos.',
     ], go: { act: 'sliceSheet' }, needsDoc: true },
+    { id: 'particles', title: 'Partículas y efectos', steps: [
+      '⟦Juegos › Animación › Partículas y efectos (explosión, fuego, humo, magia…)…⟧: explosión, fuego, humo, chispas, magia, lluvia, nieve, impacto, burbujas, hojas o confeti.',
+      'Los efectos continuos (fuego, humo, lluvia…) se repiten sin salto. Cambia colores, cantidad y tamaño, o pide «Otra variante».',
+      'Con «Pixel art» salen sin bordes suaves y solo con sus colores. Expórtalos como hoja de sprites para el juego.',
+    ], go: { act: 'particles' } },
     { id: 'texdetails', title: 'Tu propia textura con detalles', steps: [
       '⟦Juegos › Texturas › Nueva textura (repetible, la dibujas tú)…⟧ crea un lienzo que se repite: lo que pintas en un borde sale por el contrario.',
       'Dibuja la base (piedras, tablas, baldosas) con el pincel o con la herramienta de píxeles.',
@@ -296,6 +301,7 @@ export const TOPICS: Topic[] = [
     { id: 'soundcam', title: 'Sonido, cámara, huesos y terrenos', steps: [
       '⟦Juegos › Animación › Sonido de la animación (voz, música, efectos)…⟧ añade una pista: suena al reproducir, se ve como onda debajo de los fotogramas y sale en el vídeo.',
       'Toca la onda para ir al fotograma de ese momento: así cuadras bocas, pasos o golpes con el sonido.',
+      'Con las bocas en capas (cerrada, medio abierta, abierta), ⟦Juegos › Animación › Sincronía labial automática (bocas según la voz)…⟧ las cambia solas según lo fuerte que suena la voz.',
       '⟦Juegos › Animación › Cámara 2D (acercar, recorrer, temblor)…⟧ mueve la cámara de un encuadre a otro, con temblor si quieres.',
       'Con el personaje por piezas (una capa por pieza), ⟦Juegos › Animación › Animar con huesos (personaje por piezas)…⟧ te deja ponerlo en postura arrastrando y crea los fotogramas de en medio.',
       'En el editor de mapas, crea un terreno con su bloque de 3 × 3 tiles y píntalo: los bordes y las esquinas se ponen solos.',

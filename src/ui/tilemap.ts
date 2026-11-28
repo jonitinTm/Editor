@@ -160,10 +160,14 @@ export function tileMapDialog() {
   const doUndo = () => { const s = undo.pop(); if (!s) return; redo.push(JSON.stringify(m)); m = JSON.parse(s); renderLayers(); renderTerr(); draw(); };
   const doRedo = () => { const s = redo.pop(); if (!s) return; undo.push(JSON.stringify(m)); m = JSON.parse(s); renderLayers(); renderTerr(); draw(); };
   const gridBtn = act('marqueeRow', 'Mostrar u ocultar la cuadrícula', () => { grid = !grid; gridBtn.classList.toggle('on', grid); draw(); }); gridBtn.classList.add('on');
+  const zoomLbl = h('span', { class: 'tm-zlbl no-i18n' }, `×${zoom}`);
+  const setZoom = (z: number) => { zoom = Math.max(1, Math.min(8, z)); zoomLbl.textContent = `×${zoom}`; draw(); };
+  const zb = (txt: string, title: string, dz: number) => { const b = h('button', { type: 'button', class: 'btn icon-btn tm-zbtn', title, 'aria-label': title }, txt); b.onclick = () => setZoom(zoom + dz); return b; };
+  const zoomBox = h('span', { class: 'tm-zoom' }, zb('−', 'Alejar', -1), zoomLbl, zb('+', 'Acercar', 1));
   const bar = h('div', { class: 'tm-bar' },
-    tb('paint', 'brush', 'Pintar tiles'), tb('erase', 'eraser', 'Borrar tiles (también con el botón derecho)'), tb('fill', 'bucket', 'Rellenar zona'), tb('rect', 'marqueeRect', 'Rectángulo de tiles'), tb('terrain', 'brush', 'Pintar terreno (los bordes y esquinas se ponen solos)'), tb('pick', 'eyedropper', 'Coger un tile del mapa (también con Alt)'),
+    tb('paint', 'brush', 'Pintar tiles'), tb('erase', 'eraser', 'Borrar tiles (también con el botón derecho)'), tb('fill', 'bucket', 'Rellenar zona'), tb('rect', 'marqueeRect', 'Rectángulo de tiles'), tb('terrain', 'terrain', 'Pintar terreno (los bordes y esquinas se ponen solos)'), tb('pick', 'eyedropper', 'Coger un tile del mapa (también con Alt)'),
     h('span', { class: 'tm-sep' }), act('undo', 'Deshacer', doUndo), act('redo', 'Rehacer', doRedo), gridBtn,
-    h('span', { class: 'tm-zoom' }, numberSlider({ min: 1, max: 8, value: zoom, unit: '×', compact: true, onInput: v => { zoom = v; draw(); } }).el));
+    zoomBox);
   toolBtns.paint.classList.add('on');
 
   // capas del mapa
