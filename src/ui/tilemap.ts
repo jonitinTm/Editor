@@ -39,8 +39,32 @@ export function floodFill(m: TileMapData, li: number, cx: number, cy: number, s:
   while (st.length) { const i = st.pop()!; if (seen[i] || L[i] !== from) continue; seen[i] = 1; L[i] = val(i); const X = i % m.cols; if (X > 0) st.push(i - 1); if (X < m.cols - 1) st.push(i + 1); if (i >= m.cols) st.push(i - m.cols); if (i < L.length - m.cols) st.push(i + m.cols); }
 }
 export function resizeMap(m: TileMapData, cols: number, rows: number) {
-  for (const l of m.layers) { const n = new Array(cols * rows).fill(EMPTY); for (let y = 0; y < Math.min(rows, m.rows); y++) for (let x = 0; x < Math.min(cols, m.cols); x++) n[y * cols + x] = l.data[y * m.cols + x]; l.data = n; }
+  const re = (a: number[]) => { const n = new Array(cols * rows).fill(EMPTY); for (let y = 0; y < Math.min(rows, m.rows); y++) for (let x = 0; x < Math.min(cols, m.cols); x++) n[y * cols + x] = a[y * m.cols + x]; return n; };
+  for (const l of m.layers) { l.data = re(l.data); if (l.terr) l.terr = re(l.terr); }
   m.cols = cols; m.rows = rows;
+}
+/** Tile de terreno para la casilla (x, y): mira qué vecinos son del mismo terreno y elige esquina, borde, centro o
+ *  rincón interior del bloque 3×3 (y 2×2 de rincones). */
+export function terrainTile(m: TileMapData, li: number, x: number, y: number): number {
+  const L = m.layers[li], T = L.terr!, me = T[y * m.cols + x], def = m.terrains?.[me]; if (me < 0 || !def) return L.data[y * m.cols + x];
+  const tc = Math.max(1, m.tsCols ?? 1), at = (c: number, r: number) => def.base + r * tc + c;
+  const same = (dx: number, dy: number) => { const X = x + dx, Y = y + dy; return X < 0 || Y < 0 || X >= m.cols || Y >= m.rows ? true : T[Y * m.cols + X] === me; };
+  const n = same(0, -1), s = same(0, 1), w = same(-1, 0), e = same(1, 0);
+  if (!n && !w) return at(0, 0); if (!n && !e) return at(2, 0); if (!s && !w) return at(0, 2); if (!s && !e) return at(2, 2);
+  if (!n) return at(1, 0); if (!s) return at(1, 2); if (!w) return at(0, 1); if (!e) return at(2, 1);
+  // todos los lados son del terreno: si falta una diagonal, rincón interior
+  if (def.inner != null) {
+    const ia = (c: number, r: number) => def.inner! + r * tc + c;
+    if (!same(-1, -1)) return ia(0, 0); if (!same(1, -1)) return ia(1, 0); if (!same(-1, 1)) return ia(0, 1); if (!same(1, 1)) return ia(1, 1);
+  }
+  return at(1, 1);
+}
+/** Pinta (o borra, con ti = -1) terreno en una casilla y recoloca las casillas de alrededor. */
+export function paintTerrain(m: TileMapData, li: number, x: number, y: number, ti: number) {
+  const L = m.layers[li]; L.terr ??= new Array(m.cols * m.rows).fill(-1);
+  if (x < 0 || y < 0 || x >= m.cols || y >= m.rows) return;
+  L.terr[y * m.cols + x] = ti; if (ti < 0) L.data[y * m.cols + x] = EMPTY;
+  for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = x + dx, Y = y + dy; if (X < 0 || Y < 0 || X >= m.cols || Y >= m.rows) continue; if (L.terr[Y * m.cols + X] >= 0) L.data[Y * m.cols + X] = terrainTile(m, li, X, Y); }
 }
 /** Mapa en formato Tiled JSON (.tmj). */
 export function toTiled(m: TileMapData, ts: HTMLCanvasElement, image = 'tileset.png') {
@@ -59,8 +83,8 @@ export function tileMapDialog() {
   const d = app.doc; if (!d) { app.toast('Abre primero la imagen con los tiles (el tileset)', 'warn'); return; }
   const ts = d.flatten();
   let m: TileMapData = d.meta.tilemap ? JSON.parse(JSON.stringify(d.meta.tilemap)) : newMap(guessTile(d), 20, 15);
-  let info = tilesetInfo(ts, m.tile), layer = Math.min(1, m.layers.length - 1), tool = 'paint', grid = true, zoom = Math.max(1, Math.min(4, Math.floor(480 / (m.cols * m.tile)) || 1));
-  let stamp: Stamp = { w: 1, h: 1, ids: [0] };
+  let info = tilesetInfo(ts, m.tile); m.tsCols = info.cols; let layer = Math.min(1, m.layers.length - 1), tool = 'paint', grid = true, zoom = Math.max(1, Math.min(4, Math.floor(480 / (m.cols * m.tile)) || 1));
+  let stamp: Stamp = { w: 1, h: 1, ids: [0] }, terr = 0;
   const undo: string[] = [], redo: string[] = [];
   const snap = () => { undo.push(JSON.stringify(m)); if (undo.length > 80) undo.shift(); redo.length = 0; };
 
@@ -107,7 +131,9 @@ export function tileMapDialog() {
     if (!inside(c)) return;
     if (tool === 'paint') stampAt(m, layer, c.x, c.y, stamp);
     else if (tool === 'erase') stampAt(m, layer, c.x, c.y, { w: 1, h: 1, ids: [EMPTY] }, true);
+    else if (tool === 'terrain' && m.terrains?.[terr]) paintTerrain(m, layer, c.x, c.y, terr);
   };
+  const eraseAt = (c: { x: number; y: number }) => { if (tool === 'terrain') paintTerrain(m, layer, c.x, c.y, -1); else stampAt(m, layer, c.x, c.y, { w: 1, h: 1, ids: [EMPTY] }, true); };
   mc.onpointerdown = e => {
     const c = cell(e); if (!inside(c)) return; mc.setPointerCapture(e.pointerId);
     const erase = tool === 'erase' || e.button === 2;
@@ -115,9 +141,10 @@ export function tileMapDialog() {
     snap();
     if (tool === 'fill') { floodFill(m, layer, c.x, c.y, stamp, erase); draw(); return; }
     if (tool === 'rect') { rectFrom = c; draw(); return; }
-    painting = true; if (erase) stampAt(m, layer, c.x, c.y, { w: 1, h: 1, ids: [EMPTY] }, true); else apply(c); draw();
+    if (tool === 'terrain' && !m.terrains?.length) { app.toast('Primero crea un terreno: arrastra en el tileset sobre su bloque de 3 × 3 tiles y pulsa «Crear terreno»', 'warn'); return; }
+    painting = true; if (erase) eraseAt(c); else apply(c); draw();
   };
-  mc.onpointermove = e => { const c = cell(e); hover = inside(c) ? c : null; if (painting && hover) { if (e.buttons === 2) stampAt(m, layer, c.x, c.y, { w: 1, h: 1, ids: [EMPTY] }, true); else apply(c); } draw(); };
+  mc.onpointermove = e => { const c = cell(e); hover = inside(c) ? c : null; if (painting && hover) { if (e.buttons === 2) eraseAt(c); else apply(c); } draw(); };
   mc.onpointerup = e => {
     if (rectFrom) { const c = cell(e), a = rectFrom, x0 = Math.max(0, Math.min(a.x, c.x)), y0 = Math.max(0, Math.min(a.y, c.y)), x1 = Math.min(m.cols - 1, Math.max(a.x, c.x)), y1 = Math.min(m.rows - 1, Math.max(a.y, c.y)); for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) m.layers[layer].data[y * m.cols + x] = stamp.ids[((y - y0) % stamp.h) * stamp.w + (x - x0) % stamp.w]; rectFrom = null; }
     painting = false; draw();
@@ -127,14 +154,14 @@ export function tileMapDialog() {
 
   // barra de herramientas
   const toolBtns: Record<string, HTMLElement> = {};
-  const setTool = (t: string) => { tool = t; for (const k in toolBtns) toolBtns[k].classList.toggle('on', k === t); draw(); };
+  const setTool = (tl: string) => { tool = tl; for (const k in toolBtns) toolBtns[k].classList.toggle('on', k === tl); terrEl?.querySelectorAll('.tm-layer').forEach((x, i) => x.classList.toggle('on', tl === 'terrain' && i === terr)); draw(); };
   const tb = (id: string, ic: string, title: string) => { const b = h('button', { type: 'button', class: 'btn icon-btn', title, 'aria-label': title, html: icon(ic) }); b.onclick = () => setTool(id); toolBtns[id] = b; return b; };
   const act = (ic: string, title: string, fn: () => void) => { const b = h('button', { type: 'button', class: 'btn icon-btn', title, 'aria-label': title, html: icon(ic) }); b.onclick = fn; return b; };
-  const doUndo = () => { const s = undo.pop(); if (!s) return; redo.push(JSON.stringify(m)); m = JSON.parse(s); renderLayers(); draw(); };
-  const doRedo = () => { const s = redo.pop(); if (!s) return; undo.push(JSON.stringify(m)); m = JSON.parse(s); renderLayers(); draw(); };
+  const doUndo = () => { const s = undo.pop(); if (!s) return; redo.push(JSON.stringify(m)); m = JSON.parse(s); renderLayers(); renderTerr(); draw(); };
+  const doRedo = () => { const s = redo.pop(); if (!s) return; undo.push(JSON.stringify(m)); m = JSON.parse(s); renderLayers(); renderTerr(); draw(); };
   const gridBtn = act('marqueeRow', 'Mostrar u ocultar la cuadrícula', () => { grid = !grid; gridBtn.classList.toggle('on', grid); draw(); }); gridBtn.classList.add('on');
   const bar = h('div', { class: 'tm-bar' },
-    tb('paint', 'brush', 'Pintar tiles'), tb('erase', 'eraser', 'Borrar tiles (también con el botón derecho)'), tb('fill', 'bucket', 'Rellenar zona'), tb('rect', 'marqueeRect', 'Rectángulo de tiles'), tb('pick', 'eyedropper', 'Coger un tile del mapa (también con Alt)'),
+    tb('paint', 'brush', 'Pintar tiles'), tb('erase', 'eraser', 'Borrar tiles (también con el botón derecho)'), tb('fill', 'bucket', 'Rellenar zona'), tb('rect', 'marqueeRect', 'Rectángulo de tiles'), tb('terrain', 'brush', 'Pintar terreno (los bordes y esquinas se ponen solos)'), tb('pick', 'eyedropper', 'Coger un tile del mapa (también con Alt)'),
     h('span', { class: 'tm-sep' }), act('undo', 'Deshacer', doUndo), act('redo', 'Rehacer', doRedo), gridBtn,
     h('span', { class: 'tm-zoom' }, numberSlider({ min: 1, max: 8, value: zoom, unit: '×', compact: true, onInput: v => { zoom = v; draw(); } }).el));
   toolBtns.paint.classList.add('on');
@@ -151,10 +178,30 @@ export function tileMapDialog() {
   };
   renderLayers();
 
+  // terrenos automáticos
+  const terrEl = h('div', { class: 'tm-terrains' });
+  const renderTerr = () => {
+    const list = (m.terrains ?? []).map((tr, ti) => {
+      const th = h('canvas', { class: 'tm-tthumb', width: 3 * m.tile, height: 3 * m.tile }) as HTMLCanvasElement, tx = ctx2d(th); tx.imageSmoothingEnabled = false;
+      for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) { const id = tr.base + r * info.cols + c; tx.drawImage(ts, (id % info.cols) * m.tile, Math.floor(id / info.cols) * m.tile, m.tile, m.tile, c * m.tile, r * m.tile, m.tile, m.tile); }
+      const del = act('trash', 'Borrar el terreno', () => { snap(); m.terrains!.splice(ti, 1); for (const l of m.layers) if (l.terr) l.terr = l.terr.map(v => v === ti ? -1 : v > ti ? v - 1 : v); terr = 0; renderTerr(); draw(); });
+      const it = h('div', { class: 'tm-layer' + (ti === terr && tool === 'terrain' ? ' on' : '') }, th, h('span', { class: 'tm-lname no-i18n' }, tr.name + (tr.inner != null ? ' +' : '')), del);
+      it.onclick = e => { if ((e.target as HTMLElement).closest('button')) return; terr = ti; setTool('terrain'); renderTerr(); };
+      return it;
+    });
+    const mk = h('button', { type: 'button', class: 'btn' }, 'Crear terreno'); mk.title = 'Arrastra antes en el tileset sobre el bloque de 3 × 3 tiles: esquinas, bordes y centro';
+    mk.onclick = () => { if (stamp.w !== 3 || stamp.h !== 3) { app.toast('Arrastra en el tileset sobre un bloque de 3 × 3 tiles (esquinas, bordes y centro)', 'warn'); return; } snap(); (m.terrains ??= []).push({ name: `${t('Terreno')} ${m.terrains.length + 1}`, base: stamp.ids[0] }); terr = m.terrains.length - 1; setTool('terrain'); renderTerr(); };
+    const inn = h('button', { type: 'button', class: 'btn' }, 'Rincones interiores'); inn.title = 'Opcional: arrastra en el tileset sobre el bloque de 2 × 2 de rincones interiores (arriba-izquierda, arriba-derecha, abajo-izquierda, abajo-derecha)';
+    inn.onclick = () => { const tr = m.terrains?.[terr]; if (!tr) { app.toast('Crea antes el terreno', 'warn'); return; } if (stamp.w !== 2 || stamp.h !== 2) { app.toast('Arrastra en el tileset sobre un bloque de 2 × 2 tiles', 'warn'); return; } snap(); tr.inner = stamp.ids[0]; relayTerrain(); renderTerr(); draw(); };
+    terrEl.replaceChildren(h('div', { class: 'tm-sub' }, t('Terrenos automáticos')), ...list, h('div', { class: 'tm-lbtns' }, mk, inn));
+  };
+  const relayTerrain = () => { for (let li = 0; li < m.layers.length; li++) { const L = m.layers[li]; if (!L.terr) continue; for (let y = 0; y < m.rows; y++) for (let x = 0; x < m.cols; x++) if (L.terr[y * m.cols + x] >= 0) L.data[y * m.cols + x] = terrainTile(m, li, x, y); } };
+  renderTerr();
+
   // tamaño del mapa y de los tiles
   const tileSel = h('select', { title: 'Tamaño de cada tile del tileset' }, ...[8, 12, 16, 24, 32, 48, 64, 128].map(n => h('option', { value: String(n) }, `${n} px`))) as HTMLSelectElement; tileSel.value = String(m.tile);
   if (!tileSel.value) { tileSel.append(h('option', { value: String(m.tile) }, `${m.tile} px`)); tileSel.value = String(m.tile); }
-  tileSel.onchange = () => { m.tile = +tileSel.value; info = tilesetInfo(ts, m.tile); stamp = { w: 1, h: 1, ids: [0] }; drawTs(); draw(); };
+  tileSel.onchange = () => { m.tile = +tileSel.value; info = tilesetInfo(ts, m.tile); m.tsCols = info.cols; stamp = { w: 1, h: 1, ids: [0] }; drawTs(); draw(); };
   const colsIn = h('input', { type: 'number', min: '1', max: '512', value: String(m.cols), class: 'input tm-num', 'aria-label': 'Columnas' }) as HTMLInputElement;
   const rowsIn = h('input', { type: 'number', min: '1', max: '512', value: String(m.rows), class: 'input tm-num', 'aria-label': 'Filas' }) as HTMLInputElement;
   const resize = () => { const c = Math.max(1, Math.min(512, Math.round(+colsIn.value || 1))), r = Math.max(1, Math.min(512, Math.round(+rowsIn.value || 1))); if (c === m.cols && r === m.rows) return; snap(); resizeMap(m, c, r); draw(); };
@@ -180,13 +227,13 @@ export function tileMapDialog() {
     app.addDocument(nd, 'Mapa de tiles'); requestAnimationFrame(() => app.viewport.fit());
   };
   const wrap = h('div', { class: 'tm-wrap', tabindex: '0' },
-    h('div', { class: 'tm-left' }, h('div', { class: 'form-row' }, h('label', {}, 'Tamaño del tile'), tileSel), h('div', { class: 'tm-ts-wrap' }, tsc), h('div', { class: 'hint' }, 'Toca un tile o arrastra para coger un bloque (un árbol, una casa…).'), layersEl),
+    h('div', { class: 'tm-left' }, h('div', { class: 'form-row' }, h('label', {}, 'Tamaño del tile'), tileSel), h('div', { class: 'tm-ts-wrap' }, tsc), h('div', { class: 'hint' }, 'Toca un tile o arrastra para coger un bloque (un árbol, una casa…).'), layersEl, terrEl),
     h('div', { class: 'tm-right' }, bar, h('div', { class: 'tm-map-wrap' }, mc), h('div', { class: 'tm-size' }, h('label', {}, 'Columnas'), colsIn, h('label', {}, 'Filas'), rowsIn), status));
   wrap.addEventListener('keydown', e => {
     const k = e.key.toLowerCase();
     if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); e.stopPropagation(); e.shiftKey ? doRedo() : doUndo(); }
     else if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); e.stopPropagation(); doRedo(); }
-    else if (!e.ctrlKey && !e.metaKey && !e.altKey) { const map: Record<string, string> = { b: 'paint', e: 'erase', g: 'fill', u: 'rect', i: 'pick' }; if (map[k]) { e.preventDefault(); e.stopPropagation(); setTool(map[k]); } }
+    else if (!e.ctrlKey && !e.metaKey && !e.altKey) { const map: Record<string, string> = { b: 'paint', e: 'erase', g: 'fill', u: 'rect', i: 'pick', t: 'terrain' }; if (map[k]) { e.preventDefault(); e.stopPropagation(); setTool(map[k]); } }
   });
   const exp = h('button', { type: 'button', class: 'btn' }, 'Exportar mapa…'); exp.onclick = () => { save(); exportZip(); };
   const img = h('button', { type: 'button', class: 'btn' }, 'Crear imagen del mapa'); img.onclick = toImage;

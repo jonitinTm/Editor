@@ -124,6 +124,7 @@ export const ICONS: Record<string, string> = {
   onion: S('<rect x="3" y="7" width="12" height="12" rx="2" stroke-dasharray="2 2" opacity=".6"/><rect x="9" y="3" width="12" height="12" rx="2"/>'),
   palette: S('<path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.3 0 1.9-.9 1.6-1.9-.3-1.1.4-2.1 1.6-2.1H17a3.5 3.5 0 0 0 3.5-3.5c0-5.3-3.8-9.5-8.5-9.5z"/><circle cx="7.5" cy="11" r="1.1"/><circle cx="10" cy="7.3" r="1.1"/><circle cx="14.5" cy="7.3" r="1.1"/><circle cx="17" cy="11" r="1.1"/>'),
   gamepad: S('<path d="M7 8h10a4 4 0 0 1 4 4v1.5a3.5 3.5 0 0 1-6.3 2.1L14 14.7h-4l-.7.9A3.5 3.5 0 0 1 3 13.5V12a4 4 0 0 1 4-4z"/><path d="M8 10.5v3M6.5 12h3"/><circle cx="15.5" cy="11" r=".8"/><circle cx="17.3" cy="12.8" r=".8"/>'),
+  music: S('<path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>'),
   film: S('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"/>'),
   chevronLeft: S('<path d="M15 6l-6 6 6 6"/>'),
   teeth: S('<path d="M4 8c0-2 2-3 8-3s8 1 8 3c0 3-1 8-2.5 10-1 1.2-2.2.4-2.5-1L14 14h-4l-1 3c-.3 1.4-1.5 2.2-2.5 1C5 16 4 11 4 8z"/>'),

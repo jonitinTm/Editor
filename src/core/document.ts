@@ -1,4 +1,4 @@
-export type TileMapData = { tile: number; cols: number; rows: number; layers: { name: string; data: number[]; visible?: boolean }[] };
+export type TileMapData = { tile: number; cols: number; rows: number; layers: { name: string; data: number[]; visible?: boolean; /** terreno de cada casilla (-1 ninguno) */ terr?: number[] }[]; /** terrenos automáticos: bloque 3×3 (esquinas, bordes, centro) y, opcional, 2×2 de rincones interiores */ terrains?: { name: string; base: number; inner?: number }[]; /** columnas del tileset (para los bloques de terreno) */ tsCols?: number };
 // Documento: tamaño, árbol de capas, selección, guías, historial y vista.
 import { tName } from '../i18n/i18n';
 

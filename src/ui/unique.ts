@@ -170,20 +170,33 @@ export function timelapseDialog() {
     } });
 }
 /** Graba unos cuadros como vídeo con el grabador del navegador (WebM; MP4 en Safari). */
-export async function recordFrames(frames: { canvas: HTMLCanvasElement; delay: number }[], base: string) {
+export async function recordFrames(frames: { canvas: HTMLCanvasElement; delay: number }[], base: string, audio?: { buffer: AudioBuffer; offset: number; volume: number } | null, doneMsg?: string) {
   const mime = typeof MediaRecorder === 'undefined' ? null : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4;codecs=avc1', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m));
   const c = makeCanvas(frames[0].canvas.width, frames[0].canvas.height), x = ctx2d(c);
   if (!mime || typeof (c as any).captureStream !== 'function') { app.toast('Este navegador no graba vídeo: usa GIF', 'warn'); return; }
   const stream = (c as any).captureStream(0) as MediaStream, track = stream.getVideoTracks()[0] as any;
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 }), chunks: Blob[] = [];
+  // sonido: se reproduce en una salida que se mezcla en la grabación
+  let actx: AudioContext | null = null, src: AudioBufferSourceNode | null = null;
+  if (audio) {
+    try {
+      actx = new AudioContext(); const dest = actx.createMediaStreamDestination(), g = actx.createGain(); g.gain.value = audio.volume;
+      src = actx.createBufferSource(); src.buffer = audio.buffer; src.connect(g); g.connect(dest);
+      for (const t of dest.stream.getAudioTracks()) stream.addTrack(t);
+    } catch { actx = null; src = null; }
+  }
+  // con sonido hace falta un formato que admita audio (vp9/vp8 con opus, o mp4 con aac)
+  const amime = actx ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m)) ?? mime : mime;
+  const rec = new MediaRecorder(stream, { mimeType: amime, videoBitsPerSecond: 6_000_000 }), chunks: Blob[] = [];
   rec.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   const done = new Promise<void>(r => { rec.onstop = () => r(); });
   app.toast('Grabando el vídeo…'); rec.start();
+  if (src && actx) { await actx.resume().catch(() => {}); const off = audio!.offset / 1000; if (off >= 0) src.start(actx.currentTime + off); else src.start(0, -off); }
   for (const f of frames) { x.drawImage(f.canvas, 0, 0); track.requestFrame?.(); await new Promise(r => setTimeout(r, f.delay)); }
   rec.stop(); await done;
-  const mp4 = mime.startsWith('video/mp4'), io = await import('../io/files');
+  try { src?.stop(); } catch { /* ya había terminado */ } actx?.close().catch(() => {});
+  const mp4 = amime.startsWith('video/mp4'), io = await import('../io/files');
   await io.saveBlob(new Blob(chunks, { type: mp4 ? 'video/mp4' : 'video/webm' }), base + (mp4 ? '.mp4' : '.webm'));
-  app.toast(`Timelapse guardado (${frames.length} pasos)`);
+  app.toast(doneMsg ?? `Timelapse guardado (${frames.length} pasos)`);
 }
 
 // ---- Exportar para redes sociales -------------------------------------------------------------------

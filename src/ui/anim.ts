@@ -23,7 +23,7 @@ const refresh = () => listeners.forEach(f => f());
 // ---- reproducción -----------------------------------------------------------------------------
 let playTimer = 0;
 export const isPlaying = () => !!playTimer;
-export function stopAnim() { if (playTimer) { clearTimeout(playTimer); playTimer = 0; refresh(); } }
+export function stopAnim() { if (playTimer) { clearTimeout(playTimer); playTimer = 0; import('./animaudio').then(m => m.stopAudio()); refresh(); } }
 export type PlayMode = 'loop' | 'pingpong' | 'reverse' | 'once' | 'tag';
 const PLAY_KEY = 'editor.playMode';
 export function playMode(): PlayMode { try { return (localStorage.getItem(PLAY_KEY) as PlayMode) || 'loop'; } catch { return 'loop'; } }
@@ -51,11 +51,16 @@ export function playAnim() {
   let dir = 1;
   const mode = playMode();
   if (mode === 'once') { const [a, b] = playRange(d, mode); if (d.frameIndex >= b) applyFrame(d, a); }
+  // el sonido acompaña cuando se reproduce hacia delante
+  const withSound = mode === 'loop' || mode === 'once' || mode === 'tag', au = withSound && (d.meta as any).audio ? import('./animaudio') : null;
+  au?.then(m => m.playAudioAt(d, d.frameIndex));
   const tick = () => {
     const dd = app.doc; if (!dd || dd !== d || dd.frames.length < 2 || (app.viewport as any).toolActive) { playTimer = 0; refresh(); return; }
     const [a, b] = playRange(dd, mode), i = Math.min(b, Math.max(a, dd.frameIndex)), nx = nextFrame(i, a, b, mode, dir);
-    if (!nx) { playTimer = 0; refresh(); return; }
+    if (!nx) { playTimer = 0; au?.then(m => m.stopAudio()); refresh(); return; }
+    const wrapped = nx[0] < i && mode !== 'reverse' && mode !== 'pingpong';
     dir = nx[1]; applyFrame(dd, nx[0]);
+    if (wrapped) au?.then(m => m.playAudioAt(dd, nx[0]));
     playTimer = window.setTimeout(tick, dd.frames[dd.frameIndex]?.delay ?? 125);
   };
   playTimer = window.setTimeout(tick, d.frames[d.frameIndex]?.delay ?? 125);
@@ -209,7 +214,7 @@ export function onionImage(d: EditorDocument): HTMLCanvasElement | null {
 }
 
 // ---- interpolar movimiento ----------------------------------------------------------------------
-const EASE: Record<string, (t: number) => number> = {
+export const EASE: Record<string, (t: number) => number> = {
   linear: t => t, smooth: t => t * t * (3 - 2 * t), in: t => t * t, out: t => 1 - (1 - t) * (1 - t),
   bounce: t => { const n = 7.5625, d = 2.75; if (t < 1 / d) return n * t * t; if (t < 2 / d) return n * (t -= 1.5 / d) * t + 0.75; if (t < 2.5 / d) return n * (t -= 2.25 / d) * t + 0.9375; return n * (t -= 2.625 / d) * t + 0.984375; },
   back: t => { const c = 1.70158; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); },
@@ -298,7 +303,7 @@ export async function exportAnimation(d: EditorDocument, fmt: string, k: number,
   const png = async (c: HTMLCanvasElement) => new Uint8Array(await (await new Promise<Blob>(r => c.toBlob(b => r(b!), 'image/png'))).arrayBuffer());
   const save = async (b: Blob, name: string) => { try { await io.saveBlob(b, name); app.toast('Exportado'); } catch (e: any) { if (e?.name !== 'AbortError') app.toast('No se pudo exportar: ' + (e?.message ?? e), 'warn'); } };
   if (fmt === 'gif') { const { encodeGif } = await import('../io/gif'); await save(encodeGif(fr), base + '.gif'); return; }
-  if (fmt === 'video') { const { recordFrames } = await import('./unique'); await recordFrames(fr, base); return; }
+  if (fmt === 'video') { const { recordFrames } = await import('./unique'), au = pingpong ? null : await (await import('./animaudio')).audioForExport(d); await recordFrames(fr, base, au, au ? 'Vídeo con sonido guardado' : 'Vídeo guardado'); return; }
   const { makeZip } = await import('../io/zip');
   if (fmt === 'png') { const files = []; for (let i = 0; i < fr.length; i++) files.push({ name: `${d.name}_${String(i + 1).padStart(3, '0')}.png`, data: await png(fr[i].canvas) }); await save(makeZip(files), base + '_fotogramas.zip'); return; }
   // hoja de sprites: rejilla casi cuadrada + JSON con el formato de Aseprite (lo leen Godot, Phaser, Unity con plugins, Defold…)
@@ -344,6 +349,13 @@ export function exportAnimDialog() {
 const FPS = [2, 4, 6, 8, 10, 12, 15, 24, 30];
 /** Fila de controles de la animación (la usan la barra del pixel art y la barra general). */
 export function animRow(d: EditorDocument): HTMLElement {
+  const row = animRowInner(d);
+  if (!(d.meta as any).audio) return row;
+  const wrap = h('div', { class: 'px-anim-wrap' }, row);
+  import('./animaudio').then(m => { const st = m.audioStrip(d, i => { stopAnim(); applyFrame(d, i); }); if (st) wrap.append(st); });
+  return wrap;
+}
+function animRowInner(d: EditorDocument): HTMLElement {
   const b = (cls: string, title: string, ic: string, fn: () => void, on = false) => { const x = h('button', { type: 'button', class: 'btn icon-btn ' + cls + (on ? ' on' : ''), title, 'aria-label': title, html: icon(ic) }); x.onclick = fn; return x; };
   const play = b('px-play', playTimer ? 'Detener' : 'Reproducir', playTimer ? 'stop' : 'play', () => playAnim(), !!playTimer);
   const strip = h('div', { class: 'px-frames' });
@@ -376,6 +388,7 @@ export function animRow(d: EditorDocument): HTMLElement {
     b('px-onion', 'Papel cebolla: ver el fotograma anterior en transparencia', 'onion', () => { onion.on = !onion.on; refresh(); }, onion.on),
     om, hl, fps, pm,
     b('px-tween', 'Interpolar movimiento (crea los fotogramas intermedios)', 'move', () => tweenDialog()),
+    b('px-sound' + ((d.meta as any).audio ? ' on' : ''), (d.meta as any).audio ? 'Sonido de la animación (desfase, volumen, quitar)' : 'Añadir sonido (voz, música, efectos) para sincronizar', 'music', () => { import('./animaudio').then(m => m.audioDialog()); }),
     b('px-test', 'Probar animación (a tamaño real, sobre distintos fondos)', 'eye', () => previewDialog()),
     b('px-animexp', 'Exportar animación (GIF, vídeo, PNG, hoja de sprites)', 'download', () => exportAnimDialog()));
 }

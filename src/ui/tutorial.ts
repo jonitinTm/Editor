@@ -293,6 +293,13 @@ export const TOPICS: Topic[] = [
       '⟦Juegos › Pixel art › Ajustar a la paleta (con tramado)…⟧ convierte cualquier dibujo o foto a los colores de tu paleta.',
       '⟦Juegos › Pixel art › Degradado tramado…⟧ hace cielos y luces con pocos colores, y ⟦Juegos › Pixel art › Ampliar pixel art (nítido o Scale2x)…⟧ cambia el tamaño sin emborronar.',
     ], go: { act: 'colorRamp' } },
+    { id: 'soundcam', title: 'Sonido, cámara, huesos y terrenos', steps: [
+      '⟦Juegos › Animación › Sonido de la animación (voz, música, efectos)…⟧ añade una pista: suena al reproducir, se ve como onda debajo de los fotogramas y sale en el vídeo.',
+      'Toca la onda para ir al fotograma de ese momento: así cuadras bocas, pasos o golpes con el sonido.',
+      '⟦Juegos › Animación › Cámara 2D (acercar, recorrer, temblor)…⟧ mueve la cámara de un encuadre a otro, con temblor si quieres.',
+      'Con el personaje por piezas (una capa por pieza), ⟦Juegos › Animación › Animar con huesos (personaje por piezas)…⟧ te deja ponerlo en postura arrastrando y crea los fotogramas de en medio.',
+      'En el editor de mapas, crea un terreno con su bloque de 3 × 3 tiles y píntalo: los bordes y las esquinas se ponen solos.',
+    ], go: { act: 'animSound' }, needsDoc: true },
     { id: 'social', title: 'Fotos para redes sociales', steps: [
       '⟦Imagen › Para redes sociales › Tamaño para todas las redes (Instagram, TikTok, YouTube…)…⟧ adapta la foto a la vez a publicación, historia, miniatura, portada…',
       '⟦Imagen › Para redes sociales › Carrusel panorámico para Instagram…⟧ parte una panorámica en fotos seguidas.',

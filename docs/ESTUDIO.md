@@ -37,9 +37,10 @@ Pinceles con presión (activable), estabilizador, simetría, asistente de perspe
 | Reproducir en bucle, ida y vuelta, al revés, una vez o solo esta animación | ✅ t247 |
 | Probador a tamaño real sobre distintos fondos | ✅ t247 |
 | Exportar GIF, vídeo, PNG y hoja de sprites + JSON de Aseprite | ✅ t242 |
-| Importar audio para sincronizar | ⬜ fase siguiente: pista de audio que suena al reproducir y se mezcla en el vídeo |
-| Cámara 2D (zoom y desplazamiento animados) | ⬜ |
-| Huesos, mallas, cinemática inversa, sincronía labial, partículas | ⬜ fase avanzada: es un motor aparte (como Spine) y se hará sobre capas recortadas con un esqueleto propio |
+| Sonido: importar, onda bajo los fotogramas, desfase y volumen, suena al reproducir y sale en el vídeo | ✅ t248 |
+| Cámara 2D: encuadre inicial y final, zoom, suavizado y temblor | ✅ t250 |
+| Huesos sobre piezas (una capa por pieza), jerarquía automática, posturas clave con interpolación, cinemática inversa de dos huesos | ✅ t251 |
+| Mallas deformables, sincronía labial automática, partículas | ⬜ |
 
 ## 4. Pixel art — ✅
 Píxel perfecto, cuadrícula, paletas (importar y exportar .gpl, .pal y .hex), tramas, sombreado con la paleta, rampas de color, ajustar a la paleta, contorno de 1 píxel, cambiar colores, Scale2x, rotación sin píxeles sueltos (RotSprite), degradado tramado, mosaico repetible y exportación nítida (t229–t246).
@@ -55,7 +56,7 @@ Píxel perfecto, cuadrícula, paletas (importar y exportar .gpl, .pal y .hex), t
 | Pivote y cajas de colisión por fotograma, en el JSON | ✅ t247 |
 | Interfaz del juego: botones (4 estados), barras de vida, paneles, corazones | ✅ t247 |
 | Iconos para todas las tiendas | ✅ t243 |
-| Autotiles o terrenos (bordes automáticos) | ⬜ |
+| Terrenos automáticos (bloque 3×3 + rincones 2×2) | ✅ t249 |
 | Exportación directa de escenas para Godot o Unity (.tscn, prefab) | ⬜ por ahora: JSON, .tmj y PNG, que los dos importan |
 
 ## 6. Comunes
@@ -67,10 +68,7 @@ Píxel perfecto, cuadrícula, paletas (importar y exportar .gpl, .pal y .hex), t
 | Plugins | ⬜ |
 
 ## Orden de trabajo restante
-1. Audio en la animación.
-2. Cámara 2D.
-3. Autotiles.
-4. Esqueleto 2D: huesos sobre capas, cinemática inversa sencilla y exportación de los fotogramas resultantes.
-5. Nube y colaboración, solo si el producto lo pide.
+1. Mallas deformables y partículas.
+2. Nube y colaboración, solo si el producto lo pide.
 
 Antes de cada fase: no romper lo que ya funciona (la batería completa de pruebas, más las pruebas al azar con ratón y con dedo) y medir en un móvil Android real con lienzos grandes.
